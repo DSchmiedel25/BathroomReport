@@ -40,7 +40,6 @@
 </style>
 </head>
 <body>
-<div id="pullIndicator" style="position:fixed;top:-60px;left:0;right:0;text-align:center;padding:14px;background:#262626;color:#f5a623;font-size:14px;font-weight:600;transition:top 0.2s ease;z-index:9999;border-bottom:2px solid #f5a623;">⬇️ Pull down to refresh</div>
 <h1>🔧 Stewart's Bathroom Report — Admin</h1>
 <p class="sub">Read-only summary of all ratings and tips. This page is not password-protected — anyone with this exact URL can view it, so don't link to it publicly.</p>
 
@@ -562,53 +561,10 @@ document.getElementById('missingBody').addEventListener('click', async (e) => {
 
 loadAll();
 
-// Custom pull-to-refresh — regular web pages don't get this natively, so we simulate it
-(function(){
-  const indicator = document.getElementById('pullIndicator');
-  const PULL_THRESHOLD = 70;
-  const MAX_PULL = 100;
-  let touchStartY = 0;
-  let pulling = false;
-  let refreshing = false;
-
-  document.addEventListener('touchstart', (e) => {
-    if(window.scrollY === 0 && !refreshing){
-      touchStartY = e.touches[0].clientY;
-      pulling = true;
-    } else {
-      pulling = false;
-    }
-  }, { passive: true });
-
-  document.addEventListener('touchmove', (e) => {
-    if(!pulling || refreshing) return;
-    const diff = e.touches[0].clientY - touchStartY;
-    if(diff > 0 && window.scrollY === 0){
-      const pull = Math.min(diff, MAX_PULL);
-      indicator.style.top = (pull - 60) + 'px';
-      indicator.textContent = pull > PULL_THRESHOLD ? '🔄 Release to refresh' : '⬇️ Pull down to refresh';
-    }
-  }, { passive: true });
-
-  document.addEventListener('touchend', async () => {
-    if(!pulling || refreshing) return;
-    pulling = false;
-    const currentTop = parseInt(indicator.style.top || '-60', 10);
-    if(currentTop + 60 > PULL_THRESHOLD){
-      refreshing = true;
-      indicator.textContent = '🔄 Refreshing...';
-      indicator.style.top = '0px';
-      await loadAll();
-      indicator.textContent = '✅ Updated!';
-      setTimeout(() => {
-        indicator.style.top = '-60px';
-        refreshing = false;
-      }, 700);
-    } else {
-      indicator.style.top = '-60px';
-    }
-  });
-})();
+// Periodic auto-refresh every 15 minutes, so data stays current without manual reloads
+setInterval(() => {
+  loadAll();
+}, 15 * 60 * 1000);
 </script>
 </body>
 </html>
