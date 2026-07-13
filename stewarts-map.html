@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stewart's Shops Tracker</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, increment
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDMu-9NYeqvBD4Mbp2jctoAF89raE7p8UM",
+    authDomain: "stewarts-map.firebaseapp.com",
+    projectId: "stewarts-map",
+    storageBucket: "stewarts-map.firebasestorage.app",
+    messagingSenderId: "1024042855550",
+    appId: "1:1024042855550:web:02120ef818d67c57e17c2f",
+    measurementId: "G-Q63YXL8XVY"
+  };
+
+  const fbApp = initializeApp(firebaseConfig);
+  const db = getFirestore(fbApp);
+
+  // Expose just what the rest of the (non-module) page script needs
+  window.__fb = { db, doc, getDoc, setDoc, increment };
+</script>
+<style>
+  :root{
+    --charcoal:#1c1c1e; --amber:#f5a623; --cream:#fdf6e9; --green:#2f6b3c;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--charcoal);color:var(--cream);}
+  #header{
+    padding:14px 16px 10px;background:linear-gradient(180deg,#161616,#1c1c1e);
+    border-bottom:2px solid var(--amber);
+  }
+  #header h1{margin:0;font-size:19px;letter-spacing:.3px;}
+  #header p{margin:4px 0 0;font-size:12.5px;color:#c9c2b3;}
+  #map{position:absolute;top:76px;bottom:0;left:0;right:0;}
+  .leaflet-popup-content-wrapper{background:#fffaf0;border-radius:10px;}
+  .popup-inner{min-width:220px;font-size:13px;}
+  .popup-inner h3{margin:0 0 4px;font-size:15px;color:#1c1c1e;}
+  .popup-inner .addr{color:#666;font-size:11.5px;margin-bottom:8px;}
+  .rating-row{margin:6px 0;}
+  .rating-label{font-weight:600;font-size:12px;color:#333;display:block;margin-bottom:2px;}
+  .stars{font-size:20px;letter-spacing:2px;cursor:pointer;}
+  .stars span{cursor:pointer;color:#ddd;transition:color .1s;}
+  .stars span.filled{color:var(--amber);}
+  .save-note{font-size:11px;color:#2f6b3c;margin-top:4px;height:14px;}
+  #addBtn{
+    position:absolute;bottom:20px;right:16px;z-index:500;
+    background:var(--amber);color:#1c1c1e;border:none;border-radius:50px;
+    padding:13px 18px;font-weight:700;font-size:14px;box-shadow:0 3px 10px rgba(0,0,0,.4);
+    cursor:pointer;
+  }
+  #addModal{
+    position:absolute;inset:0;z-index:1000;background:rgba(0,0,0,.55);
+    display:none;align-items:center;justify-content:center;
+  }
+  #addModal.open{display:flex;}
+  #addModalBox{
+    background:#fffaf0;color:#1c1c1e;border-radius:12px;padding:18px;width:80%;max-width:320px;
+    box-shadow:0 8px 30px rgba(0,0,0,.5);
+  }
+  #addModalBox h3{margin:0 0 10px;font-size:16px;}
+  #addModalBox input{
+    width:100%;padding:9px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;box-sizing:border-box;
+    margin-bottom:12px;
+  }
+  #addModalBox .btnrow{display:flex;gap:8px;justify-content:flex-end;}
+  #addModalBox button{
+    padding:8px 14px;border-radius:6px;border:none;font-weight:600;font-size:13px;cursor:pointer;
+  }
+  #addModalCancel{background:#e0e0e0;color:#333;}
+  #addModalSave{background:var(--amber);color:#1c1c1e;}
+  #legend{
+    position:absolute;top:84px;left:10px;z-index:500;background:rgba(28,28,30,.9);
+    padding:8px 10px;border-radius:8px;font-size:11px;line-height:1.6;border:1px solid #444;
+  }
+  #searchBox{
+    position:absolute;top:84px;right:10px;z-index:500;
+    display:flex;align-items:center;background:rgba(28,28,30,.92);border:1px solid #444;
+    border-radius:8px;padding:4px 8px;max-width:52%;
+  }
+  #searchInput{
+    background:transparent;border:none;color:var(--cream);font-size:13px;padding:5px 4px;
+    outline:none;width:100%;
+  }
+  #searchInput::placeholder{color:#aaa;}
+  #searchClear{
+    background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;padding:0 4px;line-height:1;
+  }
+  #searchCount{
+    position:absolute;top:128px;right:10px;z-index:500;font-size:11px;color:#c9c2b3;
+    background:rgba(28,28,30,.85);padding:3px 8px;border-radius:6px;display:none;
+  }
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>🏪 Stewart's Shops Tracker</h1>
+  <p>Tap a pin to rate the store &amp; bathroom. Averages are shared with everyone who opens this map.</p>
+</div>
+
+<div id="legend">
+  <div><span class="dot" style="background:#4caf50"></span>Has ratings</div>
+  <div><span class="dot" style="background:#888"></span>No ratings yet</div>
+</div>
+
+<div id="searchBox">
+  <input type="text" id="searchInput" placeholder="Search store #, name, or town..." />
+  <button id="searchClear">✕</button>
+</div>
+<div id="searchCount"></div>
+
+<div id="map"></div>
+<button id="addBtn">➕ Add location</button>
+
+<div id="addModal">
+  <div id="addModalBox">
+    <h3>Name this Stewart's location</h3>
+    <input type="text" id="addModalInput" placeholder="e.g. Route 9, Anytown" />
+    <div class="btnrow">
+      <button id="addModalCancel">Cancel</button>
+      <button id="addModalSave">Add pin</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const seedLocations = [
+{"n":"New Karner Rd, Albany","lat":42.702557,"lng":-73.882814,"addr":"29 New Karner Rd, Albany, NY 12203","id":"albany-newkarner"},
+{"n":"Western Ave, Albany","lat":42.686926,"lng":-73.854328,"addr":"1667 Western Ave, Albany, NY 12203","id":"albany-western1667"},
+{"n":"Central Ave, Colonie","lat":42.715571,"lng":-73.831007,"addr":"1560 Central Ave, Colonie, NY 12205","id":"colonie-central"},
+{"n":"Western Ave, Albany (Fuller area)","lat":42.674141,"lng":-73.816584,"addr":"1050 Western Ave, Albany, NY 12203","id":"albany-western1050"},
+{"n":"Fuller Rd, Albany","lat":42.702402,"lng":-73.818300,"addr":"19 Fuller Rd, Albany, NY 12205","id":"albany-fuller"},
+{"n":"Albany Shaker Rd","lat":42.705704,"lng":-73.777062,"addr":"482 Albany Shaker Rd, Albany, NY 12211","id":"albany-shaker"},
+{"n":"New Scotland Ave, Albany","lat":42.655075,"lng":-73.817732,"addr":"875 New Scotland Ave, Albany, NY 12208","id":"albany-newscotland875"},
+{"n":"Central Ave, Albany","lat":42.698940,"lng":-73.810784,"addr":"1273 Central Ave, Albany, NY 12205","id":"albany-central1273"},
+{"n":"Henry Johnson Blvd, Albany","lat":42.663310,"lng":-73.758534,"addr":"204 Henry Johnson Blvd, Albany, NY 12210","id":"albany-henryjohnson"},
+{"n":"New Scotland Ave (285), Albany","lat":42.653370,"lng":-73.788260,"addr":"285 New Scotland Ave, Albany, NY 12208","id":"albany-newscotland285"},
+{"n":"State St, Schenectady","lat":42.781078,"lng":-73.904334,"addr":"1773 State St, Schenectady, NY 12304","id":"schdy-state"},
+{"n":"Erie Blvd, Schenectady","lat":42.817875,"lng":-73.940750,"addr":"1033 Erie Blvd, Schenectady, NY 12305","id":"schdy-erie"},
+{"n":"Nott Terrace, Schenectady","lat":42.811992,"lng":-73.936039,"addr":"120 Nott Terrace, Schenectady, NY 12308","id":"schdy-nottterrace"},
+{"n":"S Brandywine Ave, Schenectady","lat":42.800382,"lng":-73.928766,"addr":"100 S Brandywine Ave, Schenectady, NY 12307","id":"schdy-brandywine"},
+{"n":"Union St, Schenectady","lat":42.803336,"lng":-73.900587,"addr":"1739 Union St, Schenectady, NY 12309","id":"schdy-union"},
+{"n":"Van Vranken Ave, Schenectady","lat":42.825231,"lng":-73.923767,"addr":"1757 Van Vranken Ave, Schenectady, NY 12308","id":"schdy-vanvranken"},
+{"n":"Nott St, Schenectady","lat":42.819053,"lng":-73.915374,"addr":"1229 Nott St, Schenectady, NY 12308","id":"schdy-nottst"},
+{"n":"Balltown Rd, Niskayuna","lat":42.782919,"lng":-73.892644,"addr":"566 Balltown Rd, Schenectady, NY 12304","id":"nisk-balltown"},
+{"n":"McClellan St, Schenectady","lat":42.808190,"lng":-73.912270,"addr":"1010 McClellan St, Schenectady, NY 12309","id":"schdy-mcclellan"},
+{"n":"Hamburg St, Schenectady","lat":42.773837,"lng":-73.936211,"addr":"2740 Hamburg St, Schenectady, NY 12303","id":"schdy-hamburg","num":"400"},
+{"n":"4th St, Troy","lat":42.715067,"lng":-73.693609,"addr":"487 4th St, Troy, NY 12180","id":"troy-4th"},
+{"n":"Hoosick St, Troy","lat":42.739262,"lng":-73.679551,"addr":"110 Hoosick St, Troy, NY 12180","id":"troy-hoosick"},
+{"n":"Congress St, Troy","lat":42.728704,"lng":-73.687923,"addr":"127 Congress St, Troy, NY 12180","id":"troy-congress"},
+{"n":"Sweetmilk Creek Rd, Troy","lat":42.757405,"lng":-73.615344,"addr":"10 Sweetmilk Creek Rd, Troy, NY 12180","id":"troy-sweetmilk"},
+{"n":"112th St, Troy","lat":42.771354,"lng":-73.679159,"addr":"9 112th St, Troy, NY 12182","id":"troy-112th"},
+{"n":"Vandenburgh Ave, Troy","lat":42.703480,"lng":-73.687796,"addr":"8 Vandenburgh Ave, Troy, NY 12180","id":"troy-vandenburgh"},
+{"n":"Northern Dr, Troy","lat":42.784699,"lng":-73.654834,"addr":"100 Northern Dr, Troy, NY 12182","id":"troy-northern"},
+{"n":"Brunswick Rd, Troy","lat":42.722066,"lng":-73.675120,"addr":"2 Brunswick Rd, Troy, NY 12180","id":"troy-brunswick"},
+{"n":"5th Ave, Troy","lat":42.781079,"lng":-73.670040,"addr":"764 5th Ave, Troy, NY 12182","id":"troy-5thave"},
+{"n":"N Greenbush Rd, Troy","lat":42.692412,"lng":-73.687399,"addr":"50 N Greenbush Rd, Troy, NY 12180","id":"troy-ngreenbush"},
+{"n":"US-9, Ballston Spa","lat":43.026234,"lng":-73.791650,"addr":"2951 US-9, Ballston Spa, NY 12020","id":"ballstonspa-us9"},
+{"n":"Maple Dell, Saratoga Springs","lat":43.092309,"lng":-73.772679,"addr":"3-11 Maple Dell, Saratoga Springs, NY 12866","id":"saratoga-mapledell"},
+{"n":"Lake Ave, Saratoga Springs","lat":43.083927,"lng":-73.743614,"addr":"402 Lake Ave, Saratoga Springs, NY 12866","id":"saratoga-lakeave"},
+{"n":"Church St, Saratoga Springs","lat":43.083242,"lng":-73.786578,"addr":"30 Church St, Saratoga Springs, NY 12866","id":"saratoga-churchst"},
+{"n":"NY-9P, Saratoga Springs (N)","lat":43.051794,"lng":-73.721042,"addr":"1456 NY-9P, Saratoga Springs, NY 12866","id":"saratoga-9pN"},
+{"n":"NY-9P, Saratoga Springs (S)","lat":42.984232,"lng":-73.745516,"addr":"504 NY-9P, Saratoga Springs, NY 12866","id":"saratoga-9pS"},
+{"n":"S Broadway, Saratoga Springs","lat":43.075077,"lng":-73.786795,"addr":"210 S Broadway, Saratoga Springs, NY 12866","id":"saratoga-sbroadway"},
+{"n":"Broadway, Saratoga Springs (24hr)","lat":43.085184,"lng":-73.784484,"addr":"521 Broadway, Saratoga Springs, NY 12866","id":"saratoga-broadway521"},
+{"n":"West Ave, Saratoga Springs","lat":43.079072,"lng":-73.804301,"addr":"87 West Ave, Saratoga Springs, NY 12866","id":"saratoga-westave"},
+{"n":"NY-50, Saratoga Springs","lat":43.119984,"lng":-73.725846,"addr":"4208 NY-50, Saratoga Springs, NY 12866","id":"saratoga-ny50"},
+{"n":"US-9, Clifton Park (N)","lat":42.892620,"lng":-73.772055,"addr":"1859 US-9, Clifton Park, NY 12065","id":"cliftonpark-us9N"},
+{"n":"Clifton Park Center Rd","lat":42.855495,"lng":-73.776230,"addr":"418 Clifton Park Center Rd, Clifton Park, NY 12065","id":"cliftonpark-centerrd"},
+{"n":"Crescent Rd, Clifton Park","lat":42.819800,"lng":-73.770650,"addr":"1529 Crescent Rd, Clifton Park, NY 12065","id":"cliftonpark-crescent"},
+{"n":"US-9, Clifton Park (S)","lat":42.868852,"lng":-73.774002,"addr":"1736 US-9, Clifton Park, NY 12065","id":"cliftonpark-us9S"},
+{"n":"NY-146, Clifton Park","lat":42.863245,"lng":-73.759056,"addr":"454 NY-146, Clifton Park, NY 12065","id":"cliftonpark-146"},
+{"n":"NY-146, Clifton Park (Guideboard)","lat":42.869640,"lng":-73.821325,"addr":"1206 NY-146, Clifton Park, NY 12065","id":"cliftonpark-146b"},
+{"n":"US-9, Clifton Park (Crescent area)","lat":42.823979,"lng":-73.732643,"addr":"1403 US-9, Clifton Park, NY 12065","id":"cliftonpark-us9c"},
+{"n":"Guideboard Rd, Clifton Park","lat":42.837340,"lng":-73.739234,"addr":"214 Guideboard Rd, Clifton Park, NY 12065","id":"cliftonpark-guideboard"},
+{"n":"Vischer Ferry Rd, Clifton Park","lat":42.837003,"lng":-73.821092,"addr":"307 Vischer Ferry Rd, Clifton Park, NY 12065","id":"cliftonpark-vischer"},
+{"n":"Troy-Schenectady Rd, Latham","lat":42.737895,"lng":-73.732214,"addr":"186 Troy-Schenectady Rd, Latham, NY 12110","id":"latham-troyschdy"},
+{"n":"Wade Rd Extension, Latham","lat":42.757490,"lng":-73.775718,"addr":"204 Wade Rd Extension, Latham, NY 12110","id":"latham-wadeRd"},
+{"n":"Loudon Rd, Latham (N)","lat":42.766430,"lng":-73.755090,"addr":"956 Loudon Rd, Latham, NY 12110","id":"latham-loudonN"},
+{"n":"Loudon Rd, Latham (S)","lat":42.729203,"lng":-73.759902,"addr":"605 Loudon Rd, Latham, NY 12110","id":"latham-loudonS"},
+{"n":"Troy-Schenectady Rd, Latham (W)","lat":42.772525,"lng":-73.824694,"addr":"1218 Troy-Schenectady Rd, Latham, NY 12110","id":"latham-troyschdyW"},
+{"n":"Wellness Way, Latham","lat":42.766741,"lng":-73.755036,"addr":"2 Wellness Wy, Latham, NY 12110","id":"latham-wellness"},
+{"n":"US-9W, Ravena","lat":42.468648,"lng":-73.816452,"addr":"2457 US-9W, Ravena, NY 12143","id":"ravena-us9w"},
+{"n":"Western Ave, Altamont","lat":42.707657,"lng":-73.922963,"addr":"2446 Western Ave, Altamont, NY 12009","id":"altamont-western"},
+{"n":"Mill Hill Ct, Slingerlands","lat":42.682920,"lng":-73.903948,"addr":"1 Mill Hill Ct, Slingerlands, NY 12159","id":"slingerlands-millhill"},
+{"n":"Guilderland Ave, Rotterdam","lat":42.782177,"lng":-73.970776,"addr":"2970 Guilderland Ave, Rotterdam, NY 12306","id":"rotterdam-guilderland","num":"226"},
+{"n":"Delaware Ave, Delmar (N)","lat":42.624351,"lng":-73.827355,"addr":"309 Delaware Ave, Delmar, NY 12054","id":"delmar-delaware309"},
+{"n":"Delaware Ave, Delmar (S)","lat":42.614984,"lng":-73.852007,"addr":"624 Delaware Ave, Delmar, NY 12054","id":"delmar-delaware624"},
+{"n":"Columbia St, Cohoes (N)","lat":42.769540,"lng":-73.704181,"addr":"94 Columbia St, Cohoes, NY 12047","id":"cohoes-columbia94"},
+{"n":"Columbia St, Cohoes (S)","lat":42.771717,"lng":-73.727562,"addr":"480 Columbia St, Cohoes, NY 12047","id":"cohoes-columbia480"},
+{"n":"2nd Ave, Watervliet (N)","lat":42.735097,"lng":-73.700473,"addr":"2458 2nd Ave, Watervliet, NY 12189","id":"watervliet-2ndN"},
+{"n":"2nd Ave, Watervliet (S)","lat":42.730451,"lng":-73.700893,"addr":"2002 2nd Ave, Watervliet, NY 12189","id":"watervliet-2ndS"},
+{"n":"6th St, Watervliet","lat":42.713257,"lng":-73.707633,"addr":"309 6th St, Watervliet, NY 12189","id":"watervliet-6th"},
+{"n":"Broadway, Menands","lat":42.677738,"lng":-73.735072,"addr":"14 Broadway, Menands, NY 12204","id":"menands-broadway"},
+{"n":"Troy Rd, East Greenbush","lat":42.620109,"lng":-73.702438,"addr":"95 Troy Rd, East Greenbush, NY 12061","id":"eastgreenbush-troyrd"},
+{"n":"Columbia Turnpike, Rensselaer","lat":42.610606,"lng":-73.726614,"addr":"326 Columbia Turnpike, Rensselaer, NY 12144","id":"rensselaer-columbia"},
+{"n":"Troy Rd, Rensselaer","lat":42.644356,"lng":-73.697530,"addr":"304 Troy Rd, Rensselaer, NY 12144","id":"rensselaer-troyrd"},
+{"n":"N Greenbush Rd, Rensselaer","lat":42.651120,"lng":-73.696374,"addr":"536 N Greenbush Rd, Rensselaer, NY 12144","id":"rensselaer-ngreenbush"},
+{"n":"Freemans Bridge Rd, Glenville","lat":42.836174,"lng":-73.932796,"addr":"50 Freemans Bridge Rd, Schenectady, NY 12302","id":"glenville-freemansbridge"},
+{"n":"Ballston Rd, Scotia","lat":42.844274,"lng":-73.947773,"addr":"411 Ballston Rd, Scotia, NY 12302","id":"scotia-ballstonrd"},
+{"n":"Amsterdam Rd, Glenville","lat":42.880354,"lng":-74.039372,"addr":"5246 Amsterdam Rd, Schenectady, NY 12302","id":"glenville-amsterdamrd"},
+{"n":"Sacandaga Rd, Glenville","lat":42.860369,"lng":-73.981555,"addr":"571 Sacandaga Rd, Schenectady, NY 12302","id":"glenville-sacandaga"},
+{"n":"Mohawk Ave, Scotia","lat":42.826910,"lng":-73.964374,"addr":"204 Mohawk Ave, Scotia, NY 12302","id":"scotia-mohawkave"},
+{"n":"NY-50, Burnt Hills","lat":42.909940,"lng":-73.898235,"addr":"810 NY-50, Burnt Hills, NY 12027","id":"burnthills-ny50"},
+{"n":"Balltown Rd, Niskayuna","lat":42.815858,"lng":-73.892253,"addr":"1502 Balltown Rd, Niskayuna, NY 12309","id":"nisk-balltown1502"},
+{"n":"US-9, Ballston Spa (N)","lat":42.969952,"lng":-73.792470,"addr":"2467 US-9, Ballston Spa, NY 12020","id":"ballstonspa-us9N"},
+{"n":"NY-67, Ballston Spa","lat":42.971360,"lng":-73.831390,"addr":"801 NY-67, Ballston Spa, NY 12020","id":"ballstonspa-ny67"},
+{"n":"Round Lake Rd, Ballston Lake","lat":42.935467,"lng":-73.807824,"addr":"15 Round Lake Rd, Ballston Lake, NY 12019","id":"ballstonlake-roundlake"},
+{"n":"Longkill Rd, Ballston Lake (Jonesville)","lat":42.911057,"lng":-73.822395,"addr":"13 Longkill Rd, Ballston Lake, NY 12019","id":"ballstonlake-longkill"},
+{"n":"Ushers Rd, Ballston Lake","lat":42.903230,"lng":-73.796420,"addr":"322 Ushers Rd, Ballston Lake, NY 12019","id":"ballstonlake-ushersrd"},
+{"n":"Church Ave, Ballston Spa","lat":42.994295,"lng":-73.849900,"addr":"170 Church Ave, Ballston Spa, NY 12020","id":"ballstonspa-churchave"},
+{"n":"Northline Rd, Ballston Spa","lat":43.022336,"lng":-73.838923,"addr":"165 Northline Rd, Ballston Spa, NY 12020","id":"ballstonspa-northline"},
+{"n":"Glen St, Glens Falls","lat":43.311887,"lng":-73.649472,"addr":"360 Glen St, Glens Falls, NY 12801","id":"glensfalls-glenst"},
+{"n":"Ridge St, Glens Falls","lat":43.322109,"lng":-73.644090,"addr":"250 Ridge St, Glens Falls, NY 12801","id":"glensfalls-ridgest"},
+{"n":"Broad St, Glens Falls","lat":43.305388,"lng":-73.655259,"addr":"118 Broad St, Glens Falls, NY 12801","id":"glensfalls-broadst"},
+{"n":"Warren St, Glens Falls","lat":43.311169,"lng":-73.631737,"addr":"196 Warren St, Glens Falls, NY 12801","id":"glensfalls-warrenst"},
+{"n":"Quaker Rd, Queensbury","lat":43.315017,"lng":-73.610442,"addr":"777 Quaker Rd, Queensbury, NY 12804","id":"queensbury-quakerrd"},
+{"n":"Bay Rd, Queensbury","lat":43.336899,"lng":-73.653199,"addr":"402 Bay Rd, Queensbury, NY 12804","id":"queensbury-bayrd"},
+{"n":"US-9, Queensbury","lat":43.341711,"lng":-73.682589,"addr":"1002 US-9, Queensbury, NY 12804","id":"queensbury-us9"},
+{"n":"Corinth Rd, Queensbury","lat":43.296741,"lng":-73.683198,"addr":"221 Corinth Rd, Queensbury, NY 12804","id":"queensbury-corinthrd"},
+{"n":"Saratoga Ave, South Glens Falls","lat":43.298630,"lng":-73.635128,"addr":"3 Saratoga Ave, South Glens Falls, NY 12803","id":"sglensfalls-saratogaave"},
+{"n":"Aviation Rd, Queensbury","lat":43.330609,"lng":-73.697339,"addr":"347 Aviation Rd, Queensbury, NY 12804","id":"queensbury-aviationrd"},
+{"n":"US-9, Lake George (N)","lat":43.411057,"lng":-73.710755,"addr":"2164 US-9, Lake George, NY 12845","id":"lakegeorge-us9N"},
+{"n":"NY-149, Lake George","lat":43.397735,"lng":-73.623657,"addr":"977 NY-149, Lake George, NY 12845","id":"lakegeorge-ny149"},
+{"n":"US-9, Lake George (S, w/Dunkin)","lat":43.363597,"lng":-73.700126,"addr":"1412 US-9, Lake George, NY 12845","id":"lakegeorge-us9S"},
+{"n":"Main St, Warrensburg","lat":43.494785,"lng":-73.773280,"addr":"3827 Main St, Warrensburg, NY 12885","id":"warrensburg-mainst"},
+{"n":"S Catherine St, Plattsburgh","lat":44.688900,"lng":-73.457421,"addr":"4994 S Catherine St, Plattsburgh, NY 12901","id":"plattsburgh-scatherine"},
+{"n":"Cornelia St, Plattsburgh (N)","lat":44.695457,"lng":-73.526214,"addr":"809 Cornelia St, Plattsburgh, NY 12901","id":"plattsburgh-corneliaN"},
+{"n":"Cornelia St, Plattsburgh (S)","lat":44.698078,"lng":-73.475504,"addr":"292 Cornelia St, Plattsburgh, NY 12901","id":"plattsburgh-corneliaS"},
+{"n":"US-9, Plattsburgh","lat":44.670656,"lng":-73.446920,"addr":"4717 US-9, Plattsburgh, NY 12901","id":"plattsburgh-us9"},
+{"n":"Rugar St, Plattsburgh","lat":44.687465,"lng":-73.484559,"addr":"262 Rugar St, Plattsburgh, NY 12901","id":"plattsburgh-rugarst"},
+{"n":"US-9, Plattsburgh (Cumberland Head)","lat":44.726221,"lng":-73.435165,"addr":"7140 US-9, Plattsburgh, NY 12901","id":"plattsburgh-cumberlandhead"},
+{"n":"W Main St, Malone","lat":44.849107,"lng":-74.301378,"addr":"289 W Main St, Malone, NY 12953","id":"malone-wmainst"},
+{"n":"E Main St, Malone","lat":44.849448,"lng":-74.283441,"addr":"554 E Main St, Malone, NY 12953","id":"malone-emainst"},
+{"n":"Saranac Ave, Lake Placid","lat":44.295222,"lng":-73.998834,"addr":"2090 Saranac Ave, Lake Placid, NY 12946","id":"lakeplacid-saranacave"},
+{"n":"Main St, Lake Placid","lat":44.281712,"lng":-73.982201,"addr":"2711 Main St, Lake Placid, NY 12946","id":"lakeplacid-mainst"},
+{"n":"Bloomingdale Ave, Saranac Lake","lat":44.329834,"lng":-74.132052,"addr":"27 Bloomingdale Ave, Saranac Lake, NY 12983","id":"saranaclake-bloomingdale"},
+{"n":"Washington St, Watertown","lat":43.966889,"lng":-75.912016,"addr":"715 Washington St, Watertown, NY 13601","id":"watertown-washingtonst"},
+{"n":"N Massey St, Watertown","lat":43.978723,"lng":-75.915737,"addr":"229 N Massey St, Watertown, NY 13601","id":"watertown-nmassey"},
+{"n":"NY-126, Watertown","lat":43.964985,"lng":-75.874277,"addr":"23864 NY-126, Watertown, NY 13601","id":"watertown-ny126"},
+{"n":"Mill St, Watertown","lat":43.979647,"lng":-75.905962,"addr":"508 Mill St, Watertown, NY 13601","id":"watertown-millst"},
+{"n":"Market St, Potsdam","lat":44.678597,"lng":-74.986609,"addr":"124 Market St, Potsdam, NY 13676","id":"potsdam-marketst"},
+{"n":"Maple St, Potsdam","lat":44.667082,"lng":-74.990648,"addr":"26 Maple St, Potsdam, NY 13676","id":"potsdam-maplest"},
+{"n":"E Main St, Canton","lat":44.597495,"lng":-75.147890,"addr":"115 E Main St, Canton, NY 13617","id":"canton-emainst"},
+{"n":"Gouverneur St, Canton","lat":44.591526,"lng":-75.175911,"addr":"32 Gouverneur St, Canton, NY 13617","id":"canton-gouverneurst"},
+{"n":"Ford St, Ogdensburg","lat":44.699759,"lng":-75.487074,"addr":"703 Ford St, Ogdensburg, NY 13669","id":"ogdensburg-fordst","num":"435"},
+{"n":"Maple St, Massena","lat":44.935503,"lng":-74.894814,"addr":"20 Maple St, Massena, NY 13662","id":"massena-maplest"},
+{"n":"NY-56, Massena","lat":44.921348,"lng":-74.918770,"addr":"10211 NY-56, Massena, NY 13662","id":"massena-ny56"},
+{"n":"Montcalm St, Ticonderoga","lat":43.847843,"lng":-73.431915,"addr":"26 Montcalm St, Ticonderoga, NY 12883","id":"ticonderoga-montcalm"},
+{"n":"Market St, Amsterdam","lat":42.942633,"lng":-74.188313,"addr":"132 Market St, Amsterdam, NY 12010","id":"amsterdam-marketst"},
+{"n":"NY-5S, Amsterdam","lat":42.929386,"lng":-74.203777,"addr":"1455 NY-5S, Amsterdam, NY 12010","id":"amsterdam-ny5s"},
+{"n":"E Main St, Amsterdam","lat":42.934042,"lng":-74.186191,"addr":"185 E Main St, Amsterdam, NY 12010","id":"amsterdam-emainst"},
+{"n":"NY-30, Amsterdam","lat":43.017093,"lng":-74.193903,"addr":"4192 NY-30, Amsterdam, NY 12010","id":"amsterdam-ny30"},
+{"n":"E Fulton St, Gloversville","lat":43.050863,"lng":-74.325453,"addr":"1037 E Fulton St, Gloversville, NY 12078","id":"gloversville-efulton"},
+{"n":"S Main St, Gloversville","lat":43.048327,"lng":-74.347724,"addr":"76 S Main St, Gloversville, NY 12078","id":"gloversville-smain"},
+{"n":"NY-29A, Gloversville","lat":43.054650,"lng":-74.377004,"addr":"1594 NY-29A, Gloversville, NY 12078","id":"gloversville-ny29a"},
+{"n":"N Comrie Ave, Johnstown (N)","lat":43.014050,"lng":-74.361460,"addr":"203 N Comrie Ave, Johnstown, NY 12095","id":"johnstown-ncomrieN"},
+{"n":"N Comrie Ave, Johnstown (S)","lat":43.013095,"lng":-74.360436,"addr":"146 N Comrie Ave, Johnstown, NY 12095","id":"johnstown-ncomrieS"},
+{"n":"E Main St, Johnstown","lat":43.006711,"lng":-74.370898,"addr":"1 E Main St, Johnstown, NY 12095","id":"johnstown-emainst"},
+{"n":"N Ann St, Little Falls","lat":43.044403,"lng":-74.860464,"addr":"32 N Ann St, Little Falls, NY 13365","id":"littlefalls-nannst"},
+{"n":"Main St, Oneonta","lat":42.448987,"lng":-75.064461,"addr":"47 Main St, Oneonta, NY 13820","id":"oneonta-mainst"},
+{"n":"Oneida St, Oneonta","lat":42.445645,"lng":-75.106972,"addr":"168 Oneida St, Oneonta, NY 13820","id":"oneonta-oneidast"},
+{"n":"Chestnut St, Cooperstown","lat":42.694197,"lng":-74.934386,"addr":"108 Chestnut St, Cooperstown, NY 13326","id":"cooperstown-chestnutst"},
+{"n":"W Main St, Cobleskill","lat":42.676484,"lng":-74.492703,"addr":"391 W Main St, Cobleskill, NY 12043","id":"cobleskill-wmainst"},
+{"n":"NY-7, Cobleskill","lat":42.680097,"lng":-74.418872,"addr":"2668 NY-7, Cobleskill, NY 12043","id":"cobleskill-ny7"},
+{"n":"NY-23, Norwich","lat":42.539620,"lng":-75.509810,"addr":"4823 NY-23, Norwich, NY 13815","id":"norwich-ny23"},
+{"n":"Boulevard, Kingston","lat":41.924000,"lng":-74.013370,"addr":"1 Boulevard, Kingston, NY 12401","id":"kingston-boulevard"},
+{"n":"Albany Ave, Kingston","lat":41.940130,"lng":-74.001117,"addr":"420 Albany Ave, Kingston, NY 12401","id":"kingston-albanyave"},
+{"n":"Broadway, Kingston","lat":41.925310,"lng":-73.989471,"addr":"268 Broadway, Kingston, NY 12401","id":"kingston-broadway"},
+{"n":"Lucas Ave Ext, Kingston","lat":41.929208,"lng":-74.037103,"addr":"339 Lucas Ave Ext, Kingston, NY 12401","id":"kingston-lucasave"},
+{"n":"Boices Ln, Kingston","lat":41.963810,"lng":-73.993183,"addr":"45 Boices Ln, Kingston, NY 12401","id":"kingston-boicesln"},
+{"n":"Zena Rd, Kingston","lat":41.993927,"lng":-74.087010,"addr":"7 Zena Rd, Kingston, NY 12401","id":"kingston-zenard"},
+{"n":"Creek Rd, Poughkeepsie","lat":41.720533,"lng":-73.904823,"addr":"85 Creek Rd, Poughkeepsie, NY 12601","id":"poughkeepsie-creekrd"},
+{"n":"Dutchess Turnpike, Poughkeepsie","lat":41.721355,"lng":-73.846679,"addr":"1200 Dutchess Turnpike, Poughkeepsie, NY 12603","id":"poughkeepsie-dutchesstpk","num":"302"},
+{"n":"Manchester Cir, Poughkeepsie","lat":41.691287,"lng":-73.885066,"addr":"6 Manchester Cir, Poughkeepsie, NY 12603","id":"poughkeepsie-manchestercir"},
+{"n":"Vassar Rd, Poughkeepsie","lat":41.651806,"lng":-73.875399,"addr":"54 Vassar Rd, Poughkeepsie, NY 12603","id":"poughkeepsie-vassarrd"},
+{"n":"Albany Post Rd, Poughkeepsie","lat":41.738157,"lng":-73.929834,"addr":"3648 Albany Post Rd, Poughkeepsie, NY 12601","id":"poughkeepsie-albanypostrd"},
+{"n":"W Bridge St, Catskill","lat":42.217405,"lng":-73.868462,"addr":"8 W Bridge St, Catskill, NY 12414","id":"catskill-wbridgest"},
+{"n":"US-9W, Coxsackie","lat":42.363659,"lng":-73.831826,"addr":"11849 US-9W, Coxsackie, NY 12051","id":"coxsackie-us9w"},
+{"n":"US-9W, Newburgh","lat":41.544864,"lng":-74.011312,"addr":"5223 US-9W, Newburgh, NY 12550","id":"newburgh-us9w"},
+{"n":"S Plank Rd, Newburgh","lat":41.539090,"lng":-74.094172,"addr":"407 S Plank Rd, Newburgh, NY 12550","id":"newburgh-splankrd"},
+{"n":"NY-17M, Goshen","lat":41.397718,"lng":-74.356968,"addr":"2525 NY-17M, Goshen, NY 10924","id":"goshen-ny17m"},
+{"n":"Quassaick Ave, New Windsor","lat":41.476900,"lng":-74.023520,"addr":"202 Quassaick Ave, New Windsor, NY 12553","id":"newwindsor-quassaick"},
+{"n":"Luther Forest Blvd, Malta","lat":42.947608,"lng":-73.785380,"addr":"51 Luther Forest Blvd, Mechanicville, NY 12118","id":"malta-lutherforest"},
+{"n":"Saratoga Ave, Waterford","lat":42.781730,"lng":-73.696205,"addr":"30 Saratoga Ave, Waterford, NY 12188","id":"waterford-saratogaave"},
+{"n":"Hudson River Rd, Waterford","lat":42.804976,"lng":-73.666912,"addr":"105 Hudson River Rd, Waterford, NY 12188","id":"waterford-hudsonriverrd"},
+{"n":"S St, Mechanicville","lat":42.899811,"lng":-73.689393,"addr":"246 S St, Mechanicville, NY 12118","id":"mechanicville-sst"},
+{"n":"Vosburgh Rd, Mechanicville","lat":42.879209,"lng":-73.723191,"addr":"2 Vosburgh Rd, Mechanicville, NY 12118","id":"mechanicville-vosburghrd"},
+{"n":"Hudson Ave, Stillwater","lat":42.939232,"lng":-73.651812,"addr":"781 Hudson Ave, Stillwater, NY 12170","id":"stillwater-hudsonave"},
+{"n":"Ballard Rd, Gansevoort","lat":43.170762,"lng":-73.718066,"addr":"227 Ballard Rd, Gansevoort, NY 12831","id":"gansevoort-ballardrd"},
+{"n":"Northern Pines Rd, Gansevoort","lat":43.123748,"lng":-73.767272,"addr":"445 Northern Pines Rd, Gansevoort, NY 12831","id":"gansevoort-northernpines"},
+{"n":"Main St, Middleburgh","lat":42.597529,"lng":-74.334352,"addr":"305 Main St, Middleburgh, NY 12122","id":"middleburgh-mainst"},
+{"n":"Johnson Ave, Schoharie","lat":42.665114,"lng":-74.310987,"addr":"102 Johnson Ave, Schoharie, NY 12157","id":"schoharie-johnsonave"},
+{"n":"Gates Ave, Fort Edward","lat":43.285663,"lng":-73.586324,"addr":"1 Gates Ave, Fort Edward, NY 12828","id":"fortedward-gatesave"},
+{"n":"Broadway (S), Fort Edward","lat":43.267169,"lng":-73.585188,"addr":"107 Broadway, Fort Edward, NY 12828","id":"fortedward-broadwayS"},
+{"n":"Woodstock Ave, Rutland VT","lat":43.617585,"lng":-72.957266,"addr":"194 Woodstock Ave, Rutland, VT 05701","id":"rutlandvt-woodstockave"},
+{"n":"State St, Rutland VT","lat":43.609600,"lng":-72.981150,"addr":"81 State St, Rutland, VT 05701","id":"rutlandvt-statest"},
+{"n":"Main St, Manchester Center VT","lat":43.172525,"lng":-73.063254,"addr":"4455 Main St, Manchester Center, VT 05255","id":"manchestervt-mainst"},
+{"n":"Helderberg Ave, Schenectady","lat":42.781238,"lng":-73.957950,"addr":"1841 Helderberg Ave, Schenectady, NY 12303","id":"schdy-helderbergave","num":"189"},
+{"n":"Broadway, Rotterdam","lat":42.796916,"lng":-73.967071,"addr":"2140 Broadway, Schenectady, NY 12306","id":"rotterdam-broadway","num":"269"},
+{"n":"Highbridge Rd, Rotterdam","lat":42.771324,"lng":-73.923613,"addr":"1100 Highbridge Rd, Schenectady, NY 12303","id":"rotterdam-highbridge","num":"320"},
+{"n":"Chrisler Ave, Schenectady","lat":42.795593,"lng":-73.943395,"addr":"1209 Chrisler Ave, Schenectady, NY 12303","id":"schdy-chrislerave"}
+];
+
+const map = L.map('map').setView([42.75, -73.80], 10);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors',
+  maxZoom: 19
+}).addTo(map);
+
+let ratingsCache = {};
+
+function starsHtml(id, type, current){
+  let s = '<span class="stars" data-id="'+id+'" data-type="'+type+'">';
+  for(let i=1;i<=5;i++){
+    s += '<span class="'+(i<=current?'filled':'')+'" data-val="'+i+'">★</span>';
+  }
+  s += '</span>';
+  return s;
+}
+
+function markerColor(id){
+  const agg = ratingsCache[id];
+  return (agg && (agg.storeCount > 0 || agg.bathroomCount > 0)) ? '#4caf50' : '#888';
+}
+
+function makeIcon(id){
+  return L.divIcon({
+    className:'',
+    html:'<div style="background:'+markerColor(id)+';width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 3px rgba(0,0,0,.6);"></div>',
+    iconSize:[16,16],
+    iconAnchor:[8,8]
+  });
+}
+
+function emptyAgg(){ return {storeSum:0, storeCount:0, bathroomSum:0, bathroomCount:0}; }
+function emptyVote(){ return {store:0, bathroom:0}; }
+function avgStr(sum, count){ return count > 0 ? (sum/count).toFixed(1) : '—'; }
+
+// Wait for the Firebase module script (loaded separately) to finish initializing
+async function fb(){
+  while(!window.__fb){
+    await new Promise(r => setTimeout(r, 20));
+  }
+  return window.__fb;
+}
+
+// A per-browser anonymous ID so "your" vote can be found again on this device
+function getClientId(){
+  let id = localStorage.getItem('stewarts_client_id');
+  if(!id){
+    id = 'c_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem('stewarts_client_id', id);
+  }
+  return id;
+}
+
+// Shared (public) aggregate — visible to everyone who opens this map
+async function loadAggregate(id){
+  try{
+    const {db, doc, getDoc} = await fb();
+    const snap = await getDoc(doc(db, 'aggregates', id));
+    if(!snap.exists()) return emptyAgg();
+    return { ...emptyAgg(), ...snap.data() };
+  }catch(e){
+    console.error('load agg failed', e);
+    return emptyAgg();
+  }
+}
+
+// Atomically nudge the shared counters by a delta — safe even if others are rating at the same time
+async function bumpAggregate(id, sumKey, sumDelta, countKey, countDelta){
+  try{
+    const {db, doc, setDoc, increment} = await fb();
+    await setDoc(doc(db, 'aggregates', id), {
+      [sumKey]: increment(sumDelta),
+      [countKey]: increment(countDelta)
+    }, { merge: true });
+    return true;
+  }catch(e){
+    console.error('save agg failed', e);
+    return false;
+  }
+}
+
+// Personal (per-device) record of your own vote, so you can edit it later
+async function loadMyVote(id){
+  try{
+    const {db, doc, getDoc} = await fb();
+    const snap = await getDoc(doc(db, 'votes', id + '_' + getClientId()));
+    if(!snap.exists()) return emptyVote();
+    return { ...emptyVote(), ...snap.data() };
+  }catch(e){
+    return emptyVote();
+  }
+}
+async function saveMyVote(id, data){
+  try{
+    const {db, doc, setDoc} = await fb();
+    await setDoc(doc(db, 'votes', id + '_' + getClientId()), data, { merge: true });
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+function popupHtml(loc, agg, myVote){
+  return `<div class="popup-inner" data-locid="${loc.id}">
+    <h3>${loc.n}</h3>
+    <div class="addr">${loc.addr}${loc.num ? ' &middot; Shop #' + loc.num : ''}</div>
+    <div class="rating-row">
+      <span class="rating-label">Store — avg ${avgStr(agg.storeSum, agg.storeCount)}★ (${agg.storeCount} ${agg.storeCount===1?'rating':'ratings'})</span>
+      ${starsHtml(loc.id,'store',myVote.store)}
+    </div>
+    <div class="rating-row">
+      <span class="rating-label">🚻 Bathroom — avg ${avgStr(agg.bathroomSum, agg.bathroomCount)}★ (${agg.bathroomCount} ${agg.bathroomCount===1?'rating':'ratings'})</span>
+      ${starsHtml(loc.id,'bathroom',myVote.bathroom)}
+    </div>
+    <div class="save-note" id="note-${loc.id}">Your stars below — averages are shared with everyone viewing this map.</div>
+  </div>`;
+}
+
+function loadingPopupHtml(loc){
+  return `<div class="popup-inner" data-locid="${loc.id}">
+    <h3>${loc.n}</h3>
+    <div class="addr">${loc.addr}${loc.num ? ' &middot; Shop #' + loc.num : ''}</div>
+    <div class="save-note" style="color:#888;">Loading ratings…</div>
+  </div>`;
+}
+
+const markers = {};
+const myVoteCache = {};
+const loadedIds = new Set();
+
+function addMarker(loc){
+  // Nothing is fetched from storage here — that only happens when the popup is opened.
+  // This keeps page-load fast and avoids tripping the storage rate limit on 100+ pins at once.
+  const marker = L.marker([loc.lat, loc.lng], {icon: makeIcon(loc.id)}).addTo(map);
+  marker.bindPopup(loadingPopupHtml(loc));
+  marker.on('popupopen', async () => {
+    if(!loadedIds.has(loc.id)){
+      const agg = await loadAggregate(loc.id);
+      const myVote = await loadMyVote(loc.id);
+      ratingsCache[loc.id] = agg;
+      myVoteCache[loc.id] = myVote;
+      loadedIds.add(loc.id);
+      marker.setIcon(makeIcon(loc.id));
+    }
+    marker.setPopupContent(popupHtml(loc, ratingsCache[loc.id], myVoteCache[loc.id]));
+    attachStarHandlers(loc);
+  });
+  markers[loc.id] = marker;
+}
+
+function attachStarHandlers(loc){
+  const popupEl = document.querySelector(`.popup-inner[data-locid="${loc.id}"]`);
+  if(!popupEl) return;
+  popupEl.querySelectorAll('.stars').forEach(starGroup => {
+    const type = starGroup.dataset.type;
+    starGroup.querySelectorAll('span').forEach(starEl => {
+      starEl.addEventListener('click', async () => {
+        const val = parseInt(starEl.dataset.val);
+        const note = document.getElementById('note-'+loc.id);
+        if(note) note.textContent = 'Saving...';
+
+        const agg = ratingsCache[loc.id] || emptyAgg();
+        const myVote = myVoteCache[loc.id] || emptyVote();
+        const prevVal = myVote[type];
+
+        const sumKey = type + 'Sum';
+        const countKey = type + 'Count';
+        const sumDelta = val - prevVal;
+        const countDelta = prevVal > 0 ? 0 : 1;
+
+        // Update local view optimistically so it feels instant
+        agg[sumKey] += sumDelta;
+        agg[countKey] += countDelta;
+        myVote[type] = val;
+        ratingsCache[loc.id] = agg;
+        myVoteCache[loc.id] = myVote;
+
+        // repaint stars immediately
+        starGroup.querySelectorAll('span').forEach((s,i) => {
+          s.classList.toggle('filled', (i+1) <= val);
+        });
+
+        const okAgg = await bumpAggregate(loc.id, sumKey, sumDelta, countKey, countDelta);
+        const okVote = await saveMyVote(loc.id, myVote);
+        if(note) note.textContent = (okAgg && okVote) ? 'Saved ✓ — visible to everyone' : 'Save failed';
+
+        // refresh the label text with new average
+        const labelEl = starGroup.parentElement.querySelector('.rating-label');
+        if(labelEl){
+          const sum = agg[sumKey], count = agg[countKey];
+          const niceType = type === 'store' ? 'Store' : '🚻 Bathroom';
+          labelEl.textContent = `${niceType} — avg ${avgStr(sum,count)}★ (${count} ${count===1?'rating':'ratings'})`;
+        }
+
+        if(markers[loc.id]) markers[loc.id].setIcon(makeIcon(loc.id));
+      });
+    });
+  });
+}
+
+// Load all seed locations — this is now instant since no storage calls happen until a pin is tapped
+seedLocations.forEach(loc => addMarker(loc));
+
+// Add custom location
+let addingMode = false;
+let pendingLatLng = null;
+
+document.getElementById('addBtn').addEventListener('click', () => {
+  addingMode = true;
+  document.getElementById('addBtn').textContent = '📍 Tap map to place pin...';
+});
+
+map.on('click', (e) => {
+  if(!addingMode) return;
+  addingMode = false;
+  document.getElementById('addBtn').textContent = '➕ Add location';
+  pendingLatLng = e.latlng;
+  document.getElementById('addModalInput').value = '';
+  document.getElementById('addModal').classList.add('open');
+  setTimeout(() => document.getElementById('addModalInput').focus(), 50);
+});
+
+document.getElementById('addModalCancel').addEventListener('click', () => {
+  document.getElementById('addModal').classList.remove('open');
+  pendingLatLng = null;
+});
+
+document.getElementById('addModalSave').addEventListener('click', async () => {
+  const name = document.getElementById('addModalInput').value.trim();
+  document.getElementById('addModal').classList.remove('open');
+  if(!name || !pendingLatLng) { pendingLatLng = null; return; }
+  const id = 'custom-' + Date.now();
+  const loc = {n:name, lat:pendingLatLng.lat, lng:pendingLatLng.lng, addr:'Custom pin', id:id};
+  seedLocations.push(loc);
+  await addMarker(loc);
+  markers[id].openPopup();
+  pendingLatLng = null;
+});
+
+// Allow pressing Enter in the input to save
+document.getElementById('addModalInput').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){
+    document.getElementById('addModalSave').click();
+  }
+});
+
+// Search / filter by store number, name, address, or town
+function locMatches(loc, q){
+  if(!q) return true;
+  const hay = [
+    loc.num || '',
+    loc.n || '',
+    loc.addr || ''
+  ].join(' ').toLowerCase();
+  return hay.includes(q);
+}
+
+function runSearch(){
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const countEl = document.getElementById('searchCount');
+  if(!q){
+    countEl.style.display = 'none';
+    seedLocations.forEach(loc => {
+      const m = markers[loc.id];
+      if(m && !map.hasLayer(m)) m.addTo(map);
+    });
+    return;
+  }
+  let matchCount = 0;
+  let firstMatch = null;
+  seedLocations.forEach(loc => {
+    const m = markers[loc.id];
+    if(!m) return;
+    if(locMatches(loc, q)){
+      matchCount++;
+      if(!firstMatch) firstMatch = loc;
+      if(!map.hasLayer(m)) m.addTo(map);
+    } else {
+      if(map.hasLayer(m)) map.removeLayer(m);
+    }
+  });
+  countEl.style.display = 'block';
+  countEl.textContent = matchCount === 0 ? 'No matches' : `${matchCount} match${matchCount===1?'':'es'}`;
+  if(matchCount === 1 && firstMatch){
+    map.setView([firstMatch.lat, firstMatch.lng], 15);
+    markers[firstMatch.id].openPopup();
+  }
+}
+
+document.getElementById('searchInput').addEventListener('input', runSearch);
+document.getElementById('searchClear').addEventListener('click', () => {
+  document.getElementById('searchInput').value = '';
+  runSearch();
+});
+</script>
+</body>
+</html>
