@@ -155,20 +155,15 @@
     background:var(--panel-bg);color:var(--cream);border:1px solid var(--panel-border);
     padding:5px 10px;border-radius:6px;cursor:pointer;
   }
-  #accountToggle{
-    position:absolute;top:112px;right:10px;z-index:500;font-size:12px;font-weight:700;
-    background:var(--panel-bg);color:var(--cream);border:1px solid var(--panel-border);
-    padding:5px 10px;border-radius:6px;cursor:pointer;
-  }
   .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;}
   #locateBtn{
-    position:absolute;top:156px;right:10px;z-index:500;
+    position:absolute;top:112px;right:10px;z-index:500;
     background:#2196f3;color:#fff;border:none;border-radius:50px;
     padding:11px 14px;font-weight:700;font-size:13.5px;box-shadow:0 3px 10px rgba(0,0,0,.4);
     cursor:pointer;
   }
   #nearestInfo{
-    position:absolute;top:204px;right:10px;z-index:500;
+    position:absolute;top:160px;right:10px;z-index:500;
     background:var(--panel-bg);color:var(--cream);border:1px solid #2196f3;
     border-radius:8px;padding:8px 12px;font-size:13px;max-width:220px;display:none;
     cursor:pointer;line-height:1.4;
@@ -301,7 +296,6 @@
 <button id="openNowToggle">🕐 Open now</button>
 <button id="listViewToggle">📋 List</button>
 <button id="leaderboardToggle">🏆 Leaderboard</button>
-<button id="accountToggle">👤 Account</button>
 
 <div id="map"></div>
 <button id="locateBtn">📍 Where am I?</button>
@@ -798,7 +792,6 @@ map.on('popupopen', () => {
   document.getElementById('openNowToggle').style.display = 'none';
   document.getElementById('listViewToggle').style.display = 'none';
   document.getElementById('leaderboardToggle').style.display = 'none';
-  document.getElementById('accountToggle').style.display = 'none';
 });
 map.on('popupclose', () => {
   document.getElementById('locateBtn').style.display = '';
@@ -806,7 +799,6 @@ map.on('popupclose', () => {
   document.getElementById('openNowToggle').style.display = '';
   document.getElementById('listViewToggle').style.display = '';
   document.getElementById('leaderboardToggle').style.display = '';
-  document.getElementById('accountToggle').style.display = '';
   const wasCollapsed = localStorage.getItem('legendCollapsed') === '1';
   if(!wasCollapsed) document.getElementById('legendBody').classList.remove('collapsed');
 
@@ -1885,7 +1877,14 @@ async function openLeaderboard(){
   const noteEl = document.getElementById('leaderboardAccountNote');
   if(isLoggedIn()){
     const username = (window.__currentUser.email || '').split('@')[0];
-    noteEl.innerHTML = `You're on the board as <b style="color:var(--amber);">${escapeHtml(username)}</b>.`;
+    noteEl.innerHTML = `You're on the board as <b style="color:var(--amber);">${escapeHtml(username)}</b>. <button id="leaderboardLogoutBtn" style="background:none;border:none;color:#e57373;text-decoration:underline;font-size:12px;cursor:pointer;padding:0 0 0 4px;">Log out</button>`;
+    document.getElementById('leaderboardLogoutBtn').addEventListener('click', async () => {
+      await logOutAccount();
+      updateAccountUI();
+      updateAchievementBadge();
+      loadAllRatings();
+      openLeaderboard(); // refresh this panel to reflect the logged-out state
+    });
   } else {
     noteEl.innerHTML = `<button class="btn btn-amber" id="leaderboardLoginPrompt" style="width:100%;">👤 Log in to appear on the leaderboard</button>`;
     document.getElementById('leaderboardLoginPrompt').addEventListener('click', () => {
@@ -1928,21 +1927,13 @@ function updateAccountUI(){
   const loggedIn = isLoggedIn();
   document.getElementById('loggedOutView').style.display = loggedIn ? 'none' : 'block';
   document.getElementById('loggedInView').style.display = loggedIn ? 'block' : 'none';
-  const accountBtn = document.getElementById('accountToggle');
   if(loggedIn){
     const email = window.__currentUser.email || '';
     const username = email.split('@')[0];
     document.getElementById('loggedInUsername').textContent = username;
-    accountBtn.textContent = '👤 ' + username;
-  } else {
-    accountBtn.textContent = '👤 Account';
   }
 }
 
-document.getElementById('accountToggle').addEventListener('click', () => {
-  updateAccountUI();
-  document.getElementById('accountPanel').classList.add('show');
-});
 document.getElementById('accountClose').addEventListener('click', () => {
   document.getElementById('accountPanel').classList.remove('show');
   suppressNextLocateClick = true;
