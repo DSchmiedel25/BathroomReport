@@ -658,22 +658,23 @@ try{
 
 // Safely jump to and open a marker's popup, whether clustering is active or not
 // (plain L.layerGroup fallback doesn't have zoomToShowLayer)
+// Tracks a marker that's been temporarily pulled out of the cluster group so its popup
+// can be reliably opened — restored back into the cluster once its popup closes.
+let pulledOutMarker = null;
+
 function zoomToMarker(marker){
   if(!marker) return;
-  // Bypass the clustering plugin's zoomToShowLayer entirely — it's been an unreliable
-  // source of Android-specific bugs (silent failures where the callback just never fires).
-  // Instead: zoom/pan directly, then open the popup once the move settles, with a safety-net
-  // timeout in case 'moveend' never fires (e.g. already at that exact view).
-  let done = false;
-  const finish = () => {
-    if(done) return;
-    done = true;
-    map.panBy([0, -110], { animate: false }); // nudge marker down, clear of the button stack
-    marker.openPopup();
-  };
-  map.once('moveend', finish);
-  map.setView(marker.getLatLng(), 16);
-  setTimeout(finish, 600); // safety net — guarantees the popup opens even if moveend doesn't fire
+  // Bypass the clustering plugin entirely for this interaction — pulling the marker out
+  // of the cluster group and adding it directly to the map means there's no dependency on
+  // the plugin's internal (and apparently unreliable on some Android devices) un-clustering
+  // timing. This has been a persistent source of "map jumps but no popup" bugs.
+  if(markerCluster.hasLayer(marker)) markerCluster.removeLayer(marker);
+  if(!map.hasLayer(marker)) marker.addTo(map);
+  pulledOutMarker = marker;
+
+  map.setView(marker.getLatLng(), 16, { animate: false });
+  map.panBy([0, -110], { animate: false }); // nudge marker down, clear of the button stack
+  marker.openPopup();
 }
 
 // Safety net: recalculate map size whenever the viewport or layout might have changed
@@ -698,6 +699,13 @@ map.on('popupclose', () => {
   document.getElementById('listViewToggle').style.display = '';
   const wasCollapsed = localStorage.getItem('legendCollapsed') === '1';
   if(!wasCollapsed) document.getElementById('legendBody').classList.remove('collapsed');
+
+  // If a marker was pulled out of the cluster group to reliably show its popup, put it back
+  if(pulledOutMarker){
+    if(map.hasLayer(pulledOutMarker)) map.removeLayer(pulledOutMarker);
+    markerCluster.addLayer(pulledOutMarker);
+    pulledOutMarker = null;
+  }
 });
 
 // Single tile source (the one we know reliably works) — dark mode is done with a CSS
@@ -1654,7 +1662,7 @@ locateBtn.addEventListener('click', () => {
         iconSize:[16,16], iconAnchor:[8,8]
       })
     }).addTo(map);
-    userMarker.bindPopup('You are here').openPopup();
+    userMarker.bindPopup('<span style="color:var(--popup-text);font-weight:700;">📍 You are here</span>').openPopup();
 
     let nearest = null, nearestDist = Infinity;
     seedLocations.forEach(loc => {
