@@ -45,8 +45,13 @@ map.addLayer(markerCluster);
 
 function zoomToMarker(marker){
   if(!marker) return;
+
   map.setView(marker.getLatLng(), 16, { animate: false });
-  map.panBy([0, -110], { animate: false }); // nudge marker down, clear of the button stack
+
+  // Position the selected marker lower on screen so the full popup stays visible.
+  const verticalOffset = Math.min(Math.round(window.innerHeight * 0.22), 220);
+  map.panBy([0, -verticalOffset], { animate: false });
+
   marker.openPopup();
 }
 
@@ -217,8 +222,12 @@ function ratingConfidenceHtml(count){
 }
 
 const BATHROOM_AMENITIES = [
-  {key:'restroomType', label:'Restroom type', states:['unknown','single','multiple'],
-    stateLabels:{unknown:'Not sure', single:'Single-person', multiple:'Multiple stalls'}},
+  {key:'restroomType', label:'Restroom setup', states:['unknown','single','multiple'],
+    stateLabels:{
+      unknown:'Not sure',
+      single:'One shared restroom',
+      multiple:"Separate men's & women's restrooms"
+    }},
   {key:'accessible', label:'Accessible'},
   {key:'changing', label:'Changing table'},
   {key:'paper', label:'Paper towels'},
@@ -805,10 +814,25 @@ function addMarker(loc){
   marker.bindPopup(popupHtml(loc, ratingsCache[loc.id], myVoteCache[loc.id]), {
     maxWidth: Math.min(280, window.innerWidth - 40),
     maxHeight: window.innerHeight * 0.6,
-    autoPanPaddingTopLeft: [10, 130],
-    autoPanPaddingBottomRight: [10, 60]
+    autoPan: true,
+    keepInView: true,
+    autoPanPaddingTopLeft: [20, Math.min(Math.round(window.innerHeight * 0.24), 230)],
+    autoPanPaddingBottomRight: [20, 70]
   });
   marker.on('popupopen', () => {
+    // Leaflet auto-pans before all dynamic popup content has fully laid out.
+    // Re-check once the popup has rendered so its bottom is not clipped on phones.
+    setTimeout(() => {
+      const popup = marker.getPopup();
+      if(popup && popup._container){
+        map.panInside(marker.getLatLng(), {
+          paddingTopLeft: [20, Math.min(Math.round(window.innerHeight * 0.24), 230)],
+          paddingBottomRight: [20, 80],
+          animate: false
+        });
+      }
+    }, 60);
+
     attachStarHandlers(loc);
     attachTipHandlers(loc);
     attachDirectionsHandler(loc);
