@@ -3,13 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Stewart's Bathroom Report – Bathroom Ratings Map</title>
-<meta name="description" content="Find and rate bathrooms at Stewart's Shops locations across New York and Vermont.">
-<meta property="og:title" content="Stewart's Bathroom Report">
-<meta property="og:description" content="A completely unofficial map for finding and rating Stewart's Shops bathrooms.">
-<meta property="og:image" content="https://stewarts-map.github.io/Stewarts-map/icon-512.png">
+<title>BathroomReport – Find the Best Bathrooms Near You</title>
+<meta name="description" content="Find the best bathrooms, rated by the community. Currently featuring Stewart's Shops across New York and Vermont.">
+<link rel="canonical" href="https://bathroomreport.app/">
+<meta property="og:title" content="BathroomReport">
+<meta property="og:description" content="Find the best bathrooms. Rated by the community.">
+<meta property="og:image" content="https://bathroomreport.app/icon-512.png">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://stewarts-map.github.io/Stewarts-map/">
+<meta property="og:url" content="https://bathroomreport.app/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BathroomReport">
+<meta name="twitter:description" content="Find the best bathrooms. Rated by the community.">
+<meta name="twitter:image" content="https://bathroomreport.app/icon-512.png">
 <link rel="icon" href="icon-512.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -33,15 +38,17 @@
     <div style="display:flex;align-items:center;gap:10px;min-width:0;">
       <div id="headerIcon">🚽</div>
       <div style="min-width:0;">
-        <h1>Stewart's Bathroom Report</h1>
-        <p id="headerSubtitle">Tap a pin to rate the store &amp; bathroom
+        <h1>BathroomReport</h1>
+        <p id="headerSubtitle">Find the best bathrooms. Rated by the community.
           <button id="infoBtn" title="About this app">ℹ️</button>
         </p>
+        <span id="chainBadge">🚽 Currently Featuring Stewart's Shops</span>
       </div>
     </div>
-    <div style="display:flex;gap:6px;flex:none;">
+    <div style="display:flex;gap:6px;flex:none;align-items:center;">
       <button id="themeToggle">🌙</button>
       <a href="https://cash.app/$BathroomReport" target="_blank" rel="noopener" id="cashAppBtn">🍔 Buy me lunch</a>
+      <button id="accountToggle">👤 Log In</button>
     </div>
   </div>
   <div id="statPillRow">
@@ -96,7 +103,7 @@
       <li>👤 <b>Log in</b> (just a username & password, no email) to make your name and ratings follow you across devices, and to automatically appear on the <b>Leaderboard</b> under your username. <b>No password recovery exists</b> — if you forget it, that username is gone for good.</li>
     </ul>
     <p style="font-size:11.5px;color:#888;border-top:1px solid #ddd;padding-top:10px;margin-bottom:6px;">
-      Unofficial fan project — not affiliated with or endorsed by Stewart's Shops. Store hours shown may vary or be out of date — always call ahead if it matters.
+      BathroomReport is an independent, community-created project and is not affiliated with or endorsed by Stewart's Shops or any other business listed. Store hours shown may vary or be out of date — always call ahead if it matters.
     </p>
     <p style="font-size:11px;color:#aaa;margin-bottom:14px;">Location data updated: July 14, 2026</p>
     <button id="onboardingClose" class="btn btn-amber" style="width:100%;">Got it!</button>

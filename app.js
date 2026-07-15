@@ -217,8 +217,8 @@ function ratingConfidenceHtml(count){
 }
 
 const BATHROOM_AMENITIES = [
-  {key:'single', label:'Single-person restroom'},
-  {key:'multiple', label:'Multiple stalls'},
+  {key:'restroomType', label:'Restroom type', states:['unknown','single','multiple'],
+    stateLabels:{unknown:'Not sure', single:'Single-person', multiple:'Multiple stalls'}},
   {key:'accessible', label:'Accessible'},
   {key:'changing', label:'Changing table'},
   {key:'paper', label:'Paper towels'},
@@ -229,23 +229,26 @@ const CONDITION_MAX_AGE = 48 * 60 * 60 * 1000;
 const amenityCache = {};
 const conditionCache = {};
 
-// Cycles: unknown -> yes -> no -> unknown, one tap at a time (no native picker popup)
-function nextAmenityValue(val){
-  if(val === 'unknown' || !val) return 'yes';
-  if(val === 'yes') return 'no';
-  return 'unknown';
+// Cycles through whichever states this amenity defines (most are Not sure/Yes/No, but
+// Restroom type instead cycles Not sure/Single-person/Multiple stalls)
+function amenityStates(a){
+  return a.states || ['unknown', 'yes', 'no'];
 }
-function amenityStateLabel(val){
-  if(val === 'yes') return 'Yes';
-  if(val === 'no') return 'No';
-  return 'Not sure';
+function amenityStateLabel(a, val){
+  const labels = a.stateLabels || {unknown:'Not sure', yes:'Yes', no:'No'};
+  return labels[val] || 'Not sure';
+}
+function nextAmenityValue(a, val){
+  const states = amenityStates(a);
+  const idx = states.indexOf(val);
+  return states[(idx + 1) % states.length];
 }
 
 function amenityEditorHtml(locId, myVote){
   const mine = myVote.amenities || {};
   const chips = BATHROOM_AMENITIES.map(a => {
     const val = mine[a.key] || 'unknown';
-    return `<button type="button" class="amenity-chip amenity-chip-${val}" data-value="${val}" id="amenity-${a.key}-${locId}">${a.label}: <span class="amenity-chip-state">${amenityStateLabel(val)}</span></button>`;
+    return `<button type="button" class="amenity-chip amenity-chip-${val}" data-value="${val}" id="amenity-${a.key}-${locId}">${a.label}: <span class="amenity-chip-state">${amenityStateLabel(a, val)}</span></button>`;
   }).join('');
   return `<div class="amenities-editor"><div class="feature-title">🚻 Bathroom features you saw</div><div class="amenity-chip-row">${chips}</div><button class="btn btn-secondary amenities-save" id="amenities-save-${locId}">Save features</button><div class="save-note" id="amenities-note-${locId}"></div></div>`;
 }
@@ -863,7 +866,7 @@ function attachShareHandler(loc){
     const name = newBtn.dataset.sharename;
     if(navigator.share){
       try{
-        await navigator.share({ title: `${name} — Stewart's Bathroom Report`, url });
+        await navigator.share({ title: `${name} — BathroomReport`, url });
       }catch(e){ /* user cancelled the share sheet — no action needed */ }
     } else if(navigator.clipboard){
       try{
@@ -1004,18 +1007,18 @@ async function attachAmenityHandlers(loc){
   const summary=await loadAmenitySummary(loc.id);
   if(summaryEl) summaryEl.innerHTML=amenitySummaryHtml(summary);
 
-  // Each chip cycles Not sure -> Yes -> No -> Not sure on a single tap — no native picker
+  // Each chip cycles through its own states on tap — no native picker
   BATHROOM_AMENITIES.forEach(a => {
     const chipOrig = document.getElementById(`amenity-${a.key}-${loc.id}`);
     if(!chipOrig) return;
     const chip = chipOrig.cloneNode(true);
     chipOrig.parentNode.replaceChild(chip, chipOrig);
     chip.addEventListener('click', () => {
-      const next = nextAmenityValue(chip.dataset.value);
+      const next = nextAmenityValue(a, chip.dataset.value);
       chip.dataset.value = next;
       chip.className = 'amenity-chip amenity-chip-' + next;
       const stateSpan = chip.querySelector('.amenity-chip-state');
-      if(stateSpan) stateSpan.textContent = amenityStateLabel(next);
+      if(stateSpan) stateSpan.textContent = amenityStateLabel(a, next);
       if(navigator.vibrate) navigator.vibrate(10);
     });
   });
@@ -1773,14 +1776,24 @@ function updateAccountUI(){
   const loggedIn = isLoggedIn();
   document.getElementById('loggedOutView').style.display = loggedIn ? 'none' : 'block';
   document.getElementById('loggedInView').style.display = loggedIn ? 'block' : 'none';
+  const accountBtn = document.getElementById('accountToggle');
   if(loggedIn){
     const email = window.__currentUser.email || '';
-    const username = email.split('@')[0];
+    const username = email.split('@')[0]; // never show the raw email/UID anywhere in the UI
     document.getElementById('loggedInUsername').textContent = username;
+    if(accountBtn) accountBtn.textContent = '👤 ' + username;
+  } else if(accountBtn){
+    accountBtn.textContent = '👤 Log In';
   }
   const syncNote = document.getElementById('passportSyncNote');
   if(syncNote) syncNote.style.display = loggedIn ? 'none' : 'block';
 }
+
+document.getElementById('accountToggle').addEventListener('click', () => {
+  document.getElementById('accountPanel').classList.add('show');
+  updateAccountUI();
+  checkAndUnlockAchievements();
+});
 
 document.getElementById('accountClose').addEventListener('click', () => {
   document.getElementById('accountPanel').classList.remove('show');

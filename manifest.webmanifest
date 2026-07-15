@@ -1,7 +1,7 @@
 {
-  "name": "Stewart's Bathroom Report",
-  "short_name": "Bathroom Report",
-  "description": "Find and rate bathrooms at Stewart's Shops locations.",
+  "name": "BathroomReport",
+  "short_name": "BathroomReport",
+  "description": "Find the best bathrooms, rated by the community. Currently featuring Stewart's Shops.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
