@@ -229,14 +229,25 @@ const CONDITION_MAX_AGE = 48 * 60 * 60 * 1000;
 const amenityCache = {};
 const conditionCache = {};
 
+// Cycles: unknown -> yes -> no -> unknown, one tap at a time (no native picker popup)
+function nextAmenityValue(val){
+  if(val === 'unknown' || !val) return 'yes';
+  if(val === 'yes') return 'no';
+  return 'unknown';
+}
+function amenityStateLabel(val){
+  if(val === 'yes') return 'Yes';
+  if(val === 'no') return 'No';
+  return 'Not sure';
+}
+
 function amenityEditorHtml(locId, myVote){
   const mine = myVote.amenities || {};
-  return `<div class="amenities-editor"><div class="feature-title">🚻 Bathroom features you saw</div>${BATHROOM_AMENITIES.map(a => `
-    <label class="amenity-row"><span>${a.label}</span><select data-amenity="${a.key}" id="amenity-${a.key}-${locId}">
-      <option value="unknown" ${!mine[a.key] || mine[a.key] === 'unknown' ? 'selected' : ''}>Not sure</option>
-      <option value="yes" ${mine[a.key] === 'yes' ? 'selected' : ''}>Yes</option>
-      <option value="no" ${mine[a.key] === 'no' ? 'selected' : ''}>No</option>
-    </select></label>`).join('')}<button class="btn btn-secondary amenities-save" id="amenities-save-${locId}">Save features</button><div class="save-note" id="amenities-note-${locId}"></div></div>`;
+  const chips = BATHROOM_AMENITIES.map(a => {
+    const val = mine[a.key] || 'unknown';
+    return `<button type="button" class="amenity-chip amenity-chip-${val}" data-value="${val}" id="amenity-${a.key}-${locId}">${a.label}: <span class="amenity-chip-state">${amenityStateLabel(val)}</span></button>`;
+  }).join('');
+  return `<div class="amenities-editor"><div class="feature-title">🚻 Bathroom features you saw</div><div class="amenity-chip-row">${chips}</div><button class="btn btn-secondary amenities-save" id="amenities-save-${locId}">Save features</button><div class="save-note" id="amenities-note-${locId}"></div></div>`;
 }
 
 function amenitySummaryHtml(summary){
@@ -992,6 +1003,23 @@ async function attachAmenityHandlers(loc){
   const summaryEl=document.getElementById('feature-summary-'+loc.id);
   const summary=await loadAmenitySummary(loc.id);
   if(summaryEl) summaryEl.innerHTML=amenitySummaryHtml(summary);
+
+  // Each chip cycles Not sure -> Yes -> No -> Not sure on a single tap — no native picker
+  BATHROOM_AMENITIES.forEach(a => {
+    const chipOrig = document.getElementById(`amenity-${a.key}-${loc.id}`);
+    if(!chipOrig) return;
+    const chip = chipOrig.cloneNode(true);
+    chipOrig.parentNode.replaceChild(chip, chipOrig);
+    chip.addEventListener('click', () => {
+      const next = nextAmenityValue(chip.dataset.value);
+      chip.dataset.value = next;
+      chip.className = 'amenity-chip amenity-chip-' + next;
+      const stateSpan = chip.querySelector('.amenity-chip-state');
+      if(stateSpan) stateSpan.textContent = amenityStateLabel(next);
+      if(navigator.vibrate) navigator.vibrate(10);
+    });
+  });
+
   const btnOrig=document.getElementById('amenities-save-'+loc.id);
   if(!btnOrig) return;
   const btn=btnOrig.cloneNode(true); btnOrig.parentNode.replaceChild(btn,btnOrig);
@@ -1001,7 +1029,7 @@ async function attachAmenityHandlers(loc){
     const verification=await verifyNearby(loc);
     if(!verification.ok){ if(note){note.style.color='#c62828';note.textContent='📍 You need to be at this Stewart\'s to report its features.';} return; }
     const amenities={};
-    BATHROOM_AMENITIES.forEach(a=>{ const el=document.getElementById(`amenity-${a.key}-${loc.id}`); amenities[a.key]=el ? el.value : 'unknown'; });
+    BATHROOM_AMENITIES.forEach(a=>{ const el=document.getElementById(`amenity-${a.key}-${loc.id}`); amenities[a.key]=el ? el.dataset.value : 'unknown'; });
     const vote={...(myVoteCache[loc.id]||emptyVote()), amenities};
     myVoteCache[loc.id]=vote;
     btn.disabled=true;

@@ -295,12 +295,22 @@
 .feature-badge{font-size:11px;padding:3px 6px;border-radius:10px;background:rgba(47,107,60,.18);border:1px solid rgba(76,175,80,.45);color:var(--popup-text);}
 .feature-badge.unconfirmed{background:transparent;border-color:var(--popup-divider);color:var(--popup-muted);}
 .amenities-editor{margin:8px 0;padding:8px;border:1px solid var(--popup-divider);border-radius:7px;}
-.amenity-row{display:grid;grid-template-columns:1fr 92px;align-items:center;gap:8px;margin:5px 0;font-size:12px;}
-.amenity-row select{width:100%;font-size:12px;padding:5px;background:var(--popup-tip-input-bg);color:var(--popup-text);border:1px solid var(--popup-border);border-radius:5px;}
+.amenity-chip-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px;}
+.amenity-chip{
+  font-size:12px;padding:7px 10px;border-radius:20px;cursor:pointer;
+  background:var(--popup-tip-input-bg);color:var(--popup-muted);border:1px solid var(--popup-border);
+  transition:background .15s ease,color .15s ease,border-color .15s ease;
+}
+.amenity-chip-state{font-weight:700;}
+.amenity-chip-unknown{opacity:.75;}
+.amenity-chip-yes{background:rgba(47,107,60,.22);border-color:rgba(76,175,80,.55);color:var(--popup-text);}
+.amenity-chip-yes .amenity-chip-state{color:#66bb6a;}
+.amenity-chip-no{background:rgba(198,40,40,.15);border-color:rgba(229,115,115,.5);color:var(--popup-text);}
+.amenity-chip-no .amenity-chip-state{color:#ef9a9a;}
 .condition-buttons{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px;}
 .condition-btn{font-size:11.5px;padding:6px;border:1px solid var(--popup-border);border-radius:6px;background:var(--popup-tip-input-bg);color:var(--popup-text);cursor:pointer;}
 .condition-btn:disabled{opacity:.6;cursor:default;}
 .bathroom-now-card{font-size:13px;line-height:1.45;}
 .bathroom-now-card .now-title{font-weight:800;color:var(--amber);margin-bottom:3px;}
 .bathroom-now-card .now-actions{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;}
-@media(max-width:480px){#nearestInfo{left:10px;right:10px;max-width:none;top:160px}.amenity-row{grid-template-columns:1fr 88px}}
+@media(max-width:480px){#nearestInfo{left:10px;right:10px;max-width:none;top:160px}}
