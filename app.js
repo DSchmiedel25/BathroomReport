@@ -1117,7 +1117,6 @@ async function loadAllRatings(){
   updateMostRecentBadge();
   updateMyProgressBadge();
   checkAndUnlockAchievements();
-  maybeShowSupportPrompt();
   map.invalidateSize(); // header height just changed (badges filled in) — tell Leaflet to recalculate
 }
 
@@ -1480,7 +1479,6 @@ function attachStarHandlers(loc){
         const okVote = await saveMyVote(loc.id, myVote);
         if(okAgg) logActivity('rating');
         if(note) note.textContent = (okAgg && okVote) ? 'Saved ✓ — visible to everyone' : 'Save failed';
-        if(okAgg && okVote) maybeShowSupportPrompt();
 
         // refresh the label text with new average
         const labelEl = starGroup.parentElement.querySelector('.rating-label');
@@ -1554,40 +1552,6 @@ async function attachTipHandlers(loc){
 seedLocations.forEach(loc => addMarker(loc));
 loadAllRatings();
 loadWeeklyRecap();
-
-// One-time support prompt — shown after this identity has rated five different locations.
-// The permanent support link remains available in the Account panel.
-function reviewedLocationCount(){
-  return Object.values(myVoteCache).filter(vote =>
-    vote && ((vote.bathroom || 0) > 0 || (vote.store || 0) > 0)
-  ).length;
-}
-
-function closeSupportPrompt(){
-  const overlay = document.getElementById('supportPromptOverlay');
-  if(!overlay) return;
-  overlay.classList.remove('show');
-  overlay.setAttribute('aria-hidden', 'true');
-}
-
-function maybeShowSupportPrompt(){
-  if(localStorage.getItem('supportPromptShown') === '1') return;
-  if(reviewedLocationCount() < 5) return;
-
-  const overlay = document.getElementById('supportPromptOverlay');
-  if(!overlay) return;
-
-  // Mark it before opening so it never becomes a repeated interruption.
-  localStorage.setItem('supportPromptShown', '1');
-  overlay.classList.add('show');
-  overlay.setAttribute('aria-hidden', 'false');
-}
-
-document.getElementById('supportPromptLater')?.addEventListener('click', closeSupportPrompt);
-document.getElementById('supportPromptLink')?.addEventListener('click', closeSupportPrompt);
-document.getElementById('supportPromptOverlay')?.addEventListener('click', (event) => {
-  if(event.target.id === 'supportPromptOverlay') closeSupportPrompt();
-});
 
 // First-time onboarding — shown once per device, dismissible
 (function(){
