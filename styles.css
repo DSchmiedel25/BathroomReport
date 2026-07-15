@@ -52,11 +52,6 @@
     background:rgba(56,184,187,.14);border:1px solid rgba(56,184,187,.4);
     padding:3px 8px;border-radius:12px;
   }
-  #cashAppBtn{
-    display:block;text-align:center;background:linear-gradient(135deg,#00C244,#00a339);color:#fff;text-decoration:none;
-    font-weight:700;font-size:13px;padding:10px 14px;border-radius:10px;
-    box-shadow:0 2px 6px rgba(0,194,68,.3);margin-bottom:10px;
-  }
   #statPillRow{
     position:relative;height:30px;margin-top:10px;overflow:hidden;
   }
@@ -185,18 +180,137 @@
     font-size:12px;font-weight:700;padding:8px;border-radius:6px;cursor:pointer;
   }
   #onboardingOverlay{
-    position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.75);
-    display:none;align-items:center;justify-content:center;padding:20px;
+    position:fixed;
+    inset:0;
+    z-index:3000;
+    background:rgba(0,0,0,.72);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
   }
   #onboardingOverlay.show{display:flex;}
   #onboardingCard{
-    background:#fffaf0;border-radius:14px;padding:22px;max-width:340px;color:#1c1c1e;
-    box-shadow:0 8px 30px rgba(0,0,0,.5);
+    width:min(92vw, 430px);
+    max-height:min(78vh, 620px);
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    background:#fffaf0;
+    color:#1c1c1e;
+    border-radius:18px;
+    box-shadow:0 14px 40px rgba(0,0,0,.55);
   }
-  #onboardingCard h2{margin:0 0 8px;font-size:20px;}
-  #onboardingCard p{margin:0 0 8px;font-size:14px;color:#444;}
-  #onboardingCard ul{margin:0 0 16px;padding-left:20px;font-size:13.5px;line-height:1.6;color:#333;}
-  #onboardingCard li{margin-bottom:6px;}
+  #onboardingScroll{
+    min-height:0;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+    padding:18px 18px 12px;
+  }
+  #onboardingCard h2{
+    margin:0 0 5px;
+    font-size:19px;
+    line-height:1.2;
+  }
+  #onboardingCard p{
+    margin:0 0 8px;
+    color:#444;
+  }
+  .onboardingTagline{
+    font-size:13px;
+    line-height:1.35;
+  }
+  .onboardingGrid{
+    display:grid;
+    gap:8px;
+    margin:13px 0 12px;
+  }
+  .onboardingTip{
+    display:grid;
+    grid-template-columns:28px 1fr;
+    gap:8px;
+    align-items:start;
+    padding:9px 10px;
+    background:rgba(255,255,255,.58);
+    border:1px solid rgba(0,0,0,.08);
+    border-radius:11px;
+  }
+  .onboardingTip > span{
+    font-size:19px;
+    line-height:1.2;
+    text-align:center;
+  }
+  .onboardingTip b{
+    display:block;
+    margin-bottom:1px;
+    font-size:13.5px;
+    line-height:1.25;
+  }
+  .onboardingTip small{
+    display:block;
+    color:#555;
+    font-size:12px;
+    line-height:1.35;
+  }
+  #onboardingMore{
+    border-top:1px solid rgba(0,0,0,.12);
+    padding-top:10px;
+  }
+  #onboardingMore summary{
+    cursor:pointer;
+    color:#2b6466;
+    font-size:12.5px;
+    font-weight:800;
+  }
+  .onboardingMoreBody{
+    padding-top:9px;
+  }
+  .onboardingMoreBody p{
+    font-size:12px !important;
+    line-height:1.4;
+    margin-bottom:7px !important;
+  }
+  .onboardingDisclaimer{
+    padding-top:8px;
+    border-top:1px solid rgba(0,0,0,.1);
+    color:#666 !important;
+  }
+  .onboardingUpdated{
+    color:#888 !important;
+    margin-bottom:0 !important;
+  }
+  #onboardingActions{
+    flex:none;
+    padding:10px 18px calc(10px + env(safe-area-inset-bottom));
+    background:#fffaf0;
+    border-top:1px solid rgba(0,0,0,.12);
+  }
+  #onboardingClose{
+    display:block;
+    width:100%;
+    min-height:44px;
+    border-radius:11px;
+    font-size:15px;
+  }
+  @media (max-width:480px){
+    #onboardingOverlay{
+      align-items:flex-end;
+      padding:10px 10px max(10px, env(safe-area-inset-bottom));
+    }
+    #onboardingCard{
+      width:100%;
+      max-height:72vh;
+      border-radius:18px;
+    }
+    #onboardingScroll{
+      padding:15px 15px 10px;
+    }
+    #onboardingCard h2{font-size:18px;}
+    .onboardingGrid{gap:7px;margin-top:11px;}
+    .onboardingTip{padding:8px 9px;}
+    #onboardingActions{padding-left:15px;padding-right:15px;}
+  }
   #listViewPanel{
     position:absolute;inset:0;z-index:1500;background:var(--charcoal);display:none;
     flex-direction:column;
@@ -323,3 +437,82 @@
 .bathroom-now-card .now-title{font-weight:800;color:var(--amber);margin-bottom:3px;}
 .bathroom-now-card .now-actions{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;}
 @media(max-width:480px){#nearestInfo{left:10px;right:10px;max-width:none;top:160px}}
+
+
+  /* Permanent support area in the Account panel */
+  #supportSection{
+    margin-top:18px;
+    padding-top:14px;
+    border-top:1px solid var(--panel-border);
+  }
+  #supportSection p{
+    margin:0 0 12px;
+    color:var(--muted);
+    font-size:12.5px;
+    line-height:1.45;
+  }
+  .support-btn{
+    display:block;
+    width:100%;
+    text-align:center;
+    text-decoration:none;
+    background:linear-gradient(135deg,#00C244,#00a339);
+    color:#fff !important;
+    font-weight:800;
+    font-size:13px;
+    padding:11px 14px;
+    border-radius:10px;
+    box-shadow:0 2px 6px rgba(0,194,68,.28);
+  }
+
+  /* One-time thank-you prompt after five rated locations */
+  #supportPromptOverlay{
+    position:fixed;
+    inset:0;
+    z-index:3000;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    background:rgba(0,0,0,.68);
+  }
+  #supportPromptOverlay.show{display:flex;}
+  #supportPromptCard{
+    width:min(92vw,390px);
+    background:var(--popup-bg);
+    color:var(--popup-text);
+    border:1px solid var(--popup-border);
+    border-radius:18px;
+    padding:22px;
+    text-align:center;
+    box-shadow:0 18px 50px rgba(0,0,0,.42);
+  }
+  .support-prompt-icon{
+    font-size:34px;
+    line-height:1;
+    margin-bottom:8px;
+  }
+  #supportPromptCard h2{
+    margin:0 0 9px;
+    font-size:20px;
+  }
+  #supportPromptCard p{
+    margin:0 0 9px;
+    font-size:13.5px;
+    line-height:1.45;
+  }
+  #supportPromptCard .support-prompt-secondary{
+    color:var(--popup-muted);
+    font-size:12.5px;
+    margin-bottom:15px;
+  }
+  #supportPromptCard .support-btn{margin-bottom:9px;}
+  #supportPromptLater{width:100%;padding:10px 14px;}
+
+  @media (max-height:650px){
+    #supportPromptCard{
+      padding:17px;
+    }
+    .support-prompt-icon{font-size:28px;}
+    #supportPromptCard h2{font-size:18px;}
+  }
