@@ -56,7 +56,7 @@ button,input{font:inherit}button{touch-action:manipulation}a{color:var(--accent)
 .stat-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:20px}.stat-box{position:relative;overflow:hidden;background:linear-gradient(145deg,var(--surface),#0f1c2d);border:1px solid var(--line);border-radius:18px;padding:17px;box-shadow:0 9px 25px rgba(0,0,0,.12);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:750}.stat-box:after{content:"";position:absolute;width:65px;height:65px;border-radius:50%;right:-24px;bottom:-29px;background:rgba(67,198,203,.08)}.stat-box b{display:block;font-size:27px;line-height:1;color:var(--text);margin-bottom:9px;letter-spacing:-.03em}
 .dashboard-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}.panel{background:linear-gradient(150deg,var(--surface),#0e1b2d);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 14px 40px rgba(0,0,0,.16);overflow:hidden;margin-bottom:16px;scroll-margin-top:20px}.panel-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:17px 19px;border-bottom:1px solid var(--line)}.panel-title{font-size:15px;font-weight:850;margin:0}.panel-note{font-size:11px;color:var(--muted);margin:4px 0 0}.panel-body.padded{padding:16px 19px}.section-toggle{cursor:pointer;user-select:none}.section-toggle:hover{background:rgba(67,198,203,.035)}.toggle-arrow{font-size:18px;color:var(--accent)}
 .table-wrap{width:100%;overflow:auto;-webkit-overflow-scrolling:touch}table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;min-width:620px}th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}th{color:#7690a7;font-size:10px;text-transform:uppercase;letter-spacing:.08em;background:#0c1929;position:sticky;top:0;z-index:1}tbody tr:last-child td{border-bottom:0}tbody tr:hover{background:rgba(67,198,203,.025)}.loading{color:#6f8599;font-style:italic}.storeAvg{color:#79bce7;font-weight:800}.bathAvg{color:#71d9a7;font-weight:800}.tiplist{margin:0;padding:0;list-style:none;display:grid;gap:6px;color:#b8c7d4}.tiplist li{background:rgba(145,166,187,.08);padding:7px 8px;border-radius:9px}.search-row{padding:14px 16px;border-bottom:1px solid var(--line)}#namesSection.collapsed,#locationsSection.collapsed{display:none}
-.chain-pill{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;margin-left:8px;text-transform:uppercase;letter-spacing:.05em;vertical-align:middle;white-space:nowrap}
+.chain-pill{display:inline-block;font-size:11px;font-weight:800;padding:4px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.05em;vertical-align:middle;white-space:nowrap}
 .chain-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;flex:none}
 .mobile-head{display:none}
 @media(max-width:1050px){.stat-row{grid-template-columns:repeat(3,minmax(0,1fr))}.dashboard-grid{grid-template-columns:1fr}}
@@ -141,7 +141,7 @@ button,input{font:inherit}button{touch-action:manipulation}a{color:var(--accent)
     </section>
 
     <section class="page-view" data-view="locations">
-      <section class="panel" id="locationsPanel"><div class="panel-header"><div><h2 class="panel-title">All locations</h2><p class="panel-note">Search ratings, tips, and location-level controls</p></div></div><div class="search-row"><input type="search" id="filterBox" placeholder="Search name, address, or store number…"></div><div class="table-wrap"><table><thead><tr><th>Location</th><th id="th-store" style="cursor:pointer">Store ⇅</th><th id="th-bathroom" style="cursor:pointer">Bathroom ⇅</th><th id="th-reviews" style="cursor:pointer">Ratings ⇅</th><th>Tips</th><th>Actions</th></tr></thead><tbody id="tableBody"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody></table></div></section>
+      <section class="panel" id="locationsPanel"><div class="panel-header"><div><h2 class="panel-title">All locations</h2><p class="panel-note">Search ratings, tips, and location-level controls</p></div></div><div class="status-tabs" id="chainFilterRow"></div><div class="search-row"><input type="search" id="filterBox" placeholder="Search name, address, or store number…"></div><div class="table-wrap"><table><thead><tr><th>Location</th><th id="th-store" style="cursor:pointer">Store ⇅</th><th id="th-bathroom" style="cursor:pointer">Bathroom ⇅</th><th id="th-reviews" style="cursor:pointer">Ratings ⇅</th><th>Tips</th><th>Actions</th></tr></thead><tbody id="tableBody"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody></table></div></section>
     </section>
 
     <section class="page-view" data-view="tips">
@@ -678,7 +678,7 @@ function renderTable(rows){
       : '<span class="loading">none</span>';
     const chain = chainFor(loc);
     return `<tr>
-      <td><b>${escapeHtml(loc.n)}</b><span class="chain-pill" style="background:${chain.color};color:${chain.textColor};">${escapeHtml(chain.name)}</span><br><span style="color:#999;">${escapeHtml(loc.addr)}${loc.num ? ' · #' + loc.num : ''}</span></td>
+      <td><span class="chain-pill" style="background:${chain.color};color:${chain.textColor};">${escapeHtml(chain.name)}</span><br><span style="color:#999;">${escapeHtml(loc.addr)}${loc.num ? ' · #' + loc.num : ''}</span></td>
       <td class="storeAvg">${avgStr(agg.storeSum, agg.storeCount)}★ (${agg.storeCount||0})</td>
       <td class="bathAvg">${avgStr(agg.bathroomSum, agg.bathroomCount)}★ (${agg.bathroomCount||0})</td>
       <td>${r.votes ? r.votes.length : 0}</td>
@@ -689,6 +689,40 @@ function renderTable(rows){
 }
 
 let sortState = { column: null, direction: 'desc' }; // column: 'store' | 'bathroom' | 'reviews' | null
+
+// Chain filter — lets you view all locations or narrow to one/more chains at once.
+// An empty set means "no filter" (show everything).
+let activeChainFilters = new Set();
+
+function renderChainFilterRow(){
+  const row = document.getElementById('chainFilterRow');
+  if(!row) return;
+  const allActive = activeChainFilters.size === 0;
+  const chips = [`<button class="status-tab chain-filter-tab${allActive ? ' active' : ''}" data-chain="all">All</button>`];
+  Object.keys(CHAIN_REGISTRY).forEach(key => {
+    const chain = CHAIN_REGISTRY[key];
+    const isActive = activeChainFilters.has(key);
+    const style = isActive ? `background:${chain.color};border-color:${chain.color};color:${chain.textColor};` : '';
+    chips.push(`<button class="status-tab chain-filter-tab" data-chain="${key}" style="${style}">${escapeHtml(chain.name)}</button>`);
+  });
+  row.innerHTML = chips.join('');
+}
+renderChainFilterRow();
+
+document.getElementById('chainFilterRow').addEventListener('click', (e) => {
+  const btn = e.target.closest('.chain-filter-tab');
+  if(!btn) return;
+  const key = btn.dataset.chain;
+  if(key === 'all'){
+    activeChainFilters.clear();
+  } else if(activeChainFilters.has(key)){
+    activeChainFilters.delete(key);
+  } else {
+    activeChainFilters.add(key);
+  }
+  renderChainFilterRow();
+  refreshTable();
+});
 
 function sortRows(rows){
   if(!sortState.column) return rows;
@@ -711,6 +745,9 @@ function updateHeaderLabels(){
 function refreshTable(){
   const q = document.getElementById('filterBox').value.trim().toLowerCase();
   let rows = allRows;
+  if(activeChainFilters.size > 0){
+    rows = rows.filter(r => activeChainFilters.has(r.loc.chain || DEFAULT_CHAIN_KEY));
+  }
   if(q){
     rows = rows.filter(r =>
       r.loc.n.toLowerCase().includes(q) ||
