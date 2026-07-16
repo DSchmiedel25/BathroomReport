@@ -143,31 +143,61 @@
   #legendBody{margin-top:6px;}
   #legendBody.collapsed{display:none;}
   #legendToggle.collapsed-toggle #legendArrow{transform:rotate(-90deg);display:inline-block;}
+
+  #brandFilterToggle{
+    position:absolute;top:10px;right:10px;z-index:510;font-size:12px;font-weight:700;
+    background:var(--panel-bg);color:var(--cream);border:1px solid var(--panel-border);
+    padding:5px 10px;border-radius:6px;cursor:pointer;
+  }
+  #brandFilterToggle.active{border-color:var(--accent);color:var(--accent);}
+  #brandFilterPanel{
+    position:absolute;top:44px;right:10px;z-index:520;width:min(260px,calc(100% - 20px));
+    display:none;background:var(--panel-bg);color:var(--cream);
+    border:1px solid var(--panel-border);border-radius:10px;padding:10px;
+    box-shadow:0 4px 16px rgba(0,0,0,.35);
+  }
+  #brandFilterPanel.show{display:block;}
+  #brandFilterTitle{font-size:12px;font-weight:800;margin-bottom:7px;}
+  #brandFilterOptions{display:flex;flex-direction:column;gap:5px;}
+  .brand-filter-option{
+    display:flex;align-items:center;gap:8px;padding:6px 7px;border-radius:7px;
+    font-size:13px;cursor:pointer;background:rgba(127,127,127,.08);
+  }
+  .brand-filter-option input{margin:0;accent-color:var(--accent);}
+  .brand-filter-swatch{
+    width:12px;height:12px;border-radius:50%;border:1px solid rgba(255,255,255,.5);flex:none;
+  }
+  #brandFilterActions{display:flex;gap:6px;margin-top:9px;padding-top:8px;border-top:1px solid var(--panel-border);}
+  #brandFilterActions button{
+    flex:1;background:transparent;color:var(--cream);border:1px solid var(--panel-border);
+    border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;
+  }
+
   #openNowToggle{
-    position:absolute;top:10px;right:10px;z-index:500;font-size:12px;font-weight:700;
+    position:absolute;top:44px;right:10px;z-index:500;font-size:12px;font-weight:700;
     background:var(--panel-bg);color:var(--cream);border:1px solid var(--panel-border);
     padding:5px 10px;border-radius:6px;cursor:pointer;
   }
   #openNowToggle.active{background:#2e7d32;border-color:#2e7d32;color:#fff;}
   #listViewToggle{
-    position:absolute;top:44px;right:10px;z-index:500;font-size:12px;font-weight:700;
+    position:absolute;top:78px;right:10px;z-index:500;font-size:12px;font-weight:700;
     background:var(--panel-bg);color:var(--cream);border:1px solid var(--panel-border);
     padding:5px 10px;border-radius:6px;cursor:pointer;
   }
   #leaderboardToggle{
-    position:absolute;top:78px;right:10px;z-index:500;font-size:12px;font-weight:700;
+    position:absolute;top:112px;right:10px;z-index:500;font-size:12px;font-weight:700;
     background:var(--panel-bg);color:var(--cream);border:1px solid var(--panel-border);
     padding:5px 10px;border-radius:6px;cursor:pointer;
   }
   .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;}
   #locateBtn{
-    position:absolute;top:112px;right:10px;z-index:500;
+    position:absolute;top:146px;right:10px;z-index:500;
     background:#2196f3;color:#fff;border:none;border-radius:50px;
     padding:11px 14px;font-weight:700;font-size:13.5px;box-shadow:0 3px 10px rgba(0,0,0,.4);
     cursor:pointer;
   }
   #nearestInfo{
-    position:absolute;top:160px;right:10px;z-index:500;
+    position:absolute;top:194px;right:10px;z-index:500;
     background:var(--panel-bg);color:var(--cream);border:1px solid #2196f3;
     border-radius:8px;padding:8px 12px;font-size:13px;max-width:220px;display:none;
     cursor:pointer;line-height:1.4;
