@@ -1,0 +1,49 @@
+name: Refresh Cumberland Farms locations
+
+on:
+  workflow_dispatch:      # lets you trigger it manually from the Actions tab
+  schedule:
+    - cron: '0 8 1 * *'   # runs automatically at 8am UTC on the 1st of each month
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+
+      - name: Run crawler
+        run: python3 pull_cumberland_farms.py
+
+      - name: Upload pull report for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: cumberland-farms-pull-report
+          path: cumberland-farms-pull-report.json
+
+      - name: Open pull request with updated data
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "Refresh Cumberland Farms locations"
+          title: "Refresh Cumberland Farms locations"
+          body: |
+            Automated refresh from the official Cumberland Farms store directory.
+
+            **Check the `cumberland-farms-pull-report` artifact on this workflow run before merging** —
+            it lists any stores that failed to parse or were missing coordinates.
+          branch: auto/cumberland-farms-refresh
+          delete-branch: true
+          add-paths: |
+            cumberland-farms-locations.js
+            cumberland-farms-locations.csv
