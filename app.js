@@ -12,7 +12,8 @@
 //      right before app.js.
 //   3. Add one entry below with the chain's real brand color.
 const CHAIN_REGISTRY = {
-  stewarts: { name: "Stewart's Shops", color: '#a51e36', textColor: '#ffffff', dataVar: 'stewartsLocations' }
+  stewarts: { name: "Stewart's Shops", color: '#a51e36', textColor: '#ffffff', dataVar: 'stewartsLocations' },
+  cumberlandFarms: { name: "Cumberland Farms", color: '#009639', textColor: '#ffffff', dataVar: 'cumberlandFarmsLocations' }
 };
 const DEFAULT_CHAIN_KEY = 'stewarts';
 
