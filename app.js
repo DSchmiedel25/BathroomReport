@@ -1,4 +1,38 @@
-// Location data is loaded from locations.js
+// Location data is loaded from one file per chain (e.g. stewarts-locations.js),
+// each of which sets a single global array — window.stewartsLocations, etc.
+// Nothing in those files needs to say which chain it belongs to; the file
+// itself is the chain. This registry is what ties a chain's data file to its
+// display name and brand color, and merges everything into one seedLocations
+// list the rest of the app already knows how to use.
+//
+// TO ADD A NEW CHAIN:
+//   1. Create <chain>-locations.js with `window.<chain>Locations = [...]`
+//      (same shape as stewarts-locations.js — n/lat/lng/addr/id/hrs).
+//   2. Add a <script src="<chain>-locations.js"></script> tag in index.html,
+//      right before app.js.
+//   3. Add one entry below with the chain's real brand color.
+const CHAIN_REGISTRY = {
+  stewarts: { name: "Stewart's Shops", color: '#a51e36', textColor: '#ffffff', dataVar: 'stewartsLocations' }
+};
+const DEFAULT_CHAIN_KEY = 'stewarts';
+
+function chainFor(loc){
+  return CHAIN_REGISTRY[(loc && loc.chain) || DEFAULT_CHAIN_KEY] || CHAIN_REGISTRY[DEFAULT_CHAIN_KEY];
+}
+
+// Merge every chain's data file into one flat list, stamping each location
+// with its chain key (unless a location already sets its own — lets one file
+// hold a mixed bag later on if that's ever useful).
+let seedLocations = [];
+Object.keys(CHAIN_REGISTRY).forEach(chainKey => {
+  const source = window[CHAIN_REGISTRY[chainKey].dataVar] || [];
+  source.forEach(loc => { if(!loc.chain) loc.chain = chainKey; });
+  seedLocations = seedLocations.concat(source);
+});
+
+const locationsById = {};
+seedLocations.forEach(loc => { locationsById[loc.id] = loc; });
+
 // Theme: defaults to the phone's system light/dark setting, but a manual toggle overrides it
 function applyTheme(theme){
   document.documentElement.setAttribute('data-theme', theme);
@@ -193,6 +227,7 @@ function sizesForZoom(zoom){
 function makeIcon(id){
   const agg = ratingsCache[id] || emptyAgg();
   const myVote = (typeof myVoteCache !== 'undefined' && myVoteCache[id]) || emptyVote();
+  const chain = chainFor(locationsById[id]);
   const communityRated = agg.bathroomCount > 0;
   const reviewedByMe = myVote.bathroom > 0;
   const color = bathroomColor(agg);
@@ -213,7 +248,7 @@ function makeIcon(id){
     return L.divIcon({
       className:'',
       html:`<div style="position:relative;width:${outer}px;height:${outer}px;filter:drop-shadow(0 0 2px rgba(0,0,0,.6));">
-              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${outer}px;height:${outer}px;background:#fff;clip-path:${starClip};"></div>
+              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${outer}px;height:${outer}px;background:${chain.color};clip-path:${starClip};"></div>
               <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${size}px;height:${size}px;background:${color};clip-path:${starClip};"></div>
               <div style="position:absolute;top:56%;left:50%;transform:translate(-50%,-50%);">${labelHtml}</div>
             </div>`,
@@ -228,7 +263,7 @@ function makeIcon(id){
     return L.divIcon({
       className:'',
       html:`<div style="position:relative;width:${size}px;height:${size}px;">
-              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(45deg);background:${color};width:${inner}px;height:${inner}px;border:2px solid #fff;box-shadow:0 0 3px rgba(0,0,0,.6);"></div>
+              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(45deg);background:${color};width:${inner}px;height:${inner}px;border:3px solid ${chain.color};box-shadow:0 0 3px rgba(0,0,0,.6);"></div>
               <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);">${labelHtml}</div>
             </div>`,
       iconSize:[size, size],
@@ -238,7 +273,7 @@ function makeIcon(id){
 
   return L.divIcon({
     className:'',
-    html:`<div style="background:${color};width:${size}px;height:${size}px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 3px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;">${labelHtml}</div>`,
+    html:`<div style="background:${color};width:${size}px;height:${size}px;border-radius:50%;border:3px solid ${chain.color};box-shadow:0 0 3px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;">${labelHtml}</div>`,
     iconSize:[size, size],
     iconAnchor:[size/2, size/2]
   });
@@ -858,7 +893,9 @@ function popupHtml(loc, agg, myVote){
   }
   const recency = relativeTimeFromNow(agg.lastUpdated);
   const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}</div>` : '';
+  const chain = chainFor(loc);
   return `<div class="popup-inner" data-locid="${loc.id}">
+    <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${chain.name}</div>
     <h3>${loc.n}</h3>
     <div class="addr">${loc.addr}${loc.num ? ' &middot; Shop #' + loc.num : ''}</div>
     ${hoursLine}
