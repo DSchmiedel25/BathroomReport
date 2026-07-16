@@ -897,7 +897,6 @@ function popupHtml(loc, agg, myVote){
   const chain = chainFor(loc);
   return `<div class="popup-inner" data-locid="${loc.id}">
     <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${chain.name}</div>
-    <h3>${loc.n}</h3>
     <div class="addr">${loc.addr}${loc.num ? ' &middot; Shop #' + loc.num : ''}</div>
     ${hoursLine}
     <div id="accessible-badge-${loc.id}">${accessibleBadgeHtml(loc.id)}</div>
@@ -965,6 +964,13 @@ const myVoteCache = {};
 const loadedIds = new Set();
 
 function addMarker(loc){
+  // Guard against bad source data (e.g. a location with no lat/lng yet) — one invalid
+  // entry used to throw here and silently kill every script line after it on the page,
+  // which broke unrelated things like the onboarding popup and toolbar buttons.
+  if(loc.lat == null || loc.lng == null || isNaN(loc.lat) || isNaN(loc.lng)){
+    console.warn('Skipping location with missing/invalid coordinates:', loc.id, loc.n);
+    return;
+  }
   // Start every pin with placeholder (unrated-looking) data — colors/rings fill in as real data arrives
   ratingsCache[loc.id] = ratingsCache[loc.id] || emptyAgg();
   myVoteCache[loc.id] = myVoteCache[loc.id] || emptyVote();
