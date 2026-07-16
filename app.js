@@ -1900,19 +1900,27 @@ function applyFilters(){
 }
 
 // Chain filter — lets people show/hide pins per chain when more than one is registered.
-// Selection persists across visits via localStorage.
-let activeChains = new Set(Object.keys(CHAIN_REGISTRY));
+// Selection persists across visits via localStorage, stored as a DENY-list (which chains
+// are turned off) rather than an allow-list. That way, a chain added later (like Wawa)
+// defaults to visible even if someone had already saved a preference before it existed —
+// an allow-list would silently hide any chain missing from an old saved selection.
+let disabledChains = new Set();
 (function(){
-  const saved = localStorage.getItem('activeChains');
+  const saved = localStorage.getItem('disabledChains');
   if(!saved) return;
   try{
     const savedArr = JSON.parse(saved);
-    if(Array.isArray(savedArr) && savedArr.length) activeChains = new Set(savedArr);
-  }catch(e){ /* malformed saved value — keep default of all chains active */ }
+    if(Array.isArray(savedArr)) disabledChains = new Set(savedArr);
+  }catch(e){ /* malformed saved value — keep default of nothing disabled */ }
 })();
 
-function saveActiveChains(){
-  localStorage.setItem('activeChains', JSON.stringify(Array.from(activeChains)));
+function getActiveChains(){
+  return new Set(Object.keys(CHAIN_REGISTRY).filter(k => !disabledChains.has(k)));
+}
+let activeChains = getActiveChains();
+
+function saveDisabledChains(){
+  localStorage.setItem('disabledChains', JSON.stringify(Array.from(disabledChains)));
 }
 
 function renderChainFilter(){
@@ -1939,13 +1947,15 @@ document.getElementById('chainFilterBody')?.addEventListener('change', (e) => {
   const cb = e.target.closest('.chain-filter-checkbox');
   if(!cb) return;
   const key = cb.dataset.chain;
-  if(cb.checked) activeChains.add(key); else activeChains.delete(key);
+  if(cb.checked) disabledChains.delete(key); else disabledChains.add(key);
+  activeChains = getActiveChains();
   // Never allow every chain to be switched off at once — that would just blank the map
   if(activeChains.size === 0){
-    activeChains.add(key);
+    disabledChains.delete(key);
+    activeChains = getActiveChains();
     cb.checked = true;
   }
-  saveActiveChains();
+  saveDisabledChains();
   applyFilters();
 });
 
