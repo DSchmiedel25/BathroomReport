@@ -1,30 +1,45 @@
-# BathroomReport
+# BathroomReport location updater
 
-**BathroomReport** is a community-rated bathroom finder. Currently featuring Stewart's Shops
-across New York and Vermont, with the app structured so additional chains can be added later
-without another rebrand.
+This package gives you two separate GitHub Actions:
 
-Live site: https://bathroomreport.app
+1. **Update Stewart's locations**
+   - Pulls all official Stewart's store pages.
+   - Writes `stewarts-locations.js`.
+   - Writes `stewarts-pull-report.json`.
 
-## Files
-- `index.html` — page structure
-- `styles.css` — visual styles
-- `locations.js` — Stewart's location data
-- `firebase.js` — Firebase initialization
-- `app.js` — map, ratings, Bathroom Now, amenities, condition reports, sorting, achievements, Bathroom Passport
-- `manifest.webmanifest` — PWA metadata
-- `sw.js` — service worker (offline shell caching)
-- `robots.txt` / `sitemap.xml` — search engine metadata
+2. **Update Cumberland Farms locations**
+   - Pulls Cumberland Farms separately.
+   - Writes `cumberland-farms-locations.js`.
+   - Writes `cumberland-farms-pull-report.json`.
+   - Manual runs accept `ALL` or state abbreviations such as `MA VT NH ME`.
 
-## Firestore collections
-`aggregates`, `votes`, `tips`, `activity`, `reports`, `missingReports`, `blockedDevices`,
-`displayNames`, `nameReports`, `leaderboardBlocklist`, `checkins`, `achievements`,
-`conditionReports`. Firestore rules use a single wildcard rule
-(`match /{document=**} { allow read, write: if true; }`) covering all current and future
-collections, so no rule updates are needed when adding new features.
+## Upload paths
 
-## Brand vs. content
-BathroomReport is the product. Stewart's Shops is the first supported chain (content, not the
-brand). Anonymous visitors can use nearly the entire app — logging in unlocks personalization
-(Bathroom Passport, Achievements, Leaderboard participation, cross-device sync), not basic
-functionality.
+Upload the files to your repository using these exact paths:
+
+- `.github/workflows/update-stewarts-locations.yml`
+- `.github/workflows/update-cumberland-farms-locations.yml`
+- `scripts/pull_stewarts_locations.py`
+- `scripts/pull_cumberland_farms_locations.py`
+
+## GitHub setting
+
+Repository → Settings → Actions → General → Workflow permissions:
+
+- Select **Read and write permissions**
+- Save
+
+## Run from a phone
+
+Repository → Actions → choose the workflow → **Run workflow**.
+
+For Cumberland Farms:
+- `ALL` pulls every state.
+- `MA` pulls Massachusetts only.
+- `MA VT NH ME` pulls those four states.
+
+## Important
+
+The workflows replace each chain's location file separately. They include safety checks so a bad or blocked crawl does not overwrite a large file with an obviously incomplete one.
+
+Your `app.js` should continue skipping entries with missing/null coordinates rather than crashing.
