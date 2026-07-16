@@ -1,0 +1,175 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Shared helpers ----------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled != false;
+    }
+
+    // Public submissions may not create moderator-only workflow fields.
+    function hasNoModeratorFields() {
+      return !request.resource.data.keys().hasAny([
+        'moderatorNote',
+        'moderatorNotes',
+        'resolvedAt',
+        'resolvedBy',
+        'dismissedAt',
+        'dismissedBy',
+        'closedAt',
+        'closedBy',
+        'updatedByAdmin'
+      ]);
+    }
+
+    // Existing app submissions may omit status. If included, it must begin as pending.
+    function startsPending() {
+      return !request.resource.data.keys().hasAny(['status'])
+        || request.resource.data.status == 'pending';
+    }
+
+    // Only recognized workflow states may be saved by FlushPanel.
+    function validReportStatus() {
+      return !request.resource.data.keys().hasAny(['status'])
+        || request.resource.data.status in [
+          'pending',
+          'resolved',
+          'dismissed'
+        ];
+    }
+
+
+    // ---------- Administrator authorization ----------
+
+    // Admin records are maintained from the Firebase Console.
+    // Existing admins may read them, but cannot add/remove admins through the website.
+    match /admins/{uid} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+
+    // ---------- Existing public app data ----------
+    //
+    // These remain publicly writable so this ruleset works with your current
+    // no-login app. They should eventually move to anonymous Firebase Auth
+    // and owner-restricted writes.
+
+    match /votes/{id} {
+      allow read, write: if true;
+    }
+
+    match /aggregates/{id} {
+      allow read, write: if true;
+    }
+
+    match /tips/{id} {
+      allow read, write: if true;
+    }
+
+    match /checkins/{id} {
+      allow read, write: if true;
+    }
+
+    match /activity/{id} {
+      allow read, write: if true;
+    }
+
+    match /achievements/{id} {
+      allow read, write: if true;
+    }
+
+
+    // ---------- App and location reports ----------
+
+    // Visitors may submit reports, but may not assign moderation outcomes
+    // or write moderator-only audit fields.
+    //
+    // FlushPanel may read, update, resolve, dismiss, reopen, or delete them.
+    match /reports/{id} {
+      allow create: if startsPending()
+        && hasNoModeratorFields();
+
+      allow read: if isAdmin();
+
+      allow update: if isAdmin()
+        && validReportStatus();
+
+      allow delete: if isAdmin();
+    }
+
+
+    // ---------- Missing-location submissions ----------
+
+    match /missingReports/{id} {
+      allow create: if startsPending()
+        && hasNoModeratorFields();
+
+      allow read: if isAdmin();
+
+      allow update: if isAdmin()
+        && validReportStatus();
+
+      allow delete: if isAdmin();
+    }
+
+
+    // ---------- Reported leaderboard names ----------
+
+    match /nameReports/{id} {
+      allow create: if startsPending()
+        && hasNoModeratorFields();
+
+      allow read: if isAdmin();
+
+      allow update: if isAdmin()
+        && validReportStatus();
+
+      allow delete: if isAdmin();
+    }
+
+
+    // ---------- Leaderboard display names ----------
+
+    // Public reads remain necessary for the leaderboard and uniqueness checks.
+    // Existing claiming/updating behavior is preserved.
+    match /displayNames/{id} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+
+    // ---------- Moderation blocklists ----------
+
+    // The public app may check one known document ID, but cannot download
+    // the entire blocklist. FlushPanel can read/list and manage all records.
+    match /leaderboardBlocklist/{id} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /blockedDevices/{id} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+
+    // ---------- Default deny ----------
+
+    // Any collection not explicitly listed above is inaccessible.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

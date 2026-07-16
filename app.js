@@ -707,20 +707,32 @@ async function addTip(id, text){
   try{
     const {db, doc, setDoc, arrayUnion} = await fb();
     await setDoc(doc(db, 'tips', id), { tips: arrayUnion(text) }, { merge: true });
-    logActivity('tip');
+    // Store enough information for FlushPanel to hide this activity automatically
+    // if the tip is later edited or deleted.
+    logActivity('tip', {
+      locId: id,
+      text,
+      sourceId: `tip:${id}:${text}`
+    });
     return true;
   }catch(e){
     return false;
   }
 }
 
-// Weekly recap — lightweight activity log, just enough to show "X new this week"
-async function logActivity(type){
+// Activity is a display feed only. Live totals come from votes and tips.
+// Rich source fields let FlushPanel automatically exclude deleted content.
+async function logActivity(type, details = {}){
   try{
     const {db, collection, addDoc} = await fb();
-    await addDoc(collection(db, 'activity'), { type, ts: Date.now() });
+    await addDoc(collection(db, 'activity'), {
+      type,
+      ts: Date.now(),
+      deleted: false,
+      ...details
+    });
   }catch(e){
-    // non-critical — recap will just undercount slightly if this fails
+    // non-critical — the app itself still saves even if the feed entry fails
   }
 }
 
@@ -732,7 +744,9 @@ async function loadWeeklyRecap(){
     const snap = await getDocs(q);
     let ratings = 0, tips = 0;
     snap.forEach(d => {
-      const t = d.data().type;
+      const item = d.data();
+      if(item.deleted === true) return;
+      const t = item.type;
       if(t === 'rating') ratings++;
       else if(t === 'tip') tips++;
     });
@@ -1494,6 +1508,10 @@ function attachStarHandlers(loc){
         const agg = ratingsCache[loc.id] || emptyAgg();
         const myVote = myVoteCache[loc.id] || emptyVote();
         const prevVal = myVote[type];
+        // A vote document represents one rating submission for one person/location.
+        // Only the first store-or-bathroom rating creates a feed entry; later edits do not
+        // inflate the public rating count.
+        const wasCompletelyUnrated = (myVote.store || 0) === 0 && (myVote.bathroom || 0) === 0;
 
         const sumKey = type + 'Sum';
         const countKey = type + 'Count';
@@ -1525,7 +1543,14 @@ function attachStarHandlers(loc){
 
         const okAgg = await bumpAggregate(loc.id, sumKey, sumDelta, countKey, countDelta);
         const okVote = await saveMyVote(loc.id, myVote);
-        if(okAgg) logActivity('rating');
+        if(okAgg && okVote && wasCompletelyUnrated){
+          const clientId = getEffectiveId();
+          logActivity('rating', {
+            locId: loc.id,
+            clientId,
+            sourceId: `vote:${loc.id}_${clientId}`
+          });
+        }
         if(note) note.textContent = (okAgg && okVote) ? 'Saved ✓ — visible to everyone' : 'Save failed';
         if(okAgg && okVote) maybeShowSupportPrompt();
 

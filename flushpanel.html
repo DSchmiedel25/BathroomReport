@@ -109,14 +109,14 @@ button,input{font:inherit}button{touch-action:manipulation}a{color:var(--accent)
   <div class="main-content">
     <header class="topbar">
       <div class="page-title"><div class="eyebrow">Moderator Console</div><h1 id="pageHeading">Dashboard</h1><p id="pageSubheading">A quick view of what is happening across BathroomReport.</p></div>
-      <div id="adminToolbar"><button class="admin-btn secondary" id="refreshBtn" type="button">↻ Refresh data</button></div>
+      <div id="adminToolbar"><button class="admin-btn secondary" id="repairBtn" type="button">🧰 Repair data</button><button class="admin-btn secondary" id="refreshBtn" type="button">↻ Refresh data</button></div>
     </header>
     <div id="globalError" role="alert"></div>
 
     <section class="page-view active" data-view="dashboard">
       <section class="stat-row" id="statRow">
         <div class="stat-box"><b id="statLocations">—</b>Locations</div>
-        <div class="stat-box"><b id="statRated">—</b>Rated locations</div>
+        <div class="stat-box"><b id="statRated">—</b>Rating submissions</div>
         <div class="stat-box"><b id="statTips">—</b>Tips</div>
         <div class="stat-box"><b id="statReports">—</b>Pending reports</div>
         <div class="stat-box"><b id="statMissing">—</b>Location requests</div>
@@ -172,10 +172,35 @@ function escapeHtml(str){
 
 function avgStr(sum, count){ return count > 0 ? (sum/count).toFixed(1) : '—'; }
 
+async function markActivityDeleted(predicate){
+  const {db, collection, getDocs, updateDoc} = await fb();
+  const snap = await getDocs(collection(db, 'activity'));
+  let changed = 0;
+  for(const activityDoc of snap.docs){
+    const data = activityDoc.data();
+    if(data.deleted === true || !predicate(data)) continue;
+    await updateDoc(activityDoc.ref, {
+      deleted: true,
+      deletedAt: Date.now(),
+      deletedBy: 'FlushPanel'
+    });
+    changed++;
+  }
+  return changed;
+}
+
 async function deleteTip(locId, tipText){
   try{
     const {db, doc, updateDoc, arrayRemove} = await fb();
     await updateDoc(doc(db, 'tips', locId), { tips: arrayRemove(tipText) });
+
+    // Hide the related feed entry automatically. New app entries have locId/text.
+    // The repair tool handles older activity entries that lacked source information.
+    await markActivityDeleted(item =>
+      item.type === 'tip'
+      && item.locId === locId
+      && item.text === tipText
+    );
     return true;
   }catch(e){
     console.error('delete tip failed', e);
@@ -257,6 +282,12 @@ async function resetLocation(locId){
       await deleteDoc(voteDoc.ref);
     }
 
+    // Automatically hide rating and tip activity tied to this location.
+    await markActivityDeleted(item =>
+      item.locId === locId
+      && (item.type === 'rating' || item.type === 'tip')
+    );
+
     return true;
   }catch(e){
     console.error('resetLocation failed', e);
@@ -273,11 +304,134 @@ async function editTip(locId, oldText, newText){
     const ref = doc(db, 'tips', locId);
     await updateDoc(ref, { tips: arrayRemove(oldText) });
     await updateDoc(ref, { tips: arrayUnion(newText) });
+
+    // Keep the visible activity feed in sync with spelling corrections.
+    const {collection, getDocs} = await fb();
+    const activitySnap = await getDocs(collection(db, 'activity'));
+    for(const activityDoc of activitySnap.docs){
+      const item = activityDoc.data();
+      if(item.deleted !== true && item.type === 'tip' && item.locId === locId && item.text === oldText){
+        await updateDoc(activityDoc.ref, {
+          text: newText,
+          sourceId: `tip:${locId}:${newText}`,
+          editedAt: Date.now()
+        });
+      }
+    }
     return true;
   }catch(e){
     console.error('editTip failed', e);
     return false;
   }
+}
+
+
+// Rebuild aggregate rating caches from live vote documents and hide orphaned activity.
+// This is safe to run whenever test data was deleted or old counters drifted.
+async function repairDatabase(){
+  const {
+    db, collection, getDocs, doc, setDoc, updateDoc
+  } = await fb();
+
+  const [votesSnap, tipsSnap, activitySnap, aggSnap] = await Promise.all([
+    getDocs(collection(db, 'votes')),
+    getDocs(collection(db, 'tips')),
+    getDocs(collection(db, 'activity')),
+    getDocs(collection(db, 'aggregates'))
+  ]);
+
+  const aggregateByLoc = {};
+  const liveVoteSources = new Set();
+  const liveTips = new Set();
+  const existingCheckins = {};
+
+  aggSnap.forEach(d => {
+    existingCheckins[d.id] = Number(d.data().checkinCount || 0);
+  });
+
+  votesSnap.forEach(voteDoc => {
+    const vote = voteDoc.data();
+    const locId = vote.locId;
+    if(!locId) return;
+
+    const agg = aggregateByLoc[locId] || {
+      storeSum: 0, storeCount: 0,
+      bathroomSum: 0, bathroomCount: 0,
+      lastUpdated: 0
+    };
+
+    const store = Number(vote.store || 0);
+    const bathroom = Number(vote.bathroom || 0);
+    if(store >= 1 && store <= 5){
+      agg.storeSum += store;
+      agg.storeCount++;
+    }
+    if(bathroom >= 1 && bathroom <= 5){
+      agg.bathroomSum += bathroom;
+      agg.bathroomCount++;
+    }
+    agg.lastUpdated = Math.max(agg.lastUpdated, Number(vote.lastUpdated || 0));
+    aggregateByLoc[locId] = agg;
+    liveVoteSources.add(`vote:${voteDoc.id}`);
+  });
+
+  tipsSnap.forEach(tipDoc => {
+    const locId = tipDoc.id;
+    const tips = Array.isArray(tipDoc.data().tips) ? tipDoc.data().tips : [];
+    tips.forEach(text => liveTips.add(`${locId}\u0000${text}`));
+  });
+
+  // Rebuild every known aggregate so deleted votes disappear from counts and averages.
+  const allLocIds = new Set([
+    ...seedLocations.map(loc => loc.id),
+    ...Object.keys(existingCheckins),
+    ...Object.keys(aggregateByLoc)
+  ]);
+
+  for(const locId of allLocIds){
+    const rebuilt = aggregateByLoc[locId] || {
+      storeSum: 0, storeCount: 0,
+      bathroomSum: 0, bathroomCount: 0,
+      lastUpdated: 0
+    };
+    await setDoc(doc(db, 'aggregates', locId), {
+      ...rebuilt,
+      checkinCount: existingCheckins[locId] || 0
+    });
+  }
+
+  let hiddenActivity = 0;
+  for(const activityDoc of activitySnap.docs){
+    const item = activityDoc.data();
+    if(item.deleted === true) continue;
+
+    let keep = true;
+    if(item.type === 'rating'){
+      // New entries use sourceId. Legacy entries cannot be verified and are excluded
+      // so removed test ratings no longer inflate the app.
+      keep = typeof item.sourceId === 'string'
+        && liveVoteSources.has(item.sourceId);
+    } else if(item.type === 'tip'){
+      keep = typeof item.locId === 'string'
+        && typeof item.text === 'string'
+        && liveTips.has(`${item.locId}\u0000${item.text}`);
+    }
+
+    if(!keep){
+      await updateDoc(activityDoc.ref, {
+        deleted: true,
+        deletedAt: Date.now(),
+        deletedBy: 'FlushPanel repair'
+      });
+      hiddenActivity++;
+    }
+  }
+
+  return {
+    votes: votesSnap.size,
+    tips: liveTips.size,
+    hiddenActivity
+  };
 }
 
 let allRows = [];
@@ -309,19 +463,26 @@ async function loadAll(){
   const tipsById = {};
   tipsSnap.forEach(d => { tipsById[d.id] = (d.data().tips || []); });
 
-  let ratedCount = 0;
+  const votesSnap = await getDocs(collection(db, 'votes'));
+  const votesById = {};
+  votesSnap.forEach(d => {
+    const vote = d.data();
+    if(!vote.locId) return;
+    (votesById[vote.locId] ||= []).push({ id: d.id, ...vote });
+  });
+
   let totalTips = 0;
 
   allRows = seedLocations.map(loc => {
-    const agg = aggById[loc.id] || {storeSum:0, storeCount:0, bathroomSum:0, bathroomCount:0};
+    const agg = aggById[loc.id] || {storeSum:0, storeCount:0,bathroomSum:0,bathroomCount:0};
     const tips = tipsById[loc.id] || [];
-    if((agg.storeCount||0) > 0 || (agg.bathroomCount||0) > 0) ratedCount++;
+    const votes = votesById[loc.id] || [];
     totalTips += tips.length;
-    return { loc, agg, tips };
+    return { loc, agg, tips, votes };
   });
 
   document.getElementById('statLocations').textContent = seedLocations.length;
-  document.getElementById('statRated').textContent = ratedCount;
+  document.getElementById('statRated').textContent = votesSnap.size;
   document.getElementById('statTips').textContent = totalTips;
 
   try{
@@ -495,7 +656,7 @@ function renderTable(rows){
       <td><b>${escapeHtml(loc.n)}</b><br><span style="color:#999;">${escapeHtml(loc.addr)}${loc.num ? ' · #' + loc.num : ''}</span></td>
       <td class="storeAvg">${avgStr(agg.storeSum, agg.storeCount)}★ (${agg.storeCount||0})</td>
       <td class="bathAvg">${avgStr(agg.bathroomSum, agg.bathroomCount)}★ (${agg.bathroomCount||0})</td>
-      <td>${(agg.storeCount||0) + (agg.bathroomCount||0)}</td>
+      <td>${r.votes ? r.votes.length : 0}</td>
       <td>${tipsHtml}</td>
       <td><button class="reset-location-btn" data-locid="${loc.id}" data-locname="${escapeHtml(loc.n)}" style="background:#b71c1c;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;white-space:nowrap;">🗑️ Reset</button></td>
     </tr>`;
@@ -509,7 +670,7 @@ function sortRows(rows){
   const sorted = [...rows];
   const bathAvg = r => r.agg.bathroomCount > 0 ? r.agg.bathroomSum / r.agg.bathroomCount : -1;
   const storeAvg = r => r.agg.storeCount > 0 ? r.agg.storeSum / r.agg.storeCount : -1;
-  const reviewCount = r => (r.agg.storeCount||0) + (r.agg.bathroomCount||0);
+  const reviewCount = r => r.votes ? r.votes.length : 0;
   const getVal = sortState.column === 'store' ? storeAvg : sortState.column === 'bathroom' ? bathAvg : reviewCount;
   sorted.sort((a, b) => sortState.direction === 'desc' ? getVal(b) - getVal(a) : getVal(a) - getVal(b));
   return sorted;
@@ -738,6 +899,35 @@ document.getElementById('tipsFilter').addEventListener('input',renderTipsPage);
 document.getElementById('tipsList').addEventListener('click',async e=>{const edit=e.target.closest('.tip-page-edit');const del=e.target.closest('.tip-page-delete');const btn=edit||del;if(!btn)return;const locId=btn.dataset.locid,oldText=decodeURIComponent(btn.dataset.tip);if(edit){const newText=(prompt('Edit tip:',oldText)||'').trim().slice(0,50);if(!newText||newText===oldText)return;btn.disabled=true;const ok=await editTip(locId,oldText,newText);if(ok){const row=allRows.find(r=>r.loc.id===locId);if(row)row.tips=row.tips.map(t=>t===oldText?newText:t);renderTipsPage();refreshTable();renderDashboard();}else{alert('Could not save — try again.');btn.disabled=false;}}else{if(!confirm(`Delete this tip?
 
 "${oldText}"`))return;btn.disabled=true;const ok=await deleteTip(locId,oldText);if(ok){const row=allRows.find(r=>r.loc.id===locId);if(row)row.tips=row.tips.filter(t=>t!==oldText);renderTipsPage();refreshTable();renderDashboard();}else{alert('Could not delete — try again.');btn.disabled=false;}}});
+
+
+document.getElementById('repairBtn').addEventListener('click', async () => {
+  if(!confirm(
+    'Repair BathroomReport data now?\n\n' +
+    'This rebuilds rating averages from live vote records and excludes orphaned test activity. ' +
+    'It does not delete current votes or tips.'
+  )) return;
+
+  const btn = document.getElementById('repairBtn');
+  btn.disabled = true;
+  btn.textContent = 'Repairing…';
+  try{
+    const result = await repairDatabase();
+    await loadAll();
+    alert(
+      `Repair complete.\n\n` +
+      `${result.votes} live rating submissions\n` +
+      `${result.tips} live tips\n` +
+      `${result.hiddenActivity} old/orphaned activity entries excluded`
+    );
+  }catch(e){
+    console.error('repair failed', e);
+    alert('Repair failed. Check Firestore permissions and try again.');
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '🧰 Repair data';
+  }
+});
 
 // ---- Admin authentication gate ----
 const loginGate = document.getElementById('loginGate');
