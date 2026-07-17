@@ -54,10 +54,10 @@ button,input{font:inherit}button{touch-action:manipulation}a{color:var(--accent)
 .admin-btn{border:1px solid transparent;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;transition:.16s ease;background:var(--surface2);color:var(--text)}.admin-btn:hover{transform:translateY(-1px);border-color:rgba(67,198,203,.35)}.admin-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}.admin-btn.primary{width:100%;margin-top:17px;background:linear-gradient(135deg,var(--accent),#59d9d7);color:#07121f;box-shadow:0 8px 22px rgba(67,198,203,.18)}.admin-btn.secondary{border-color:var(--line)}.admin-btn.danger{background:rgba(239,91,99,.12);color:#ff8f95;border-color:rgba(239,91,99,.22)}
 #globalError{display:none;background:rgba(239,91,99,.12);border:1px solid rgba(239,91,99,.35);color:#ffabb0;padding:12px 14px;border-radius:14px;margin-bottom:18px}
 .stat-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:20px}.stat-box{position:relative;overflow:hidden;background:linear-gradient(145deg,var(--surface),#0f1c2d);border:1px solid var(--line);border-radius:18px;padding:17px;box-shadow:0 9px 25px rgba(0,0,0,.12);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:750}.stat-box:after{content:"";position:absolute;width:65px;height:65px;border-radius:50%;right:-24px;bottom:-29px;background:rgba(67,198,203,.08)}.stat-box b{display:block;font-size:27px;line-height:1;color:var(--text);margin-bottom:9px;letter-spacing:-.03em}
-.dashboard-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}.panel{background:linear-gradient(150deg,var(--surface),#0e1b2d);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 14px 40px rgba(0,0,0,.16);overflow:hidden;margin-bottom:16px;scroll-margin-top:20px}.panel-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:17px 19px;border-bottom:1px solid var(--line)}.panel-title{font-size:15px;font-weight:850;margin:0}.panel-note{font-size:11px;color:var(--muted);margin:4px 0 0}.panel-body.padded{padding:16px 19px}.section-toggle{cursor:pointer;user-select:none}.section-toggle:hover{background:rgba(67,198,203,.035)}.toggle-arrow{font-size:18px;color:var(--accent)}
+.dashboard-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}.dashboard-grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:16px}.panel{background:linear-gradient(150deg,var(--surface),#0e1b2d);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 14px 40px rgba(0,0,0,.16);overflow:hidden;margin-bottom:16px;scroll-margin-top:20px}.panel-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:17px 19px;border-bottom:1px solid var(--line)}.panel-title{font-size:15px;font-weight:850;margin:0}.panel-note{font-size:11px;color:var(--muted);margin:4px 0 0}.panel-body.padded{padding:16px 19px}.section-toggle{cursor:pointer;user-select:none}.section-toggle:hover{background:rgba(67,198,203,.035)}.toggle-arrow{font-size:18px;color:var(--accent)}
 .table-wrap{width:100%;overflow:auto;-webkit-overflow-scrolling:touch}table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;min-width:620px}th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}th{color:#7690a7;font-size:10px;text-transform:uppercase;letter-spacing:.08em;background:#0c1929;position:sticky;top:0;z-index:1}tbody tr:last-child td{border-bottom:0}tbody tr:hover{background:rgba(67,198,203,.025)}.loading{color:#6f8599;font-style:italic}.storeAvg{color:#79bce7;font-weight:800}.bathAvg{color:#71d9a7;font-weight:800}.tiplist{margin:0;padding:0;list-style:none;display:grid;gap:6px;color:#b8c7d4}.tiplist li{background:rgba(145,166,187,.08);padding:7px 8px;border-radius:9px}.search-row{padding:14px 16px;border-bottom:1px solid var(--line)}#namesSection.collapsed,#locationsSection.collapsed{display:none}
 .mobile-head{display:none}
-@media(max-width:1050px){.stat-row{grid-template-columns:repeat(3,minmax(0,1fr))}.dashboard-grid{grid-template-columns:1fr}}
+@media(max-width:1050px){.stat-row{grid-template-columns:repeat(3,minmax(0,1fr))}.dashboard-grid{grid-template-columns:1fr}.dashboard-grid-3{grid-template-columns:1fr}}
 @media(max-width:780px){.admin-layout{display:block}.sidebar{position:static;height:auto;padding:12px;border-right:0;border-bottom:1px solid var(--line);display:block}.brand-lockup{padding:0}.side-label,.side-nav,.sidebar-foot{display:none}.mobile-head{display:block}.main-content{padding:18px 12px 34px}.topbar{align-items:center}.page-title h1{font-size:23px}.stat-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.stat-box:last-child{grid-column:span 2}}
 @media(max-width:520px){.topbar{display:block}#adminToolbar{margin-top:14px}#adminToolbar button{flex:1}.stat-box{padding:14px}.stat-box b{font-size:23px}.panel-header{padding:14px}th,td{padding:10px 12px}}
 
@@ -163,8 +163,19 @@ button,input{font:inherit}button{touch-action:manipulation}a{color:var(--accent)
 // Stewart's-only snapshot (311 entries) that never got updated when Cumberland Farms
 // and Wawa were added to the live map. This pulls from the same source files instead,
 // so FlushPanel's counts always match what's actually on the site.
-const CHAIN_DATA_VARS = ['stewartsLocations', 'cumberlandFarmsLocations', 'wawaLocations'];
-const seedLocations = CHAIN_DATA_VARS.reduce((all, key) => all.concat(window[key] || []), []);
+// Same registry pattern as the public app's CHAIN_REGISTRY — add a new chain here and its
+// own sidebar tab, dashboard row, and colored breakdown all appear automatically.
+const CHAIN_META = {
+  stewarts: { name: "Stewart's Shops", color: '#a51e36', dataVar: 'stewartsLocations' },
+  cumberlandFarms: { name: 'Cumberland Farms', color: '#009639', dataVar: 'cumberlandFarmsLocations' },
+  wawa: { name: 'Wawa', color: '#c8102e', dataVar: 'wawaLocations' }
+};
+let seedLocations = [];
+Object.keys(CHAIN_META).forEach(key => {
+  const source = window[CHAIN_META[key].dataVar] || [];
+  source.forEach(loc => { if(!loc.chain) loc.chain = key; });
+  seedLocations = seedLocations.concat(source);
+});
 
 async function fb(){
   while(!window.__fb){ await new Promise(r => setTimeout(r, 20)); }
@@ -583,6 +594,7 @@ async function loadAll(){
   refreshTable();
   renderTipsPage();
   renderDashboard();
+  refreshAllChainViews();
   }catch(e){
     console.error('Admin data failed to load', e);
     showGlobalError('Could not load the admin dashboard. Check your connection and Firestore permissions.');
@@ -641,8 +653,8 @@ function renderDashboard(){
   tipItems.slice(0,3).forEach(x=>events.push({ts:0,html:activityItem('💡','Tip submitted',`${x.loc.n}: ${x.t}`)}));
   document.getElementById('recentActivity').innerHTML=events.sort((a,b)=>b.ts-a.ts).slice(0,8).map(e=>e.html).join('')||'<div class="empty-state">No recent activity.</div>';
 }
-function renderTable(rows){
-  const body = document.getElementById('tableBody');
+function renderTable(rows, tbodyId){
+  const body = document.getElementById(tbodyId || 'tableBody');
   if(rows.length === 0){
     body.innerHTML = '<tr><td colspan="6" class="loading">No matches.</td></tr>';
     return;
@@ -720,8 +732,10 @@ document.getElementById('th-bathroom').addEventListener('click', () => handleHea
 document.getElementById('th-reviews').addEventListener('click', () => handleHeaderClick('reviews'));
 document.getElementById('filterBox').addEventListener('input', refreshTable);
 
-// Event delegation — handles clicks on delete/dismiss buttons even after table re-renders
-document.getElementById('tableBody').addEventListener('click', async (e) => {
+// Event delegation — handles clicks on delete/dismiss buttons even after table re-renders.
+// Attached to the whole admin app (not just one table) so it also covers the per-chain
+// tables, which share these same button classes.
+document.getElementById('adminApp').addEventListener('click', async (e) => {
   const deleteBtn = e.target.closest('.delete-tip-btn');
   if(deleteBtn){
     const locId = deleteBtn.dataset.locid;
@@ -733,6 +747,7 @@ document.getElementById('tableBody').addEventListener('click', async (e) => {
       const row = allRows.find(r => r.loc.id === locId);
       if(row) row.tips = row.tips.filter(t => t !== tipText);
       refreshTable();
+      refreshAllChainViews();
     } else {
       alert('Could not delete — try again.');
       deleteBtn.disabled = false;
@@ -775,6 +790,7 @@ document.getElementById('tableBody').addEventListener('click', async (e) => {
       const row = allRows.find(r => r.loc.id === locId);
       if(row) row.tips = row.tips.map(t => t === oldText ? newText : t);
       refreshTable();
+      refreshAllChainViews();
     } else {
       alert('Could not save — try again.');
       refreshTable();
@@ -805,6 +821,7 @@ Type the full location name exactly to continue:`
         row.tips = [];
       }
       refreshTable();
+      refreshAllChainViews();
     } else {
       alert('Something went wrong — try again.');
       resetBtn.disabled = false;
@@ -816,7 +833,7 @@ Type the full location name exactly to continue:`
 document.getElementById('reportsCards').addEventListener('click', async (e) => {
   const btn=e.target.closest('.report-status-btn'); if(!btn) return;
   btn.disabled=true; const ok=await updateReportStatus(btn.dataset.reportid,btn.dataset.status);
-  if(ok){ const r=allReports.find(x=>x.id===btn.dataset.reportid); if(r){r.status=btn.dataset.status;r.moderatedAt=Date.now();} renderReports(); renderDashboard(); const pending=allReports.filter(x=>(x.status||'pending')==='pending').length; document.getElementById('statReports').textContent=pending; document.getElementById('navReports').textContent=pending; }
+  if(ok){ const r=allReports.find(x=>x.id===btn.dataset.reportid); if(r){r.status=btn.dataset.status;r.moderatedAt=Date.now();} renderReports(); renderDashboard(); const pending=allReports.filter(x=>(x.status||'pending')==='pending').length; document.getElementById('statReports').textContent=pending; document.getElementById('navReports').textContent=pending; renderByBrandPanel(); chainKeys.forEach(k=>refreshChainTable(k)); }
   else { alert('Could not update report — try again.'); btn.disabled=false; }
 });
 
@@ -898,14 +915,205 @@ document.getElementById('missingBody').addEventListener('click', async (e) => {
 
 // ---- Admin navigation ----
 const pageMeta={dashboard:['Dashboard','A quick view of what is happening across BathroomReport.'],reports:['Reports','Review app and location-data issues by status.'],locations:['Locations','Manage location ratings, tips, and data.'],tips:['Tips','Correct spelling or remove public tips.'],requests:['Location requests','Review suggested missing locations.'],leaderboard:['Leaderboard','Manage claimed and reported display names.']};
+
+// ── Per-chain sidebar tabs, pages, and dashboard breakdown ──────────────────────────────
+// Everything below is generated from CHAIN_META so adding a fourth chain later needs no
+// changes here — it just needs an entry in CHAIN_META up top.
+const chainKeys = Object.keys(CHAIN_META);
+
+(function buildChainNav(){
+  const locationsNavBtn = document.querySelector('.nav-link[data-page="locations"]');
+  let insertAfterEl = locationsNavBtn;
+  chainKeys.forEach(key => {
+    const meta = CHAIN_META[key];
+    pageMeta['chain-' + key] = [meta.name, `Locations, tips, and pending reports for ${meta.name} only.`];
+    const navBtn = document.createElement('button');
+    navBtn.className = 'nav-link';
+    navBtn.dataset.page = 'chain-' + key;
+    navBtn.innerHTML = `<span class="nav-icon" style="color:${meta.color};">●</span>${escapeHtml(meta.name)}`;
+    insertAfterEl.insertAdjacentElement('afterend', navBtn);
+    insertAfterEl = navBtn;
+  });
+})();
+
+(function buildChainPages(){
+  const locationsPage = document.querySelector('.page-view[data-view="locations"]');
+  let insertAfterEl = locationsPage;
+  chainKeys.forEach(key => {
+    const meta = CHAIN_META[key];
+    const section = document.createElement('section');
+    section.className = 'page-view';
+    section.dataset.view = 'chain-' + key;
+    section.innerHTML = `
+      <section class="stat-row" style="grid-template-columns:repeat(4,minmax(0,1fr));">
+        <div class="stat-box" style="border-left:4px solid ${meta.color};"><b id="chainStat-${key}-locations">—</b>Locations</div>
+        <div class="stat-box" style="border-left:4px solid ${meta.color};"><b id="chainStat-${key}-store">—</b>Avg store</div>
+        <div class="stat-box" style="border-left:4px solid ${meta.color};"><b id="chainStat-${key}-bathroom">—</b>Avg bathroom</div>
+        <div class="stat-box" style="border-left:4px solid ${meta.color};"><b id="chainStat-${key}-reports">—</b>Pending reports</div>
+      </section>
+      <section class="panel">
+        <div class="panel-header"><div><h2 class="panel-title">${escapeHtml(meta.name)} locations</h2><p class="panel-note">Search ratings, tips, and location-level controls for this brand only</p></div></div>
+        <div class="search-row"><input type="search" id="chainFilterBox-${key}" placeholder="Search name, address, or store number…"></div>
+        <div class="table-wrap"><table><thead><tr><th>Location</th><th>Store</th><th>Bathroom</th><th>Ratings</th><th>Tips</th><th>Actions</th></tr></thead><tbody id="chainTableBody-${key}"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody></table></div>
+      </section>
+      <section class="panel">
+        <div class="panel-header"><div><h2 class="panel-title">${escapeHtml(meta.name)} tips</h2><p class="panel-note">Tips submitted for this brand only</p></div></div>
+        <div id="chainTips-${key}" class="tips-list"><div class="empty-state">Loading…</div></div>
+      </section>
+    `;
+    insertAfterEl.insertAdjacentElement('afterend', section);
+    insertAfterEl = section;
+  });
+})();
+
+(function buildDashboardBrandPanel(){
+  const dashboardGrid = document.querySelector('[data-view="dashboard"] .dashboard-grid');
+  const panel = document.createElement('section');
+  panel.className = 'panel';
+  panel.innerHTML = `
+    <div class="panel-header"><div><h2 class="panel-title">By brand</h2><p class="panel-note">Quick health check per chain, color-coded to match the map</p></div></div>
+    <div id="byBrandList" class="activity-list"><div class="empty-state">Loading…</div></div>
+  `;
+  dashboardGrid.insertAdjacentElement('afterend', panel);
+
+  // One mini activity feed per brand — last several ratings, reports, and tips for
+  // that chain only, so you don't have to open each brand's tab just to check in.
+  const activityGrid = document.createElement('div');
+  activityGrid.className = 'dashboard-grid-3';
+  chainKeys.forEach(key => {
+    const meta = CHAIN_META[key];
+    const brandPanel = document.createElement('section');
+    brandPanel.className = 'panel';
+    brandPanel.style.borderTop = `3px solid ${meta.color}`;
+    brandPanel.innerHTML = `
+      <div class="panel-header"><div><h2 class="panel-title">${escapeHtml(meta.name)}</h2><p class="panel-note">Recent ratings, reports &amp; tips</p></div><button class="mini-btn" data-go="chain-${key}">View all</button></div>
+      <div id="brandActivity-${key}" class="activity-list"><div class="empty-state">Loading…</div></div>
+    `;
+    activityGrid.appendChild(brandPanel);
+  });
+  panel.insertAdjacentElement('afterend', activityGrid);
+})();
+
+// Given a location ID, finds which chain it belongs to (used to attribute reports —
+// which only carry a locId — back to a brand).
+function chainForLocId(locId){
+  const row = allRows.find(r => r.loc.id === locId);
+  return row ? (row.loc.chain || 'stewarts') : null;
+}
+
+function renderBrandActivity(key){
+  const root = document.getElementById('brandActivity-' + key);
+  if(!root) return;
+  const events = [];
+  allRows.filter(r => (r.loc.chain||'stewarts')===key).forEach(r => {
+    (r.votes||[]).forEach(v => {
+      const storeStr = v.store ? `Store ${v.store}★` : '';
+      const bathStr = v.bathroom ? `Bathroom ${v.bathroom}★` : '';
+      const summary = [storeStr, bathStr].filter(Boolean).join(' · ') || 'Rating updated';
+      events.push({
+        ts: v.lastUpdated || 0,
+        html: activityItem('⭐', r.loc.n, summary, v.lastUpdated ? new Date(v.lastUpdated).toLocaleDateString() : '')
+      });
+    });
+    // Tips aren't individually timestamped in Firestore (just a plain string array),
+    // so they sort after anything with a real timestamp rather than claiming a false one.
+    r.tips.forEach(t => events.push({ ts: 0, html: activityItem('💡', t, r.loc.n) }));
+  });
+  allReports.filter(rep => chainForLocId(rep.locId) === key).forEach(rep => {
+    events.push({
+      ts: rep.ts || 0,
+      html: activityItem('⚑', reportType(rep), rep.locName || rep.appArea || CHAIN_META[key].name, rep.ts ? new Date(rep.ts).toLocaleDateString() : '')
+    });
+  });
+  events.sort((a,b) => b.ts - a.ts);
+  root.innerHTML = events.length
+    ? events.slice(0, 8).map(e => e.html).join('')
+    : '<div class="empty-state">No recent activity for this brand yet.</div>';
+}
+
+function renderByBrandPanel(){
+  const root = document.getElementById('byBrandList');
+  if(!root) return;
+  root.innerHTML = chainKeys.map(key => {
+    const meta = CHAIN_META[key];
+    const rows = allRows.filter(r => (r.loc.chain || 'stewarts') === key);
+    const storeSum = rows.reduce((s,r)=>s+(r.agg.storeSum||0),0);
+    const storeCount = rows.reduce((s,r)=>s+(r.agg.storeCount||0),0);
+    const bathSum = rows.reduce((s,r)=>s+(r.agg.bathroomSum||0),0);
+    const bathCount = rows.reduce((s,r)=>s+(r.agg.bathroomCount||0),0);
+    const pendingForChain = allReports.filter(r => {
+      if((r.status||'pending')!=='pending') return false;
+      const row = allRows.find(x=>x.loc.id===r.locId);
+      return row && (row.loc.chain||'stewarts')===key;
+    }).length;
+    return `<div class="activity-item" data-go="chain-${key}" style="cursor:pointer;border-left:4px solid ${meta.color};">
+      <div class="activity-icon" style="background:${meta.color}22;color:${meta.color};">●</div>
+      <div>
+        <div class="activity-title">${escapeHtml(meta.name)}</div>
+        <div class="activity-meta">${rows.length} locations · ${avgStr(storeSum,storeCount)}★ store · ${avgStr(bathSum,bathCount)}★ bathroom</div>
+      </div>
+      <div class="activity-time">${pendingForChain ? pendingForChain + ' pending' : ''}</div>
+    </div>`;
+  }).join('');
+}
+
+function refreshChainTable(key){
+  const tbody = document.getElementById('chainTableBody-' + key);
+  if(!tbody) return;
+  const q = (document.getElementById('chainFilterBox-' + key)?.value || '').trim().toLowerCase();
+  let rows = allRows.filter(r => (r.loc.chain || 'stewarts') === key);
+  if(q){
+    rows = rows.filter(r =>
+      r.loc.n.toLowerCase().includes(q) ||
+      r.loc.addr.toLowerCase().includes(q) ||
+      (r.loc.num || '').toLowerCase().includes(q)
+    );
+  }
+  renderTable(rows, 'chainTableBody-' + key);
+
+  const meta = CHAIN_META[key];
+  const storeSum = rows.reduce((s,r)=>s+(r.agg.storeSum||0),0);
+  const storeCount = rows.reduce((s,r)=>s+(r.agg.storeCount||0),0);
+  const bathSum = rows.reduce((s,r)=>s+(r.agg.bathroomSum||0),0);
+  const bathCount = rows.reduce((s,r)=>s+(r.agg.bathroomCount||0),0);
+  const pendingForChain = allReports.filter(r => {
+    if((r.status||'pending')!=='pending') return false;
+    const row = allRows.find(x=>x.loc.id===r.locId);
+    return row && (row.loc.chain||'stewarts')===key;
+  }).length;
+  document.getElementById(`chainStat-${key}-locations`).textContent = allRows.filter(r=>(r.loc.chain||'stewarts')===key).length;
+  document.getElementById(`chainStat-${key}-store`).textContent = avgStr(storeSum,storeCount) + '★';
+  document.getElementById(`chainStat-${key}-bathroom`).textContent = avgStr(bathSum,bathCount) + '★';
+  document.getElementById(`chainStat-${key}-reports`).textContent = pendingForChain;
+}
+
+function renderChainTips(key){
+  const root = document.getElementById('chainTips-' + key);
+  if(!root) return;
+  const tips = [];
+  allRows.filter(r => (r.loc.chain||'stewarts')===key).forEach(r => r.tips.forEach((text,i) => tips.push({text, loc:r.loc, index:i})));
+  root.innerHTML = tips.length
+    ? tips.map(t=>`<div class="tip-row"><div class="tip-copy">💡 ${escapeHtml(t.text)}</div><div><div class="tip-location"><b>${escapeHtml(t.loc.n)}</b><br>${escapeHtml(t.loc.addr)}</div></div><div class="report-actions"><button class="mini-btn tip-page-edit" data-locid="${t.loc.id}" data-tip="${encodeURIComponent(t.text)}">Edit</button><button class="mini-btn danger tip-page-delete" data-locid="${t.loc.id}" data-tip="${encodeURIComponent(t.text)}">Delete</button></div></div>`).join('')
+    : '<div class="empty-state">No tips for this brand yet.</div>';
+}
+
+function refreshAllChainViews(){
+  chainKeys.forEach(key => { refreshChainTable(key); renderChainTips(key); renderBrandActivity(key); });
+  renderByBrandPanel();
+}
+
+chainKeys.forEach(key => {
+  document.getElementById('chainFilterBox-' + key)?.addEventListener('input', () => refreshChainTable(key));
+});
+
 function showPage(page){ document.querySelectorAll('.page-view').forEach(v=>v.classList.toggle('active',v.dataset.view===page)); document.querySelectorAll('.nav-link').forEach(n=>n.classList.toggle('active',n.dataset.page===page)); const meta=pageMeta[page]||pageMeta.dashboard; document.getElementById('pageHeading').textContent=meta[0]; document.getElementById('pageSubheading').textContent=meta[1]; window.scrollTo({top:0,behavior:'smooth'});}
 document.querySelectorAll('.nav-link[data-page]').forEach(btn=>btn.addEventListener('click',()=>showPage(btn.dataset.page)));
 document.addEventListener('click',e=>{const go=e.target.closest('[data-go]');if(go)showPage(go.dataset.go)});
 document.querySelectorAll('.status-tab').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.status-tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active');reportFilter=btn.dataset.status;renderReports();}));
 document.getElementById('tipsFilter').addEventListener('input',renderTipsPage);
-document.getElementById('tipsList').addEventListener('click',async e=>{const edit=e.target.closest('.tip-page-edit');const del=e.target.closest('.tip-page-delete');const btn=edit||del;if(!btn)return;const locId=btn.dataset.locid,oldText=decodeURIComponent(btn.dataset.tip);if(edit){const newText=(prompt('Edit tip:',oldText)||'').trim().slice(0,50);if(!newText||newText===oldText)return;btn.disabled=true;const ok=await editTip(locId,oldText,newText);if(ok){const row=allRows.find(r=>r.loc.id===locId);if(row)row.tips=row.tips.map(t=>t===oldText?newText:t);renderTipsPage();refreshTable();renderDashboard();}else{alert('Could not save — try again.');btn.disabled=false;}}else{if(!confirm(`Delete this tip?
+document.getElementById('adminApp').addEventListener('click',async e=>{const edit=e.target.closest('.tip-page-edit');const del=e.target.closest('.tip-page-delete');const btn=edit||del;if(!btn)return;const locId=btn.dataset.locid,oldText=decodeURIComponent(btn.dataset.tip);if(edit){const newText=(prompt('Edit tip:',oldText)||'').trim().slice(0,50);if(!newText||newText===oldText)return;btn.disabled=true;const ok=await editTip(locId,oldText,newText);if(ok){const row=allRows.find(r=>r.loc.id===locId);if(row)row.tips=row.tips.map(t=>t===oldText?newText:t);renderTipsPage();refreshTable();renderDashboard();refreshAllChainViews();}else{alert('Could not save — try again.');btn.disabled=false;}}else{if(!confirm(`Delete this tip?
 
-"${oldText}"`))return;btn.disabled=true;const ok=await deleteTip(locId,oldText);if(ok){const row=allRows.find(r=>r.loc.id===locId);if(row)row.tips=row.tips.filter(t=>t!==oldText);renderTipsPage();refreshTable();renderDashboard();}else{alert('Could not delete — try again.');btn.disabled=false;}}});
+"${oldText}"`))return;btn.disabled=true;const ok=await deleteTip(locId,oldText);if(ok){const row=allRows.find(r=>r.loc.id===locId);if(row)row.tips=row.tips.filter(t=>t!==oldText);renderTipsPage();refreshTable();renderDashboard();refreshAllChainViews();}else{alert('Could not delete — try again.');btn.disabled=false;}}});
 
 
 document.getElementById('repairBtn').addEventListener('click', async () => {
