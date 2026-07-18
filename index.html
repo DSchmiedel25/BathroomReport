@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>BathroomReport – Find the Best Bathrooms Near You</title>
-<meta name="description" content="Find the best bathrooms, rated by the community. Currently featuring Stewart's Shops across New York and Vermont.">
+<meta name="description" content="Find public bathrooms at popular regional convenience stores, rated by the community.">
 <link rel="canonical" href="https://bathroomreport.app/">
 <meta property="og:title" content="BathroomReport">
 <meta property="og:description" content="Find the best bathrooms. Rated by the community.">
@@ -25,198 +25,207 @@
 <script type="module" src="firebase.js"></script>
 <script src="stewarts-locations.js"></script>
 <script src="cumberland-farms-locations.js"></script>
+<script src="wawa-locations.js"></script>
+<script src="fastrac-locations.js"></script>
+<script src="alltownfresh-locations.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-P30WFPVB80"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-P30WFPVB80');
+</script>
 </head>
 <body>
-
 <div id="installBanner">
-  <div class="icon">📲</div>
-  <div class="msg" id="installMsg">Add this to your home screen for one-tap access.</div>
-  <button class="closeBtn" id="installClose">✕</button>
+<div class="icon">📲</div>
+<div class="msg" id="installMsg">Add this to your home screen for one-tap access.</div>
+<button class="closeBtn" id="installClose">✕</button>
 </div>
-
 <div id="header">
-  <div id="headerTopRow">
-    <div id="headerBrand">
-      <img id="headerIcon" src="icon-192.png" alt="BathroomReport logo">
-      <h1>BathroomReport</h1>
-    </div>
-    <div id="headerActions">
-      <button id="themeToggle">🌙</button>
-      <button id="accountToggle">👤 Log In</button>
-    </div>
-  </div>
-  <p id="headerSubtitle">Find the best bathrooms. Rated by the community.
-    <button id="infoBtn" title="About this app">ℹ️</button>
-  </p>
-  <span id="chainBadge">🚽 Currently Featuring Stewart's Shops</span>
-  <div id="statPillRow">
-    <span class="stat-pill" id="myProgressBadge"></span>
-    <span class="stat-pill" id="weeklyRecap"></span>
-    <span class="stat-pill" id="mostRecentBadge"></span>
-  </div>
+<div id="headerTopRow">
+<div id="headerBrand">
+<img id="headerIcon" src="icon-192.png" alt="BathroomReport logo">
+<h1>BathroomReport</h1>
 </div>
-
+<div id="headerActions">
+<button id="themeToggle">🌙</button>
+<button id="accountToggle">👤 Log In</button>
+</div>
+</div>
+<p id="headerSubtitle">Find the best bathrooms. Rated by the community.
+<button id="infoBtn" title="About this app">ℹ️</button>
+</p>
+<span id="chainBadge">🚽 Regional convenience-store bathrooms</span>
+<div id="statPillRow">
+<span class="stat-pill" id="openNowBadge"></span>
+<span class="stat-pill" id="weeklyRecap"></span>
+<span class="stat-pill" id="mostRecentBadge"></span>
+<span class="stat-pill" id="totalCoverageBadge"></span>
+<span class="stat-pill" id="mostReviewedBadge"></span>
+<span class="stat-pill" id="highestRatedBadge"></span>
+<span class="stat-pill" id="nearestBathroomBadge"></span>
+<span class="stat-pill" id="topRatedNearbyBadge"></span>
+<span class="stat-pill" id="closingSoonBadge"></span>
+<span class="stat-pill" id="accessibleNearbyBadge"></span>
+</div>
+</div>
 <div id="mapWrap">
+<div id="topLeftControls">
 <div id="legend">
-  <div id="legendToggle">🔑 Key <span id="legendArrow">▾</span></div>
-  <div id="legendBody">
-    <div><span class="dot" style="background:#1e88e5"></span>5★ bathroom = ⭐ star pin</div>
-    <div><span class="dot" style="background:#43a047"></span>4★</div>
-    <div><span class="dot" style="background:#fdd835"></span>3★</div>
-    <div><span class="dot" style="background:#fb8c00"></span>2★</div>
-    <div><span class="dot" style="background:#e53935"></span>1★</div>
-    <div><span class="dot" style="background:#8a8a8a"></span>Not yet rated</div>
-    <div>◆ Diamond = you reviewed it</div>
-  </div>
+<div id="legendToggle">🔑 Key <span id="legendArrow">▾</span></div>
+<div id="legendBody">
+<div><span class="dot" style="background:#1e88e5"></span>5★ bathroom = ⭐ star pin</div>
+<div><span class="dot" style="background:#43a047"></span>4★</div>
+<div><span class="dot" style="background:#fdd835"></span>3★</div>
+<div><span class="dot" style="background:#fb8c00"></span>2★</div>
+<div><span class="dot" style="background:#e53935"></span>1★</div>
+<div><span class="dot" style="background:#8a8a8a"></span>Not yet rated</div>
+<div>◆ Diamond = you reviewed it</div>
 </div>
-
+</div>
+<div id="chainFilter">
+<div id="chainFilterToggle">🏪 Chains <span id="chainFilterArrow">▾</span></div>
+<div id="chainFilterBody"></div>
+</div>
+</div>
 <button id="openNowToggle">🕐 Open now</button>
 <button id="listViewToggle">📋 List</button>
 <button id="leaderboardToggle">🏆 Leaderboard</button>
-
 <div id="map"></div>
+<button id="whereAmIBtn" aria-label="Show my current location on the map">📍 Where Am I?</button>
 <button id="locateBtn" aria-label="Find the closest Stewart's bathroom by driving distance">🚽 Bathroom Now</button>
 <div id="nearestInfo"></div>
-
 <button id="missingBtn">📍 We Missed One?</button>
 <div id="missingPanel">
-  <div class="rating-label" style="color:#b5750f;font-size:15px;">What'd we miss?</div>
-  <input type="text" id="missingInput" maxlength="120" placeholder="Address or cross streets" style="width:100%;margin-bottom:8px;" />
-  <button class="btn btn-amber tip-submit" id="missingSubmit" style="width:100%;margin-bottom:8px;">Send it in</button>
-  <button id="missingUseLocationBtn" type="button">📍 Use my location instead</button>
-  <div class="save-note" id="missingNote"></div>
+<div class="rating-label" style="color:#b5750f;font-size:15px;">What'd we miss?</div>
+<input type="text" id="missingInput" maxlength="120" placeholder="Address or cross streets" style="width:100%;margin-bottom:8px;" />
+<button class="btn btn-amber tip-submit" id="missingSubmit" style="width:100%;margin-bottom:8px;">Send it in</button>
+<button id="missingUseLocationBtn" type="button">📍 Use my location instead</button>
+<div class="save-note" id="missingNote"></div>
 </div>
-
 <div id="onboardingOverlay">
-  <div id="onboardingCard" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
-    <div id="onboardingScroll">
-      <h2 id="onboardingTitle">🚽 Welcome to BathroomReport</h2>
-      <p class="onboardingTagline">Find a bathroom, check its rating, and help the next traveler.</p>
-
-      <div class="onboardingGrid" aria-label="Quick tour">
-        <div class="onboardingTip">
-          <span aria-hidden="true">📍</span>
-          <div><b>Rate a stop</b><small>Tap a pin to review a store and bathroom or get directions.</small></div>
-        </div>
-        <div class="onboardingTip">
-          <span aria-hidden="true">✅</span>
-          <div><b>Log a visit</b><small>Use "I've been here" without leaving a rating.</small></div>
-        </div>
-        <div class="onboardingTip">
-          <span aria-hidden="true">🚽</span>
-          <div><b>Bathroom Now</b><small>Find the closest open restroom by driving distance.</small></div>
-        </div>
-        <div class="onboardingTip">
-          <span aria-hidden="true">👤</span>
-          <div><b>Optional account</b><small>Keep ratings across devices and join the leaderboard.</small></div>
-        </div>
-      </div>
-
-      <details id="onboardingMore">
-        <summary>More tips &amp; important info</summary>
-        <div class="onboardingMoreBody">
-          <p>Use List to browse every location and choose Apple Maps, Google Maps, or Waze for directions.</p>
-          <p>Hours are shown live when available, but may occasionally be outdated.</p>
-          <p>You can share a pin or report wrong information from its popup.</p>
-          <p>Accounts use a username and password with no email. There is currently no password recovery.</p>
-          <p class="onboardingDisclaimer">BathroomReport is an independent, community-created project and is not affiliated with or endorsed by Stewart's Shops or any other business listed.</p>
-          <p class="onboardingUpdated">Location data updated: July 14, 2026</p>
-          <a href="https://cash.app/$BathroomReport" target="_blank" rel="noopener" id="cashAppBtn">🍔 Enjoying this? Buy me lunch</a>
-        </div>
-      </details>
-    </div>
-
-    <div id="onboardingActions">
-      <button id="onboardingClose" class="btn btn-amber">Got it!</button>
-    </div>
-  </div>
+<div id="onboardingCard" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
+<div id="onboardingScroll">
+<h2 id="onboardingTitle">🚽 Welcome to BathroomReport</h2>
+<p class="onboardingTagline">Find a bathroom, check its rating, and help the next traveler.</p>
+<div class="onboardingGrid" aria-label="Quick tour">
+<div class="onboardingTip">
+<span aria-hidden="true">📍</span>
+<div><b>Rate a stop</b><small>Tap a pin to review a store and bathroom or get directions.</small></div>
 </div>
-
+<div class="onboardingTip">
+<span aria-hidden="true">✅</span>
+<div><b>Log a visit</b><small>Use "I've been here" without leaving a rating.</small></div>
+</div>
+<div class="onboardingTip">
+<span aria-hidden="true">🚽</span>
+<div><b>Bathroom Now</b><small>Find the closest open restroom by driving distance.</small></div>
+</div>
+<div class="onboardingTip">
+<span aria-hidden="true">👤</span>
+<div><b>Optional account</b><small>Keep ratings across devices and join the leaderboard.</small></div>
+</div>
+</div>
+<details id="onboardingMore">
+<summary>More tips &amp; important info</summary>
+<div class="onboardingMoreBody">
+<p>Use List to browse every location and choose Apple Maps, Google Maps, or Waze for directions.</p>
+<p>Hours are shown live when available, but may occasionally be outdated.</p>
+<p>You can share a pin or report wrong information from its popup.</p>
+<p>Accounts use a username and password with no email. There is currently no password recovery.</p>
+<p class="onboardingDisclaimer">BathroomReport is an independent, community-created project and is not affiliated with or endorsed by Stewart's Shops or any other business listed.</p>
+<p class="onboardingUpdated">Location data updated: July 14, 2026</p>
+<a href="https://cash.app/$BathroomReport" target="_blank" rel="noopener" id="cashAppBtn">🍔 Enjoying this? Buy me lunch</a>
+</div>
+</details>
+</div>
+<div id="onboardingActions">
+<button id="onboardingClose" class="btn btn-amber">Got it!</button>
+</div>
+</div>
+</div>
 <div id="listViewPanel">
-  <div id="listViewHeader">
-    <span>All Locations</span>
-    <button id="listViewClose">✕</button>
-  </div>
-  <div id="listControls">
-    <label for="listSort">Sort:</label>
-    <select id="listSort">
-      <option value="closest">Closest</option>
-      <option value="best">Best bathrooms</option>
-      <option value="reviewed">Most reviewed</option>
-      <option value="recent">Recently reviewed</option>
-      <option value="open">Open now</option>
-      <option value="az">A–Z</option>
-    </select>
-    <label id="accessibleFilterLabel"><input type="checkbox" id="accessibleOnly"> ♿ Accessible only</label>
-  </div>
-  <div id="listViewItems"></div>
+<div id="listViewHeader">
+<span>All Locations</span>
+<button id="listViewClose">✕</button>
+</div>
+<div id="listControls">
+<label for="listSort">Sort:</label>
+<select id="listSort">
+<option value="closest">Closest</option>
+<option value="best">Best bathrooms</option>
+<option value="reviewed">Most reviewed</option>
+<option value="recent">Recently reviewed</option>
+<option value="open">Open now</option>
+<option value="az">A–Z</option>
+</select>
+<label id="accessibleFilterLabel"><input type="checkbox" id="accessibleOnly"> ♿ Accessible only</label>
+</div>
+<div id="listViewItems"></div>
 </div>
 </div>
-
 <div id="leaderboardPanel">
-  <div id="listViewHeader">
-    <span>🏆 Leaderboard</span>
-    <button id="leaderboardClose">✕</button>
-  </div>
-  <p style="padding:10px 16px 0;color:var(--muted);font-size:12px;font-style:italic;margin:0;">
-    Completely optional, purely for fun, and entirely unnecessary — genuinely nobody needs to be
-    the leading authority on convenience store bathrooms. If you're near the top of this list,
-    maybe take a second to reflect on some of your recent life choices. We're not judging. We're
-    right here with you.
-  </p>
-  <div id="leaderboardAccountNote" style="padding:12px 16px;border-bottom:1px solid #333;color:var(--cream);font-size:13px;"></div>
-  <div id="leaderboardItems" style="flex:1;overflow-y:auto;padding:8px 0;"></div>
+<div id="leaderboardHeader">
+<span>🏆 Leaderboard</span>
+<button id="leaderboardClose">✕</button>
 </div>
-
+<p style="padding:10px 16px 0;color:var(--muted);font-size:12px;font-style:italic;margin:0;">
+Completely optional, purely for fun, and entirely unnecessary — genuinely nobody needs to be
+the leading authority on convenience store bathrooms. If you're near the top of this list,
+maybe take a second to reflect on some of your recent life choices. We're not judging. We're
+right here with you.
+</p>
+<div id="leaderboardAccountNote" style="padding:12px 16px;border-bottom:1px solid #333;color:var(--cream);font-size:13px;"></div>
+<div id="leaderboardItems" style="flex:1;overflow-y:auto;padding:8px 0;"></div>
+</div>
 <div id="accountPanel">
-  <div id="listViewHeader">
-    <span>👤 Account</span>
-    <button id="accountClose">✕</button>
-  </div>
-  <div style="padding:16px;overflow-y:auto;flex:1;">
-    <div id="loggedOutView">
-      <p style="color:var(--cream);font-size:13px;margin:0 0 12px;">
-        Log in to make your name and rating history follow you across devices — otherwise
-        everything's tied just to this phone/browser.
-      </p>
-      <div class="rating-label" style="color:var(--cream);">Username</div>
-      <input type="text" id="authUsername" maxlength="20" placeholder="letters, numbers, underscore" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
-      <div class="rating-label" style="color:var(--cream);">Password</div>
-      <input type="password" id="authPassword" placeholder="at least 6 characters" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
-      <p style="background:#3a2226;border:1px solid #e53935;border-radius:6px;padding:8px 10px;color:#ffab91;font-size:12px;margin:0 0 12px;">
-        ⚠️ There's no email attached to this account, so there's no way to reset a forgotten password — not by you, not by us. Once it's set, write it down somewhere safe. If it's lost, that username is gone for good.
-      </p>
-      <button class="btn btn-amber" id="authSignUpBtn" style="width:100%;margin-bottom:8px;">Sign Up (new account)</button>
-      <button class="btn btn-secondary" id="authLogInBtn" style="width:100%;">Log In (existing account)</button>
-      <div class="save-note" id="authNote" style="height:auto;margin-top:8px;"></div>
-    </div>
-    <div id="loggedInView" style="display:none;">
-      <p style="color:var(--cream);font-size:15px;margin:0 0 12px;">
-        Logged in as <b id="loggedInUsername" style="color:var(--amber);"></b>
-      </p>
-      <button class="btn btn-danger" id="logOutBtn" style="width:100%;">Log Out</button>
-    </div>
-
-    <div id="passportSection">
-      <div class="account-section-title">🎫 Bathroom Passport</div>
-      <p id="passportSyncNote" style="color:var(--muted);font-size:11.5px;margin:0 0 8px;display:none;">
-        This is tracked on this device only — log in to sync it across devices.
-      </p>
-      <div id="bathroomPassportBody"></div>
-    </div>
-
-    <div id="achievementsSection">
-      <div class="account-section-title">🏆 Achievements</div>
-      <div id="achievementsList"></div>
-    </div>
-  </div>
+<div id="accountHeader">
+<span>👤 Account</span>
+<button id="accountClose">✕</button>
 </div>
-
-<script src="stewarts-locations.js"></script>
+<div style="padding:16px;overflow-y:auto;flex:1;">
+<div id="loggedOutView">
+<p style="color:var(--cream);font-size:13px;margin:0 0 12px;">
+Log in to make your name and rating history follow you across devices — otherwise
+everything's tied just to this phone/browser.
+</p>
+<div class="rating-label" style="color:var(--cream);">Username</div>
+<input type="text" id="authUsername" maxlength="20" placeholder="letters, numbers, underscore" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
+<div class="rating-label" style="color:var(--cream);">Password</div>
+<input type="password" id="authPassword" placeholder="at least 6 characters" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
+<p style="background:#3a2226;border:1px solid #e53935;border-radius:6px;padding:8px 10px;color:#ffab91;font-size:12px;margin:0 0 12px;">
+⚠️ There's no email attached to this account, so there's no way to reset a forgotten password — not by you, not by us. Once it's set, write it down somewhere safe. If it's lost, that username is gone for good.
+</p>
+<button class="btn btn-amber" id="authSignUpBtn" style="width:100%;margin-bottom:8px;">Sign Up (new account)</button>
+<button class="btn btn-secondary" id="authLogInBtn" style="width:100%;">Log In (existing account)</button>
+<div class="save-note" id="authNote" style="height:auto;margin-top:8px;"></div>
+</div>
+<div id="loggedInView" style="display:none;">
+<p style="color:var(--cream);font-size:15px;margin:0 0 12px;">
+Logged in as <b id="loggedInUsername" style="color:var(--amber);"></b>
+</p>
+<button class="btn btn-danger" id="logOutBtn" style="width:100%;">Log Out</button>
+</div>
+<div id="passportSection">
+<div class="account-section-title">🎫 Bathroom Passport</div>
+<p id="passportSyncNote" style="color:var(--muted);font-size:11.5px;margin:0 0 8px;display:none;">
+This is tracked on this device only — log in to sync it across devices.
+</p>
+<div id="bathroomPassportBody"></div>
+</div>
+<div id="achievementsSection">
+<div class="account-section-title">🏆 Achievements</div>
+<div id="achievementsList"></div>
+</div>
+</div>
+</div>
 <!-- To add a chain: <script src="<chain>-locations.js"></script> here, then register it in app.js's CHAIN_REGISTRY -->
 <script src="app.js"></script>
 </body>
