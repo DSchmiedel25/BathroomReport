@@ -971,6 +971,11 @@ function popupHtml(loc, agg, myVote){
 }
 
 const markers = {};
+// Keep a separate list of every marker. The ID-keyed `markers` object is useful for lookups,
+// but it can only retain one marker per ID. Filtering the complete list guarantees that
+// every pin is removed when its chain is disabled, even if bad imported data ever contains
+// a duplicate ID.
+const allLocationMarkers = [];
 const myVoteCache = {};
 const loadedIds = new Set();
 
@@ -980,6 +985,9 @@ function addMarker(loc){
   myVoteCache[loc.id] = myVoteCache[loc.id] || emptyVote();
   const marker = L.marker([loc.lat, loc.lng], {icon: makeIcon(loc.id)});
   marker.locId = loc.id; // used by the cluster icon function to compute the cluster's average rating
+  marker.chainKey = loc.chain || DEFAULT_CHAIN_KEY;
+  marker.locationData = loc;
+  allLocationMarkers.push(marker);
   markerCluster.addLayer(marker);
   marker.bindPopup(popupHtml(loc, ratingsCache[loc.id], myVoteCache[loc.id]), {
     maxWidth: Math.min(280, window.innerWidth - 40),
@@ -1906,11 +1914,14 @@ function relativeTimeFromNow(ts){
 let showOnlyOpenNow = false;
 
 function applyFilters(){
-  seedLocations.forEach(loc => {
-    const m = markers[loc.id];
-    if(!m) return;
+  // Filter the actual marker instances rather than looking them up again by location ID.
+  // This prevents stray pins when imported data has duplicate IDs or a marker lookup is
+  // overwritten: every marker that was created is always evaluated and removed as needed.
+  allLocationMarkers.forEach(m => {
+    const loc = m.locationData;
+    if(!loc) return;
     const openOk = !showOnlyOpenNow || isLocationOpenNow(loc) !== false; // null (unknown) counts as OK
-    const chainOk = activeChains.has(loc.chain || DEFAULT_CHAIN_KEY);
+    const chainOk = activeChains.has(m.chainKey || DEFAULT_CHAIN_KEY);
     if(openOk && chainOk){
       if(!markerCluster.hasLayer(m)) markerCluster.addLayer(m);
     } else {
