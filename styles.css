@@ -168,37 +168,39 @@
     color:var(--cream);white-space:nowrap;
   }
   .chain-filter-row input{margin:0;cursor:pointer;}
-  #openNowToggle{
-    position:absolute;top:10px;right:10px;z-index:500;font-size:12px;font-weight:700;
+  /* Right-side map controls: one aligned stack with matching dimensions. */
+  #openNowToggle,
+  #listViewToggle,
+  #leaderboardToggle,
+  #whereAmIBtn{
+    position:absolute;right:10px;z-index:500;
+    width:148px;min-height:34px;box-sizing:border-box;
+    display:flex;align-items:center;justify-content:center;
     background:var(--panel-bg);color:var(--cream);border:1px solid var(--panel-border);
-    padding:5px 10px;border-radius:6px;cursor:pointer;
+    border-radius:8px;padding:6px 10px;
+    font-size:12px;font-weight:700;line-height:1.2;
+    box-shadow:0 3px 10px rgba(0,0,0,.3);cursor:pointer;
   }
+  #openNowToggle{top:10px;}
+  #listViewToggle{top:50px;}
+  #leaderboardToggle{top:90px;}
+  #whereAmIBtn{top:130px;}
   #openNowToggle.active{background:#2e7d32;border-color:#2e7d32;color:#fff;}
-  #listViewToggle{
-    position:absolute;top:44px;right:10px;z-index:500;font-size:12px;font-weight:700;
-    background:var(--panel-bg);color:var(--cream);border:1px solid var(--panel-border);
-    padding:5px 10px;border-radius:6px;cursor:pointer;
-  }
-  #leaderboardToggle{
-    position:absolute;top:78px;right:10px;z-index:500;font-size:12px;font-weight:700;
-    background:var(--panel-bg);color:var(--cream);border:1px solid var(--panel-border);
-    padding:5px 10px;border-radius:6px;cursor:pointer;
+  .map-control-icon{
+    width:17px;height:17px;flex:0 0 17px;margin-right:7px;
+    fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;
   }
   .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;}
-  #whereAmIBtn{
-    position:absolute;top:60px;right:10px;z-index:500;
-    background:var(--panel-bg);color:var(--cream);border:1px solid #2196f3;border-radius:50px;
-    padding:9px 14px;font-weight:700;font-size:12.5px;box-shadow:0 3px 10px rgba(0,0,0,.3);
-    cursor:pointer;
-  }
   #locateBtn{
-    position:absolute;top:112px;right:10px;z-index:500;
-    background:#2196f3;color:#fff;border:none;border-radius:50px;
-    padding:11px 14px;font-weight:700;font-size:13.5px;box-shadow:0 3px 10px rgba(0,0,0,.4);
-    cursor:pointer;
+    position:absolute;top:176px;right:10px;z-index:500;
+    width:148px;min-height:42px;box-sizing:border-box;
+    display:flex;align-items:center;justify-content:center;
+    background:#2196f3;color:#fff;border:none;border-radius:10px;
+    padding:9px 10px;font-weight:700;font-size:13px;line-height:1.2;
+    box-shadow:0 3px 10px rgba(0,0,0,.4);cursor:pointer;
   }
   #nearestInfo{
-    position:absolute;top:160px;right:10px;z-index:500;
+    position:absolute;top:224px;right:10px;z-index:500;
     background:var(--panel-bg);color:var(--cream);border:1px solid #2196f3;
     border-radius:8px;padding:8px 12px;font-size:13px;max-width:220px;display:none;
     cursor:pointer;line-height:1.4;
@@ -487,7 +489,7 @@
   width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
 }
 .bathroom-now-close:active{background:rgba(255,255,255,.25);}
-@media(max-width:480px){#nearestInfo{left:10px;right:10px;max-width:none;top:160px}}
+@media(max-width:480px){#nearestInfo{left:10px;right:10px;max-width:none;top:224px}}
 
 
   /* Permanent support area in the Account panel */
