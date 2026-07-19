@@ -1814,6 +1814,7 @@ async function attachTipHandlers(loc){
 // Load all seed locations — this is now instant since no storage calls happen until a pin is tapped
 seedLocations.forEach(loc => addMarker(loc));
 loadAllRatings();
+loadOverrides();
 loadWeeklyRecap();
 
 // One-time support prompt — shown after this identity has rated five different locations.
@@ -1882,12 +1883,27 @@ map.on('zoomend', () => {
   });
 });
 
-// Open-now calculation — loc.hrs is either "24" (24hr) or "HHMM-HHMM" in 24hr time.
-// Locations with no .hrs field are "unknown" and are never hidden by the open-now filter.
+// Day keys aligned to Date.getDay() (0=Sunday). A location may carry per-day hours
+// (loc.hours, set by an admin correction) which take precedence over the single
+// loc.hrs window. Each day's value is "24", "HHMM-HHMM", "closed", or missing (unknown).
+const HRS_DAY_KEYS = ['sun','mon','tue','wed','thu','fri','sat'];
+function todayHrsString(loc){
+  if(loc && loc.hours && typeof loc.hours === 'object' && Object.keys(loc.hours).length){
+    const v = loc.hours[HRS_DAY_KEYS[new Date().getDay()]];
+    return (v === undefined || v === null) ? null : v;
+  }
+  return (loc && loc.hrs != null) ? loc.hrs : null;
+}
+
+// Open-now calculation — the effective hours string is "24", "HHMM-HHMM", "closed",
+// or empty/unknown (from todayHrsString, which also handles per-day hours).
+// Locations with no known hours are "unknown" and are never hidden by the open-now filter.
 function isLocationOpenNow(loc){
-  if(!loc.hrs) return null; // unknown — we don't have hours data for this one yet
-  if(loc.hrs === '24') return true;
-  const parts = loc.hrs.split('-');
+  const hrs = todayHrsString(loc);
+  if(!hrs) return null; // unknown — we don't have hours data for this one yet
+  if(hrs === 'closed') return false;
+  if(hrs === '24') return true;
+  const parts = hrs.split('-');
   if(parts.length !== 2) return null;
   const open = parseInt(parts[0], 10);
   const close = parseInt(parts[1], 10);
@@ -1914,14 +1930,56 @@ function formatTime12h(hhmm){
 }
 
 function formatHrsDisplay(loc){
-  if(!loc.hrs) return null;
-  if(loc.hrs === '24') return 'Open 24 hours';
-  const parts = loc.hrs.split('-');
+  const hrs = todayHrsString(loc);
+  if(!hrs) return null;
+  if(hrs === 'closed') return 'Closed today';
+  if(hrs === '24') return 'Open 24 hours';
+  const parts = hrs.split('-');
   if(parts.length !== 2) return null;
   const open = parseInt(parts[0], 10);
   const close = parseInt(parts[1], 10);
   if(isNaN(open) || isNaN(close)) return null;
   return `${formatTime12h(open)} – ${formatTime12h(close)}`;
+}
+
+// Admin corrections (hours, address, coordinates, phone) live in the Firestore
+// `overrides` collection and are merged over the built-in location data at load, so a
+// fix made in FlushPanel shows up without a redeploy. Best-effort: if this fails, the
+// static data still works. Reads are public per the security rules.
+async function loadOverrides(){
+  try{
+    const {db, collection, getDocs} = await fb();
+    const snap = await getDocs(collection(db, 'overrides'));
+    let coordsMoved = false;
+    snap.forEach(docSnap => {
+      const loc = locationsById[docSnap.id];
+      if(!loc) return; // an override for a location we don't ship — ignore safely
+      if(applyOverrideToLocation(loc, docSnap.data() || {})) coordsMoved = true;
+    });
+    // If any pin moved, re-evaluate which markers are in view.
+    if(coordsMoved && typeof applyFilters === 'function') applyFilters();
+  }catch(e){ /* overrides are optional; keep the static data */ }
+}
+
+// Merge one override document onto its location record (in place) and refresh its
+// marker/popup. Returns true if the coordinates changed (so the pin was moved).
+function applyOverrideToLocation(loc, data){
+  ['hrs','addr','city','state','zipCode','phone'].forEach(f => {
+    if(data[f] !== undefined) loc[f] = data[f];
+  });
+  if(data.hours !== undefined) loc.hours = data.hours;   // per-day hours map ({} clears it)
+  if(data.locName !== undefined) loc.n = data.locName;   // corrected display name
+  let coordsMoved = false;
+  if(typeof data.lat === 'number' && typeof data.lng === 'number'){
+    coordsMoved = (data.lat !== loc.lat || data.lng !== loc.lng);
+    loc.lat = data.lat; loc.lng = data.lng;
+  }
+  const marker = markers[loc.id];
+  if(marker){
+    if(coordsMoved) marker.setLatLng([loc.lat, loc.lng]);
+    if(marker.getPopup()) marker.setPopupContent(popupHtml(loc, ratingsCache[loc.id], myVoteCache[loc.id]));
+  }
+  return coordsMoved;
 }
 
 // "2 days ago" style formatting for showing when a location was last rated

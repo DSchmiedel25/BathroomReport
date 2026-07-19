@@ -652,6 +652,7 @@ function renderReports(){
       <div class="report-copy">${escapeHtml(details)}</div>
       ${r.moderatorNote ? `<div class="activity-meta"><b>Moderator note:</b> ${escapeHtml(r.moderatorNote)}</div>` : ''}
       <div class="report-foot"><span class="activity-meta">Submitted ${formatWhen(r.ts)}</span><div class="report-actions">
+      ${locId ? `<button class="mini-btn edit-loc-btn" data-locid="${escapeHtml(locId)}" style="background:rgba(63,185,139,.13);color:#7ee0ad;border-color:rgba(63,185,139,.28)">✎ Edit location</button>` : ''}
       ${status !== 'pending' ? `<button class="mini-btn reopen report-status-btn" data-reportid="${r.id}" data-status="pending">Reopen</button>` : ''}
       ${status !== 'resolved' ? `<button class="mini-btn resolve report-status-btn" data-reportid="${r.id}" data-status="resolved">Resolve</button>` : ''}
       ${status !== 'dismissed' ? `<button class="mini-btn dismiss report-status-btn" data-reportid="${r.id}" data-status="dismissed">Dismiss</button>` : ''}
@@ -1242,6 +1243,228 @@ document.getElementById('refreshBtn').addEventListener('click', loadAll);
 setInterval(() => {
   if(adminAuthorized && !document.querySelector('.edit-tip-input')) loadAll();
 }, 15 * 60 * 1000);
+
+/* ============================================================================
+   Location editing — fix hours / address / coordinates / phone from a report.
+   Writes an admin-only override doc (overrides/{locId}) that the public app merges
+   over its built-in data at load, so corrections go live with no redeploy.
+   ============================================================================ */
+(function(){
+  const locById = {};
+  seedLocations.forEach(l => { locById[l.id] = l; });
+
+  const DAY_KEYS = ['sun','mon','tue','wed','thu','fri','sat'];
+  const DAY_LABELS = { sun:'Sun', mon:'Mon', tue:'Tue', wed:'Wed', thu:'Thu', fri:'Fri', sat:'Sat' };
+  const toTimeInput = hhmm => (hhmm && /^\d{3,4}$/.test(hhmm)) ? (hhmm.padStart(4,'0').slice(0,2)+':'+hhmm.padStart(4,'0').slice(2)) : '';
+  const fromTimeInput = v => (v && /^\d{2}:\d{2}$/.test(v)) ? v.replace(':','') : '';
+
+  let modal;
+  function ensureModal(){
+    if(modal) return modal;
+    const style = document.createElement('style');
+    style.textContent =
+      '.loc-edit-backdrop{position:fixed;inset:0;background:rgba(3,10,20,.72);display:flex;align-items:flex-start;justify-content:center;padding:24px 14px;overflow:auto;z-index:1000}' +
+      '.loc-edit{background:#101b2c;border:1px solid #26384c;border-radius:16px;max-width:520px;width:100%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.5)}' +
+      '.loc-edit h3{margin:0 0 2px;font-size:16px}.loc-edit .sub{color:#8ea1b4;font-size:12px;margin-bottom:14px;word-break:break-all}' +
+      '.loc-edit label{display:block;font-size:11px;font-weight:800;color:#9db0c1;margin:10px 0 4px}' +
+      '.loc-edit input,.loc-edit select{width:100%;box-sizing:border-box;background:#0c1929;border:1px solid #26384c;color:#e7eef5;border-radius:9px;padding:9px 10px;font-size:13px}' +
+      '.loc-edit .row{display:flex;gap:10px}.loc-edit .row>div{flex:1}' +
+      '.loc-edit .day-row{display:flex;align-items:center;gap:8px;margin:6px 0}.loc-edit .day-row .d{width:34px;font-size:11px;font-weight:800;color:#9db0c1}' +
+      '.loc-edit .day-row select{width:120px;flex:0 0 auto}.loc-edit .day-row input{flex:1;min-width:0}' +
+      '.loc-edit .note{font-size:11px;color:#8ea1b4;margin-top:8px}.loc-edit .msg{font-size:12px;font-weight:700;margin-top:10px;min-height:16px}' +
+      '.loc-edit .foot{display:flex;justify-content:space-between;gap:10px;margin-top:16px;flex-wrap:wrap}.loc-edit .btns{display:flex;gap:8px}' +
+      '.le-btn{border:1px solid #26384c;background:#17263a;color:#e7eef5;border-radius:9px;padding:9px 14px;font-size:12px;font-weight:800;cursor:pointer}' +
+      '.le-btn.primary{background:#3fb98b;border-color:#3fb98b;color:#07121f}.le-btn.danger{background:rgba(239,91,99,.14);color:#ff8f95;border-color:rgba(239,91,99,.25)}';
+    document.head.appendChild(style);
+    const back = document.createElement('div');
+    back.className = 'loc-edit-backdrop';
+    back.style.display = 'none';
+    back.innerHTML = '<div class="loc-edit" role="dialog" aria-modal="true" aria-labelledby="leTitle"></div>';
+    document.body.appendChild(back);
+    back.addEventListener('click', e => { if(e.target === back) closeModal(); });
+    document.addEventListener('keydown', e => { if(e.key === 'Escape' && modal && modal.style.display !== 'none') closeModal(); });
+    modal = back;
+    return back;
+  }
+  function closeModal(){ if(modal) modal.style.display = 'none'; }
+
+  function dayRowsHtml(hoursObj){
+    return DAY_KEYS.map(k => {
+      const v = hoursObj && hoursObj[k];
+      const mode = v === '24' ? '24' : v === 'closed' ? 'closed' : (v && v.indexOf('-') > -1) ? 'window' : 'unknown';
+      const oc = (mode === 'window') ? v.split('-') : ['',''];
+      const showTimes = mode === 'window' ? '' : 'display:none';
+      return '<div class="day-row" data-day="' + k + '">' +
+        '<span class="d">' + DAY_LABELS[k] + '</span>' +
+        '<select class="le-day-mode">' +
+          '<option value="unknown"' + (mode==='unknown'?' selected':'') + '>Unknown</option>' +
+          '<option value="window"' + (mode==='window'?' selected':'') + '>Open\u2013close</option>' +
+          '<option value="24"' + (mode==='24'?' selected':'') + '>24 hours</option>' +
+          '<option value="closed"' + (mode==='closed'?' selected':'') + '>Closed</option>' +
+        '</select>' +
+        '<input type="time" class="le-day-open" value="' + toTimeInput(oc[0]) + '" style="' + showTimes + '">' +
+        '<input type="time" class="le-day-close" value="' + toTimeInput(oc[1]) + '" style="' + showTimes + '">' +
+      '</div>';
+    }).join('');
+  }
+
+  async function openEditor(locId){
+    const loc = locById[locId];
+    ensureModal();
+    const box = modal.querySelector('.loc-edit');
+    box.innerHTML = '<div class="msg">Loading\u2026</div>';
+    modal.style.display = 'flex';
+
+    let existing = {};
+    try{
+      const { db, doc, getDoc } = await fb();
+      const snap = await getDoc(doc(db, 'overrides', locId));
+      if(snap.exists()) existing = snap.data() || {};
+    }catch(e){ /* fall back to static values */ }
+
+    const cur = Object.assign({}, loc || {}, existing);
+    const name = (loc && loc.n) || existing.locName || locId;
+    const effHours = existing.hours && Object.keys(existing.hours).length ? existing.hours : null;
+    const singleHrs = effHours ? '' : (cur.hrs || '');
+    const hMode = effHours ? 'perday' : (singleHrs === '24' ? '24' : (singleHrs && singleHrs.indexOf('-') > -1) ? 'window' : (singleHrs === '' ? 'keep' : 'keep'));
+    const sParts = (hMode === 'window') ? singleHrs.split('-') : ['',''];
+
+    box.innerHTML =
+      '<h3 id="leTitle">Edit ' + escapeHtml(name) + '</h3>' +
+      '<div class="sub">' + escapeHtml(locId) + ' \u00b7 goes live on the map without a redeploy</div>' +
+      '<label>Address</label><input id="le-addr" value="' + escapeHtml(cur.addr || '') + '">' +
+      '<div class="row"><div><label>City</label><input id="le-city" value="' + escapeHtml(cur.city || '') + '"></div>' +
+        '<div><label>State</label><input id="le-state" value="' + escapeHtml(cur.state || '') + '"></div>' +
+        '<div><label>ZIP</label><input id="le-zip" value="' + escapeHtml(cur.zipCode || '') + '"></div></div>' +
+      '<label>Phone</label><input id="le-phone" value="' + escapeHtml(cur.phone || '') + '">' +
+      '<div class="row"><div><label>Latitude</label><input id="le-lat" inputmode="decimal" value="' + (cur.lat != null ? cur.lat : '') + '"></div>' +
+        '<div><label>Longitude</label><input id="le-lng" inputmode="decimal" value="' + (cur.lng != null ? cur.lng : '') + '"></div></div>' +
+      '<label>Hours</label><select id="le-hmode">' +
+        '<option value="keep"' + (hMode==='keep'?' selected':'') + '>Keep current</option>' +
+        '<option value="24"' + (hMode==='24'?' selected':'') + '>Open 24 hours</option>' +
+        '<option value="window"' + (hMode==='window'?' selected':'') + '>Same window every day</option>' +
+        '<option value="perday"' + (hMode==='perday'?' selected':'') + '>Different by day</option>' +
+        '<option value="unknown">Unknown / clear</option>' +
+      '</select>' +
+      '<div id="le-single" style="' + (hMode==='window'?'':'display:none') + '"><div class="row" style="margin-top:8px">' +
+        '<div><label>Opens</label><input type="time" id="le-open" value="' + toTimeInput(sParts[0]) + '"></div>' +
+        '<div><label>Closes</label><input type="time" id="le-close" value="' + toTimeInput(sParts[1]) + '"></div></div></div>' +
+      '<div id="le-perday" style="' + (hMode==='perday'?'':'display:none') + ';margin-top:8px">' + dayRowsHtml(effHours) + '</div>' +
+      '<div class="note">Anything left blank or "Unknown" shows honestly as unknown \u2014 it is never treated as closed.</div>' +
+      '<div class="msg" id="le-msg"></div>' +
+      '<div class="foot"><div>' + (existing.updatedAt ? '<button class="le-btn danger" id="le-revert">Revert to shipped data</button>' : '') + '</div>' +
+        '<div class="btns"><button class="le-btn" id="le-cancel">Cancel</button><button class="le-btn primary" id="le-save">Save correction</button></div></div>';
+
+    const hmode = box.querySelector('#le-hmode');
+    const single = box.querySelector('#le-single');
+    const perday = box.querySelector('#le-perday');
+    hmode.addEventListener('change', () => {
+      single.style.display = hmode.value === 'window' ? '' : 'none';
+      perday.style.display = hmode.value === 'perday' ? '' : 'none';
+    });
+    perday.querySelectorAll('.day-row').forEach(row => {
+      const sel = row.querySelector('.le-day-mode');
+      sel.addEventListener('change', () => {
+        const show = sel.value === 'window' ? '' : 'none';
+        row.querySelector('.le-day-open').style.display = show;
+        row.querySelector('.le-day-close').style.display = show;
+      });
+    });
+    box.querySelector('#le-cancel').addEventListener('click', closeModal);
+    box.querySelector('#le-save').addEventListener('click', () => saveOverride(locId, loc, existing, box));
+    const rev = box.querySelector('#le-revert');
+    if(rev) rev.addEventListener('click', () => revertOverride(locId, box));
+  }
+
+  function readPerday(box){
+    const out = {};
+    box.querySelectorAll('#le-perday .day-row').forEach(row => {
+      const k = row.dataset.day;
+      const mode = row.querySelector('.le-day-mode').value;
+      if(mode === '24') out[k] = '24';
+      else if(mode === 'closed') out[k] = 'closed';
+      else if(mode === 'window'){
+        const o = fromTimeInput(row.querySelector('.le-day-open').value);
+        const c = fromTimeInput(row.querySelector('.le-day-close').value);
+        if(o && c) out[k] = o + '-' + c;
+      }
+    });
+    return out;
+  }
+
+  async function saveOverride(locId, loc, existing, box){
+    const msg = box.querySelector('#le-msg');
+    msg.style.color = '#8ea1b4'; msg.textContent = 'Saving\u2026';
+    const payload = {};
+    const val = id => box.querySelector(id).value.trim();
+    if(val('#le-addr'))  payload.addr = val('#le-addr');
+    if(val('#le-city'))  payload.city = val('#le-city');
+    if(val('#le-state')) payload.state = val('#le-state');
+    if(val('#le-zip'))   payload.zipCode = val('#le-zip');
+    if(val('#le-phone')) payload.phone = val('#le-phone');
+    const latRaw = val('#le-lat'), lngRaw = val('#le-lng');
+    if(latRaw !== '' || lngRaw !== ''){
+      const lat = parseFloat(latRaw), lng = parseFloat(lngRaw);
+      if(!isFinite(lat) || !isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180){
+        msg.style.color = '#ff8f95'; msg.textContent = 'Latitude / longitude look invalid.'; return;
+      }
+      payload.lat = lat; payload.lng = lng;
+    }
+    const hmode = box.querySelector('#le-hmode').value;
+    if(hmode === '24'){ payload.hrs = '24'; payload.hours = {}; }
+    else if(hmode === 'unknown'){ payload.hrs = ''; payload.hours = {}; }
+    else if(hmode === 'window'){
+      const o = fromTimeInput(box.querySelector('#le-open').value);
+      const c = fromTimeInput(box.querySelector('#le-close').value);
+      if(!o || !c){ msg.style.color = '#ff8f95'; msg.textContent = 'Enter both open and close times.'; return; }
+      payload.hrs = o + '-' + c; payload.hours = {};
+    }
+    else if(hmode === 'perday'){ payload.hours = readPerday(box); }
+
+    if(!Object.keys(payload).length){
+      msg.style.color = '#ff8f95'; msg.textContent = 'Nothing to save \u2014 change a field first.'; return;
+    }
+    try{
+      const { db, doc, setDoc, auth } = await fb();
+      const uid = auth.currentUser && auth.currentUser.uid;
+      if(!uid){ msg.style.color = '#ff8f95'; msg.textContent = 'Not signed in.'; return; }
+      payload.updatedBy = uid;
+      payload.updatedAt = Date.now();
+      if(!existing.original && loc){
+        payload.original = {
+          hrs: loc.hrs != null ? loc.hrs : null,
+          addr: loc.addr != null ? loc.addr : null,
+          lat: loc.lat, lng: loc.lng,
+          phone: loc.phone != null ? loc.phone : null
+        };
+      }
+      await setDoc(doc(db, 'overrides', locId), payload, { merge: true });
+      msg.style.color = '#7ee0ad'; msg.textContent = 'Saved. Live on the map on next load.';
+      setTimeout(closeModal, 900);
+    }catch(e){
+      msg.style.color = '#ff8f95'; msg.textContent = 'Save failed: ' + (e && e.message ? e.message : 'unknown error');
+    }
+  }
+
+  async function revertOverride(locId, box){
+    const msg = box.querySelector('#le-msg');
+    if(!window.confirm('Remove all corrections for this location and revert to the shipped data?')) return;
+    msg.style.color = '#8ea1b4'; msg.textContent = 'Reverting\u2026';
+    try{
+      const { db, doc, deleteDoc } = await fb();
+      await deleteDoc(doc(db, 'overrides', locId));
+      msg.style.color = '#7ee0ad'; msg.textContent = 'Reverted to shipped data.';
+      setTimeout(closeModal, 900);
+    }catch(e){
+      msg.style.color = '#ff8f95'; msg.textContent = 'Revert failed: ' + (e && e.message ? e.message : 'unknown error');
+    }
+  }
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest && e.target.closest('.edit-loc-btn');
+    if(btn){ e.preventDefault(); openEditor(btn.dataset.locid); }
+  });
+})();
 </script>
 </body>
 </html>
