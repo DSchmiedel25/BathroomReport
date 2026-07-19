@@ -540,11 +540,6 @@ async function signUpAccount(username, password){
     const oldAnonId = getClientId(); // capture before login changes what getEffectiveId() returns
     const cred = await createUserWithEmailAndPassword(auth, usernameToEmail(clean), password);
     await migrateAnonymousDataToAccount(oldAnonId, cred.user.uid, clean);
-    // The account username is also used as the public display name.
-    // since Firebase Auth already guarantees usernames are unique.
-    await setDoc(doc(db, 'displayNames', cred.user.uid), {
-      name: clean, nameLower: clean.toLowerCase(), updatedAt: Date.now()
-    }, { merge: true });
     return { ok: true };
   }catch(e){
     if(e.code === 'auth/email-already-in-use') return { ok: false, reason: 'That username is already taken.' };
@@ -575,8 +570,8 @@ async function logOutAccount(){
   await signOut(auth);
 }
 
-// One-time migration: folds this device's existing anonymous ratings/name into the new
-// account, so signing up doesn't wipe out history you already built up on this device.
+// One-time migration: folds this device's anonymous ratings, check-ins, and achievements
+// into the account so signing up does not wipe out existing Passport progress.
 async function migrateAnonymousDataToAccount(oldAnonId, newUid, username){
   if(oldAnonId === newUid) return; // nothing to migrate (shouldn't normally happen)
   try{
@@ -591,16 +586,6 @@ async function migrateAnonymousDataToAccount(oldAnonId, newUid, username){
       if(!locId) continue;
       await setDoc(doc(db, 'votes', locId + '_' + newUid), { ...data, clientId: newUid }, { merge: true });
       await deleteDoc(voteDoc.ref);
-    }
-
-    // Carry over a previously-set display name if the new account doesn't already have one.
-    const newNameSnap = await getDoc(doc(db, 'displayNames', newUid));
-    if(!newNameSnap.exists()){
-      const oldNameSnap = await getDoc(doc(db, 'displayNames', oldAnonId));
-      if(oldNameSnap.exists()){
-        await setDoc(doc(db, 'displayNames', newUid), oldNameSnap.data());
-        await deleteDoc(doc(db, 'displayNames', oldAnonId));
-      }
     }
 
     // Move check-ins over too — Bathroom Passport and several achievements (Road Warrior,
