@@ -1357,8 +1357,32 @@ async function attachStoreFeatureHandlers(loc){
 }
 
 async function loadAllRatings(){
-  await Promise.all(seedLocations.map(async loc => {
-    const [agg, myVote] = await Promise.all([loadAggregate(loc.id), loadMyVote(loc.id)]);
+  // Two bulk reads instead of two per location. Previously this read an `aggregates` doc
+  // AND a `votes` doc for every one of the ~3,000 locations on every load (~6,000 reads).
+  // Now we read the whole `aggregates` collection once (only locations that actually have
+  // ratings) plus just this user's own votes — a couple dozen reads total. Same data on
+  // screen; ~300x fewer reads, which is essential for staying inside Firestore quotas.
+  const {db, collection, getDocs, query, where} = await fb();
+
+  const aggById = {};
+  try{
+    const aggSnap = await getDocs(collection(db, 'aggregates'));
+    aggSnap.forEach(d => { aggById[d.id] = { ...emptyAgg(), ...d.data() }; });
+  }catch(e){ console.error('bulk aggregates load failed', e); }
+
+  const voteByLoc = {};
+  try{
+    const mineSnap = await getDocs(query(collection(db, 'votes'), where('clientId', '==', getEffectiveId())));
+    mineSnap.forEach(d => {
+      const v = d.data();
+      const locId = v.locId || d.id.split('_')[0];
+      voteByLoc[locId] = { ...emptyVote(), ...v };
+    });
+  }catch(e){ console.error('bulk votes load failed', e); }
+
+  seedLocations.forEach(loc => {
+    const agg = aggById[loc.id] || emptyAgg();
+    const myVote = voteByLoc[loc.id] || emptyVote();
     ratingsCache[loc.id] = agg;
     myVoteCache[loc.id] = myVote;
     loadedIds.add(loc.id);
@@ -1374,7 +1398,7 @@ async function loadAllRatings(){
       marker.setPopupContent(popupHtml(loc, agg, myVote));
       if(marker.isPopupOpen()) attachStarHandlers(loc);
     }
-  }));
+  });
   updateMostRecentBadge();
   updateMyProgressBadge();
   checkAndUnlockAchievements();
