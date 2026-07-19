@@ -23,15 +23,15 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous"></script>
 <script type="module" src="firebase.js"></script>
-<script src="stewarts-locations.js"></script>
-<script src="cumberland-farms-locations.js"></script>
-<script src="wawa-locations.js"></script>
-<script src="fastrac-locations.js"></script>
-<script src="alltownfresh-locations.js"></script>
-<script src="byrne-dairy-locations.js"></script>
-<script src="parkers-locations.js"></script>
-<script src="sheetz-locations.js"></script>
-<script src="racetrac-locations.js"></script>
+<script defer src="stewarts-locations.js"></script>
+<script defer src="cumberland-farms-locations.js"></script>
+<script defer src="wawa-locations.js"></script>
+<script defer src="fastrac-locations.js"></script>
+<script defer src="alltownfresh-locations.js"></script>
+<script defer src="byrne-dairy-locations.js"></script>
+<script defer src="parkers-locations.js"></script>
+<script defer src="sheetz-locations.js"></script>
+<script defer src="racetrac-locations.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
@@ -231,6 +231,6 @@ This is tracked on this device only — log in to sync it across devices.
 </div>
 </div>
 <!-- To add a chain: <script src="<chain>-locations.js"></script> here, then register it in app.js's CHAIN_REGISTRY -->
-<script src="app.js"></script>
+<script defer src="app.js"></script>
 </body>
 </html>

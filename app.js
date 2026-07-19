@@ -994,7 +994,10 @@ function addMarker(loc){
   marker.chainKey = loc.chain || DEFAULT_CHAIN_KEY;
   marker.locationData = loc;
   allLocationMarkers.push(marker);
-  markerCluster.addLayer(marker);
+  // Not added to the map here on purpose: applyFilters() is the single authority on which
+  // pins are on the map. It renders only markers within the current viewport (plus the
+  // chain and open-now filters), so the ~3,000 off-screen pins stay out of the DOM. This
+  // is the main win for load speed and map responsiveness as the dataset grows nationally.
   marker.bindPopup(popupHtml(loc, ratingsCache[loc.id], myVoteCache[loc.id]), {
     maxWidth: Math.min(280, window.innerWidth - 40),
     maxHeight: window.innerHeight * 0.6,
@@ -1919,22 +1922,40 @@ function relativeTimeFromNow(ts){
 
 let showOnlyOpenNow = false;
 
+// How far beyond the visible map edges to still render pins, as a fraction of the
+// viewport, so a small pan doesn't leave blank areas while new pins load in.
+const MARKER_VIEWPORT_PAD = 0.3;
+
 function applyFilters(){
   // Filter the actual marker instances rather than looking them up again by location ID.
   // This prevents stray pins when imported data has duplicate IDs or a marker lookup is
   // overwritten: every marker that was created is always evaluated and removed as needed.
+  //
+  // A pin is shown only when it passes the chain + open-now filters AND is inside the
+  // padded viewport. Off-screen pins stay out of the DOM, which is what keeps the map fast
+  // with thousands of locations loaded. A pin whose popup is currently open is always kept
+  // (e.g. a Bathroom Now / list result centered on a pin that a filter would otherwise hide)
+  // so opening it never immediately closes it on the resulting map move.
+  const bounds = map.getBounds().pad(MARKER_VIEWPORT_PAD);
   allLocationMarkers.forEach(m => {
     const loc = m.locationData;
     if(!loc) return;
     const openOk = !showOnlyOpenNow || isLocationOpenNow(loc) !== false; // null (unknown) counts as OK
     const chainOk = activeChains.has(m.chainKey || DEFAULT_CHAIN_KEY);
-    if(openOk && chainOk){
+    const inView = bounds.contains(m.getLatLng());
+    const popupOpen = m.isPopupOpen && m.isPopupOpen();
+    if((openOk && chainOk && inView) || popupOpen){
       if(!markerCluster.hasLayer(m)) markerCluster.addLayer(m);
     } else {
       if(markerCluster.hasLayer(m)) markerCluster.removeLayer(m);
     }
   });
 }
+
+// Re-evaluate which pins are on the map whenever the view settles after a pan or zoom.
+// 'moveend' fires after both, so it covers zooming too. This is what makes viewport-based
+// rendering work: as you move around, only the pins now in view get added to the DOM.
+map.on('moveend', applyFilters);
 
 // Chain filter — lets people show/hide pins per chain when more than one is registered.
 // Selection persists across visits via localStorage, stored as a DENY-list (which chains

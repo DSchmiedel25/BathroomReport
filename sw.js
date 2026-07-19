@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bathroomreport-v10';
+const CACHE_NAME = 'bathroomreport-v11';
 const APP_SHELL = [
   './',
   './index.html',
@@ -11,6 +11,8 @@ const APP_SHELL = [
   './alltownfresh-locations.js',
   './byrne-dairy-locations.js',
   './parkers-locations.js',
+  './sheetz-locations.js',
+  './racetrac-locations.js',
   './app.js',
   './manifest.webmanifest'
 ];
@@ -41,13 +43,27 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if(url.origin !== self.location.origin) return;
 
+  // Stale-while-revalidate: serve the cached copy immediately when we have one (so
+  // repeat visits don't re-download ~1 MB of chain data every load), and refresh that
+  // copy from the network in the background so the *next* load is up to date. On a cache
+  // miss we go to the network and cache the result; if the network is unreachable we fall
+  // back to index.html so navigations still work offline. The cache is versioned
+  // (CACHE_NAME), so bump the version on any deploy to force fresh files through.
   event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
-        return response;
+    caches.open(CACHE_NAME).then(cache =>
+      cache.match(event.request).then(cached => {
+        const networkFetch = fetch(event.request)
+          .then(response => {
+            if(response && response.status === 200){
+              cache.put(event.request, response.clone());
+            }
+            return response;
+          })
+          .catch(() => cached || caches.match('./index.html'));
+        // Cached hit → instant response now, revalidation continues in the background.
+        // Cached miss → wait for the network (with the offline fallback above).
+        return cached || networkFetch;
       })
-      .catch(() => caches.match(event.request).then(hit => hit || caches.match('./index.html')))
+    )
   );
 });
