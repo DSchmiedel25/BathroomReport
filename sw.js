@@ -1,8 +1,10 @@
-const CACHE_NAME = 'bathroomreport-v13';
+const CACHE_NAME = 'bathroomreport-v15';
 const APP_SHELL = [
   './',
   './index.html',
   './styles.css',
+  './shell.css',
+  './logo.png',
   './firebase.js',
   './stewarts-locations.js',
   './cumberland-farms-locations.js',

@@ -61,6 +61,14 @@ document.getElementById('themeToggle').addEventListener('click', () => {
   const body = document.getElementById('legendBody');
   const arrow = document.getElementById('legendArrow');
 
+  // Pins are colored by store brand (not community rating), so the key lists chains.
+  if(body){
+    body.innerHTML = Object.keys(CHAIN_REGISTRY).map(k => {
+      const c = CHAIN_REGISTRY[k];
+      return `<div><span class="dot" style="background:${c.color}"></span>${c.name}</div>`;
+    }).join('');
+  }
+
   function setCollapsed(collapsed){
     body.classList.toggle('collapsed', collapsed);
     arrow.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
@@ -216,20 +224,6 @@ function starsHtml(id, type, current){
 }
 
 // Color the dot itself by the bathroom average, matching star-rating tiers 1-5
-function bathroomColor(agg){
-  if(!agg || agg.bathroomCount === 0) return '#8a8a8a';
-  const avg = agg.bathroomSum / agg.bathroomCount;
-  const rounded = Math.max(1, Math.min(5, Math.round(avg)));
-  const colors = {
-    1: '#e53935', // red
-    2: '#fb8c00', // orange
-    3: '#fdd835', // yellow
-    4: '#43a047', // green
-    5: '#1e88e5'  // blue
-  };
-  return colors[rounded];
-}
-
 // Marker size scales with zoom level so pins are easy to see and tap whether zoomed out or in
 function sizesForZoom(zoom){
   if(zoom >= 15) return {unrated:22, rated:30};
@@ -240,55 +234,16 @@ function sizesForZoom(zoom){
 }
 
 function makeIcon(id){
-  const agg = ratingsCache[id] || emptyAgg();
-  const myVote = (typeof myVoteCache !== 'undefined' && myVoteCache[id]) || emptyVote();
+  // Pins are colored by store brand only. They no longer encode community rating, so the
+  // map never has to load aggregate data just to draw pins (that's what caused reads to
+  // scale with the dataset and spike on zoom-out). Rating is shown in the popup, loaded
+  // for a single location when its pin is opened.
   const chain = chainFor(locationsById[id]);
-  const communityRated = agg.bathroomCount > 0;
-  const reviewedByMe = myVote.bathroom > 0;
-  const color = bathroomColor(agg);
   const sizes = sizesForZoom(map.getZoom());
-  const size = communityRated ? sizes.rated : sizes.unrated;
-  // Show the rounded star number on the pin itself — not just color — so it's still
-  // readable for colorblind users where red/orange/yellow/green can look similar.
-  const roundedStar = communityRated ? Math.round(agg.bathroomSum / agg.bathroomCount) : null;
-  const labelHtml = roundedStar
-    ? `<span style="color:#fff;font-weight:800;font-size:${Math.round(size*0.5)}px;text-shadow:0 1px 2px rgba(0,0,0,.7);">${roundedStar}</span>`
-    : '';
-
-  // 5-star bathrooms get a distinctive star-shaped pin instead of circle/diamond — makes
-  // the very best spots visually pop out on the map at a glance
-  if(roundedStar === 5){
-    const starClip = 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
-    const outer = size + 5;
-    return L.divIcon({
-      className:'',
-      html:`<div style="position:relative;width:${outer}px;height:${outer}px;filter:drop-shadow(0 0 2px rgba(0,0,0,.6));">
-              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${outer}px;height:${outer}px;background:${chain.color};clip-path:${starClip};"></div>
-              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${size}px;height:${size}px;background:${color};clip-path:${starClip};"></div>
-              <div style="position:absolute;top:56%;left:50%;transform:translate(-50%,-50%);">${labelHtml}</div>
-            </div>`,
-      iconSize:[outer, outer],
-      iconAnchor:[outer/2, outer/2]
-    });
-  }
-
-  if(reviewedByMe){
-    // Diamond shape for anything YOU'VE personally rated — same color scale, different silhouette
-    const inner = Math.round(size * 0.72);
-    return L.divIcon({
-      className:'',
-      html:`<div style="position:relative;width:${size}px;height:${size}px;">
-              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(45deg);background:${color};width:${inner}px;height:${inner}px;border:3px solid ${chain.color};box-shadow:0 0 3px rgba(0,0,0,.6);"></div>
-              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);">${labelHtml}</div>
-            </div>`,
-      iconSize:[size, size],
-      iconAnchor:[size/2, size/2]
-    });
-  }
-
+  const size = sizes.rated; // one uniform size per zoom level
   return L.divIcon({
     className:'',
-    html:`<div style="background:${color};width:${size}px;height:${size}px;border-radius:50%;border:3px solid ${chain.color};box-shadow:0 0 3px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;">${labelHtml}</div>`,
+    html:`<div style="background:${chain.color};width:${size}px;height:${size}px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 3px rgba(0,0,0,.6);"></div>`,
     iconSize:[size, size],
     iconAnchor:[size/2, size/2]
   });
@@ -1950,7 +1905,7 @@ function relativeTimeFromNow(ts){
   return `${years} year${years===1?'':'s'} ago`;
 }
 
-let showOnlyOpenNow = false;
+let showAllLocations = false; // map hides confirmed-closed by default; the ☰ "Show all" toggle flips this
 
 // How far beyond the visible map edges to still render pins, as a fraction of the
 // viewport, so a small pan doesn't leave blank areas while new pins load in.
@@ -1970,7 +1925,7 @@ function applyFilters(){
   allLocationMarkers.forEach(m => {
     const loc = m.locationData;
     if(!loc) return;
-    const openOk = !showOnlyOpenNow || isLocationOpenNow(loc) !== false; // null (unknown) counts as OK
+    const openOk = showAllLocations || isLocationOpenNow(loc) !== false; // hide only confirmed-closed; unknown stays visible
     const chainOk = activeChains.has(m.chainKey || DEFAULT_CHAIN_KEY);
     const inView = bounds.contains(m.getLatLng());
     const popupOpen = m.isPopupOpen && m.isPopupOpen();
@@ -2070,13 +2025,17 @@ document.getElementById('chainFilterBody')?.addEventListener('change', (e) => {
 renderChainFilter();
 applyFilters();
 
-document.getElementById('openNowToggle').addEventListener('click', () => {
-  showOnlyOpenNow = !showOnlyOpenNow;
-  const btn = document.getElementById('openNowToggle');
-  btn.classList.toggle('active', showOnlyOpenNow);
-  btn.textContent = showOnlyOpenNow ? '🕐 Open now ✓' : '🕐 Open now';
-  applyFilters();
-});
+// "Show all locations" lives in the ☰ menu now. Off by default → the map shows only
+// open + unknown-hours locations; on → also reveals confirmed-closed ones.
+(function(){
+  const t = document.getElementById('showAllToggle');
+  if(!t) return;
+  t.addEventListener('click', () => {
+    showAllLocations = !showAllLocations;
+    t.classList.toggle('on', showAllLocations);
+    applyFilters();
+  });
+})();
 
 // List view — sortable without adding a permanent map search bar
 let currentListPosition = null;

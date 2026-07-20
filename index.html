@@ -18,7 +18,7 @@
 <link rel="icon" href="icon-512.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#f5a623">
+<meta name="theme-color" content="#2ea1aa">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous"></script>
@@ -36,6 +36,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="shell.css">
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-P30WFPVB80"></script>
 <script>
@@ -54,18 +55,17 @@
 </div>
 <div id="header">
 <div id="headerTopRow">
+<button id="menuBtn" aria-label="Menu">☰</button>
 <div id="headerBrand">
-<img id="headerIcon" src="icon-192.png" alt="BathroomReport logo">
-<h1>BathroomReport</h1>
+<img id="headerIcon" src="logo.png" alt="Bathroom Report logo">
+<h1>BATHROOM <span class="wm-accent">REPORT</span></h1>
 </div>
 <div id="headerActions">
-<button id="themeToggle">🌙</button>
 <button id="accountToggle">👤 Log In</button>
+<button id="themeToggle">🌙</button>
 </div>
 </div>
-<p id="headerSubtitle">Find the best bathrooms. Rated by the community.
-<button id="infoBtn" title="About this app">ℹ️</button>
-</p>
+<p id="headerSubtitle">Find a clean, open bathroom fast</p>
 <span id="chainBadge">🚽 Regional convenience-store bathrooms</span>
 <div id="statPillRow">
 <span class="stat-pill" id="openNowBadge"></span>
@@ -84,15 +84,7 @@
 <div id="topLeftControls">
 <div id="legend">
 <div id="legendToggle">🔑 Key <span id="legendArrow">▾</span></div>
-<div id="legendBody">
-<div><span class="dot" style="background:#1e88e5"></span>5★ bathroom = ⭐ star pin</div>
-<div><span class="dot" style="background:#43a047"></span>4★</div>
-<div><span class="dot" style="background:#fdd835"></span>3★</div>
-<div><span class="dot" style="background:#fb8c00"></span>2★</div>
-<div><span class="dot" style="background:#e53935"></span>1★</div>
-<div><span class="dot" style="background:#8a8a8a"></span>Not yet rated</div>
-<div>◆ Diamond = you reviewed it</div>
-</div>
+<div id="legendBody"><!-- Chain color key is rendered by app.js from CHAIN_REGISTRY --></div>
 </div>
 <div id="chainFilter">
 <div id="chainFilterToggle">🏪 Chains <span id="chainFilterArrow">▾</span></div>
@@ -101,7 +93,6 @@
 </div>
 <button id="openNowToggle">🕐 Open now</button>
 <button id="listViewToggle">📋 List</button>
-<button id="passportToggle">🎫 Passport</button>
 <div id="map"></div>
 <button id="whereAmIBtn" aria-label="Show my current location on the map"><svg class="map-control-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path><circle cx="12" cy="12" r="8"></circle></svg><span>Where Am I?</span></button>
 <button id="locateBtn" aria-label="Find the closest Stewart's bathroom by driving distance">🚽 Bathroom Now</button>
@@ -217,6 +208,34 @@ This is tracked on this device only — log in to sync it across devices.
 </div>
 </div>
 <!-- To add a chain: <script src="<chain>-locations.js"></script> here, then register it in app.js's CHAIN_REGISTRY -->
+<!-- Menu drawer (Stage 1 chrome) -->
+<div id="drawerScrim"></div>
+<nav id="appDrawer" aria-label="Menu">
+<div class="d-brand"><img src="logo.png" alt=""><b>BATHROOM <span class="wm-accent">REPORT</span></b></div>
+<div class="d-items">
+<button id="passportToggle">🎫 Passport</button>
+<button id="infoBtn" title="About this app">ℹ️ How it works</button>
+<button id="showAllToggle" class="d-toggle"><span>📍 Show all locations</span><span class="d-switch"><b></b></span></button>
+</div>
+<div class="d-foot">Independent, community-created · not affiliated with any business listed.</div>
+</nav>
+<!-- Community banner (logged-out) -->
+<div id="communityBanner">
+<span>✨</span>
+<div class="cb-txt"><b>Ratings &amp; hours are community powered.</b><small>Sign in to help the next person.</small></div>
+<a href="#" id="learnMoreLink">Learn More</a>
+<button class="cb-close" id="cbClose" aria-label="Dismiss">×</button>
+</div>
+<script>
+(function(){
+  var d=document.getElementById('appDrawer'),s=document.getElementById('drawerScrim'),m=document.getElementById('menuBtn');
+  var open=function(){d.classList.add('open');s.classList.add('open');},close=function(){d.classList.remove('open');s.classList.remove('open');};
+  if(m)m.addEventListener('click',open);
+  if(s)s.addEventListener('click',close);
+  if(d)d.querySelectorAll('button:not(#showAllToggle)').forEach(function(b){b.addEventListener('click',close);});
+  var cb=document.getElementById('cbClose');if(cb)cb.addEventListener('click',function(){document.getElementById('communityBanner').style.display='none';});
+})();
+</script>
 <script defer src="app.js"></script>
 </body>
 </html>
