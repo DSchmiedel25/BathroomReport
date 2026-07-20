@@ -62,7 +62,6 @@
 </div>
 <div id="headerActions">
 <button id="accountToggle">👤 Log In</button>
-<button id="themeToggle">🌙</button>
 </div>
 </div>
 <p id="headerSubtitle">Find a clean, open bathroom fast</p>
@@ -198,6 +197,7 @@ This is tracked on this device only — log in to sync it across devices.
 <div class="d-items">
 <button id="passportToggle">🎫 Passport</button>
 <button id="infoBtn" title="About this app">ℹ️ How it works</button>
+<button id="themeToggle">🌙</button>
 <button id="showAllToggle" class="d-toggle"><span>📍 Show all locations</span><span class="d-switch"><b></b></span></button>
 </div>
 <div class="d-foot">Independent, community-created · not affiliated with any business listed.</div>
@@ -215,7 +215,7 @@ This is tracked on this device only — log in to sync it across devices.
   var open=function(){d.classList.add('open');s.classList.add('open');},close=function(){d.classList.remove('open');s.classList.remove('open');};
   if(m)m.addEventListener('click',open);
   if(s)s.addEventListener('click',close);
-  if(d)d.querySelectorAll('button:not(#showAllToggle)').forEach(function(b){b.addEventListener('click',close);});
+  if(d)d.querySelectorAll('button:not(#showAllToggle):not(#themeToggle)').forEach(function(b){b.addEventListener('click',close);});
   var cb=document.getElementById('cbClose');if(cb)cb.addEventListener('click',function(){document.getElementById('communityBanner').style.display='none';});
   var hiw=document.getElementById('howItWorks');
   function openHiw(e){if(e)e.preventDefault();hiw.classList.add('show');}
