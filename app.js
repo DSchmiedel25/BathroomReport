@@ -674,12 +674,14 @@ async function saveMyVote(id, data){
   try{
     const {db, doc, setDoc} = await fb();
     const clientId = getEffectiveId();
-    await setDoc(doc(db, 'votes', id + '_' + clientId), {
-      ...data,
-      clientId,
-      locId: id,
-      lastUpdated: Date.now()
-    }, { merge: true });
+    const existing = myVoteCache[id] || {};
+    const payload = { ...data, clientId, locId: id, lastUpdated: Date.now() };
+    // First bathroom rating gets an immutable ratedAt — drives the time-based achievements.
+    if(data.bathroom > 0 && !existing.ratedAt){
+      payload.ratedAt = Date.now();
+      if(myVoteCache[id]) myVoteCache[id].ratedAt = payload.ratedAt;
+    }
+    await setDoc(doc(db, 'votes', id + '_' + clientId), payload, { merge: true });
     return true;
   }catch(e){
     return false;
@@ -818,26 +820,12 @@ function popupHtml(loc, agg, myVote){
       </div>
       <div class="save-note" id="report-note-${loc.id}"></div>
     </div>
-    <div class="checkin-row">
-      <button class="btn btn-secondary checkin-btn" id="checkin-btn-${loc.id}">✅ I've been here</button>
-      <span class="checkin-count">${agg.checkinCount || 0} check-in${(agg.checkinCount || 0) === 1 ? '' : 's'}</span>
-      <div class="save-note" id="checkin-note-${loc.id}"></div>
-    </div>
-    <div class="dual-rating-row">
-      <div class="rating-col">
-        <span class="rating-label">🚻 Bathroom</span>
-        <div class="rating-score-line"><span class="rating-score">${avgStr(agg.bathroomSum, agg.bathroomCount)}★</span> ${ratingConfidenceHtml(agg.bathroomCount)}</div>
-        ${starsHtml(loc.id,'bathroom',myVote.bathroom)}
-        <div class="star-quip" id="quip-bathroom-${loc.id}">${quipFor('bathroom', myVote.bathroom)}</div>
-        <div class="save-note" id="note-bathroom-${loc.id}"></div>
-      </div>
-      <div class="rating-col">
-        <span class="rating-label">🏪 Store</span>
-        <div class="rating-score-line"><span class="rating-score">${avgStr(agg.storeSum, agg.storeCount)}★</span> ${ratingConfidenceHtml(agg.storeCount)}</div>
-        ${starsHtml(loc.id,'store',myVote.store)}
-        <div class="star-quip" id="quip-store-${loc.id}">${quipFor('store', myVote.store)}</div>
-        <div class="save-note" id="note-store-${loc.id}"></div>
-      </div>
+    ${isLoggedIn() ? `<div class="rating-col single-rating">
+      <span class="rating-label">🚻 Rate this bathroom</span>
+      <div class="rating-score-line"><span class="rating-score">${avgStr(agg.bathroomSum, agg.bathroomCount)}★</span> ${ratingConfidenceHtml(agg.bathroomCount)}</div>
+      ${starsHtml(loc.id,'bathroom',myVote.bathroom)}
+      <div class="star-quip" id="quip-bathroom-${loc.id}">${quipFor('bathroom', myVote.bathroom)}</div>
+      <div class="save-note" id="note-bathroom-${loc.id}"></div>
     </div>
     <div class="tips-section">
       <span class="rating-label">💬 Tips from visitors</span>
@@ -848,12 +836,7 @@ function popupHtml(loc, agg, myVote){
       </div>
     </div>
     <div class="feature-summary"><div class="feature-title">🚻 Confirmed bathroom features</div><div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id])}</div></div>
-    ${amenityEditorHtml(loc.id, myVote)}
-    <div id="store-toggle-${loc.id}" class="store-rating-toggle">🏪 Store details <span id="store-arrow-${loc.id}">▾</span></div>
-    <div id="store-section-${loc.id}" class="store-rating-section collapsed">
-      <div class="feature-summary"><div class="feature-title">🏪 Confirmed store features</div><div class="feature-badges" id="store-feature-summary-${loc.id}">${storeFeatureSummaryHtml(storeFeatureCache[loc.id])}</div></div>
-      ${storeFeatureEditorHtml(loc.id, myVote)}
-    </div>
+    ${amenityEditorHtml(loc.id, myVote)}` : `<div class="popup-signin-hint">🔒 Sign in to rate this bathroom and see visitor tips.</div>`}
   </div>`;
 }
 
@@ -885,15 +868,23 @@ function addMarker(loc){
     autoPan: false,
     keepInView: false
   });
-  marker.on('popupopen', () => {
+  marker.on('popupopen', async () => {
     // Keep the selected pin centered horizontally and near the bottom of the
     // visible map. The popup then grows upward with maximum available room.
     requestAnimationFrame(() => positionSelectedMarker(marker, false));
 
-    // Each handler runs independently — without this, a thrown error in any one of
-    // them (e.g. a data-shape edge case for a newly added chain) would silently stop
-    // every handler listed after it from ever attaching, with no visible symptom
-    // beyond "this button doesn't do anything."
+    // On-demand: load just THIS location's aggregate (replaces the old bulk read of every
+    // aggregate). One getDoc per opened popup, then refresh the popup content once.
+    try{
+      const {db, doc, getDoc} = await fb();
+      const snap = await getDoc(doc(db, 'aggregates', loc.id));
+      if(snap.exists()){
+        ratingsCache[loc.id] = { ...emptyAgg(), ...snap.data() };
+        if(marker.isPopupOpen()) marker.setPopupContent(popupHtml(loc, ratingsCache[loc.id], myVoteCache[loc.id]));
+      }
+    }catch(e){ /* non-fatal — popup shows the placeholder rating until next open */ }
+
+    // Each handler runs independently — a thrown error in one must not stop the rest.
     const safeAttach = (fn) => {
       try{ fn(loc); }catch(e){ console.error(`${fn.name} failed for ${loc.id}:`, e); }
     };
@@ -902,10 +893,7 @@ function addMarker(loc){
     safeAttach(attachDirectionsHandler);
     safeAttach(attachShareHandler);
     safeAttach(attachReportHandler);
-    safeAttach(attachCheckinHandler);
-    safeAttach(attachStoreToggleHandler);
     safeAttach(attachAmenityHandlers);
-    safeAttach(attachStoreFeatureHandlers);
   });
   markers[loc.id] = marker;
 }
@@ -1238,18 +1226,10 @@ async function attachStoreFeatureHandlers(loc){
 }
 
 async function loadAllRatings(){
-  // Two bulk reads instead of two per location. Previously this read an `aggregates` doc
-  // AND a `votes` doc for every one of the ~3,000 locations on every load (~6,000 reads).
-  // Now we read the whole `aggregates` collection once (only locations that actually have
-  // ratings) plus just this user's own votes — a couple dozen reads total. Same data on
-  // screen; ~300x fewer reads, which is essential for staying inside Firestore quotas.
+  // Loads only THIS user's own votes (a handful of docs). Community ratings are NOT bulk-read
+  // anymore — that was thousands of reads on every load and after every auth change. Each
+  // location's aggregate now loads on demand when its popup opens (one getDoc per open).
   const {db, collection, getDocs, query, where} = await fb();
-
-  const aggById = {};
-  try{
-    const aggSnap = await getDocs(collection(db, 'aggregates'));
-    aggSnap.forEach(d => { aggById[d.id] = { ...emptyAgg(), ...d.data() }; });
-  }catch(e){ console.error('bulk aggregates load failed', e); }
 
   const voteByLoc = {};
   try{
@@ -1262,7 +1242,7 @@ async function loadAllRatings(){
   }catch(e){ console.error('bulk votes load failed', e); }
 
   seedLocations.forEach(loc => {
-    const agg = aggById[loc.id] || emptyAgg();
+    const agg = ratingsCache[loc.id] || emptyAgg();
     const myVote = voteByLoc[loc.id] || emptyVote();
     ratingsCache[loc.id] = agg;
     myVoteCache[loc.id] = myVote;
@@ -1297,26 +1277,36 @@ async function loadAllRatings(){
 // works immediately even signed-out, and syncs across devices once you log in.
 
 const ACHIEVEMENT_DEFS = [
-  { key:'firstFlush', icon:'🚽', name:'First Flush', desc:'Submit your first bathroom review',
-    calc: (s) => ({ done: s.bathroomRatedCount >= 1, current: Math.min(s.bathroomRatedCount,1), total:1 }) },
-  { key:'frequentFlusher', icon:'🧻', name:'Frequent Flusher', desc:'Review 10 different bathrooms',
-    calc: (s) => ({ done: s.bathroomRatedCount >= 10, current: Math.min(s.bathroomRatedCount,10), total:10 }) },
-  { key:'bathroomCritic', icon:'🕵️', name:'Bathroom Critic', desc:'Review 25 different bathrooms',
-    calc: (s) => ({ done: s.bathroomRatedCount >= 25, current: Math.min(s.bathroomRatedCount,25), total:25 }) },
-  { key:'royalFlush', icon:'👑', name:'Royal Flush', desc:'Give five different bathrooms a 5-star rating',
-    calc: (s) => ({ done: s.fiveStarCount >= 5, current: Math.min(s.fiveStarCount,5), total:5 }) },
-  { key:'roadWarrior', icon:'🛣️', name:'Road Warrior', desc:"Check in at 50 different locations",
-    calc: (s) => ({ done: s.checkinCount >= 50, current: Math.min(s.checkinCount,50), total:50 }) },
-  { key:'hiddenGemHunter', icon:'💎', name:'Hidden Gem Hunter', desc:'Review a location that had fewer than 5 bathroom reviews at the time',
-    calc: (s) => ({ done: s.hiddenGemCount >= 1, current: Math.min(s.hiddenGemCount,1), total:1 }) },
-  { key:'earlyBird', icon:'☀️', name:'Early Bird', desc:'Check in before 5:00 AM',
-    calc: (s) => ({ done: s.hasEarlyBirdCheckin, current: s.hasEarlyBirdCheckin ? 1 : 0, total:1 }) },
-  { key:'nightOwl', icon:'🌙', name:'Night Owl', desc:'Check in after midnight',
-    calc: (s) => ({ done: s.hasNightOwlCheckin, current: s.hasNightOwlCheckin ? 1 : 0, total:1 }) },
-  { key:'countyCollector', icon:'🗺️', name:'County Collector', desc:'Visit locations in 10 different areas',
-    calc: (s) => ({ done: s.areaCount >= 10, current: Math.min(s.areaCount,10), total:10 }) },
-  { key:'stewartsLegend', icon:'🏁', name:"Rest Stop Legend", desc:'Visit every location currently on the map',
-    calc: (s) => ({ done: s.totalLocations > 0 && s.visitedCount >= s.totalLocations, current: s.visitedCount, total: s.totalLocations }) }
+  { key:'firstFlush', icon:'🚽', name:'First Flush', desc:'Rate your first bathroom',
+    calc:s=>({done:s.bathroomRatedCount>=1,current:Math.min(s.bathroomRatedCount,1),total:1})},
+  { key:'centuryClub', icon:'💯', name:'Century Club', desc:'Rate 100 bathrooms',
+    calc:s=>({done:s.bathroomRatedCount>=100,current:Math.min(s.bathroomRatedCount,100),total:100})},
+  { key:'roadWarrior', icon:'🛣️', name:'Road Warrior', desc:'Rate bathrooms in 10 different states',
+    calc:s=>({done:s.stateCount>=10,current:Math.min(s.stateCount,10),total:10})},
+  { key:'chainExplorer', icon:'🏪', name:'Chain Explorer', desc:'Rate at least one of every chain on the map',
+    calc:s=>({done:s.totalChains>0&&s.chainCount>=s.totalChains,current:s.chainCount,total:s.totalChains||1})},
+  { key:'brandLoyalist', icon:'🏷️', name:'Brand Loyalist', desc:'Rate 10 locations of a single chain',
+    calc:s=>({done:s.maxOneChain>=10,current:Math.min(s.maxOneChain,10),total:10})},
+  { key:'critic', icon:'⭐', name:'Critic', desc:'Give a 5-star rating',
+    calc:s=>({done:s.fiveStarCount>=1,current:Math.min(s.fiveStarCount,1),total:1})},
+  { key:'toughCrowd', icon:'💢', name:'Tough Crowd', desc:'Give a 1-star rating',
+    calc:s=>({done:s.oneStarCount>=1,current:Math.min(s.oneStarCount,1),total:1})},
+  { key:'hiddenGemHunter', icon:'💎', name:'Hidden Gem Hunter', desc:'Rate a spot that had fewer than 5 reviews',
+    calc:s=>({done:s.hiddenGemCount>=1,current:Math.min(s.hiddenGemCount,1),total:1})},
+  { key:'earlyBird', icon:'☀️', name:'Early Bird', desc:'Rate before 5:00 AM',
+    calc:s=>({done:s.hasEarlyBird,current:s.hasEarlyBird?1:0,total:1})},
+  { key:'nightOwl', icon:'🌙', name:'Night Owl', desc:'Rate between midnight and 4:00 AM',
+    calc:s=>({done:s.hasNightOwl,current:s.hasNightOwl?1:0,total:1})},
+  { key:'weekendWarrior', icon:'📅', name:'Weekend Warrior', desc:'Rate on 5 weekend days',
+    calc:s=>({done:s.weekendCount>=5,current:Math.min(s.weekendCount,5),total:5})},
+  { key:'streak', icon:'🔥', name:'Streak', desc:'Rate 3 days in a row',
+    calc:s=>({done:s.maxStreak>=3,current:Math.min(s.maxStreak,3),total:3})},
+  { key:'marathon', icon:'🏃', name:'Marathon', desc:'Rate 5 bathrooms in a single day',
+    calc:s=>({done:s.maxInOneDay>=5,current:Math.min(s.maxInOneDay,5),total:5})},
+  { key:'crossCountry', icon:'🧭', name:'Cross-Country', desc:'Rate two bathrooms 1,000+ miles apart',
+    calc:s=>({done:s.maxMilesApart>=1000,current:Math.min(Math.round(s.maxMilesApart),1000),total:1000})},
+  { key:'cityHopper', icon:'🌆', name:'City Hopper', desc:'Rate bathrooms in 15 different cities',
+    calc:s=>({done:s.cityCount>=15,current:Math.min(s.cityCount,15),total:15})}
 ];
 
 // We don't have real county data in locations.js, only addresses — so "County Collector"
@@ -1328,62 +1318,80 @@ function getCityFromAddress(addr){
   return parts.length >= 2 ? parts[parts.length - 2] : parts[0];
 }
 
+function stateFromAddr(addr){
+  if(!addr) return null;
+  let m = addr.match(/\b([A-Z]{2})\b\s*\d{5}/);
+  if(m) return m[1];
+  const parts = addr.split(',').map(p=>p.trim());
+  m = (parts[parts.length-1]||'').match(/\b([A-Z]{2})\b/);
+  return m ? m[1] : null;
+}
+function longestConsecutiveDayStreak(dayKeySet){
+  const days = [...dayKeySet].map(x=>{const d=new Date(x);d.setHours(0,0,0,0);return d.getTime();}).sort((a,b)=>a-b);
+  if(!days.length) return 0;
+  let best=1, run=1;
+  for(let i=1;i<days.length;i++){
+    const diff = Math.round((days[i]-days[i-1])/864e5);
+    if(diff===1){ run++; best=Math.max(best,run); }
+    else if(diff>1){ run=1; }
+  }
+  return best;
+}
+// Achievements derive entirely from your own votes (already in myVoteCache) joined with the
+// bundled location data — states, chains, cities, coordinates, and each rating's ratedAt.
+// No check-in reads, no extra queries: zero Firestore reads beyond the Passport's votes load.
 async function computeAchievementStats(){
-  const bathroomRatedIds = new Set();
-  const fiveStarIds = new Set();
-  const storeOrBathroomRatedIds = new Set();
-  let hiddenGemCount = 0;
+  const rated = [];
   Object.keys(myVoteCache).forEach(id => {
     const v = myVoteCache[id];
-    if(!v) return;
-    if(v.bathroom > 0){ bathroomRatedIds.add(id); storeOrBathroomRatedIds.add(id); }
-    if(v.store > 0) storeOrBathroomRatedIds.add(id);
-    if(v.bathroom === 5) fiveStarIds.add(id);
-    if(v.wasHiddenGem) hiddenGemCount++;
-  });
-
-  let checkinLocIds = new Set();
-  let hasEarlyBirdCheckin = false;
-  let hasNightOwlCheckin = false;
-  try{
-    const {db, collection, query, where, getDocs} = await fb();
-    const myId = getEffectiveId();
-    const q = query(collection(db, 'checkins'), where('clientId', '==', myId));
-    const snap = await getDocs(q);
-    snap.forEach(d => {
-      const data = d.data();
-      if(data.locId) checkinLocIds.add(data.locId);
-      if(data.ts){
-        const hour = new Date(data.ts).getHours();
-        // Non-overlapping split of the pre-dawn hours: midnight–3:59am counts as Night Owl
-        // (out late), 4am–4:59am counts as Early Bird (up early before 5am).
-        if(hour >= 0 && hour < 4) hasNightOwlCheckin = true;
-        if(hour === 4) hasEarlyBirdCheckin = true;
-      }
-    });
-  }catch(e){
-    console.error('computeAchievementStats: checkins fetch failed (non-fatal)', e);
-  }
-
-  // "Visited" = checked in OR rated (either store or bathroom) — broader than check-ins alone
-  const visitedIds = new Set([...checkinLocIds, ...storeOrBathroomRatedIds]);
-
-  const areaSet = new Set();
-  visitedIds.forEach(id => {
+    if(!v || !(v.bathroom > 0)) return;
     const loc = seedLocations.find(l => l.id === id);
-    if(loc) areaSet.add(getCityFromAddress(loc.addr));
+    if(!loc) return;
+    rated.push({ loc, bathroom: v.bathroom, ratedAt: v.ratedAt || null, wasHiddenGem: !!v.wasHiddenGem });
   });
+
+  const bathroomRatedCount = rated.length;
+  const fiveStarCount = rated.filter(r => r.bathroom === 5).length;
+  const oneStarCount  = rated.filter(r => r.bathroom === 1).length;
+  const hiddenGemCount = rated.filter(r => r.wasHiddenGem).length;
+
+  const states = new Set(), cities = new Set(), chainCounts = {};
+  rated.forEach(r => {
+    const st = stateFromAddr(r.loc.addr); if(st) states.add(st);
+    cities.add(getCityFromAddress(r.loc.addr));
+    const ck = r.loc.chain || DEFAULT_CHAIN_KEY;
+    chainCounts[ck] = (chainCounts[ck] || 0) + 1;
+  });
+  const maxOneChain = Object.values(chainCounts).reduce((m,n)=>Math.max(m,n), 0);
+
+  let hasEarlyBird=false, hasNightOwl=false;
+  const weekendDays = new Set(), dayCounts = {}, dayKeys = new Set();
+  rated.forEach(r => {
+    if(!r.ratedAt) return;                       // time-based stats need a ratedAt timestamp
+    const d = new Date(r.ratedAt), h = d.getHours(), dow = d.getDay(), key = d.toDateString();
+    if(h < 5) hasEarlyBird = true;
+    if(h >= 0 && h < 4) hasNightOwl = true;
+    if(dow === 0 || dow === 6) weekendDays.add(key);
+    dayCounts[key] = (dayCounts[key] || 0) + 1;
+    dayKeys.add(key);
+  });
+  const maxInOneDay = Object.values(dayCounts).reduce((m,n)=>Math.max(m,n), 0);
+
+  let maxMilesApart = 0;                          // farthest-apart pair (n = your own ratings)
+  for(let i=0;i<rated.length;i++)
+    for(let j=i+1;j<rated.length;j++){
+      const d = milesBetween(rated[i].loc.lat, rated[i].loc.lng, rated[j].loc.lat, rated[j].loc.lng);
+      if(d > maxMilesApart) maxMilesApart = d;
+    }
 
   return {
-    bathroomRatedCount: bathroomRatedIds.size,
-    fiveStarCount: fiveStarIds.size,
-    hiddenGemCount,
-    checkinCount: checkinLocIds.size,
-    hasEarlyBirdCheckin,
-    hasNightOwlCheckin,
-    areaCount: areaSet.size,
-    visitedCount: visitedIds.size,
-    totalLocations: seedLocations.length
+    bathroomRatedCount, fiveStarCount, oneStarCount, hiddenGemCount,
+    stateCount: states.size, cityCount: cities.size,
+    chainCount: Object.keys(chainCounts).length, maxOneChain,
+    totalChains: Object.keys(CHAIN_REGISTRY).length,
+    hasEarlyBird, hasNightOwl, weekendCount: weekendDays.size,
+    maxInOneDay, maxStreak: longestConsecutiveDayStreak(dayKeys), maxMilesApart,
+    visitedCount: bathroomRatedCount, totalLocations: seedLocations.length
   };
 }
 
@@ -1720,7 +1728,7 @@ async function attachTipHandlers(loc){
 seedLocations.forEach(loc => addMarker(loc));
 loadAllRatings();
 loadOverrides();
-loadWeeklyRecap();
+// loadWeeklyRecap();  // disabled — its stat pill is hidden in the redesign (was wasting reads/load)
 
 // One-time support prompt — shown after this identity has rated five different locations.
 // The permanent support link remains available in the Account panel.
@@ -2253,42 +2261,59 @@ function showBathroomNowResult(result,fallback=false){
   document.getElementById('bathroom-now-directions').onclick=()=>{const pref=localStorage.getItem('preferredNavApp')||'google';window.open(buildNavUrl(pref,result.loc.lat,result.loc.lng),'_blank','noopener');};
   zoomToMarker(markers[result.loc.id]);
 }
+// Bathroom Now: one tap -> nearest OPEN bathroom -> directions in the user's preferred app.
+// Ranked by straight-line distance (the maps app computes the real route), so the whole
+// thing can run without waiting on a routing API — which matters because opening a URL after
+// an async gap gets popup-blocked on mobile. When we already have a recent fix we open
+// directions synchronously inside the tap; otherwise we reserve a tab inside the tap and
+// point it at directions once the location fix returns.
 locateBtn.addEventListener('click',()=>{
   if(suppressNextLocateClick)return;
   if(!navigator.geolocation){nearestInfo.style.display='block';nearestInfo.textContent="Your browser doesn't support location.";return;}
-  locateBtn.disabled=true;locateBtn.textContent='🚽 Finding bathroom…';nearestInfo.style.display='none';
-  navigator.geolocation.getCurrentPosition(async pos=>{
-    const user={lat:pos.coords.latitude,lng:pos.coords.longitude};lastKnownPos={...user,ts:Date.now()};currentListPosition=lastKnownPos;
-    setUserLocationMarker(user.lat,user.lng);
-    // Prefer the selected chains, but don't strand someone far from their nearest pick —
-    // if nothing selected is within a reasonable driving distance, widen to every chain
-    // (still open-only) so the closest real option wins instead.
+
+  const navUrlFor = loc => buildNavUrl(localStorage.getItem('preferredNavApp')||'google', loc.lat, loc.lng);
+  const nearestOpen = user => {
     const CHAIN_FALLBACK_MILES = 20;
-    let eligible = seedLocations.filter(loc =>
-      activeChains.has(loc.chain || DEFAULT_CHAIN_KEY) && isLocationOpenNow(loc) !== false
-    );
-    const nearestSelectedMiles = eligible.reduce((min,loc) => {
-      const d = milesBetween(user.lat, user.lng, loc.lat, loc.lng);
-      return d < min ? d : min;
-    }, Infinity);
-    if(nearestSelectedMiles > CHAIN_FALLBACK_MILES){
-      eligible = seedLocations.filter(loc => isLocationOpenNow(loc) !== false);
-    }
-    const candidates=eligible.map(loc=>({loc,d:milesBetween(user.lat,user.lng,loc.lat,loc.lng)})).sort((a,b)=>a.d-b.d).slice(0,10).map(x=>x.loc);
-    if(!candidates.length){
-      locateBtn.disabled=false;locateBtn.textContent='🚽 Bathroom Now';
-      nearestInfo.style.display='block';
-      nearestInfo.textContent='No open bathrooms found nearby right now.';
-      return;
-    }
-    try{
-      const options=await getDrivingOptions(user,candidates);
-      options.sort((a,b)=>{const rank=x=>isLocationOpenNow(x.loc)===true?0:isLocationOpenNow(x.loc)===null?1:2;return rank(a)-rank(b)||a.distanceMiles-b.distanceMiles;});
-      if(!options.length)throw new Error('No routes');showBathroomNowResult(options[0],false);
-    }catch(e){
-      const loc=candidates[0];showBathroomNowResult({loc,distanceMiles:milesBetween(user.lat,user.lng,loc.lat,loc.lng),durationMinutes:null},true);
-    }finally{locateBtn.disabled=false;locateBtn.textContent='🚽 Bathroom Now';}
-  },err=>{locateBtn.disabled=false;locateBtn.textContent='🚽 Bathroom Now';nearestInfo.style.display='block';nearestInfo.textContent=err.code===1?'Location access was denied. Enable location permission for this site to use Bathroom Now.':'Could not get your location. Check your connection and location settings.';},{enableHighAccuracy:true,timeout:10000});
+    let eligible = seedLocations.filter(loc => activeChains.has(loc.chain||DEFAULT_CHAIN_KEY) && isLocationOpenNow(loc)!==false);
+    const nearestSel = eligible.reduce((min,loc)=>{const d=milesBetween(user.lat,user.lng,loc.lat,loc.lng);return d<min?d:min;},Infinity);
+    if(nearestSel > CHAIN_FALLBACK_MILES) eligible = seedLocations.filter(loc => isLocationOpenNow(loc)!==false);
+    if(!eligible.length) return null;
+    return eligible.map(loc=>({loc,d:milesBetween(user.lat,user.lng,loc.lat,loc.lng)})).sort((a,b)=>a.d-b.d)[0].loc;
+  };
+  const centerOn = loc => { const m=markers[loc.id]; if(m) zoomToMarker(m); else map.setView([loc.lat,loc.lng],16); };
+  const noneMsg = () => { nearestInfo.style.display='block'; nearestInfo.textContent='No open bathrooms found nearby right now.'; };
+
+  // Fast path — recent fix: compute + open directions synchronously (stays inside the gesture).
+  const fresh = (lastKnownPos && Date.now()-lastKnownPos.ts < 5*60*1000) ? lastKnownPos : null;
+  if(fresh){
+    const loc = nearestOpen(fresh);
+    if(!loc){ noneMsg(); return; }
+    centerOn(loc);
+    window.open(navUrlFor(loc),'_blank','noopener');
+    return;
+  }
+
+  // Slow path — need a fix: reserve a tab now, redirect it after the async location returns.
+  const pending = window.open('','_blank');
+  locateBtn.disabled=true; locateBtn.textContent='🚽 Finding bathroom…'; nearestInfo.style.display='none';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const user={lat:pos.coords.latitude,lng:pos.coords.longitude};
+    lastKnownPos={...user,ts:Date.now()}; currentListPosition=lastKnownPos;
+    setUserLocationMarker(user.lat,user.lng);
+    locateBtn.disabled=false; locateBtn.textContent='🚽 Bathroom Now';
+    const loc = nearestOpen(user);
+    if(!loc){ if(pending) pending.close(); noneMsg(); return; }
+    centerOn(loc);
+    const url = navUrlFor(loc);
+    if(pending) pending.location.href = url; else window.location.href = url;
+  }, err=>{
+    if(pending) pending.close();
+    locateBtn.disabled=false; locateBtn.textContent='🚽 Bathroom Now';
+    nearestInfo.style.display='block';
+    nearestInfo.textContent = err.code===1
+      ? 'Location access was denied. Enable location permission for this site to use Bathroom Now.'
+      : 'Could not get your location. Check your connection and location settings.';
+  }, {enableHighAccuracy:true, timeout:10000});
 });
 
 // Missing-location reporting — logs straight to Firestore (visible in FlushPanel), no email needed
