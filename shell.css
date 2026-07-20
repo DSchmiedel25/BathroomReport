@@ -300,3 +300,5 @@ body:not(.logged-in) #appDrawer #themeToggle{ display:none !important; }
 
 
 .hiw-btn-icon{ width:22px; height:22px; border-radius:5px; display:block; }
+
+#appDrawer .d-version{ display:block; margin-top:8px; font-size:11px; color:var(--shell-muted); opacity:.75; letter-spacing:.02em; }
