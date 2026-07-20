@@ -94,7 +94,7 @@
 #whereAmIBtn .map-control-icon{ width:22px; height:22px; stroke:currentColor; fill:none; }
 
 #listViewToggle{
-  position:fixed !important; right:12px !important; top:calc(env(safe-area-inset-top) + 130px) !important;
+  position:fixed !important; right:12px !important; top:calc(env(safe-area-inset-top) + 228px) !important;
   left:auto !important; bottom:auto !important; z-index:600 !important;
   width:46px !important; height:46px !important; border-radius:14px !important;
   background:var(--shell-chrome) !important; border:1px solid var(--shell-line) !important;
@@ -215,7 +215,7 @@
 
 /* ---------- Leaflet zoom control: move to the right rail (clear of the bottom banner) + theme dark ---------- */
 .leaflet-control-zoom{
-  position:fixed !important; right:12px !important; top:calc(env(safe-area-inset-top) + 186px) !important;
+  position:fixed !important; right:12px !important; top:calc(env(safe-area-inset-top) + 130px) !important;
   bottom:auto !important; left:auto !important; z-index:600 !important;
   border:0 !important; box-shadow:var(--shell-shadow) !important;
 }
