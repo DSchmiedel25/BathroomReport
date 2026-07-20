@@ -217,15 +217,19 @@
 .leaflet-control-zoom{
   position:fixed !important; right:12px !important; top:calc(env(safe-area-inset-top) + 130px) !important;
   bottom:auto !important; left:auto !important; z-index:600 !important;
-  border:0 !important; box-shadow:var(--shell-shadow) !important;
+  width:46px !important; margin:0 !important; box-sizing:border-box !important;
+  border:1px solid var(--shell-line) !important; border-radius:14px !important; overflow:hidden !important;
+  background:var(--shell-chrome) !important; box-shadow:var(--shell-shadow) !important;
 }
 .leaflet-control-zoom a{
   background:var(--shell-chrome) !important; color:var(--shell-ink) !important;
-  border:1px solid var(--shell-line) !important; width:46px !important; height:44px !important;
-  line-height:44px !important; font-size:20px !important;
+  width:100% !important; height:44px !important; line-height:44px !important; font-size:20px !important;
+  box-sizing:border-box !important; margin:0 !important; border:0 !important; border-radius:0 !important;
 }
-.leaflet-control-zoom a:first-child{ border-radius:12px 12px 0 0 !important; }
-.leaflet-control-zoom a:last-child{ border-radius:0 0 12px 12px !important; border-top:0 !important; }
+.leaflet-control-zoom a:first-child{ border-bottom:1px solid var(--shell-line) !important; }
+
+/* All three rail controls compute to the exact same 46px box so their edges line up. */
+#whereAmIBtn, #listViewToggle { box-sizing:border-box !important; }
 
 /* ---------- How Bathroom Report works (info page = About = Learn More) ---------- */
 #howItWorks.hiw-overlay{ position:fixed; inset:0; z-index:1000; display:none; background:rgba(4,10,18,.72); }
@@ -271,3 +275,10 @@ body.list-open #missingBtn,
 body.list-open #topLeftControls,
 body.list-open #locateBtn,
 body.list-open #communityBanner { display:none !important; }
+
+/* ---------- "We Missed One?" form: drop it right under its button (top-left), not the bottom ---------- */
+#missingPanel{
+  position:absolute !important; left:12px !important; top:58px !important;
+  right:auto !important; bottom:auto !important;
+  z-index:700 !important; width:min(82vw, 300px) !important;
+}
