@@ -1,28 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>
-/* TEMP DIAGNOSTIC — shows any JS error on screen so we can find the break. Remove after. */
-window.addEventListener('error', function(e){
-  try{
-    var d = document.getElementById('__diagErr');
-    if(!d){ d = document.createElement('div'); d.id='__diagErr';
-      d.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#b00020;color:#fff;font:12px/1.45 monospace;padding:10px;white-space:pre-wrap;max-height:60vh;overflow:auto;';
-      (document.body||document.documentElement).appendChild(d); }
-    d.textContent += 'JS ERROR: ' + (e.message||e.type||'?') + '\n  file: ' + ((e.filename||'').split('/').pop()||'?') + '  line: ' + (e.lineno||'?') + '\n\n';
-  }catch(_){}
-}, true);
-window.addEventListener('unhandledrejection', function(e){
-  try{
-    var d = document.getElementById('__diagErr');
-    if(!d){ d = document.createElement('div'); d.id='__diagErr';
-      d.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#8a0015;color:#fff;font:12px/1.45 monospace;padding:10px;white-space:pre-wrap;max-height:60vh;overflow:auto;';
-      (document.body||document.documentElement).appendChild(d); }
-    d.textContent += 'PROMISE REJECTED: ' + ((e.reason&&e.reason.message)||e.reason||'?') + '\n\n';
-  }catch(_){}
-});
-</script>
-
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>BathroomReport – Find the Best Bathrooms Near You</title>

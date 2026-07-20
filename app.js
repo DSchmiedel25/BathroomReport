@@ -622,6 +622,21 @@ async function loadMyVote(id){
     return emptyVote();
   }
 }
+async function bumpAggregate(id, sumKey, sumDelta, countKey, countDelta){
+  try{
+    const {db, doc, setDoc, increment} = await fb();
+    await setDoc(doc(db, 'aggregates', id), {
+      [sumKey]: increment(sumDelta),
+      [countKey]: increment(countDelta),
+      lastUpdated: Date.now()
+    }, { merge: true });
+    return true;
+  }catch(e){
+    console.error('save agg failed', e);
+    return false;
+  }
+}
+
 async function saveMyVote(id, data){
   try{
     const {db, doc, setDoc} = await fb();
@@ -1556,13 +1571,11 @@ function attachStarHandlers(loc){
         const quipEl = document.getElementById('quip-' + type + '-' + loc.id);
         if(quipEl) quipEl.textContent = quipFor(type, val);
 
-        // Aggregate totals are recomputed server-side by the recomputeBathroomAggregate Cloud
-        // Function, which reacts to this vote write — the client only writes the vote. The
-        // on-screen average was already updated optimistically above.
+        const okAgg = await bumpAggregate(loc.id, sumKey, sumDelta, countKey, countDelta);
         const okVote = await saveMyVote(loc.id, myVote);
-        if(okVote) logActivity('rating', { sourceId: loc.id + '_' + getEffectiveId(), locId: loc.id });
-        if(note) note.textContent = okVote ? 'Saved ✓ — visible to everyone' : 'Save failed';
-        if(okVote) maybeShowSupportPrompt();
+        if(okAgg) logActivity('rating', { sourceId: loc.id + '_' + getEffectiveId(), locId: loc.id });
+        if(note) note.textContent = (okAgg && okVote) ? 'Saved ✓ — visible to everyone' : 'Save failed';
+        if(okAgg && okVote) maybeShowSupportPrompt();
 
         // refresh the label text with new average
         const labelEl = starGroup.parentElement.querySelector('.rating-label');
@@ -1706,74 +1719,38 @@ map.on('zoomend', () => {
 // (loc.hours, set by an admin correction) which take precedence over the single
 // loc.hrs window. Each day's value is "24", "HHMM-HHMM", "closed", or missing (unknown).
 const HRS_DAY_KEYS = ['sun','mon','tue','wed','thu','fri','sat'];
-// ---- Timezone-aware hours ----
-// Open/closed is computed in the LOCATION's timezone, not the visitor's. A location can carry
-// an explicit IANA `tz` (most precise); otherwise we approximate from longitude across the
-// continental-US bands. DST and overnight windows are handled correctly. Missing hours stay
-// "unknown" (never "closed").
-function tzForLocation(loc){
-  if(loc && loc.tz) return loc.tz;
-  const lng = parseFloat(loc && loc.lng);
-  if(isNaN(lng)) return 'America/New_York';
-  if(lng >= -87.5) return 'America/New_York';   // Eastern
-  if(lng >= -102)  return 'America/Chicago';     // Central
-  if(lng >= -115)  return 'America/Denver';      // Mountain
-  return 'America/Los_Angeles';                  // Pacific
-}
-const _tzFmtCache = {};
-function nowInLocationTz(loc){
-  const tz = tzForLocation(loc);
-  let fmt = _tzFmtCache[tz];
-  if(fmt === undefined){
-    try{ fmt = new Intl.DateTimeFormat('en-US', {timeZone:tz, weekday:'short', hour:'2-digit', minute:'2-digit', hour12:false}); }
-    catch(e){ fmt = null; }
-    _tzFmtCache[tz] = fmt;
-  }
-  if(!fmt){ const d = new Date(); return { day:d.getDay(), hhmm:d.getHours()*100 + d.getMinutes() }; }
-  const m = {};
-  fmt.formatToParts(new Date()).forEach(p => { m[p.type] = p.value; });
-  const dayMap = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
-  let hour = parseInt(m.hour, 10); if(hour >= 24) hour -= 24;   // some engines render midnight as "24"
-  return { day: dayMap[m.weekday], hhmm: hour * 100 + parseInt(m.minute, 10) };
-}
-function hrsForDay(loc, dayIdx){
+// A location may carry per-day hours (loc.hours) which take precedence over the single
+// loc.hrs window. Each day's value is "24", "HHMM-HHMM", "closed", or missing (unknown).
+function todayHrsString(loc){
   if(loc && loc.hours && typeof loc.hours === 'object' && Object.keys(loc.hours).length){
-    const v = loc.hours[HRS_DAY_KEYS[dayIdx]];
+    const v = loc.hours[HRS_DAY_KEYS[new Date().getDay()]];
     return (v === undefined || v === null) ? null : v;
   }
   return (loc && loc.hrs != null) ? loc.hrs : null;
 }
-// The location's own "today" (used for display too) — its timezone, not the visitor's.
-function todayHrsString(loc){
-  return hrsForDay(loc, nowInLocationTz(loc).day);
-}
-function parseHrsString(hrs){
-  if(!hrs) return null;                       // unknown
-  if(hrs === '24') return { allDay:true };
-  if(hrs === 'closed') return { closed:true };
-  const p = hrs.split('-');
-  if(p.length !== 2) return null;
-  const o = parseInt(p[0], 10), c = parseInt(p[1], 10);
-  if(isNaN(o) || isNaN(c)) return null;
-  return { open:o, close:c };
-}
 
-// Open-now calculation — the effective hours string is "24", "HHMM-HHMM", "closed",
-// or empty/unknown (from todayHrsString, which also handles per-day hours).
+// Open-now calculation — effective hours string is "24", "HHMM-HHMM", "closed", or unknown.
 // Locations with no known hours are "unknown" and are never hidden by the open-now filter.
+// Computed in the visitor's local time; stores show their own local hours, which is fine
+// for a regionally-focused map.
 function isLocationOpenNow(loc){
-  const { day, hhmm } = nowInLocationTz(loc);
-
-  // Still open from YESTERDAY's overnight window that runs past midnight (e.g. 1800-0200, now 0100)?
-  const y = parseHrsString(hrsForDay(loc, (day + 6) % 7));
-  if(y && y.open != null && y.close != null && y.close < y.open && hhmm < y.close) return true;
-
-  const t = parseHrsString(hrsForDay(loc, day));
-  if(t === null) return null;                                   // today's hours unknown → never "closed"
-  if(t.closed) return false;
-  if(t.allDay) return true;
-  if(t.close > t.open) return hhmm >= t.open && hhmm < t.close;  // normal same-day window
-  return hhmm >= t.open;                                         // overnight window — evening part (tail caught next day)
+  const hrs = todayHrsString(loc);
+  if(!hrs) return null; // unknown — we don't have hours data for this one yet
+  if(hrs === 'closed') return false;
+  if(hrs === '24') return true;
+  const parts = hrs.split('-');
+  if(parts.length !== 2) return null;
+  const open = parseInt(parts[0], 10);
+  const close = parseInt(parts[1], 10);
+  if(isNaN(open) || isNaN(close)) return null;
+  const now = new Date();
+  const nowVal = now.getHours() * 100 + now.getMinutes();
+  if(close > open){
+    return nowVal >= open && nowVal < close;
+  } else {
+    // overnight closing (e.g. closes 1am) — open spans midnight
+    return nowVal >= open || nowVal < close;
+  }
 }
 
 // Turns "0430-2400" into "4:30 AM – 12:00 AM", or "24" into "Open 24 hours"
