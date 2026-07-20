@@ -253,7 +253,7 @@
 .hiw-faq p{ margin-bottom:11px; }
 .hiw-faq b{ color:var(--shell-ink); }
 .hiw-support{ background:var(--shell-chrome2); border-radius:14px; padding:15px !important; border:0 !important; margin:8px 0; }
-.hiw-btn{ display:inline-block; margin-top:10px; background:var(--accent); color:var(--accent-ink) !important;
+.hiw-btn{ display:inline-flex; align-items:center; gap:9px; margin-top:10px; background:var(--accent); color:var(--accent-ink) !important;
   font-weight:800; font-size:14px; padding:11px 18px; border-radius:12px; text-decoration:none; }
 .hiw-updated{ color:var(--shell-muted) !important; font-size:11.5px !important; text-align:center; margin-top:16px !important; }
 
@@ -311,3 +311,6 @@ body:not(.logged-in) #appDrawer #themeToggle{ display:none !important; }
 .hiw-social-row a{ display:inline-flex; }
 .hiw-social-row img{ width:46px; height:46px; border-radius:12px; display:block; border:1px solid rgba(255,255,255,.12); }
 .hiw-social-row a:active{ opacity:.8; }
+
+
+.hiw-btn-icon{ width:22px; height:22px; border-radius:5px; display:block; }
