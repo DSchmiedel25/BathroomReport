@@ -1,0 +1,11 @@
+{
+  "name": "bathroom-report-functions",
+  "description": "Server-side rating aggregation for Bathroom Report",
+  "private": true,
+  "engines": { "node": "20" },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.1.0"
+  }
+}
