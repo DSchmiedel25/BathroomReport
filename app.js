@@ -788,8 +788,11 @@ function popupHtml(loc, agg, myVote){
     ${isLoggedIn() ? `<div class="rating-col single-rating">
       <span class="rating-label">🚻 Rate this bathroom</span>
       <div class="rating-score-line"><span class="rating-score">${avgStr(agg.bathroomSum, agg.bathroomCount)}★</span> ${ratingConfidenceHtml(agg.bathroomCount)}</div>
-      ${starsHtml(loc.id,'bathroom',myVote.bathroom)}
-      <div class="star-quip" id="quip-bathroom-${loc.id}">${quipFor('bathroom', myVote.bathroom)}</div>
+      <div class="rate-stack" id="ratestack-bathroom-${loc.id}">
+        ${starsHtml(loc.id,'bathroom',myVote.bathroom)}
+        <div class="star-quip" id="quip-bathroom-${loc.id}">${quipFor('bathroom', myVote.bathroom)}</div>
+        <div class="rate-flash" id="flash-bathroom-${loc.id}" aria-live="polite"></div>
+      </div>
       <div class="save-note" id="note-bathroom-${loc.id}"></div>
     </div>
     <div class="tips-section">
@@ -1507,6 +1510,28 @@ async function verifyNearby(loc){
   return { ok: dist <= VERIFY_RADIUS_MILES, distance: dist };
 }
 
+// Transient rating messages (checking / distance errors) are shown OVER the star row via a
+// .rate-flash overlay, so the popup card never changes height. Error messages auto-fade back
+// to the stars after a few seconds.
+const _rateFlashTimers = {};
+function showFlash(locId, type, msg, autohideMs, isError){
+  const el = document.getElementById('flash-' + type + '-' + locId);
+  if(!el) return;
+  clearTimeout(_rateFlashTimers[type + locId]);
+  el.textContent = msg;
+  el.classList.toggle('err', !!isError);
+  el.classList.add('show');
+  if(autohideMs > 0){
+    _rateFlashTimers[type + locId] = setTimeout(() => el.classList.remove('show'), autohideMs);
+  }
+}
+function hideFlash(locId, type){
+  const el = document.getElementById('flash-' + type + '-' + locId);
+  if(!el) return;
+  clearTimeout(_rateFlashTimers[type + locId]);
+  el.classList.remove('show');
+}
+
 function attachStarHandlers(loc){
   const popupEl = document.querySelector(`.popup-inner[data-locid="${loc.id}"]`);
   if(!popupEl) return;
@@ -1519,23 +1544,22 @@ function attachStarHandlers(loc){
         const note = document.getElementById('note-' + type + '-' + loc.id);
 
         if(deviceIsBlocked){
-          if(note){ note.style.color = '#c62828'; note.textContent = 'This device is no longer able to submit ratings.'; }
+          showFlash(loc.id, type, 'This device is no longer able to submit ratings.', 4000, true);
           return;
         }
 
-        if(note) note.textContent = 'Checking you\'re nearby...';
+        showFlash(loc.id, type, 'Checking you\'re nearby…', 0, false);
 
         const verification = await verifyNearby(loc);
         if(!verification.ok){
-          if(note){
-            note.style.color = '#c62828';
-            note.textContent = verification.reason === 'no-location'
-              ? '📍 Enable location to verify you\'re at this Bathroom before rating.'
-              : `📍 You need to be at this Bathroom to rate it (you're ${verification.distance.toFixed(1)} mi away).`;
-          }
+          const msg = verification.reason === 'no-location'
+            ? '📍 Enable location to verify you\'re at this Bathroom before rating.'
+            : `📍 You need to be at this Bathroom to rate it (you're ${verification.distance.toFixed(1)} mi away).`;
+          showFlash(loc.id, type, msg, 4000, true);
           return;
         }
-        if(note){ note.style.color = ''; note.textContent = 'Saving...'; }
+        hideFlash(loc.id, type);
+        if(note){ note.style.color = ''; note.textContent = 'Saving…'; }
 
         const agg = ratingsCache[loc.id] || emptyAgg();
         const myVote = myVoteCache[loc.id] || emptyVote();

@@ -126,7 +126,7 @@
   background:var(--shell-chrome) !important; border:1px solid var(--shell-line) !important;
   border-radius:14px !important; box-shadow:var(--shell-shadow) !important; color:var(--shell-ink) !important;
 }
-#legendToggle, #chainFilterToggle{ color:var(--shell-ink) !important; font-weight:800 !important; }
+#legendToggle, #chainFilterToggle{ color:var(--shell-ink) !important; font-weight:800 !important; font-size:14px !important; }
 #legendBody .dot{ border:1.5px solid #fff; }
 
 /* ---------- Bathroom Now: big teal bottom bar ---------- */
@@ -317,3 +317,18 @@ body:not(.logged-in) #appDrawer #themeToggle{ display:none !important; }
 #appDrawer .d-count{ display:block; margin-top:10px; font-size:12px; font-weight:600; color:var(--shell-muted); opacity:1; letter-spacing:.02em; }
 #appDrawer .d-count:empty{ display:none; }
 #appDrawer .d-version{ display:block; margin-top:8px; font-size:11px; color:var(--shell-muted); opacity:.75; letter-spacing:.02em; }
+
+/* ---------- Rating flash overlay ---------- */
+/* Transient status/error is drawn OVER the stars so the rating card height never
+   changes; it fades back to the stars after a few seconds. */
+.rate-stack{ position:relative; }
+.rate-flash{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  text-align:center; padding:0 10px; border-radius:8px;
+  background:var(--popup-bg, #ffffff); color:var(--shell-ink, #333);
+  font-weight:600; font-size:13px; line-height:1.3;
+  opacity:0; pointer-events:none; transition:opacity .3s ease;
+}
+.rate-flash.show{ opacity:1; pointer-events:auto; }
+.rate-flash.err{ color:#c62828; }
+@media (prefers-reduced-motion: reduce){ .rate-flash{ transition:none; } }
