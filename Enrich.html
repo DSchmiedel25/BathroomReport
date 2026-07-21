@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Waypoint — POI Enrichment Console</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0f1a24;          /* deep slate base */
+    --ink-2:#17252f;        /* raised ink */
+    --line-ink:#263a47;     /* borders on ink */
+    --paper:#ece7db;        /* worktop */
+    --paper-2:#f6f2e9;      /* raised paper */
+    --line:#d3cbb9;         /* borders on paper */
+    --text:#12202a;
+    --muted:#5f6f76;
+    --beacon:#e39b2f;       /* amber locator accent */
+    --beacon-soft:#f2c67d;
+    --resolved:#158a6b;     /* teal success */
+    --lost:#bb4a30;         /* rust not-found */
+    --geo:#4a6f8a;          /* slate-blue geocode-only */
+    --radius:10px;
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    --disp:'Space Grotesk',system-ui,-apple-system,Segoe UI,sans-serif;
+    --body:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font-family:var(--body);
+    color:var(--text);
+    background:var(--ink);
+    line-height:1.5;
+  }
+  /* ---------- Header ---------- */
+  header.masthead{
+    background:var(--ink);
+    color:var(--paper);
+    padding:22px 22px 20px;
+    border-bottom:1px solid var(--line-ink);
+    position:relative;
+    overflow:hidden;
+  }
+  header.masthead::before{ /* faint coordinate grid */
+    content:"";position:absolute;inset:0;pointer-events:none;opacity:.14;
+    background-image:linear-gradient(var(--line-ink) 1px,transparent 1px),linear-gradient(90deg,var(--line-ink) 1px,transparent 1px);
+    background-size:34px 34px;
+    mask-image:radial-gradient(120% 120% at 12% 0%,#000 30%,transparent 75%);
+  }
+  .mast-row{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;position:relative}
+  .crosshair{
+    width:26px;height:26px;flex:none;align-self:center;position:relative;
+  }
+  .crosshair::before,.crosshair::after{content:"";position:absolute;background:var(--beacon)}
+  .crosshair::before{left:12px;top:0;width:2px;height:26px}
+  .crosshair::after{top:12px;left:0;height:2px;width:26px}
+  .crosshair span{position:absolute;left:8px;top:8px;width:10px;height:10px;border:2px solid var(--beacon);border-radius:50%}
+  h1{
+    font-family:var(--disp);font-weight:700;letter-spacing:-.01em;
+    font-size:clamp(1.5rem,3.5vw,2rem);margin:0;
+  }
+  h1 .tag{color:var(--beacon)}
+  .subtitle{color:#a9bcc6;font-size:.95rem;margin:6px 0 0;max-width:60ch;position:relative}
+  .keyled{
+    margin-left:auto;display:flex;align-items:center;gap:9px;font-family:var(--mono);
+    font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:#8ea3ad;
+    background:var(--ink-2);border:1px solid var(--line-ink);border-radius:100px;padding:7px 13px;align-self:center;
+  }
+  .led{width:9px;height:9px;border-radius:50%;background:#6b7a82;box-shadow:0 0 0 0 rgba(0,0,0,0)}
+  .led.ok{background:var(--resolved);box-shadow:0 0 8px var(--resolved)}
+  .led.err{background:var(--lost);box-shadow:0 0 8px var(--lost)}
+  .led.wait{background:var(--beacon);box-shadow:0 0 8px var(--beacon)}
+
+  /* ---------- Workspace ---------- */
+  main{max-width:1080px;margin:0 auto;padding:22px 18px 60px}
+  .station{
+    background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px;margin-bottom:16px;
+  }
+  .station.raised{background:var(--paper-2)}
+  .st-head{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+  .st-num{
+    font-family:var(--mono);font-size:.72rem;font-weight:600;color:var(--ink);
+    background:var(--beacon-soft);border:1px solid var(--beacon);border-radius:6px;
+    padding:2px 7px;letter-spacing:.05em;
+  }
+  .st-title{font-family:var(--disp);font-weight:600;font-size:1.05rem;margin:0}
+  .st-hint{color:var(--muted);font-size:.86rem;margin:-6px 0 14px}
+  label.fld{display:block;font-size:.78rem;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+  input[type=text],input[type=password],select,textarea{
+    width:100%;font-family:var(--mono);font-size:.9rem;color:var(--text);
+    background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--beacon);outline-offset:1px;border-color:var(--beacon)}
+  textarea{min-height:110px;resize:vertical;line-height:1.45}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row > *{flex:1 1 200px}
+  details.help{margin-top:10px;font-size:.85rem;color:var(--muted)}
+  details.help summary{cursor:pointer;color:var(--geo);font-weight:600;user-select:none}
+  details.help a{color:var(--geo)}
+  details.help ol{margin:8px 0 0;padding-left:20px}
+  details.help li{margin:4px 0}
+
+  /* toggles */
+  .toggles{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .toggle{
+    display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.82rem;
+    background:#fff;border:1px solid var(--line);border-radius:100px;padding:7px 13px;cursor:pointer;user-select:none;
+  }
+  .toggle input{accent-color:var(--beacon);width:15px;height:15px}
+  .toggle[data-locked]{opacity:.55;cursor:not-allowed}
+
+  /* drop zone */
+  .drop{
+    border:2px dashed var(--line);border-radius:var(--radius);background:#fff;
+    padding:26px 18px;text-align:center;transition:.15s;cursor:pointer;
+  }
+  .drop.hot{border-color:var(--beacon);background:#fffaf0}
+  .drop strong{font-family:var(--disp)}
+  .drop .or{color:var(--muted);font-size:.85rem;margin:8px 0}
+  .filepill{
+    display:none;margin-top:10px;font-family:var(--mono);font-size:.82rem;color:var(--resolved);
+  }
+
+  /* mapping grid */
+  .mapgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .count-chip{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+  .count-chip b{color:var(--text)}
+
+  /* buttons */
+  button.act{
+    font-family:var(--disp);font-weight:600;font-size:.98rem;letter-spacing:.01em;
+    color:var(--ink);background:var(--beacon);border:1px solid #c9861f;border-radius:9px;
+    padding:12px 20px;cursor:pointer;transition:.12s;
+  }
+  button.act:hover{background:#eaa63f}
+  button.act:disabled{background:#d8cdb6;border-color:var(--line);color:#8a8672;cursor:not-allowed}
+  button.ghost{
+    font-family:var(--disp);font-weight:600;font-size:.9rem;color:var(--text);
+    background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px 16px;cursor:pointer;
+  }
+  button.ghost:hover{border-color:var(--beacon)}
+  button.ghost:disabled{opacity:.5;cursor:not-allowed}
+  .runbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+
+  /* progress sweep */
+  .sweep{flex:1 1 200px;min-width:180px;height:10px;background:#fff;border:1px solid var(--line);border-radius:100px;overflow:hidden}
+  .sweep .fill{height:100%;width:0;background:linear-gradient(90deg,var(--beacon),var(--resolved));transition:width .25s}
+  .sweep-label{font-family:var(--mono);font-size:.8rem;color:var(--muted);white-space:nowrap}
+
+  /* results table */
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:#fff}
+  table{border-collapse:collapse;width:100%;min-width:640px;font-size:.86rem}
+  thead th{
+    font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+    text-align:left;padding:10px 12px;background:var(--paper-2);border-bottom:1px solid var(--line);position:sticky;top:0;
+  }
+  tbody td{padding:9px 12px;border-bottom:1px solid #eee6d6;vertical-align:top}
+  tbody tr:last-child td{border-bottom:none}
+  td.name{font-weight:600;font-family:var(--disp)}
+  td.mono{font-family:var(--mono);font-size:.8rem;color:#33454f}
+  td.hours{font-family:var(--mono);font-size:.76rem;color:#4a5a62;white-space:pre-line;max-width:280px}
+  .beacon{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none;background:#b9b3a3}
+  .beacon.pending .dot{background:var(--beacon)}
+  .beacon.working .dot{background:var(--beacon);animation:pulse 1s ease-in-out infinite}
+  .beacon.resolved .dot{background:var(--resolved);box-shadow:0 0 0 3px rgba(21,138,107,.18)}
+  .beacon.geocoded .dot{background:var(--geo);box-shadow:0 0 0 3px rgba(74,111,138,.18)}
+  .beacon.lost .dot{background:var(--lost)}
+  .beacon.verified .dot{background:var(--resolved);box-shadow:0 0 0 3px rgba(21,138,107,.18)}
+  .beacon.filled .dot{background:var(--geo);box-shadow:0 0 0 3px rgba(74,111,138,.18)}
+  .beacon.corrected .dot{background:var(--beacon);box-shadow:0 0 0 3px rgba(227,155,47,.22)}
+  .beacon.closed .dot{background:var(--lost);box-shadow:0 0 0 3px rgba(187,74,48,.18)}
+  .beacon.pending{color:var(--muted)}
+  .beacon.working{color:var(--beacon)}
+  .beacon.resolved,.beacon.verified{color:var(--resolved)}
+  .beacon.geocoded,.beacon.filled{color:var(--geo)}
+  .beacon.corrected{color:#9a6a12}
+  .beacon.lost,.beacon.closed{color:var(--lost)}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:.5}}
+
+  #map{height:360px;border-radius:var(--radius);border:1px solid var(--line);margin-top:14px}
+  .leaflet-popup-content{font-family:var(--body);font-size:.85rem}
+  .leaflet-popup-content b{font-family:var(--disp)}
+  .leaflet-popup-content .h{font-family:var(--mono);font-size:.74rem;color:#4a5a62;white-space:pre-line;display:block;margin-top:4px}
+
+  .export-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .hidden{display:none !important}
+  .banner{
+    font-family:var(--mono);font-size:.82rem;border-radius:8px;padding:10px 13px;margin-top:12px;
+  }
+  .banner.warn{background:#fdf3e0;border:1px solid var(--beacon);color:#7a4d0a}
+  .banner.err{background:#fbeae5;border:1px solid var(--lost);color:#7a2c17}
+  footer{color:#7c8b93;font-size:.78rem;text-align:center;padding:0 18px 30px;font-family:var(--mono)}
+  @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+  @media (max-width:560px){ main{padding:16px 12px 50px} .station{padding:14px} .keyled{margin-left:0;margin-top:10px} }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="mast-row">
+    <div class="crosshair"><span></span></div>
+    <div>
+      <h1>Waypoint <span class="tag">Enrichment Console</span></h1>
+      <p class="subtitle">Drop a GeoJSON or JSON of businesses. Waypoint checks every location against Google Places — verifying addresses you have, filling ones you don't, flagging anything that changed — and hands back a clean, ready-to-use file.</p>
+    </div>
+    <div class="keyled"><span id="keyLed" class="led"></span><span id="keyLedTxt">Key not set</span></div>
+  </div>
+</header>
+
+<main>
+
+  <!-- STATION 1: KEY + FIELDS -->
+  <section class="station raised">
+    <div class="st-head"><span class="st-num">01</span><h2 class="st-title">Connect &amp; choose fields</h2></div>
+    <div class="row">
+      <div style="flex:2 1 300px">
+        <label class="fld" for="apiKey">Google Maps API key</label>
+        <input id="apiKey" type="password" placeholder="AIza…" autocomplete="off" spellcheck="false" />
+      </div>
+      <div style="flex:1 1 160px;display:flex;align-items:flex-end">
+        <button id="rememberBtn" class="ghost" style="width:100%">Remember key</button>
+      </div>
+    </div>
+    <div style="margin-top:14px">
+      <label class="fld">Fill in for each location</label>
+      <div class="toggles">
+        <label class="toggle"><input type="checkbox" id="optCoords" checked> Coordinates</label>
+        <label class="toggle"><input type="checkbox" id="optAddress" checked> Full address</label>
+        <label class="toggle"><input type="checkbox" id="optHours" checked> Opening hours</label>
+        <label class="toggle"><input type="checkbox" id="optPhone"> Phone &amp; website</label>
+      </div>
+    </div>
+    <details class="help">
+      <summary>How to get a key &amp; what to enable</summary>
+      <ol>
+        <li>In <a href="https://console.cloud.google.com/google/maps-apis" target="_blank" rel="noopener">Google Cloud → Maps</a>, create a project and an API key.</li>
+        <li>Enable three APIs: <b>Maps JavaScript API</b>, <b>Places API (New)</b>, and <b>Geocoding API</b>.</li>
+        <li>Restrict the key by <b>HTTP referrer</b> to your site (e.g. <span class="count-chip"><b>yourname.github.io/*</b></span>) so it can't be abused.</li>
+        <li>Cost: each location = one Text Search call. The first <b>5,000 calls per month are free</b>; Waypoint shows the count before you run so you can stay under it.</li>
+      </ol>
+    </details>
+  </section>
+
+  <!-- STATION 2: INPUT -->
+  <section class="station">
+    <div class="st-head"><span class="st-num">02</span><h2 class="st-title">Load your locations</h2></div>
+    <div id="drop" class="drop">
+      <strong>Drop a .geojson / .json file</strong>
+      <div class="or">or click to browse</div>
+      <div class="or" style="margin:0">— or paste below —</div>
+      <div class="filepill" id="filepill"></div>
+    </div>
+    <input type="file" id="fileInput" accept=".json,.geojson,application/json,application/geo+json" class="hidden" />
+    <textarea id="pasteBox" style="margin-top:12px" placeholder='Paste JSON here, e.g.
+[
+  {"name":"Stewart&#39;s Shops","city":"Ballston Spa, NY"},
+  {"name":"Cumberland Farms","address":"Route 50, Saratoga Springs"}
+]'></textarea>
+    <div class="runbar" style="margin-top:12px">
+      <button id="parseBtn" class="ghost">Read file</button>
+      <span id="parseMsg" class="count-chip"></span>
+    </div>
+  </section>
+
+  <!-- STATION 3: MAPPING -->
+  <section class="station raised hidden" id="mapStation">
+    <div class="st-head"><span class="st-num">03</span><h2 class="st-title">Confirm the columns</h2></div>
+    <p class="st-hint">Waypoint guessed which fields hold what. Fix any that are wrong — leave blank if a location type doesn't have it.</p>
+    <div class="mapgrid" id="mapGrid"></div>
+    <p class="count-chip" style="margin-top:12px">Detected <b id="recCount">0</b> locations.</p>
+  </section>
+
+  <!-- STATION 4: RUN -->
+  <section class="station hidden" id="runStation">
+    <div class="st-head"><span class="st-num">04</span><h2 class="st-title">Enrich</h2></div>
+    <div class="runbar">
+      <button id="runBtn" class="act">Enrich locations</button>
+      <div class="sweep"><div class="fill" id="sweepFill"></div></div>
+      <span class="sweep-label" id="sweepLabel">Idle</span>
+    </div>
+    <div id="runBanner"></div>
+  </section>
+
+  <!-- STATION 5: RESULTS -->
+  <section class="station raised hidden" id="resultStation">
+    <div class="st-head"><span class="st-num">05</span><h2 class="st-title">Results</h2></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th>Status</th><th>Name</th><th>Address</th><th>Lat, Lng</th><th>Hours</th>
+        </tr></thead>
+        <tbody id="resBody"></tbody>
+      </table>
+    </div>
+    <div id="map"></div>
+  </section>
+
+  <!-- STATION 6: EXPORT -->
+  <section class="station hidden" id="exportStation">
+    <div class="st-head"><span class="st-num">06</span><h2 class="st-title">Export</h2></div>
+    <p class="st-hint">Your original fields are kept; the new ones are added alongside.</p>
+    <div class="export-row">
+      <button class="ghost" id="dlGeojson">Download GeoJSON</button>
+      <button class="ghost" id="dlJson">Download JSON</button>
+      <button class="ghost" id="dlCsv">Download CSV</button>
+    </div>
+  </section>
+
+</main>
+
+<footer>Waypoint · runs entirely in your browser · your key and data never leave this page</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ---------- element refs ----------
+  const $ = id => document.getElementById(id);
+  const apiKeyEl=$('apiKey'), rememberBtn=$('rememberBtn'), keyLed=$('keyLed'), keyLedTxt=$('keyLedTxt');
+  const drop=$('drop'), fileInput=$('fileInput'), filepill=$('filepill'), pasteBox=$('pasteBox');
+  const parseBtn=$('parseBtn'), parseMsg=$('parseMsg');
+  const mapStation=$('mapStation'), mapGrid=$('mapGrid'), recCount=$('recCount');
+  const runStation=$('runStation'), runBtn=$('runBtn'), sweepFill=$('sweepFill'), sweepLabel=$('sweepLabel'), runBanner=$('runBanner');
+  const resultStation=$('resultStation'), resBody=$('resBody');
+  const exportStation=$('exportStation');
+
+  const opt = { coords:$('optCoords'), address:$('optAddress'), hours:$('optHours'), phone:$('optPhone') };
+
+  // ---------- state ----------
+  let records = [];        // normalized: {props, geomCoords:[lng,lat]|null, out:{}, status, feature?}
+  let allKeys = [];        // union of property keys
+  let mapping = {};        // role -> key
+  let googleReady = false;
+  let Place=null, Geocoder=null, geocoder=null;
+  let leafletMap=null, markerLayer=null;
+
+  // ---------- key persistence (graceful if storage blocked) ----------
+  function safeGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  function safeSet(k,v){ try{ localStorage.setItem(k,v); return true; }catch(e){ return false; } }
+  const saved = safeGet('waypoint_key');
+  if(saved){ apiKeyEl.value = saved; setKeyLed('idle','Key loaded'); }
+
+  function setKeyLed(state,txt){
+    keyLed.className='led'+(state==='ok'?' ok':state==='err'?' err':state==='wait'?' wait':'');
+    keyLedTxt.textContent=txt;
+  }
+  apiKeyEl.addEventListener('input',()=>{ setKeyLed('idle', apiKeyEl.value?'Key set':'Key not set'); });
+  rememberBtn.addEventListener('click',()=>{
+    if(!apiKeyEl.value){ setKeyLed('err','Nothing to save'); return; }
+    const ok = safeSet('waypoint_key', apiKeyEl.value.trim());
+    setKeyLed(ok?'ok':'err', ok?'Key remembered':'Storage blocked here');
+  });
+
+  // ---------- Google loader (injects official bootstrap with the user's key) ----------
+  function loadGoogle(key){
+    if(window.__gmapsBooted) return window.__gmapsBooted;
+    window.gm_authFailure = ()=>{ setKeyLed('err','Key rejected'); flash('err','Google rejected the key. Check that billing is on and the key allows this site.'); };
+    window.__gmapsBooted = (async ()=>{
+      ((g)=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({key:key,v:"weekly"});
+      const pl = await google.maps.importLibrary('places');
+      const gc = await google.maps.importLibrary('geocoding');
+      Place = pl.Place; Geocoder = gc.Geocoder; geocoder = new Geocoder();
+      googleReady=true;
+    })();
+    return window.__gmapsBooted;
+  }
+
+  // ---------- input parsing ----------
+  drop.addEventListener('click',()=>fileInput.click());
+  ;['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('hot');}));
+  ;['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('hot');}));
+  drop.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) readFile(f); });
+  fileInput.addEventListener('change',e=>{ const f=e.target.files[0]; if(f) readFile(f); });
+  parseBtn.addEventListener('click',()=>{
+    if(pasteBox.value.trim()){ ingest(pasteBox.value); }
+    else if(fileInput.files[0]){ readFile(fileInput.files[0]); }
+    else { parseMsg.textContent='Add a file or paste JSON first.'; }
+  });
+
+  function readFile(f){
+    filepill.style.display='block'; filepill.textContent='◆ '+f.name;
+    const r=new FileReader();
+    r.onload=()=>ingest(r.result);
+    r.onerror=()=>{ parseMsg.textContent='Could not read that file.'; };
+    r.readAsText(f);
+  }
+
+  function ingest(text){
+    let data;
+    try{ data=JSON.parse(text); }
+    catch(e){ parseMsg.textContent='That isn\'t valid JSON — check for a stray comma or quote.'; return; }
+    records = normalize(data);
+    if(!records.length){ parseMsg.textContent='No locations found in that structure.'; return; }
+    allKeys = collectKeys(records);
+    parseMsg.textContent='';
+    buildMapping();
+    recCount.textContent=records.length;
+    mapStation.classList.remove('hidden');
+    runStation.classList.remove('hidden');
+    sweepLabel.textContent=`${records.length} lookups needed · first 5,000/mo are free`;
+    mapStation.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+
+  function isFeature(o){ return o && o.type==='Feature' && ('geometry' in o || 'properties' in o); }
+  function pointCoords(geom){
+    if(geom && geom.type==='Point' && Array.isArray(geom.coordinates)) return geom.coordinates.slice(0,2); // [lng,lat]
+    return null;
+  }
+  function normalize(data){
+    const out=[];
+    const push=(props,geomCoords,feature)=>out.push({props:props||{},geomCoords:geomCoords||null,out:{},status:'pending',feature:feature||null});
+    if(data && data.type==='FeatureCollection' && Array.isArray(data.features)){
+      data.features.forEach(f=>push(f.properties, pointCoords(f.geometry), f));
+    } else if(Array.isArray(data)){
+      data.forEach(item=>{
+        if(isFeature(item)) push(item.properties, pointCoords(item.geometry), item);
+        else if(item && typeof item==='object') push(item, null, null);
+      });
+    } else if(isFeature(data)){
+      push(data.properties, pointCoords(data.geometry), data);
+    } else if(data && typeof data==='object'){
+      push(data, null, null);
+    }
+    return out;
+  }
+  function collectKeys(recs){
+    const s=new Set();
+    recs.forEach(r=>Object.keys(r.props||{}).forEach(k=>s.add(k)));
+    return [...s];
+  }
+
+  // ---------- field auto-detection ----------
+  const DETECT = {
+    name:   k=>/^(name|title|place|business|label|displayname|store|shop)$/i.test(k)||/name/i.test(k),
+    address:k=>/(address|addr|street|formatted|vicinity)/i.test(k),
+    city:   k=>/(city|town|locality|municipal)/i.test(k),
+    region: k=>/(state|province|region)/i.test(k),
+    lat:    k=>['lat','latitude','y'].includes(k.toLowerCase())||/latitude/i.test(k),
+    lng:    k=>['lng','lon','long','longitude','x'].includes(k.toLowerCase())||/longitude/i.test(k),
+  };
+  const ROLES=[
+    ['name','Name'],['address','Street address'],['city','City'],
+    ['region','State / region'],['lat','Latitude'],['lng','Longitude']
+  ];
+  function guess(role){ for(const k of allKeys) if(DETECT[role](k)) return k; return ''; }
+  function buildMapping(){
+    mapping={};
+    mapGrid.innerHTML='';
+    ROLES.forEach(([role,lab])=>{
+      mapping[role]=guess(role);
+      const wrap=document.createElement('div');
+      const options=['<option value="">— none —</option>']
+        .concat(allKeys.map(k=>`<option value="${esc(k)}"${k===mapping[role]?' selected':''}>${esc(k)}</option>`));
+      wrap.innerHTML=`<label class="fld">${lab}</label><select data-role="${role}">${options.join('')}</select>`;
+      wrap.querySelector('select').addEventListener('change',e=>{ mapping[role]=e.target.value; });
+      mapGrid.appendChild(wrap);
+    });
+  }
+
+  // ---------- helpers ----------
+  function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function val(rec,role){ const k=mapping[role]; return k&&rec.props[k]!=null?String(rec.props[k]).trim():''; }
+  function coordsOf(rec){
+    // prefer mapped lat/lng, else geojson geometry [lng,lat]
+    const la=parseFloat(val(rec,'lat')), ln=parseFloat(val(rec,'lng'));
+    if(isFinite(la)&&isFinite(ln)) return {lat:la,lng:ln};
+    if(rec.geomCoords){ const [x,y]=rec.geomCoords; if(isFinite(y)&&isFinite(x)) return {lat:+y,lng:+x}; }
+    return null;
+  }
+  function queryOf(rec){
+    return [val(rec,'name'),val(rec,'address'),val(rec,'city'),val(rec,'region')].filter(Boolean).join(', ');
+  }
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  function flash(kind,msg){ runBanner.innerHTML=`<div class="banner ${kind}">${esc(msg)}</div>`; }
+  function clearFlash(){ runBanner.innerHTML=''; }
+
+  // ---------- enrichment run ----------
+  runBtn.addEventListener('click', run);
+  async function run(){
+    const key=apiKeyEl.value.trim();
+    if(!key){ setKeyLed('err','Key required'); flash('err','Enter your Google Maps API key in station 01 first.'); return; }
+    clearFlash();
+    runBtn.disabled=true; setKeyLed('wait','Connecting…'); sweepLabel.textContent='Connecting…';
+    try{ await loadGoogle(key); }
+    catch(e){ setKeyLed('err','Load failed'); flash('err','Could not load Google Maps. Check the key and your connection.'); runBtn.disabled=false; return; }
+    if(!googleReady){ runBtn.disabled=false; return; }
+    setKeyLed('ok','Connected');
+
+    // reset result view
+    resultStation.classList.remove('hidden');
+    exportStation.classList.add('hidden');
+    resBody.innerHTML='';
+    records.forEach((rec,i)=>{ rec.status='pending'; rec.out={}; rec.rowEl=makeRow(rec,i); });
+
+    const fields=['displayName','formattedAddress','addressComponents','location','regularOpeningHours','businessStatus'];
+    if(opt.phone.checked){ fields.push('nationalPhoneNumber','websiteURI'); }
+
+    let done=0;
+    const tally={verified:0,filled:0,corrected:0,closed:0,geocoded:0,lost:0};
+    const total=records.length;
+    for(const rec of records){
+      setRowStatus(rec,'working');
+      await enrichOne(rec,fields);
+      done++;
+      if(tally[rec.status]!=null) tally[rec.status]++;
+      sweepFill.style.width=Math.round(done/total*100)+'%';
+      sweepLabel.textContent=`${done}/${total} · ✓${tally.verified} ＋${tally.filled} Δ${tally.corrected}`;
+      await sleep(220); // gentle pacing to stay under QPS limits
+    }
+    sweepLabel.textContent=`Done · ${tally.verified} verified · ${tally.filled} filled · ${tally.corrected} corrected`;
+    runBtn.disabled=false;
+    exportStation.classList.remove('hidden');
+    renderMap();
+    const issues=[];
+    if(tally.corrected) issues.push(`${tally.corrected} address(es) differed from your file and were updated to Google's version (originals kept in osm_address)`);
+    if(tally.closed) issues.push(`${tally.closed} may be permanently closed (see business_status)`);
+    if(tally.geocoded) issues.push(`${tally.geocoded} got an approximate address from coordinates only`);
+    if(tally.lost) issues.push(`${tally.lost} had no confident match — check pins manually`);
+    if(issues.length) flash('warn',issues.join('. ')+'.');
+  }
+
+  // ---- verification helpers ----
+  const SUFFIX={street:'st',avenue:'ave',road:'rd',drive:'dr',highway:'hwy',boulevard:'blvd',parkway:'pkwy',lane:'ln',court:'ct',place:'pl',route:'rte',turnpike:'tpke',freeway:'fwy',expressway:'expy',north:'n',south:'s',east:'e',west:'w',northeast:'ne',northwest:'nw',southeast:'se',southwest:'sw'};
+  function normAddr(s){
+    return String(s||'').toLowerCase().replace(/[^a-z0-9 ]/g,' ')
+      .split(/\s+/).filter(Boolean).map(t=>SUFFIX[t]||t).join(' ');
+  }
+  function sameAddr(a,b){
+    const na=normAddr(a), nb=normAddr(b);
+    if(!na||!nb) return false;
+    if(na===nb) return true;
+    const ta=new Set(na.split(' ')), tb=new Set(nb.split(' '));
+    let inter=0; ta.forEach(t=>{ if(tb.has(t)) inter++; });
+    return inter/Math.max(ta.size,tb.size)>=0.7;
+  }
+  function havM(a,b){
+    const R=6371000,r=Math.PI/180;
+    const h=Math.sin((b.lat-a.lat)*r/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin((b.lng-a.lng)*r/2)**2;
+    return Math.round(2*R*Math.asin(Math.sqrt(h)));
+  }
+  function comps(place){
+    const out={num:'',route:'',city:'',state:'',zip:''};
+    (place.addressComponents||[]).forEach(c=>{
+      const t=c.types||[];
+      if(t.includes('street_number')) out.num=c.longText||c.shortText||'';
+      else if(t.includes('route')) out.route=c.shortText||c.longText||'';
+      else if(t.includes('locality')) out.city=c.longText||'';
+      else if(!out.city&&t.includes('postal_town')) out.city=c.longText||'';
+      else if(t.includes('administrative_area_level_1')) out.state=c.shortText||'';
+      else if(t.includes('postal_code')) out.zip=c.longText||'';
+    });
+    out.street=(out.num+' '+out.route).trim();
+    return out;
+  }
+  function hoursCompact(oh){
+    if(!oh||!oh.weekdayDescriptions||!oh.weekdayDescriptions.length) return '';
+    if(oh.weekdayDescriptions.every(x=>/open 24 hours/i.test(x))) return '24/7';
+    return oh.weekdayDescriptions.join('; ');
+  }
+
+  async function enrichOne(rec,fields){
+    const coords=coordsOf(rec);
+    const q=queryOf(rec);
+    let place=null;
+    try{
+      const req={ textQuery:q||'store', fields, maxResultCount:1, region:'us', language:'en-US' };
+      if(coords) req.locationBias={ center:coords, radius:2000 };
+      const res=await Place.searchByText(req);
+      place=res.places && res.places[0] || null;
+    }catch(e){
+      if(/API|denied|not enabled|REQUEST_DENIED/i.test(e.message||'')) flash('err','Places API (New) may not be enabled on this key. Enable it in Google Cloud, then re-run.');
+    }
+
+    if(place){
+      const g=place.location?{lat:place.location.lat(),lng:place.location.lng()}:null;
+      const c=comps(place);
+      rec.out.gAddress=place.formattedAddress||'';
+      rec.out.street=c.street; rec.out.city=c.city; rec.out.state=c.state; rec.out.zip=c.zip;
+      rec.out.lat = coords?coords.lat:(g?round(g.lat):null);   // keep source coords; Google only fills gaps
+      rec.out.lng = coords?coords.lng:(g?round(g.lng):null);
+      rec.out.offset = (coords&&g)?havM(coords,g):null;
+      rec.out.hours = hoursCompact(place.regularOpeningHours);
+      if(opt.phone.checked){ rec.out.phone=place.nationalPhoneNumber||''; rec.out.website=place.websiteURI||''; }
+      rec.out.closedFlag = place.businessStatus && place.businessStatus!=='OPERATIONAL' ? place.businessStatus : '';
+      const existing=val(rec,'address');
+      if(rec.out.closedFlag) rec.status='closed';
+      else if(rec.out.offset!=null && rec.out.offset>400) rec.status='lost'; // matched something too far away
+      else if(!existing) rec.status='filled';
+      else if(sameAddr(existing,c.street)) rec.status='verified';
+      else rec.status='corrected';
+    } else if(coords && geocoder){
+      try{
+        const gr=await geocoder.geocode({ location:coords });
+        const first=gr.results && gr.results[0];
+        rec.out.lat=coords.lat; rec.out.lng=coords.lng;
+        rec.out.gAddress=first?first.formatted_address:'';
+        rec.status=first?'geocoded':'lost';
+      }catch(e){ rec.status='lost'; }
+    } else {
+      rec.status='lost';
+    }
+    writeBack(rec);
+    setRowStatus(rec,rec.status);
+    fillRow(rec);
+  }
+
+  function writeBack(rec){
+    const p=rec.props;
+    if(rec.out.offset!=null) p.pin_offset_m=rec.out.offset;
+    if(rec.status==='lost'){ p.address_status = rec.out.gAddress ? 'no_match_nearby' : 'not_found'; return; }
+    if(rec.status==='geocoded'){
+      if(opt.address.checked && rec.out.gAddress) p.formatted_address=rec.out.gAddress;
+      p.address_status='approx_geocode';
+      return;
+    }
+    if(opt.address.checked){
+      if(rec.status==='corrected' && p.address) p.osm_address=p.address; // audit trail
+      if(rec.out.street) p.address=rec.out.street;
+      if(rec.out.city) p.city=rec.out.city;
+      if(rec.out.state) p.state=rec.out.state;
+      if(rec.out.zip) p.zip=rec.out.zip;
+      if(rec.out.gAddress) p.formatted_address=rec.out.gAddress;
+      p.address_status=rec.status;                  // verified | filled | corrected | closed
+      p.address_checked=new Date().toISOString().slice(0,10);
+    }
+    if(opt.coords.checked && rec.out.lat!=null && (p.lat==null||p.lat==='')){ p.lat=round(rec.out.lat); p.lng=round(rec.out.lng); }
+    if(opt.hours.checked && rec.out.hours){ p.hours=rec.out.hours; p.hours_source='google'; }
+    if(opt.phone.checked){ if(rec.out.phone) p.phone=rec.out.phone; if(rec.out.website) p.website=rec.out.website; }
+    if(rec.out.closedFlag){ p.business_status=rec.out.closedFlag; }
+    if('missing' in p){                              // refresh built-in linter field
+      const miss=['address','city','state','zip','phone'].filter(k=>!p[k]);
+      if(p.hours_source==='chain_default') miss.push('hours_verified');
+      p.missing=miss.join(',');
+    }
+  }
+  function round(n){ return Math.round(n*1e6)/1e6; }
+
+  // ---------- results table ----------
+  const STATUS_LABEL={pending:'Queued',working:'Checking',verified:'Verified',filled:'Filled',corrected:'Corrected',closed:'Closed?',geocoded:'Approx.',lost:'No match'};
+  function makeRow(rec,i){
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td><span class="beacon pending"><span class="dot"></span><span class="lab">Queued</span></span></td>
+      <td class="name">${esc(val(rec,'name')||'(unnamed)')}</td>
+      <td class="mono addr">—</td><td class="mono ll">—</td><td class="hours hrs">—</td>`;
+    resBody.appendChild(tr);
+    return tr;
+  }
+  function setRowStatus(rec,st){
+    const b=rec.rowEl.querySelector('.beacon');
+    b.className='beacon '+st;
+    b.querySelector('.lab').textContent=STATUS_LABEL[st]||st;
+  }
+  function fillRow(rec){
+    const tr=rec.rowEl;
+    tr.querySelector('.addr').textContent=rec.out.street||rec.out.gAddress||'—';
+    tr.querySelector('.ll').textContent=(rec.out.lat!=null)?`${round(rec.out.lat)}, ${round(rec.out.lng)}`+(rec.out.offset!=null?` · Δ${rec.out.offset}m`:''):'—';
+    const h=rec.out.hours?rec.out.hours.split('; ').join('\n'):(rec.status==='geocoded'?'(no hours found)':'—');
+    tr.querySelector('.hrs').textContent=h;
+  }
+
+  // ---------- map ----------
+  function renderMap(){
+    const pts=records.filter(r=>r.out.lat!=null);
+    if(!pts.length) return;
+    if(!leafletMap){
+      leafletMap=L.map('map',{scrollWheelZoom:false});
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(leafletMap);
+      markerLayer=L.layerGroup().addTo(leafletMap);
+    }
+    markerLayer.clearLayers();
+    const bounds=[];
+    pts.forEach(r=>{
+      const nm=esc(val(r,'name')||'Location');
+      const addr=esc(r.out.gAddress||r.out.street||'');
+      const hrs=r.out.hours?esc(r.out.hours.split('; ').join('\n')):'';
+      const m=L.marker([r.out.lat,r.out.lng]).bindPopup(`<b>${nm}</b><br>${addr}${hrs?`<span class="h">${hrs}</span>`:''}`);
+      markerLayer.addLayer(m);
+      bounds.push([r.out.lat,r.out.lng]);
+    });
+    leafletMap.fitBounds(bounds,{padding:[30,30],maxZoom:14});
+    setTimeout(()=>leafletMap.invalidateSize(),50);
+  }
+
+  // ---------- export ----------
+  function download(name,text,mime){
+    const blob=new Blob([text],{type:mime});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }
+  $('dlJson').addEventListener('click',()=>{
+    const arr=records.map(r=>r.props);
+    download('enriched.json', JSON.stringify(arr,null,2),'application/json');
+  });
+  $('dlGeojson').addEventListener('click',()=>{
+    const fc={type:'FeatureCollection',features:records.map(r=>{
+      const c=coordsOf(r); const lng=r.out.lng!=null?r.out.lng:(c?c.lng:null); const lat=r.out.lat!=null?r.out.lat:(c?c.lat:null);
+      return {type:'Feature',
+        geometry:(lat!=null&&lng!=null)?{type:'Point',coordinates:[round(lng),round(lat)]}:null,
+        properties:r.props};
+    })};
+    download('enriched.geojson', JSON.stringify(fc,null,2),'application/geo+json');
+  });
+  $('dlCsv').addEventListener('click',()=>{
+    const keys=collectKeys(records);
+    const head=keys.map(csvCell).join(',');
+    const rows=records.map(r=>keys.map(k=>csvCell(r.props[k]!=null?r.props[k]:'')).join(','));
+    download('enriched.csv',[head].concat(rows).join('\r\n'),'text/csv');
+  });
+  function csvCell(v){ v=String(v); return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+
+})();
+</script>
+</body>
+</html>
