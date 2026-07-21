@@ -893,6 +893,21 @@ function buildNavUrl(app, lat, lng){
   return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 }
 
+// Best default when the user hasn't explicitly chosen: Apple Maps on Apple hardware
+// (iPhone/iPad/Mac — iPadOS 13+ reports as "Macintosh", so also check touch points),
+// Google Maps everywhere else. Lets logged-out users get the right app with zero setup.
+function deviceDefaultNavApp(){
+  const ua = navigator.userAgent || '';
+  const isApple = /iPhone|iPad|iPod/.test(ua)
+    || /Macintosh/.test(ua)
+    || (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
+  return isApple ? 'apple' : 'google';
+}
+// The nav app to actually open: an explicit saved preference wins; otherwise the device default.
+function resolveNavApp(){
+  return localStorage.getItem('preferredNavApp') || deviceDefaultNavApp();
+}
+
 function attachDirectionsHandler(loc){
   const btnOrig = document.getElementById('directions-btn-' + loc.id);
   const changeBtnOrig = document.getElementById('nav-change-' + loc.id);
@@ -909,12 +924,7 @@ function attachDirectionsHandler(loc){
   };
 
   btn.addEventListener('click', () => {
-    const pref = localStorage.getItem('preferredNavApp');
-    if(pref){
-      openWith(pref);
-    } else {
-      chooser.style.display = chooser.style.display === 'none' ? 'flex' : 'none';
-    }
+    openWith(resolveNavApp());   // explicit saved pref, else the device default (Apple on Apple, Google elsewhere)
   });
 
   changeBtn.addEventListener('click', () => {
@@ -1955,6 +1965,7 @@ function syncChainFilterToAuth(){
     const multiChain = Object.keys(CHAIN_REGISTRY).length >= 2;
     cf.style.display = (isLoggedIn() && multiChain) ? '' : 'none';
   }
+  if(typeof renderNavPref === 'function') renderNavPref();
   applyFilters();
 }
 
@@ -2020,6 +2031,22 @@ document.getElementById('chainFilterBody')?.addEventListener('change', (e) => {
 })();
 renderChainFilter();
 applyFilters();
+
+// Directions-app preference (drawer, signed-in only). The highlighted button reflects the app
+// that will actually open — the explicit saved choice, or the device default when none is set.
+function renderNavPref(){
+  const wrap = document.getElementById('navAppPref');
+  if(!wrap) return;
+  const active = resolveNavApp();
+  wrap.querySelectorAll('.nav-pref-btn').forEach(b => b.classList.toggle('active', b.dataset.app === active));
+}
+document.getElementById('navAppPref')?.addEventListener('click', (e) => {
+  const b = e.target.closest('.nav-pref-btn');
+  if(!b) return;
+  localStorage.setItem('preferredNavApp', b.dataset.app);
+  renderNavPref();
+});
+renderNavPref();
 
 // Closed-locations filter — a left pill on the map. On by default → the map hides
 // confirmed-closed spots (open + unknown-hours stay visible). Tapping it off shows
@@ -2236,7 +2263,10 @@ function bathroomNowCard(result,fallback=false){
   const hoursMissingNote=open===null?'<br><small>No hours listed for this store — tap "View pin" then 🚩 to send them in.</small>':'';
   const outsideSelection=!activeChains.has(result.loc.chain || DEFAULT_CHAIN_KEY);
   const chainNote=outsideSelection?`<div class="nearest-alert">Nothing close by in your selected chains, so this ${escapeHtml((CHAIN_REGISTRY[result.loc.chain]||{}).name||'nearby')} location is shown instead.</div>`:'';
-  return `<div class="bathroom-now-card"><button class="bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':'Closest bathroom by driving distance'}</div>${chainNote}<b>${result.loc.n}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${lastRatedNote}${hoursMissingNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">View pin</button></div></div>`;
+  // Filled chain pill so you can see which brand this is at a glance, colored from the registry.
+  const chain=CHAIN_REGISTRY[result.loc.chain]||{};
+  const chainBadge=chain.name?`<div class="now-chain-badge" style="background:${chain.color};color:${chain.textColor};">${escapeHtml(chain.name)}</div>`:'';
+  return `<div class="bathroom-now-card"><button class="bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':'Closest bathroom by driving distance'}</div>${chainNote}${chainBadge}<b>${result.loc.n}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${lastRatedNote}${hoursMissingNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">View pin</button></div></div>`;
 }
 let userMarker=null;
 const whereAmIBtn=document.getElementById('whereAmIBtn');
@@ -2292,7 +2322,7 @@ function showBathroomNowResult(result,fallback=false){
     if(m) zoomToMarker(m);
     else map.setView([result.loc.lat,result.loc.lng],16,{animate:false});  // marker not built yet — center the map anyway
   };
-  document.getElementById('bathroom-now-directions').onclick=()=>{const pref=localStorage.getItem('preferredNavApp')||'google';window.open(buildNavUrl(pref,result.loc.lat,result.loc.lng),'_blank','noopener');};
+  document.getElementById('bathroom-now-directions').onclick=()=>{window.open(buildNavUrl(resolveNavApp(),result.loc.lat,result.loc.lng),'_blank','noopener');};
   zoomToMarker(markers[result.loc.id]);
 }
 locateBtn.addEventListener('click',()=>{

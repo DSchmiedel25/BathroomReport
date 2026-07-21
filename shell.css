@@ -375,3 +375,32 @@ body:not(.logged-in) #appDrawer #chainFilter{ display:none !important; }
 #appDrawer .chain-filter-row:active{ background:var(--shell-chrome2); }
 #appDrawer .chain-filter-row input{ width:18px; height:18px; flex:none; }
 #appDrawer .chain-filter-row .dot{ width:12px; height:12px; border-radius:50%; flex:none; border:1.5px solid #fff; }
+
+/* ---------- Directions-app preference (drawer, signed-in only) ---------- */
+/* Logged-out users get the device default automatically (Apple Maps on Apple, Google elsewhere),
+   so the manual picker is a signed-in feature — mirror the Chains section's hard-hide. */
+body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
+
+#appDrawer #navAppPref{
+  border-top:1px solid var(--shell-line); padding:12px 20px 14px;
+}
+#appDrawer .d-section-label{
+  font-size:15px; font-weight:700; color:var(--shell-ink); margin-bottom:10px;
+}
+#appDrawer .nav-pref-choices{ display:flex; gap:8px; }
+#appDrawer .nav-pref-btn{
+  flex:1; padding:9px 6px; border-radius:12px; cursor:pointer;
+  background:var(--shell-chrome2); color:var(--shell-ink);
+  border:1px solid var(--shell-line); font-size:12.5px; font-weight:700; white-space:nowrap;
+}
+#appDrawer .nav-pref-btn.active{
+  background:var(--accent); color:var(--accent-ink); border-color:var(--accent);
+}
+#appDrawer .nav-pref-btn:active{ opacity:.85; }
+
+/* ---------- Chain badge in the Bathroom Now card (below the callout, above the name) ---------- */
+#nearestInfo .now-chain-badge{
+  display:inline-block; margin:2px 0 6px; padding:3px 10px;
+  border-radius:999px; font-size:12px; font-weight:800; letter-spacing:.01em;
+  line-height:1.4; white-space:nowrap;
+}
