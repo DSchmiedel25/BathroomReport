@@ -565,3 +565,5 @@
     .support-prompt-icon{font-size:28px;}
     #supportPromptCard h2{font-size:18px;}
   }
+
+.popup-inner .addr.addr-title{ font-weight:700; font-size:15px; color:#1a1a1a; margin-top:6px; }

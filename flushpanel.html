@@ -188,6 +188,8 @@
   .chip, .pill{ display:inline-flex !important; align-items:center !important; align-self:flex-start !important;
     flex:0 0 auto !important; height:auto !important; min-height:0 !important; max-height:28px !important;
     line-height:1.25 !important; overflow:hidden !important; }
+  .add-select{ width:100%; padding:9px 11px; border-radius:9px; border:1px solid var(--line); background:var(--bg2); color:var(--text); font:inherit; }
+  .mini.primary-mini{ background:var(--accent); border-color:transparent; color:#04121b; }
 </style>
 </head>
 <body>
@@ -221,7 +223,7 @@
     <div class="sidebar-foot">
       <div class="who" id="whoami"></div>
       <button class="btn full" id="signoutBtn">Sign out</button>
-      <div class="panel-version">FlushPanel v2.1 · 2026-07-20</div>
+      <div class="panel-version">FlushPanel v2.2 · 2026-07-20</div>
     </div>
   </aside>
 
@@ -307,6 +309,40 @@
       <label class="resolve-check"><input type="checkbox" id="resolveOnSave" checked> Resolve this report on save</label>
       <button class="btn" id="fixCancel">Cancel</button>
       <button class="btn primary" id="fixSave">Save correction</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add-store modal -->
+<div class="modal-backdrop hidden" id="addModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h2>Add as store</h2><div class="sub">Writes an override → next bake creates it in the chain's file.</div></div>
+      <button class="x" id="addClose" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="fld"><label>Chain</label><select id="addChain" class="add-select"></select></div>
+      <div class="fld"><label>Display name</label><input id="addName" type="text" placeholder="Crane Street, Schenectady"></div>
+      <div class="fld"><label>Address</label><input id="addAddr" type="text"></div>
+      <div class="grid2">
+        <div class="fld"><label>City</label><input id="addCity" type="text"></div>
+        <div class="fld"><label>State</label><input id="addState" type="text"></div>
+      </div>
+      <div class="grid2">
+        <div class="fld"><label>ZIP</label><input id="addZip" type="text"></div>
+        <div class="fld"><label>Phone</label><input id="addPhone" type="text"></div>
+      </div>
+      <div class="grid2">
+        <div class="fld"><label>Latitude</label><input id="addLat" type="text" inputmode="decimal"></div>
+        <div class="fld"><label>Longitude</label><input id="addLng" type="text" inputmode="decimal"></div>
+      </div>
+      <div class="fld"><label>Hours</label><input id="addHrs" type="text" placeholder="0430-2400 · 24 · closed"><div class="hint">Blank = hours unknown (that's fine — the app shows &ldquo;hours unavailable&rdquo;).</div></div>
+      <div class="fld"><label>Store ID</label><input id="addId" type="text"><div class="hint">Auto-filled from the name. Must be unique — it becomes the location's permanent id.</div></div>
+    </div>
+    <div class="modal-foot">
+      <label class="resolve-check"><input type="checkbox" id="addRemove" checked> Remove the request after adding</label>
+      <button class="btn" id="addCancel">Cancel</button>
+      <button class="btn primary" id="addSave">Add store</button>
     </div>
   </div>
 </div>
@@ -771,6 +807,7 @@ function renderRequests(){
       <div class="card-foot">
         <span class="meta">Submitted ${when(m.ts)}</span>
         <div class="actions">
+          <button class="mini primary-mini" data-act="addstore" data-id="${m.id}">➕ Add as store</button>
           <button class="mini resolve" data-act="added" data-id="${m.id}">✓ Added — remove</button>
           <button class="mini danger" data-act="dismiss" data-id="${m.id}">✕ Dismiss — remove</button>
         </div>
@@ -782,6 +819,7 @@ function renderRequests(){
 $('#requestsList').addEventListener('click', async (e) => {
   const btn = e.target.closest('button[data-act]'); if(!btn) return;
   const req = allRequests.find(m => m.id === btn.dataset.id); if(!req) return;
+  if(btn.dataset.act === 'addstore'){ openAddStore(req); return; }
   const isAdded = btn.dataset.act === 'added';
   const label = req.description ? `“${req.description}”` : 'this request';
   const verb = isAdded ? 'Mark as added and remove' : 'Dismiss and remove';
@@ -859,6 +897,91 @@ $('#tipsList').addEventListener('click', async (e) => {
     }catch(err){ console.error(err); toast('Could not update tip.', true); }
   }
 });
+
+
+// ===== Add a brand-new store from a location request =====
+function chainOptions(){
+  const out = [];
+  for(const key of Object.keys(window)){
+    if(Array.isArray(window[key]) && /Locations$/.test(key)){
+      const ck = key.replace(/Locations$/, '');
+      const label = ck.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).trim();
+      out.push({ key: ck, label });
+    }
+  }
+  out.sort((a,b) => a.label.localeCompare(b.label));
+  return out;
+}
+function slugify(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60); }
+let currentAdd = null;
+function openAddStore(req){
+  currentAdd = { reqId: req.id };
+  $('#addChain').innerHTML = '<option value="">— choose chain —</option>' +
+    chainOptions().map(c => `<option value="${esc(c.key)}">${esc(c.label)}</option>`).join('');
+  $('#addName').value = req.description || '';
+  $('#addAddr').value = '';
+  $('#addCity').value = ''; $('#addState').value = 'NY';
+  $('#addZip').value = ''; $('#addPhone').value = '';
+  $('#addLat').value = (typeof req.lat === 'number') ? req.lat : '';
+  $('#addLng').value = (typeof req.lng === 'number') ? req.lng : '';
+  $('#addHrs').value = '';
+  const idEl = $('#addId'); idEl.value = ''; delete idEl.dataset.touched;
+  $('#addRemove').checked = true;
+  suggestAddId();
+  $('#addModal').classList.remove('hidden');
+}
+function closeAddStore(){ $('#addModal').classList.add('hidden'); currentAdd = null; }
+function suggestAddId(){
+  const idEl = $('#addId');
+  if(idEl.dataset.touched) return;
+  idEl.value = slugify(($('#addName').value||'') + '-' + ($('#addCity').value||''));
+}
+$('#addClose').addEventListener('click', closeAddStore);
+$('#addCancel').addEventListener('click', closeAddStore);
+$('#addModal').addEventListener('click', e => { if(e.target === $('#addModal')) closeAddStore(); });
+$('#addName').addEventListener('input', suggestAddId);
+$('#addCity').addEventListener('input', suggestAddId);
+$('#addId').addEventListener('input', () => { $('#addId').dataset.touched = '1'; });
+
+async function saveAddStore(){
+  if(!currentAdd) return;
+  const chain = $('#addChain').value.trim();
+  const name = $('#addName').value.trim();
+  const latRaw = $('#addLat').value.trim(), lngRaw = $('#addLng').value.trim();
+  const id = slugify($('#addId').value.trim() || (name + '-' + $('#addCity').value.trim()));
+  if(!chain){ toast('Pick a chain.', true); return; }
+  if(!name){ toast('Enter a display name.', true); $('#addName').focus(); return; }
+  const lat = Number(latRaw), lng = Number(lngRaw);
+  if(latRaw==='' || Number.isNaN(lat) || lngRaw==='' || Number.isNaN(lng)){ toast('Latitude and longitude must be numbers.', true); return; }
+  if(!id){ toast('Enter a store ID.', true); $('#addId').focus(); return; }
+  if(locById[id]){ toast('That ID already exists — change it.', true); $('#addId').focus(); return; }
+
+  const patch = { chain, locName: name, addr: $('#addAddr').value.trim(), lat, lng,
+    updatedAt: Date.now(), updatedByAdmin: currentUser.email || currentUser.uid };
+  const city = $('#addCity').value.trim(); if(city) patch.city = city;
+  const st = $('#addState').value.trim(); if(st) patch.state = st;
+  const zip = $('#addZip').value.trim(); if(zip) patch.zipCode = zip;
+  const ph = $('#addPhone').value.trim(); if(ph) patch.phone = ph;
+  const hrs = $('#addHrs').value.trim(); if(hrs) patch.hrs = hrs;
+
+  $('#addSave').disabled = true;
+  try{
+    await setDoc(doc(db, 'overrides', id), patch, { merge: true });
+    locById[id] = { id, n: name, chain, lat, lng, addr: patch.addr };  // so a second add can't reuse the id
+    if($('#addRemove').checked){
+      await deleteDoc(doc(db, 'missingReports', currentAdd.reqId));
+      allRequests = allRequests.filter(m => m.id !== currentAdd.reqId);
+      renderRequests(); updateBadges();
+    }
+    toast('Store queued — run a bake to publish it.');
+    closeAddStore();
+  }catch(e){
+    console.error('add store failed', e);
+    toast('Could not save — check the overrides write rule.', true);
+  }
+  $('#addSave').disabled = false;
+}
+$('#addSave').addEventListener('click', saveAddStore);
 
 </script>
 </body>

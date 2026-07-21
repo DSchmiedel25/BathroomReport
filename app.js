@@ -752,8 +752,7 @@ function popupHtml(loc, agg, myVote){
   const chain = chainFor(loc);
   return `<div class="popup-inner" data-locid="${loc.id}">
     <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${chain.name}</div>
-    <h3>${loc.n}</h3>
-    <div class="addr">${loc.addr}${loc.num ? ' &middot; Shop #' + loc.num : ''}</div>
+    <div class="addr addr-title">${loc.addr}${loc.num ? ' &middot; Shop #' + loc.num : ''}</div>
     ${hoursLine}
     <div id="accessible-badge-${loc.id}">${accessibleBadgeHtml(loc.id)}</div>
     ${recencyLine}
