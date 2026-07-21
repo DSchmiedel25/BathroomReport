@@ -2181,14 +2181,40 @@ async function getDrivingOptions(user,candidates){
   const data=await response.json();
   return candidates.map((loc,i)=>({loc,distanceMiles:data.distances?.[0]?.[i+1]/1609.344,durationMinutes:data.durations?.[0]?.[i+1]/60})).filter(x=>Number.isFinite(x.distanceMiles));
 }
+// Compact "3 days ago" style relative time. Returns '' for missing/invalid input.
+function timeAgo(ts){
+  const t = typeof ts === 'number' ? ts : Date.parse(ts);
+  if(!Number.isFinite(t)) return '';
+  const s = Math.floor((Date.now() - t) / 1000);
+  if(s < 0) return 'just now';
+  if(s < 60) return 'just now';
+  const m = Math.floor(s/60);      if(m < 60) return `${m} min ago`;
+  const h = Math.floor(m/60);      if(h < 24) return `${h} hour${h===1?'':'s'} ago`;
+  const d = Math.floor(h/24);      if(d < 30) return `${d} day${d===1?'':'s'} ago`;
+  const mo = Math.floor(d/30);     if(mo < 12) return `${mo} month${mo===1?'':'s'} ago`;
+  const y = Math.floor(d/365);     return `${y} year${y===1?'':'s'} ago`;
+}
+
 function bathroomNowCard(result,fallback=false){
   const agg=ratingsCache[result.loc.id]||emptyAgg(); const open=isLocationOpenNow(result.loc);
-  const distance=Number.isFinite(result.distanceMiles)?`${result.distanceMiles.toFixed(1)} mi`:'Distance unavailable';
-  const duration=Number.isFinite(result.durationMinutes)?` · ${Math.round(result.durationMinutes)} min`:'';
+  // Driving distance is trustworthy; the straight-line fallback is not (5 mi as-the-crow can be 40 by road),
+  // so in fallback mode we label it plainly and drop the false precision instead of showing it like a road distance.
+  let distance;
+  if(!Number.isFinite(result.distanceMiles)){
+    distance = 'Distance unavailable';
+  }else if(fallback){
+    distance = `~${result.distanceMiles.toFixed(1)} mi straight-line`;
+  }else{
+    distance = `${result.distanceMiles.toFixed(1)} mi`;
+  }
+  const duration=(!fallback && Number.isFinite(result.durationMinutes))?` · ${Math.round(result.durationMinutes)} min`:'';
+  // "Last rated" shows only when the aggregate actually carries a timestamp — no field, no line (never fabricated).
+  const ratedWhen = agg.bathroomCount>0 ? timeAgo(agg.lastRatedAt) : '';
+  const lastRatedNote = ratedWhen ? ` · rated ${ratedWhen}` : '';
   const hoursMissingNote=open===null?'<br><small>No hours listed for this store — tap "View pin" then 🚩 to send them in.</small>':'';
   const outsideSelection=!activeChains.has(result.loc.chain || DEFAULT_CHAIN_KEY);
   const chainNote=outsideSelection?`<div class="nearest-alert">Nothing close by in your selected chains, so this ${escapeHtml((CHAIN_REGISTRY[result.loc.chain]||{}).name||'nearby')} location is shown instead.</div>`:'';
-  return `<div class="bathroom-now-card"><button class="bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':'Closest bathroom by driving distance'}</div>${chainNote}<b>${result.loc.n}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${fallback?'<br><small>Driving route unavailable; using straight-line distance.</small>':''}${hoursMissingNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">View pin</button></div></div>`;
+  return `<div class="bathroom-now-card"><button class="bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':'Closest bathroom by driving distance'}</div>${chainNote}<b>${result.loc.n}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${lastRatedNote}${hoursMissingNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">View pin</button></div></div>`;
 }
 let userMarker=null;
 const whereAmIBtn=document.getElementById('whereAmIBtn');
@@ -2238,7 +2264,12 @@ let suppressNextLocateClick=false;
 function showBathroomNowResult(result,fallback=false){
   nearestInfo.style.display='block'; nearestInfo.innerHTML=bathroomNowCard(result,fallback);
   document.getElementById('bathroom-now-close').onclick=()=>{ nearestInfo.style.display='none'; };
-  document.getElementById('bathroom-now-view').onclick=()=>zoomToMarker(markers[result.loc.id]);
+  document.getElementById('bathroom-now-view').onclick=()=>{
+    nearestInfo.style.display='none';                 // dismiss the overlay first, or the pin's popup opens hidden behind it
+    const m=markers[result.loc.id];
+    if(m) zoomToMarker(m);
+    else map.setView([result.loc.lat,result.loc.lng],16,{animate:false});  // marker not built yet — center the map anyway
+  };
   document.getElementById('bathroom-now-directions').onclick=()=>{const pref=localStorage.getItem('preferredNavApp')||'google';window.open(buildNavUrl(pref,result.loc.lat,result.loc.lng),'_blank','noopener');};
   zoomToMarker(markers[result.loc.id]);
 }
