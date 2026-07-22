@@ -482,6 +482,19 @@ function storeFeatureEditorHtml(locId, myVote){
   </div>`;
 }
 
+// True if a location has any store feature worth showing at render time (community-confirmed,
+// baked-confirmed, or OSM-verified) — used to pre-collapse the empty store section without a flash.
+function storeSectionHasContent(loc){
+  const conf = (loc && loc.conf) || {};
+  const osm = (loc && loc.osm) || {};
+  const cache = storeFeatureCache[loc.id];
+  return STORE_FEATURES.some(a => {
+    if(conf[a.key] || osm[a.key]) return true;
+    const x = cache && cache[a.key];
+    return x && x.yes >= 2 && x.yes > x.no;
+  });
+}
+
 function storeFeatureSummaryHtml(summary, loc){
   const conf = (loc && loc.conf) || {};
   const confirmed = STORE_FEATURES.filter(a => {
@@ -866,6 +879,7 @@ function popupHtml(loc, agg, myVote){
       </div>
       <div class="save-note" id="note-bathroom-${loc.id}"></div>
     </div>
+    <div class="feature-summary"><div class="feature-title">🚻 Confirmed bathroom features</div><div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>
     <div class="tips-section">
       <span class="rating-label">💬 Tips from visitors</span>
       <ul class="tips-list" id="tips-list-${loc.id}"><li style="color:#999;">Loading…</li></ul>
@@ -874,9 +888,11 @@ function popupHtml(loc, agg, myVote){
         <button class="btn btn-amber tip-submit" id="tip-submit-${loc.id}">Add</button>
       </div>
     </div>
-    <div class="feature-summary"><div class="feature-title">🚻 Confirmed bathroom features</div><div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>
-    <div class="feature-summary"><div class="feature-title">🏪 Confirmed store features</div><div class="feature-badges" id="store-feature-summary-${loc.id}">${storeFeatureSummaryHtml(storeFeatureCache[loc.id], loc)}</div></div>
-    ${amenityEditorHtml(loc.id, myVote)}` : `<div class="popup-signin-hint">🔒 Sign in to rate this bathroom and see visitor tips.</div>`}
+    ${amenityEditorHtml(loc.id, myVote)}
+    <div class="store-section${storeSectionHasContent(loc) ? '' : ' is-empty'}">
+      <div class="store-section-head">🏪 Store</div>
+      <div class="feature-summary"><div class="feature-badges" id="store-feature-summary-${loc.id}">${storeFeatureSummaryHtml(storeFeatureCache[loc.id], loc)}</div></div>
+    </div>` : `<div class="popup-signin-hint">🔒 Sign in to rate this bathroom and see visitor tips.</div>`}
   </div>`;
 }
 
@@ -1167,7 +1183,16 @@ async function attachAmenityHandlers(loc){
 async function attachStoreFeatureHandlers(loc){
   const summaryEl=document.getElementById('store-feature-summary-'+loc.id);
   const summary=await loadStoreFeatureSummary(loc.id);
-  if(summaryEl) summaryEl.innerHTML=storeFeatureSummaryHtml(summary, loc);
+  if(summaryEl){
+    summaryEl.innerHTML=storeFeatureSummaryHtml(summary, loc);
+    // Collapse the whole "🏪 Store" section when nothing is confirmed or verified, so an empty
+    // section never shows a lonely header.
+    const section = summaryEl.closest('.store-section');
+    if(section){
+      const hasReal = summaryEl.querySelector('.feature-badge:not(.unconfirmed)');
+      section.classList.toggle('is-empty', !hasReal);
+    }
+  }
 
   const stepOrig = document.getElementById('store-feature-step-' + loc.id);
   if(!stepOrig) return;

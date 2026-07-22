@@ -444,3 +444,9 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
   opacity:.7;
 }
 #appDrawer .d-close:hover{ opacity:1; }
+
+/* ---------- Store section (quieter, below the bathroom-first content) ---------- */
+.store-section{ margin-top:14px; padding-top:12px; border-top:1px solid var(--popup-divider, rgba(0,0,0,.12)); }
+.store-section-head{ font-size:13px; font-weight:800; opacity:.65; margin-bottom:6px; }
+/* When the store summary has nothing confirmed/verified, hide the whole section (JS adds .is-empty). */
+.store-section.is-empty{ display:none; }
