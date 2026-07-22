@@ -12,21 +12,21 @@
 //      <head>, alongside the other chain data files, before app.js loads.
 //   3. Add one entry below with the chain's real brand color.
 const CHAIN_REGISTRY = {
-  stewarts: { name: "Stewart's Shops", color: '#a51e36', textColor: '#ffffff', dataVar: 'stewartsLocations' },
+  stewarts: { name: "Stewart's Shops", color: '#5b3a8f', textColor: '#ffffff', dataVar: 'stewartsLocations' },
   cumberlandFarms: { name: "Cumberland Farms", color: '#009639', textColor: '#ffffff', dataVar: 'cumberlandFarmsLocations' },
-  wawa: { name: "Wawa", color: '#c8102e', textColor: '#ffffff', dataVar: 'wawaLocations' },
-  fastrac: { name: "Fastrac", color: '#e1251b', textColor: '#ffffff', dataVar: 'fastracLocations' },
-  alltownFresh: { name: "Alltown Fresh", color: '#4f6f3d', textColor: '#ffffff', dataVar: 'alltownFreshLocations' },
-  byrneDairy: { name: "Byrne Dairy", color: '#be1e2d', textColor: '#ffffff', dataVar: 'byrneDairyLocations' },
-  parkers: { name: "Parker's", color: '#005ca9', textColor: '#ffffff', dataVar: 'parkersLocations' },
+  wawa: { name: "Wawa", color: '#00b3b3', textColor: '#ffffff', dataVar: 'wawaLocations' },
+  fastrac: { name: "Fastrac", color: '#0088cc', textColor: '#ffffff', dataVar: 'fastracLocations' },
+  alltownFresh: { name: "Alltown Fresh", color: '#6d8c3a', textColor: '#ffffff', dataVar: 'alltownFreshLocations' },
+  byrneDairy: { name: "Byrne Dairy", color: '#8a6d1a', textColor: '#ffffff', dataVar: 'byrneDairyLocations' },
+  parkers: { name: "Parker's", color: '#1565c0', textColor: '#ffffff', dataVar: 'parkersLocations' },
   sheetz: { name: "Sheetz", color: '#ee3124', textColor: '#ffffff', dataVar: 'sheetzLocations' },
   racetrac: { name: "RaceTrac", color: '#00205b', textColor: '#ffffff', dataVar: 'racetracLocations' },
   pilotFlyingJ: { name: "Pilot Flying J", color: '#fdb913', textColor: '#1c1c1e', dataVar: 'pilotLocations' },
-  maverik: { name: "Maverik", color: '#c4122f', textColor: '#ffffff', dataVar: 'maverikLocations' },
-  quiktrip: { name: "QuikTrip", color: '#ed1c24', textColor: '#ffffff', dataVar: 'quiktripLocations' },
-  loves: { name: "Love's", color: '#e4002b', textColor: '#ffffff', dataVar: 'lovesLocations' },
+  maverik: { name: "Maverik", color: '#b30086', textColor: '#ffffff', dataVar: 'maverikLocations' },
+  quiktrip: { name: "QuikTrip", color: '#e8590c', textColor: '#ffffff', dataVar: 'quiktripLocations' },
+  loves: { name: "Love's", color: '#8e44ad', textColor: '#ffffff', dataVar: 'lovesLocations' },
   bucees: { name: "Buc-ee's", color: '#ffd200', textColor: '#1c1c1e', dataVar: 'buceesLocations' },
-  caseys: { name: "Casey's", color: '#c8102e', textColor: '#ffffff', dataVar: 'caseysLocations' }
+  caseys: { name: "Casey's", color: '#d81b60', textColor: '#ffffff', dataVar: 'caseysLocations' }
 };
 const DEFAULT_CHAIN_KEY = 'stewarts';
 
@@ -2328,6 +2328,26 @@ function applyFilters(){
   // (e.g. a Bathroom Now / list result centered on a pin that a filter would otherwise hide)
   // so opening it never immediately closes it on the resulting map move.
   const bounds = map.getBounds().pad(MARKER_VIEWPORT_PAD);
+
+  // Zoom-based thinning: when zoomed out, thousands of pins pile into an unreadable smear and
+  // strain older devices. Individual pins aren't tappable at that scale anyway, so below a zoom
+  // threshold we render only a deterministic 1-in-N sample (keyed off each pin's own coords, so
+  // the SAME pins show across pans — no flicker). As you zoom in, N drops to 1 and every in-view
+  // pin appears. A pin with an open popup is always exempt.
+  const z = map.getZoom();
+  let sampleN = 1;
+  if(z <= 5)      sampleN = 12;   // country view — heavy thinning
+  else if(z <= 6) sampleN = 7;
+  else if(z <= 7) sampleN = 4;
+  else if(z <= 8) sampleN = 2;    // regional — light thinning
+  const keepBySample = (m) => {
+    if(sampleN <= 1) return true;
+    const p = m.getLatLng();
+    // stable integer hash from coords → consistent membership regardless of pan
+    const h = Math.abs(Math.round((p.lat * 73856093) ^ (p.lng * 19349663)));
+    return (h % sampleN) === 0;
+  };
+
   allLocationMarkers.forEach(m => {
     const loc = m.locationData;
     if(!loc) return;
@@ -2336,7 +2356,7 @@ function applyFilters(){
     const chainOk = activeChains.has(m.chainKey || DEFAULT_CHAIN_KEY);
     const inView = bounds.contains(m.getLatLng());
     const popupOpen = m.isPopupOpen && m.isPopupOpen();
-    if((openOk && accessOk && chainOk && inView) || popupOpen){
+    if((openOk && accessOk && chainOk && inView && keepBySample(m)) || popupOpen){
       if(!markerCluster.hasLayer(m)) markerCluster.addLayer(m);
     } else {
       if(markerCluster.hasLayer(m)) markerCluster.removeLayer(m);
