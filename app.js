@@ -25,7 +25,8 @@ const CHAIN_REGISTRY = {
   maverik: { name: "Maverik", color: '#c4122f', textColor: '#ffffff', dataVar: 'maverikLocations' },
   quiktrip: { name: "QuikTrip", color: '#ed1c24', textColor: '#ffffff', dataVar: 'quiktripLocations' },
   loves: { name: "Love's", color: '#e4002b', textColor: '#ffffff', dataVar: 'lovesLocations' },
-  bucees: { name: "Buc-ee's", color: '#ffd200', textColor: '#1c1c1e', dataVar: 'buceesLocations' }
+  bucees: { name: "Buc-ee's", color: '#ffd200', textColor: '#1c1c1e', dataVar: 'buceesLocations' },
+  caseys: { name: "Casey's", color: '#c8102e', textColor: '#ffffff', dataVar: 'caseysLocations' }
 };
 const DEFAULT_CHAIN_KEY = 'stewarts';
 
