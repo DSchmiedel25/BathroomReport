@@ -193,6 +193,11 @@ map.on('popupopen', () => {
   document.getElementById('whereAmIBtn').style.display = 'none';
 });
 map.on('popupclose', () => {
+  // Clear per-visit question state so reopening any pin computes a fresh visit (a new set of
+  // up-to-4, including "not sure" trickle-back). Only one popup is open at a time, so clearing
+  // all of it here is safe.
+  for(const k in visitQuestions) delete visitQuestions[k];
+  for(const k in visitCursor) delete visitCursor[k];
   document.getElementById('locateBtn').style.display = '';
   document.getElementById('missingBtn').style.display = '';
   document.getElementById('topLeftControls').style.display = '';
@@ -295,18 +300,83 @@ function ratingConfidenceHtml(count){
     : `<span class="rating-confidence">${label}</span>`;
 }
 
+// A community feature is "confirmed" when at least CONFIRM_THRESHOLD different people voted yes
+// AND yes outnumber no. The same bar applies symmetrically to "confirmed no". One constant so the
+// threshold is tuned in a single place (badges, filters, priority engine, and the bake tool all
+// use it). Raised to 3 in v2.6 for stronger trust.
+const CONFIRM_THRESHOLD = 3;
+function isConfirmedYes(x){ return !!x && x.yes >= CONFIRM_THRESHOLD && x.yes > x.no; }
+function isConfirmedNo(x){  return !!x && x.no  >= CONFIRM_THRESHOLD && x.no  > x.yes; }
+
+// ---------- Voting priority engine (v2.6) ----------
+// Usefulness tiers drive which unconfirmed questions surface first. Higher number = higher
+// priority. gas is intentionally absent (OSM-known, never asked). Anything not listed defaults
+// to LOW.
+const AMENITY_TIER = {
+  accessible: 3, changing: 3,                                   // HIGH
+  indoorSeating: 2, wifi: 2, restroomType: 2, grabAndGo: 2, hotFood: 2, evCharging: 2, // MEDIUM
+  airPump: 1, shower: 1                                         // LOW
+};
+const QUESTIONS_PER_VISIT = 4;
+
+// Combined bathroom+store definition for a key.
+function amenityDefFor(key){
+  return BATHROOM_AMENITIES.find(a => a.key === key) || STORE_FEATURES.find(a => a.key === key);
+}
+function isBathroomKey(key){ return BATHROOM_AMENITIES.some(a => a.key === key); }
+
+// Is this amenity already settled for this location (so we never ask it)?
+//  - community-confirmed (live votes >= threshold, or baked conf) → settled
+//  - gas that OSM knows → settled (the gas exception: trusted, never asked)
+// OSM-verified NON-gas amenities are NOT settled — they stay askable so visitors can promote
+// them from teal (verified) to amber (confirmed by visitors).
+function amenitySettled(loc, key, summary){
+  const conf = (loc && loc.conf) || {};
+  const osm  = (loc && loc.osm) || {};
+  if(key === 'gas') return true;                      // never asked
+  if(conf[key]) return true;                          // baked community confirmation
+  if(isConfirmedYes(summary && summary[key])) return true;  // live community confirmation
+  if(isConfirmedNo(summary && summary[key])) return true;   // community-confirmed absent — stop asking
+  return false;
+}
+
+// Score an unconfirmed amenity: base tier + near-threshold boost (at exactly 2 yes, one vote from
+// confirming, bump up one tier).
+function amenityPriority(key, summary){
+  let score = AMENITY_TIER[key] || 1;
+  const x = summary && summary[key];
+  if(x && x.yes === (CONFIRM_THRESHOLD - 1) && x.yes > x.no) score += 1;  // near-threshold boost
+  return score;
+}
+
+// Build this visit's question list: the combined pool minus settled minus this person's own
+// yes/no answers minus their retired ones, ranked by priority, capped at QUESTIONS_PER_VISIT.
+// "Not sure" resurfacing (at most 1) and retirement are layered in Stage 3c via amenityMeta.
+function pickVisitQuestions(loc, myVote){
+  const summary = { ...(amenityCache[loc.id] || {}), ...(storeFeatureCache[loc.id] || {}) };
+  const mine = { ...(myVote.amenities || {}), ...(myVote.storeFeatures || {}) };
+  const allKeys = [...BATHROOM_AMENITIES, ...STORE_FEATURES].map(a => a.key);
+
+  const pool = allKeys.filter(key => {
+    if(amenitySettled(loc, key, summary)) return false;         // confirmed / gas → skip
+    const ans = mine[key];
+    if(ans === 'yes' || ans === 'no' || (ans && ans !== 'unknown')) return false; // they answered it
+    return true;                                                // unconfirmed + unanswered-by-them
+  });
+
+  pool.sort((a, b) => amenityPriority(b, summary) - amenityPriority(a, summary));
+  return pool.slice(0, QUESTIONS_PER_VISIT);
+}
+
 const BATHROOM_AMENITIES = [
   {key:'restroomType', label:'Restroom setup', states:['unknown','single','multiple'],
     stateLabels:{
       unknown:'Not sure',
-      single:'One shared restroom',
-      multiple:"Separate men's & women's restrooms"
+      single:'Single',
+      multiple:"Men's & women's"
     }},
   {key:'accessible', label:'Handicap accessible', stateIcons:{yes:'♿️'}},
-  {key:'changing', label:'Changing table', stateIcons:{yes:'🚼'}},
-  {key:'handDrying', label:'Hand drying', states:['unknown','paper','dryer','both'],
-    stateLabels:{unknown:'Not sure', paper:'Paper towels', dryer:'Hand dryer', both:'Both'},
-    stateIcons:{paper:'🧻', dryer:'💨', both:'🧻💨'}}
+  {key:'changing', label:'Changing table', stateIcons:{yes:'🚼'}}
 ];
 const amenityCache = {};
 
@@ -318,7 +388,9 @@ const STORE_FEATURES = [
   {key:'airPump', label:'Air pump', stateIcons:{yes:'🛞'}},
   {key:'shower', label:'Showers', stateIcons:{yes:'🚿'}},
   {key:'indoorSeating', label:'Indoor seating', stateIcons:{yes:'🪑'}},
-  {key:'wifi', label:'WiFi', stateIcons:{yes:'📶'}}
+  {key:'wifi', label:'WiFi', stateIcons:{yes:'📶'}},
+  {key:'grabAndGo', label:'Grab & go snacks', stateIcons:{yes:'🥤'}},
+  {key:'hotFood', label:'Hot food', stateIcons:{yes:'🍔'}}
 ];
 const storeFeatureCache = {};
 
@@ -340,26 +412,39 @@ function amenityAnswerIcon(a, val){
 
 // Renders whichever single question comes next (the first one this person hasn't answered
 // yet), or a friendly completion message once every feature has an answer on record.
-function renderAmenityStepHtml(myVote){
-  const mine = myVote.amenities || {};
-  const idx = BATHROOM_AMENITIES.findIndex(a => mine[a.key] === undefined);
-  if(idx === -1){
+// Per-popup visit state: the ordered list of question keys chosen for this visit (computed once
+// on open so it stays stable as the person answers), and how far through it they are.
+const visitQuestions = {};
+const visitCursor = {};
+
+function renderAmenityStepHtml(myVote, locId){
+  // Compute the visit's question list once, on first render for this popup instance.
+  if(locId != null && !visitQuestions[locId]){
+    const loc = locationsById[locId];
+    visitQuestions[locId] = loc ? pickVisitQuestions(loc, myVote) : [];
+    visitCursor[locId] = 0;
+  }
+  const list = (locId != null && visitQuestions[locId]) || [];
+  const cursor = (locId != null && visitCursor[locId]) || 0;
+
+  if(cursor >= list.length){
     return `<div class="amenity-complete">🚽 That's everything — thanks for the intel!</div>`;
   }
-  const a = BATHROOM_AMENITIES[idx];
+  const a = amenityDefFor(list[cursor]);
+  if(!a){ return `<div class="amenity-complete">🚽 That's everything — thanks for the intel!</div>`; }
   const states = a.states || ['unknown', 'yes', 'no'];
   const buttons = states.map(s =>
     `<button type="button" class="amenity-answer-btn" data-key="${a.key}" data-value="${s}">${amenityAnswerIcon(a, s)} ${amenityStateLabel(a, s)}</button>`
   ).join('');
-  return `<div class="amenity-progress">Feature ${idx + 1} of ${BATHROOM_AMENITIES.length}</div>
+  return `<div class="amenity-progress">Question ${cursor + 1} of ${list.length}</div>
     <div class="amenity-question-label">${a.label}</div>
     <div class="amenity-answer-row">${buttons}</div>`;
 }
 
 function amenityEditorHtml(locId, myVote){
   return `<div class="amenities-editor">
-    <div class="feature-title">🚻 Bathroom features you saw</div>
-    <div class="amenity-step" id="amenity-step-${locId}">${renderAmenityStepHtml(myVote)}</div>
+    <div class="feature-title">✅ Confirm what you saw</div>
+    <div class="amenity-step" id="amenity-step-${locId}">${renderAmenityStepHtml(myVote, locId)}</div>
     <div class="save-note" id="amenities-note-${locId}"></div>
   </div>`;
 }
@@ -374,20 +459,20 @@ function osmVerifiedBadges(loc, featureDefs, communitySummary, skip){
     if(!osm[a.key]) return false;
     if(conf[a.key]) return false;   // community-baked confirmation wins (shown green elsewhere)
     const x = communitySummary && communitySummary[a.key];
-    const communityConfirmed = x && x.yes >= 2 && x.yes > x.no;   // don't duplicate a confirmed badge
+    const communityConfirmed = isConfirmedYes(x);   // don't duplicate a confirmed badge
     return !communityConfirmed;
-  }).map(a => `<span class="feature-badge verified">${amenityAnswerIcon(a, 'yes')} ${a.label} ✓</span>`).join('');
+  }).map(a => `<span class="feature-badge verified">${amenityAnswerIcon(a, 'yes')} ${a.label}</span>`).join('');
 }
 
 function amenitySummaryHtml(summary, loc){
   const conf = (loc && loc.conf) || {};
   const confirmed = BATHROOM_AMENITIES.filter(a => {
     const x = summary && summary[a.key] || {yes:0,no:0};
-    return (x.yes >= 2 && x.yes > x.no) || conf[a.key];   // live votes OR baked community confirmation
+    return isConfirmedYes(x) || conf[a.key];   // live votes OR baked community confirmation
   });
   // 'accessible' is shown by its own prominent badge, so exclude it here to avoid duplication.
   const verified = osmVerifiedBadges(loc, BATHROOM_AMENITIES, summary, ['accessible']);
-  const communityBadges = confirmed.map(a => `<span class="feature-badge">${amenityAnswerIcon(a, 'yes')} ${a.label}</span>`).join('');
+  const communityBadges = confirmed.map(a => `<span class="feature-badge community">${amenityAnswerIcon(a, 'yes')} ${a.label} ⭐</span>`).join('');
   const all = communityBadges + verified;
   if(!summary && !verified) return '<span class="feature-badge unconfirmed">Loading features…</span>';
   if(!all) return '<span class="feature-badge unconfirmed">No features confirmed yet</span>';
@@ -400,7 +485,7 @@ function amenitySummaryHtml(summary, loc){
 function isConfirmedAccessible(summary){
   if(!summary || !summary.accessible) return false;
   const x = summary.accessible;
-  return x.yes >= 2 && x.yes > x.no;
+  return isConfirmedYes(x);
 }
 
 // Compact head-row ♿ indicator (sits next to the chain badge / gas icon so accessibility is
@@ -491,7 +576,7 @@ function storeSectionHasContent(loc){
   return STORE_FEATURES.some(a => {
     if(conf[a.key] || osm[a.key]) return true;
     const x = cache && cache[a.key];
-    return x && x.yes >= 2 && x.yes > x.no;
+    return isConfirmedYes(x);
   });
 }
 
@@ -499,10 +584,10 @@ function storeFeatureSummaryHtml(summary, loc){
   const conf = (loc && loc.conf) || {};
   const confirmed = STORE_FEATURES.filter(a => {
     const x = summary && summary[a.key] || {yes:0,no:0};
-    return (x.yes >= 2 && x.yes > x.no) || conf[a.key];
+    return isConfirmedYes(x) || conf[a.key];
   });
   const verified = osmVerifiedBadges(loc, STORE_FEATURES, summary);
-  const all = confirmed.map(a => `<span class="feature-badge">${amenityAnswerIcon(a, 'yes')} ${a.label}</span>`).join('') + verified;
+  const all = confirmed.map(a => `<span class="feature-badge community">${amenityAnswerIcon(a, 'yes')} ${a.label} ⭐</span>`).join('') + verified;
   if(!summary && !verified) return '<span class="feature-badge unconfirmed">Loading features…</span>';
   if(!all) return '<span class="feature-badge unconfirmed">No features confirmed yet</span>';
   return all;
@@ -879,7 +964,7 @@ function popupHtml(loc, agg, myVote){
       </div>
       <div class="save-note" id="note-bathroom-${loc.id}"></div>
     </div>
-    <div class="feature-summary"><div class="feature-title">🚻 Confirmed bathroom features</div><div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>
+    <div class="feature-summary"><div class="feature-title">🚻 Bathroom features</div><div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>
     <div class="tips-section">
       <span class="rating-label">💬 Tips from visitors</span>
       <ul class="tips-list" id="tips-list-${loc.id}"><li style="color:#999;">Loading…</li></ul>
@@ -890,7 +975,7 @@ function popupHtml(loc, agg, myVote){
     </div>
     ${amenityEditorHtml(loc.id, myVote)}
     <div class="store-section${storeSectionHasContent(loc) ? '' : ' is-empty'}">
-      <div class="store-section-head">🏪 Store</div>
+      <div class="store-section-head">🏪 Store amenities</div>
       <div class="feature-summary"><div class="feature-badges" id="store-feature-summary-${loc.id}">${storeFeatureSummaryHtml(storeFeatureCache[loc.id], loc)}</div></div>
     </div>` : `<div class="popup-signin-hint">🔒 Sign in to rate this bathroom and see visitor tips.</div>`}
   </div>`;
@@ -1158,8 +1243,15 @@ async function attachAmenityHandlers(loc){
     }
 
     const myVote = myVoteCache[loc.id] || emptyVote();
-    const amenities = { ...(myVote.amenities || {}), [key]: value };
-    const updatedVote = { ...myVote, amenities };
+    // Route the answer to the right field so store questions asked in the combined flow still
+    // aggregate as store features.
+    const bathroom = isBathroomKey(key);
+    const updatedVote = { ...myVote };
+    if(bathroom){
+      updatedVote.amenities = { ...(myVote.amenities || {}), [key]: value };
+    } else {
+      updatedVote.storeFeatures = { ...(myVote.storeFeatures || {}), [key]: value };
+    }
     myVoteCache[loc.id] = updatedVote;
 
     const ok = await saveMyVote(loc.id, updatedVote);
@@ -1172,11 +1264,23 @@ async function attachAmenityHandlers(loc){
     if(note) note.textContent = '';
     if(navigator.vibrate) navigator.vibrate(10);
 
-    // Auto-advance to the next unanswered feature (or show the completion message)
-    stepEl.innerHTML = renderAmenityStepHtml(updatedVote);
+    // Advance through this visit's question list, then re-render (next question or the thanks note).
+    if(visitCursor[loc.id] != null) visitCursor[loc.id] += 1;
+    stepEl.innerHTML = renderAmenityStepHtml(updatedVote, loc.id);
 
-    const fresh = await loadAmenitySummary(loc.id);
-    if(summaryEl) summaryEl.innerHTML = amenitySummaryHtml(fresh, loc);
+    // Refresh whichever summary this answer could affect.
+    if(bathroom){
+      const fresh = await loadAmenitySummary(loc.id);
+      if(summaryEl) summaryEl.innerHTML = amenitySummaryHtml(fresh, loc);
+    } else {
+      const freshStore = await loadStoreFeatureSummary(loc.id);
+      const storeEl = document.getElementById('store-feature-summary-' + loc.id);
+      if(storeEl){
+        storeEl.innerHTML = storeFeatureSummaryHtml(freshStore, loc);
+        const section = storeEl.closest('.store-section');
+        if(section) section.classList.toggle('is-empty', !storeEl.querySelector('.feature-badge:not(.unconfirmed)'));
+      }
+    }
   });
 }
 
