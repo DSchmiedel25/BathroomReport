@@ -29,7 +29,10 @@ const CHAIN_REGISTRY = {
   caseys: { name: "Casey's", color: '#d81b60', textColor: '#ffffff', dataVar: 'caseysLocations' },
   kwiktrip: { name: "Kwik Trip", color: '#3f51b5', textColor: '#ffffff', dataVar: 'kwiktripLocations' },
   royalFarms: { name: "Royal Farms", color: '#33691e', textColor: '#ffffff', dataVar: 'royalFarmsLocations' },
-  rutters: { name: "Rutter's", color: '#4e342e', textColor: '#ffffff', dataVar: 'ruttersLocations' }
+  rutters: { name: "Rutter's", color: '#4e342e', textColor: '#ffffff', dataVar: 'ruttersLocations' },
+  nycDunkin: { name: "Dunkin'", color: '#ff6e0c', textColor: '#ffffff', dataVar: 'nycDunkinLocations', group: 'metro', metro: 'NYC', layer: 'customer', shape: 'square' },
+  nycStarbucks: { name: 'Starbucks', color: '#00704a', textColor: '#ffffff', dataVar: 'nycStarbucksLocations', group: 'metro', metro: 'NYC', layer: 'customer', shape: 'square' },
+  nycPublic: { name: 'Public restroom', color: '#0e7c5a', textColor: '#ffffff', dataVar: 'nycPublicLocations', group: 'metro', metro: 'NYC', layer: 'public', shape: 'diamond' }
 };
 const DEFAULT_CHAIN_KEY = 'stewarts';
 
@@ -299,10 +302,26 @@ function makeIcon(id){
   const size = sizes.rated; // one uniform size per zoom level
   return L.divIcon({
     className:'',
-    html:`<div style="background:${chain.color};width:${size}px;height:${size}px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 3px rgba(0,0,0,.6);"></div>`,
+    html:`<div style="${pinShapeStyle(chain, size)}"></div>`,
     iconSize:[size, size],
     iconAnchor:[size/2, size/2]
   });
+}
+
+// Pin shape is the between-layer axis: color still tells you the brand, shape tells you the
+// kind of place. circle = pit stop (default), diamond = metro/public, square = customer chain.
+// A registry entry with no `shape` renders as a circle, so existing chains are unchanged.
+// circle/square/diamond keep the white ring + drop shadow; triangle uses clip-path, which
+// clips a normal border/box-shadow, so it swaps to a shape-following drop-shadow and no ring.
+function pinShapeStyle(chain, size){
+  const base = `background:${chain.color};width:${size}px;height:${size}px;`;
+  const ring = 'border:2px solid #fff;box-shadow:0 0 3px rgba(0,0,0,.6);';
+  switch(chain.shape){
+    case 'square':   return base + ring + 'border-radius:3px;';
+    case 'diamond':  return base + ring + 'border-radius:3px;transform:rotate(45deg);';
+    case 'triangle': return base + 'clip-path:polygon(50% 0,100% 100%,0 100%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));';
+    default:         return base + ring + 'border-radius:50%;';
+  }
 }
 
 function emptyAgg(){ return {bathroomSum:0, bathroomCount:0}; }
@@ -393,7 +412,10 @@ function pickVisitQuestions(loc, myVote){
   const summary = { ...(amenityCache[loc.id] || {}), ...(storeFeatureCache[loc.id] || {}) };
   const mine = { ...(myVote.amenities || {}), ...(myVote.storeFeatures || {}) };
   const meta = myVote.amenityMeta || {};
-  const allKeys = [...BATHROOM_AMENITIES, ...STORE_FEATURES].map(a => a.key);
+  // Metro locations (Dunkin, Starbucks, public restrooms, …) get bathroom questions only —
+  // store/gas-station features (EV charging, air pump, showers, …) are never asked there.
+  const isMetro = chainFor(loc).group === 'metro';
+  const allKeys = (isMetro ? BATHROOM_AMENITIES : [...BATHROOM_AMENITIES, ...STORE_FEATURES]).map(a => a.key);
 
   const eligible = allKeys.filter(key => {
     if(amenitySettled(loc, key, summary)) return false;                 // confirmed / gas
@@ -860,6 +882,7 @@ window.addEventListener('authStateReady', () => {
   checkIfBlocked();
   if(typeof loadAllRatings === 'function') loadAllRatings();
   if(typeof updateAccountUI === 'function') updateAccountUI();
+  if(typeof loadTravelModeFromAccount === 'function') loadTravelModeFromAccount();
 });
 
 // Shared (public) aggregate — visible to everyone who opens this map
@@ -1045,7 +1068,79 @@ function oooHardHtml(loc, status){
     </div>`;
 }
 
+// Access badge for metro locations — the "can I actually use this?" answer, shown first.
+// Customer chains (Dunkin/Starbucks) default to "customers only"; civic toilets are "public".
+function metroAccessBadge(loc){
+  const a = (loc.metroInfo && loc.metroInfo.access) || '';
+  if(a === 'customer') return '<div class="access-badge access-customer">🔑 Customers only</div>';
+  if(a === 'public')   return '<div class="access-badge access-public">✅ Public restroom</div>';
+  return '<div class="access-badge access-unknown">❔ Access unknown</div>';
+}
+
+// Metro (city) popup — for non-gas-station locations. Leads with access, shows accessibility and
+// hours (hours are DISPLAYED as text, never computed into an open/closed status, since OSM hours
+// aren't in our parseable format). Reuses the same element IDs as the pit-stop popup so the shared
+// directions / share / report / rating / tip handlers attach unchanged. Store-amenity sections are
+// omitted (there's no convenience store); their attach handlers no-op safely via safeAttach().
+function metroPopupHtml(loc, agg, myVote){
+  const shareUrl = `${location.origin}${location.pathname}?loc=${encodeURIComponent(loc.id)}`;
+  const chain = chainFor(loc);
+  const raw = (loc.metroInfo && loc.metroInfo.hoursRaw) || '';
+  const hoursLine = raw
+    ? `<div class="hours-line">🕐 ${escapeHtml(raw)}</div>`
+    : `<div class="hours-line">🕐 Hours not listed yet — know them? Tap 🚩 below to send them in.</div>`;
+  return `<div class="popup-inner" data-locid="${loc.id}">
+    <div class="popup-head-row">
+      <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${escapeHtml(chain.name)}</div>
+    </div>
+    <div class="addr addr-title">${escapeHtml(loc.addr || '')}</div>
+    ${metroAccessBadge(loc)}
+    ${(loc.metroInfo && loc.metroInfo.fee) ? `<div class="hours-line">${loc.metroInfo.fee === 'free' ? '✅ Free to use' : '💰 Paid / fee'}</div>` : ''}
+    ${(loc.metroInfo && loc.metroInfo.disposal) ? `<div class="hours-line">🚻 Basic facilities (portable / chemical unit)</div>` : ''}
+    ${hoursLine}
+    <div id="accessible-badge-${loc.id}">${accessibleBadgeHtml(loc.id)}</div>
+    <div class="popup-actions">
+      <button class="btn btn-primary directions-btn" id="directions-btn-${loc.id}" data-lat="${loc.lat}" data-lng="${loc.lng}">🧭 Directions</button>
+      <button class="btn btn-secondary btn-icon-only share-btn" title="Share" data-shareurl="${shareUrl}" data-sharename="${(loc.n||'').replace(/"/g,'&quot;')}">🔗</button>
+      <button class="btn btn-danger btn-icon-only report-toggle-btn" title="Report an issue" id="report-toggle-${loc.id}">🚩</button>
+    </div>
+    <div class="report-section" id="report-section-${loc.id}" style="display:none;">
+      <div class="report-heading">Report a problem with this listing</div>
+      <div class="report-cats" id="report-cats-${loc.id}">
+        <button type="button" class="report-cat-btn" data-reason="Permanently closed">🚫 Permanently closed</button>
+        <button type="button" class="report-cat-btn" data-reason="Wrong address / location">📍 Wrong address</button>
+        <button type="button" class="report-cat-btn" data-reason="Wrong hours">🕐 Wrong hours</button>
+        <button type="button" class="report-cat-btn" data-reason="Not a real location">❓ Not a real location</button>
+        <button type="button" class="report-cat-btn" data-reason="__other__">✏️ Other</button>
+      </div>
+      <div class="report-other-row" id="report-other-row-${loc.id}" style="display:none;">
+        <input type="text" class="tip-input" id="report-input-${loc.id}" maxlength="80" placeholder="Briefly describe the problem" />
+        <button class="btn btn-amber tip-submit" id="report-submit-${loc.id}">Send</button>
+      </div>
+      <div class="save-note" id="report-note-${loc.id}"></div>
+    </div>
+    ${isLoggedIn() ? `<div class="rating-col single-rating" id="rating-section-${loc.id}">
+      ${ratingSectionInnerHtml(loc, agg, myVote)}
+    </div>
+    <div class="community-section${communitySectionHasContent(loc) ? '' : ' is-empty'}" id="community-section-${loc.id}">
+      <div class="feature-title">✅ Confirmed by visitors</div>
+      <div class="feature-badges" id="community-summary-${loc.id}">${communitySummaryHtml(loc)}</div>
+    </div>
+    <div class="tips-section">
+      <span class="rating-label">💬 Tips from visitors</span>
+      <ul class="tips-list" id="tips-list-${loc.id}"><li style="color:#999;">Loading…</li></ul>
+      <div class="tip-input-row">
+        <input type="text" class="tip-input" id="tip-input-${loc.id}" maxlength="${MAX_TIP_LENGTH}" placeholder="e.g. need a key, buzzer required" />
+        <button class="btn btn-amber tip-submit" id="tip-submit-${loc.id}">Add</button>
+      </div>
+    </div>
+    ${amenityEditorHtml(loc.id, myVote)}
+    <div class="feature-summary osm-bathroom-section${osmBathroomHasContent(loc) ? '' : ' is-empty'}"><div class="feature-title">🚻 Bathroom features</div><div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>` : `<div class="popup-signin-hint">🔒 Sign in to rate this bathroom and see visitor tips.</div>`}
+  </div>`;
+}
+
 function popupHtml(loc, agg, myVote){
+  if(chainFor(loc).group === 'metro') return metroPopupHtml(loc, agg, myVote);
   const shareUrl = `${location.origin}${location.pathname}?loc=${encodeURIComponent(loc.id)}`;
   const hoursText = formatHrsDisplay(loc);
   const openStatus = isLocationOpenNow(loc);
@@ -2147,6 +2242,7 @@ function getVerifiedPosition(){
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         lastKnownPos = { lat: pos.coords.latitude, lng: pos.coords.longitude, ts: Date.now() };
+        maybeAutoSetTravelMode(lastKnownPos.lat, lastKnownPos.lng);
         resolve(lastKnownPos);
       },
       () => resolve(null),
@@ -2364,14 +2460,43 @@ document.getElementById('supportPromptOverlay')?.addEventListener('click', (even
   if(event.target.id === 'supportPromptOverlay') closeSupportPrompt();
 });
 
-// First-time onboarding — shown once per device, dismissible
-(function(){
-  if(localStorage.getItem('onboardingSeen') === '1') return;
-  document.getElementById('onboardingOverlay').classList.add('show');
-})();
+// Onboarding overlay — the quick welcome/tour. Shown once per device on first run, and
+// re-openable anytime via the header ℹ️ button. The road/foot choice appears only when a metro
+// layer exists; otherwise it stays hidden and onboarding is unchanged.
+function openOnboarding(){
+  const ov = document.getElementById('onboardingOverlay');
+  if(ov) ov.classList.add('show');
+  const mode = document.getElementById('onboardingMode');
+  if(!mode) return;
+  if(metroKeys().length > 0){
+    mode.style.display = '';
+    // Read the stored value directly (travelMode the variable may not be initialized this early).
+    const cur = localStorage.getItem('travelMode') === 'foot' ? 'foot' : 'road';
+    mode.querySelectorAll('.onboardingModeBtn').forEach(b =>
+      b.classList.toggle('selected', b.dataset.mode === cur));
+  } else {
+    mode.style.display = 'none';
+  }
+}
+// First run: show it once per device.
+if(localStorage.getItem('onboardingSeen') !== '1') openOnboarding();
+// Header ℹ️ button re-opens the tour anytime.
+document.getElementById('onboardingInfoBtn')?.addEventListener('click', openOnboarding);
 document.getElementById('onboardingClose').addEventListener('click', () => {
   localStorage.setItem('onboardingSeen', '1');
   document.getElementById('onboardingOverlay').classList.remove('show');
+});
+// Onboarding road/foot choice — sets the travel mode's starting state (later refined by location).
+document.querySelectorAll('.onboardingModeBtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    travelMode = (btn.dataset.mode === 'foot') ? 'foot' : 'road';
+    saveTravelMode();
+    saveTravelModeToAccount();
+    localStorage.setItem('travelModeChosen', '1');
+    document.querySelectorAll('.onboardingModeBtn').forEach(b => b.classList.toggle('selected', b === btn));
+    renderLayers();
+    applyFilters();
+  });
 });
 // ("How it works" opens the info page — wired in index.html's chrome script)
 
@@ -2387,6 +2512,7 @@ document.getElementById('onboardingClose').addEventListener('click', () => {
 })();
 
 // Resize every pin whenever the zoom level changes
+let lastMetroZoomOk = null;
 map.on('zoomend', () => {
   seedLocations.forEach(loc => {
     const m = markers[loc.id];
@@ -2394,6 +2520,13 @@ map.on('zoomend', () => {
     if(m.isPopupOpen()) resizeOpenMarkerIcon(m); // resize in place; never swap icon on an open popup
     else m.setIcon(makeIcon(loc.id));
   });
+  // Metro zoom gate: only re-run the membership filter when crossing the threshold, not on
+  // every zoom step — applyFilters iterates all markers, so this keeps zooming cheap.
+  const metroZoomOk = map.getZoom() >= METRO_MIN_ZOOM;
+  if(metroZoomOk !== lastMetroZoomOk){
+    lastMetroZoomOk = metroZoomOk;
+    applyFilters();
+  }
 });
 
 // Day keys aligned to Date.getDay() (0=Sunday). A location may carry per-day hours
@@ -2566,8 +2699,13 @@ function applyFilters(){
     const openOk = showAllLocations || isLocationOpenNow(loc) !== false; // hide only confirmed-closed; unknown stays visible
     const accessOk = !hideInaccessible || !isConfirmedNotAccessible(loc); // hide only confirmed-inaccessible; unknown stays visible
     const chainOk = activeChains.has(m.chainKey || DEFAULT_CHAIN_KEY);
+    // Metro (city) pins require BOTH foot mode AND city-level zoom (>= METRO_MIN_ZOOM), so the
+    // highway view stays pit-stops-only even on foot. Pit stops always show. Bathroom Now still
+    // finds metro spots regardless (it filters seedLocations, not markers).
+    const isMetroLoc = groupOf(m.chainKey || DEFAULT_CHAIN_KEY) === 'metro';
+    const layerOk = !isMetroLoc || (travelMode === 'foot' && map.getZoom() >= METRO_MIN_ZOOM);
     const popupOpen = m.isPopupOpen && m.isPopupOpen();
-    if((openOk && accessOk && chainOk) || popupOpen){
+    if((openOk && accessOk && chainOk && layerOk) || popupOpen){
       if(!markerCluster.hasLayer(m)) markerCluster.addLayer(m);
     } else {
       if(markerCluster.hasLayer(m)) markerCluster.removeLayer(m);
@@ -2597,6 +2735,86 @@ let disabledChains = new Set();
   }catch(e){ /* malformed saved value — keep default of nothing disabled */ }
 })();
 
+// Travel mode — the one layer control shown to EVERYONE (logged in or not). It is the core
+// "on the road vs on foot" choice, not a personalization. 'road' shows pit stops only (clean
+// highway view); 'foot' adds the city/metro restrooms on top. State is set by the onboarding
+// preset + current-metro detection (a later step) and can be changed here. Stored for everyone.
+let travelMode = 'road';
+(function(){ const s = localStorage.getItem('travelMode'); if(s === 'road' || s === 'foot') travelMode = s; })();
+function saveTravelMode(){ localStorage.setItem('travelMode', travelMode); }
+// A registry entry with group:'metro' belongs to the city layer; anything else is a pit stop.
+function groupOf(key){ return (CHAIN_REGISTRY[key] && CHAIN_REGISTRY[key].group) || 'pitstop'; }
+function metroKeys(){ return Object.keys(CHAIN_REGISTRY).filter(k => CHAIN_REGISTRY[k].group === 'metro'); }
+
+// Metro boundaries for location auto-detect. Each entry is a bounding box for a covered metro
+// AREA (use the metro area, not just city limits). Empty until a metro is added with its bounds,
+// so auto-detect is inert today. A polygon test can replace the bbox later if more precision is
+// needed.
+const METRO_BOUNDS = {
+  NYC: { minLat: 40.49, maxLat: 40.92, minLng: -74.27, maxLng: -73.68 },
+};
+function insideAnyMetro(lat, lng){
+  return Object.values(METRO_BOUNDS).some(b =>
+    lat >= b.minLat && lat <= b.maxLat && lng >= b.minLng && lng <= b.maxLng);
+}
+// Auto-set travel mode from location: when the user is inside a covered metro and hasn't chosen a
+// mode themselves, switch to "on foot" (which adds the city layer on top of pit stops — nothing
+// disappears). Runs at most once per session, never overrides a manual choice, and never
+// force-reverts to road when they leave. It only sets the starting state, as agreed.
+let autoModeApplied = false;
+function maybeAutoSetTravelMode(lat, lng){
+  if(autoModeApplied) return;
+  if(localStorage.getItem('travelModeChosen') === '1') return; // user already chose — respect it
+  if(metroKeys().length === 0) return;                          // no city layer exists yet
+  if(!insideAnyMetro(lat, lng)) return;                         // only auto-enable inside a metro
+  autoModeApplied = true;
+  if(travelMode !== 'foot'){
+    travelMode = 'foot';
+    saveTravelMode();
+    renderLayers();
+    applyFilters();
+  }
+}
+
+// Account sync for travel mode (3c). Signed-in users get their choice persisted to their own
+// settings doc so it follows them across devices. Signed-out users keep the localStorage value.
+// Reads/writes are owner-only (see the settings/{uid} rule); failures fall back to the local pref.
+async function loadTravelModeFromAccount(){
+  if(!isLoggedIn()) return;
+  try{
+    const {db, doc, getDoc} = await fb();
+    const snap = await getDoc(doc(db, 'settings', getEffectiveId()));
+    if(snap.exists()){
+      const m = snap.data().travelMode;
+      if(m === 'road' || m === 'foot'){
+        travelMode = m;                              // the synced choice wins on login
+        saveTravelMode();                            // mirror locally
+        localStorage.setItem('travelModeChosen', '1'); // it's an explicit choice — auto-detect defers
+        renderLayers();
+        applyFilters();
+      }
+    }
+  }catch(e){ /* offline or denied — keep the local pref */ }
+}
+async function saveTravelModeToAccount(){
+  if(!isLoggedIn()) return;
+  try{
+    const {db, doc, setDoc} = await fb();
+    await setDoc(doc(db, 'settings', getEffectiveId()), { travelMode }, { merge: true });
+  }catch(e){ /* ignore — local pref is already saved */ }
+}
+
+// Metro pins only render at city-level zoom or closer. Below this (highway/regional view),
+// the map stays pit-stops-only regardless of mode — keeps the road-trip view clean and avoids
+// dumping ~1,400 dense city pins into a zoomed-out map.
+const METRO_MIN_ZOOM = 12;
+
+// Shared with List and Bathroom Now: does the travel mode allow this location right now?
+// (Metro/city locations only count "on foot" — matches the map's applyFilters gate.)
+function modeAllows(loc){
+  return groupOf(loc.chain || DEFAULT_CHAIN_KEY) !== 'metro' || travelMode === 'foot';
+}
+
 function getActiveChains(){
   // Chain filtering is a signed-in feature. Logged-out users always see every chain
   // (the saved disable list is ignored until they log in), so nothing is hidden by default.
@@ -2611,6 +2829,7 @@ let activeChains = getActiveChains();
 function syncChainFilterToAuth(){
   activeChains = getActiveChains();
   renderChainFilter();
+  renderLayers();
   const cf = document.getElementById('chainFilter');
   if(cf){
     const multiChain = Object.keys(CHAIN_REGISTRY).length >= 2;
@@ -2628,7 +2847,7 @@ function renderChainFilter(){
   const wrap = document.getElementById('chainFilter');
   const body = document.getElementById('chainFilterBody');
   if(!wrap || !body) return;
-  const chainKeys = Object.keys(CHAIN_REGISTRY);
+  const chainKeys = Object.keys(CHAIN_REGISTRY).filter(k => (CHAIN_REGISTRY[k].group || 'pitstop') !== 'metro');
   if(chainKeys.length < 2){
     // Only one chain registered — nothing meaningful to filter, so hide the control entirely
     wrap.style.display = 'none';
@@ -2656,13 +2875,15 @@ document.getElementById('chainFilterBody')?.addEventListener('click', (e) => {
   applyFilters();
 });
 
-document.getElementById('chainFilterBody')?.addEventListener('change', (e) => {
+// Shared by the per-chain checkboxes (under Pitstops) and the per-city public/customer checkboxes
+// (under Metros) — both are entries in CHAIN_REGISTRY toggled through the same disabledChains list.
+function onSubLayerCheckboxChange(e){
   const cb = e.target.closest('.chain-filter-checkbox');
   if(!cb) return;
   const key = cb.dataset.chain;
   if(cb.checked) disabledChains.delete(key); else disabledChains.add(key);
   activeChains = getActiveChains();
-  // Never allow every chain to be switched off at once — that would just blank the map
+  // Never allow every registered layer to be switched off at once — that would just blank the map
   if(activeChains.size === 0){
     disabledChains.delete(key);
     activeChains = getActiveChains();
@@ -2670,7 +2891,64 @@ document.getElementById('chainFilterBody')?.addEventListener('change', (e) => {
   }
   saveDisabledChains();
   renderChainFilter();
+  renderLayers();
   applyFilters();
+}
+document.getElementById('chainFilterBody')?.addEventListener('change', onSubLayerCheckboxChange);
+document.getElementById('metroFilterBody')?.addEventListener('change', onSubLayerCheckboxChange);
+
+// ---- Travel mode toggle (on the road / on foot) ------------------------------------------
+// The one open control: shown to everyone, but only once a metro layer actually exists in the
+// registry (group:'metro'). Until then the drawer is unchanged. 'road' = pit stops only; 'foot'
+// = pit stops + city restrooms. The per-chain and per-city checkboxes below it stay a signed-in
+// refinement (gated), same as the chain filter has always been.
+function renderLayers(){
+  const metros = metroKeys();
+  const hasMetros = metros.length > 0;
+  const modeBtn = document.getElementById('travelModeToggle');
+  const mFilter = document.getElementById('metroFilter');
+  if(modeBtn) modeBtn.style.display = hasMetros ? '' : 'none';
+  if(mFilter) mFilter.style.display = (hasMetros && isLoggedIn()) ? '' : 'none';
+  if(!hasMetros) return;
+
+  if(modeBtn){
+    const foot = travelMode === 'foot';
+    modeBtn.classList.toggle('on', foot);
+    modeBtn.setAttribute('aria-pressed', String(foot));
+    const label = modeBtn.querySelector('.travel-mode-label');
+    if(label) label.textContent = foot ? '🚶 On foot' : '🛣️ On the road';
+  }
+
+  // City detail (per-metro public/customer checkboxes) — a signed-in refinement, gated like chains.
+  const body = document.getElementById('metroFilterBody');
+  if(!body) return;
+  if(!isLoggedIn()){ body.innerHTML = ''; return; }
+  const byCity = {};
+  metros.forEach(k => {
+    const c = CHAIN_REGISTRY[k];
+    const city = c.metro || 'Other';
+    (byCity[city] = byCity[city] || []).push(k);
+  });
+  body.innerHTML = Object.keys(byCity).map(city => {
+    const rows = byCity[city].map(key => {
+      const c = CHAIN_REGISTRY[key];
+      const checked = activeChains.has(key) ? 'checked' : '';
+      const kind = c.name;
+      return `<label class="chain-filter-row">
+        <input type="checkbox" class="chain-filter-checkbox" data-chain="${key}" ${checked}>
+        <span class="dot" style="background:${c.color}"></span>${escapeHtml(kind)}
+      </label>`;
+    }).join('');
+    return `<div class="metro-city"><div class="metro-city-name">${escapeHtml(city)}</div>${rows}</div>`;
+  }).join('');
+}
+
+// Mode toggle — everyone. Flips road ⟷ foot, which shows/hides the whole city layer. A manual
+// flip counts as an explicit choice (auto-detect defers to it) and syncs to the account if signed in.
+document.getElementById('travelModeToggle')?.addEventListener('click', () => {
+  travelMode = (travelMode === 'foot') ? 'road' : 'foot';
+  localStorage.setItem('travelModeChosen', '1');
+  saveTravelMode(); saveTravelModeToAccount(); renderLayers(); applyFilters();
 });
 
 // Collapsible chain filter panel — same remembered-collapse pattern as the legend
@@ -2694,6 +2972,7 @@ document.getElementById('chainFilterBody')?.addEventListener('change', (e) => {
   });
 })();
 renderChainFilter();
+renderLayers();
 applyFilters();
 
 // Directions-app preference (drawer, signed-in only). The highlighted button reflects the app
@@ -2770,6 +3049,7 @@ async function buildListView(){
 
   // Distance-only + capped: no ratings, no reads to build. Details load when a pin is opened.
   const nearest = seedLocations
+    .filter(loc => modeAllows(loc) && activeChains.has(loc.chain || DEFAULT_CHAIN_KEY))
     .map(loc => ({ loc, dist: milesBetween(currentListPosition.lat, currentListPosition.lng, loc.lat, loc.lng) }))
     .sort((a,b) => a.dist - b.dist)
     .slice(0, NEAREST_COUNT);
@@ -3019,6 +3299,7 @@ whereAmIBtn.addEventListener('click',()=>{
     const lat=pos.coords.latitude, lng=pos.coords.longitude;
     lastKnownPos={lat,lng,ts:Date.now()};
     currentListPosition=lastKnownPos;
+    maybeAutoSetTravelMode(lat,lng);
     setUserLocationMarker(lat,lng);
     map.setView([lat,lng],16,{animate:true});
     whereAmIBtn.disabled=false;
@@ -3059,6 +3340,8 @@ locateBtn.addEventListener('click',()=>{
     // if nothing selected is within a reasonable driving distance, widen to every chain
     // (still open-only) so the closest real option wins instead.
     const CHAIN_FALLBACK_MILES = 20;
+    // Bathroom Now ignores travel mode on purpose: it's the emergency button, so the closest
+    // usable bathroom wins even if it's a city/metro spot (e.g. a Dunkin) while in road mode.
     let eligible = seedLocations.filter(loc =>
       activeChains.has(loc.chain || DEFAULT_CHAIN_KEY) && isLocationOpenNow(loc) !== false
     );

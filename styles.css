@@ -608,3 +608,18 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
   .lb-count{flex:none;font-size:12.5px;color:var(--muted);font-weight:600;}
   .lb-you{margin-top:6px;border-top:1px dashed rgba(255,255,255,.15);}
   .lb-empty{padding:10px;color:var(--muted);font-size:13px;text-align:center;}
+
+/* Onboarding: road/foot travel-mode choice (shown only when a metro layer exists) */
+#onboardingMode{ margin-top:16px; text-align:center; }
+#onboardingMode .onboardingModeQ{ font-weight:700; margin-bottom:10px; }
+#onboardingMode .onboardingModeBtns{ display:flex; gap:10px; }
+#onboardingMode .onboardingModeBtn{ flex:1; }
+#onboardingMode .onboardingModeBtn.selected{ outline:2px solid var(--accent); outline-offset:2px; }
+#onboardingMode .onboardingModeHint{ display:block; margin-top:8px; opacity:.7; }
+
+/* Metro popup: access badge (customers-only / public / unknown) */
+.access-badge{ display:inline-block; font-weight:700; font-size:13px; padding:4px 10px;
+  border-radius:999px; margin:2px 0 4px; }
+.access-badge.access-customer{ background:#fff3e0; color:#b23c00; }
+.access-badge.access-public{ background:#e6f4ea; color:#1b7a3d; }
+.access-badge.access-unknown{ background:#eceff1; color:#455a64; }

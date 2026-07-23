@@ -46,6 +46,9 @@
 <script defer src="kwiktrip-locations.js"></script>
 <script defer src="royalfarms-locations.js"></script>
 <script defer src="rutters-locations.js"></script>
+<script defer src="nyc-dunkin-locations.js"></script>
+<script defer src="nyc-starbucks-locations.js"></script>
+<script defer src="nyc-public-locations.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
@@ -75,6 +78,7 @@
 <h1>BATHROOM <span class="wm-accent">REPORT</span></h1>
 </div>
 <div id="headerActions">
+<button id="onboardingInfoBtn" aria-label="How Bathroom Report works" title="How it works">ℹ️</button>
 <button id="accountToggle">👤 Log In</button>
 </div>
 </div>
@@ -145,6 +149,14 @@
 </div>
 </details>
 </div>
+<div id="onboardingMode" style="display:none">
+<div class="onboardingModeQ">How are you getting around?</div>
+<div class="onboardingModeBtns">
+<button type="button" class="btn onboardingModeBtn" data-mode="road">🛣️ On the road</button>
+<button type="button" class="btn onboardingModeBtn" data-mode="foot">🚶 On foot</button>
+</div>
+<small class="onboardingModeHint">Sets what shows on the map. You can switch anytime in the menu.</small>
+</div>
 <div id="onboardingActions">
 <button id="onboardingClose" class="btn btn-amber">Got it!</button>
 </div>
@@ -212,9 +224,13 @@ This is tracked on this device only — log in to sync it across devices.
 <div class="d-items">
 <button id="passportToggle">🎫 Passport</button>
 <button id="infoBtn" title="FAQ and how it works">❓ FAQ: How it works</button>
+<button id="travelModeToggle" class="d-toggle" aria-pressed="false" style="display:none"><span class="travel-mode-label">🛣️ On the road</span><span class="d-switch"><b></b></span></button>
 <div id="chainFilter" class="d-section">
 <div id="chainFilterToggle">🏪 Chains <span id="chainFilterArrow">▾</span></div>
 <div id="chainFilterBody"></div>
+</div>
+<div id="metroFilter" class="d-section" style="display:none">
+<div id="metroFilterBody"></div>
 </div>
 <button id="accessibleToggle" class="d-toggle"><span>♿ Hide confirmed step-only</span><span class="d-switch"><b></b></span></button>
 <div id="navAppPref" class="d-section">

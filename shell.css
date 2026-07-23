@@ -492,3 +492,13 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 .report-cat-btn:hover{ border-color:#c62828; }
 .report-other-row{ display:flex; gap:6px; margin-top:8px; }
 .report-other-row .tip-input{ flex:1; }
+
+/* Metro city labels in the drawer's city-detail list */
+#appDrawer .metro-city-name{ font-weight:600; font-size:.82rem; opacity:.7; margin:8px 0 2px; }
+
+/* Header ℹ️ button — re-opens the onboarding tour; mirrors #menuBtn */
+#onboardingInfoBtn{
+  width:44px; height:44px; border:0; background:transparent; color:var(--shell-ink);
+  font-size:20px; border-radius:12px; display:grid; place-items:center; cursor:pointer;
+}
+#onboardingInfoBtn:active{ background:var(--shell-chrome2); }
