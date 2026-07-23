@@ -8,7 +8,25 @@
     --popup-bg:#0f2235; --popup-text:#f5f7fa; --popup-muted:#93a5b8; --popup-border:#2a4056;
     --popup-divider:#2a4056; --popup-report-bg:#3a2226; --popup-tip-input-bg:#0a1826;
     --popup-star-empty:#3a5165;
-  }
+  }/* ============================================================
+   Light mode: give the app chrome (header, drawer, pills,
+   overlays) light values so they follow the theme toggle.
+   ============================================================ */
+html[data-theme="light"]{
+  --shell-bg:#f4f5f7;
+  --shell-chrome:#ffffff;
+  --shell-chrome2:#eceef1;
+  --shell-line:rgba(0,0,0,.10);
+  --shell-ink:#14161a;
+  --shell-muted:#5a6470;
+  --shell-shadow:0 12px 40px rgba(0,0,0,.18);
+}
+/* Two spots hardcode dark-mode colors — give them readable light values */
+html[data-theme="light"] .hiw-body p{ color:#42505d; }
+html[data-theme="light"] #appDrawer .nav-pref-select{
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2314161a' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");
+}
+
   html[data-theme="light"]{
     --charcoal:#eef3f5; --cream:#0b192a; --header-grad-top:#ffffff;
     --muted:#5a6b7a; --panel-bg:rgba(255,255,255,.92); --panel-border:#cfd8de; --placeholder:#8a97a3;
