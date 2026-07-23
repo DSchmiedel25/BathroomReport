@@ -195,6 +195,7 @@ everything's tied just to this phone/browser.
 </p>
 <button class="btn btn-amber" id="authSignUpBtn" style="width:100%;margin-bottom:8px;">Sign Up (new account)</button>
 <button class="btn btn-secondary" id="authLogInBtn" style="width:100%;">Log In (existing account)</button>
+<button id="onboardingInfoBtn" class="btn btn-secondary" style="width:100%;margin-top:8px;">ℹ️ How it works</button>
 <div class="save-note" id="authNote" style="height:auto;margin-top:8px;"></div>
 </div>
 <div id="loggedInView" style="display:none;">
@@ -203,7 +204,6 @@ Logged in as <b id="loggedInUsername" style="color:var(--amber);"></b>
 </p>
 <button class="btn btn-danger" id="logOutBtn" style="width:100%;">Log Out</button>
 </div>
-<button id="onboardingInfoBtn" class="btn btn-secondary" style="width:100%;margin-top:10px;">ℹ️ How it works</button>
 <div id="passportSection">
 <div class="account-section-title">🎫 Bathroom Passport</div>
 <p id="passportSyncNote" style="color:var(--muted);font-size:11.5px;margin:0 0 8px;display:none;">
@@ -234,14 +234,18 @@ This is tracked on this device only — log in to sync it across devices.
 <div id="travelModeCoverage" class="d-coverage-note" style="display:none"></div>
 </div>
 <div id="chainFilter" class="d-section">
-<div id="chainFilterToggle">🛣️ Pit Stops <span id="chainFilterArrow">▾</span></div>
+<div id="chainFilterToggle" class="d-collapse-head">🛣️ Pit Stops <span id="chainFilterArrow" class="d-collapse-arrow">▾</span></div>
 <div id="chainFilterBody"></div>
 </div>
 <div id="metroFilter" class="d-section" style="display:none">
-<div id="metroFilterToggle">🏙️ Metros <span id="metroFilterArrow">▾</span></div>
+<div id="metroFilterToggle" class="d-collapse-head">🏙️ Metros <span id="metroFilterArrow" class="d-collapse-arrow">▾</span></div>
 <div id="metroFilterBody"></div>
 </div>
+<div class="d-section">
+<div class="d-section-label">⚙️ Preferences</div>
 <button id="accessibleToggle" class="d-toggle"><span>♿ Hide confirmed step-only</span><span class="d-switch"><b></b></span></button>
+<button id="themeToggle" class="d-toggle"><span><span class="theme-ico">🌙</span> Appearance</span><span class="d-switch"><b></b></span></button>
+</div>
 <div id="navAppPref" class="d-section">
 <div class="d-section-label">🧭 Directions app</div>
 <select id="navAppSelect" class="nav-pref-select" aria-label="Preferred directions app">
@@ -250,7 +254,6 @@ This is tracked on this device only — log in to sync it across devices.
 <option value="waze">Waze</option>
 </select>
 </div>
-<button id="themeToggle" class="d-toggle"><span><span class="theme-ico">🌙</span> Appearance</span><span class="d-switch"><b></b></span></button>
 </div>
 <div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version">v2.8 · 2026-07-22</span></div>
 </nav>

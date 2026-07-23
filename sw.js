@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bathroomreport-v86';
+const CACHE_NAME = 'bathroomreport-v87';
 const APP_SHELL = [
   './',
   './index.html',

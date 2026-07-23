@@ -628,3 +628,10 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
 #metroFilterBody{margin-top:6px;}
 #metroFilterBody.collapsed{display:none;}
 #metroFilterToggle{cursor:pointer;}
+
+/* Unified drawer collapse sections — Metros matches Pit Stops exactly */
+#metroFilterBody{margin-top:6px;}
+#metroFilterBody.collapsed{display:none;}
+#metroFilterToggle.collapsed-toggle #metroFilterArrow,
+.d-collapse-head.collapsed-toggle .d-collapse-arrow{transform:rotate(-90deg);display:inline-block;}
+.metro-city{padding:0;}

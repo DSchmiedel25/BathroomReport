@@ -358,11 +358,15 @@ body:not(.logged-in) #appDrawer #chainFilter{ display:none !important; }
   border-radius:0 !important; box-shadow:none !important;
   width:100% !important; max-width:none !important; margin:0 !important; padding:6px 0 !important;
 }
-#appDrawer #chainFilterToggle{
+#appDrawer #chainFilterToggle,
+#appDrawer #metroFilterToggle,
+#appDrawer .d-collapse-head{
   display:flex !important; align-items:center; gap:10px;
-  padding:15px 20px !important; margin:0 !important;
+  padding:14px 20px !important; margin:0 !important;
   font-size:15px !important; font-weight:700 !important; color:var(--shell-ink) !important; cursor:pointer;
 }
+#appDrawer .d-collapse-arrow{ margin-left:auto; transition:transform .16s; }
+#appDrawer .d-collapse-head:active{ background:var(--shell-chrome2); }
 #appDrawer #chainFilterToggle #chainFilterArrow{ margin-left:auto; transition:transform .16s; }
 #appDrawer #chainFilterToggle:active{ background:var(--shell-chrome2); }
 
@@ -519,3 +523,11 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 
 /* Selected city pill */
 #appDrawer .d-city-jump.sel{ background:var(--accent); color:#fff; }
+
+/* Metros body indent matches Pit Stops; tighter, consistent section rhythm */
+#appDrawer #metroFilterBody{ margin:0 !important; padding:0 0 8px !important; }
+#appDrawer #metroFilterBody .chain-filter-row{ padding:11px 20px 11px 46px !important; }
+#appDrawer .d-section{ border-top:1px solid var(--shell-line); }
+#appDrawer .d-section:first-of-type{ border-top:none; }
+#appDrawer .d-section .d-toggle{ margin:2px 0 0; }
+#appDrawer .d-items > .d-toggle{ margin-top:0; }
