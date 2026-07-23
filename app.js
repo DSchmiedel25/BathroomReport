@@ -1284,11 +1284,15 @@ function addMarker(loc){
   markers[loc.id] = marker;
 }
 
-// Directions — remembers the user's preferred nav app after they pick once
+// Directions — remembers the user's preferred nav app after they pick once.
+// "On foot" requests walking directions where the nav app's URL supports it:
+// Apple (dirflg=w) and Google (travelmode=walking). Waze is driving-only — no walking
+// mode exists in its URL scheme, so foot mode there still opens a drive route.
 function buildNavUrl(app, lat, lng){
+  const walking = travelMode === 'foot';
   if(app === 'waze') return `https://www.waze.com/ul?ll=${lat},${lng}&navigate=yes`;
-  if(app === 'apple') return `https://maps.apple.com/?daddr=${lat},${lng}`;
-  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  if(app === 'apple') return `https://maps.apple.com/?daddr=${lat},${lng}${walking ? '&dirflg=w' : ''}`;
+  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}${walking ? '&travelmode=walking' : ''}`;
 }
 
 // Best default when the user hasn't explicitly chosen: Apple Maps on Apple hardware
@@ -2758,6 +2762,14 @@ function saveTravelMode(){ localStorage.setItem('travelMode', travelMode); }
 function groupOf(key){ return (CHAIN_REGISTRY[key] && CHAIN_REGISTRY[key].group) || 'pitstop'; }
 function metroKeys(){ return Object.keys(CHAIN_REGISTRY).filter(k => CHAIN_REGISTRY[k].group === 'metro'); }
 
+// The one city whose options show in the Metros tree. Picked via the jump pills (or auto-set
+// from location); other cities' pins/checkbox states are untouched, just not shown.
+let selectedMetro = localStorage.getItem('selectedMetro') || null;
+function setSelectedMetro(city, manual){
+  selectedMetro = city;
+  if(manual) localStorage.setItem('selectedMetro', city);
+}
+
 // Metro boundaries for location auto-detect. Each entry is a bounding box for a covered metro
 // AREA (use the metro area, not just city limits). Empty until a metro is added with its bounds,
 // so auto-detect is inert today. A polygon test can replace the bbox later if more precision is
@@ -2766,8 +2778,15 @@ const METRO_BOUNDS = {
   NYC: { minLat: 40.49, maxLat: 40.92, minLng: -74.27, maxLng: -73.68 },
 };
 function insideAnyMetro(lat, lng){
-  return Object.values(METRO_BOUNDS).some(b =>
-    lat >= b.minLat && lat <= b.maxLat && lng >= b.minLng && lng <= b.maxLng);
+  return metroAt(lat, lng) !== null;
+}
+// Which covered metro (if any) contains this point — returns the city name or null.
+function metroAt(lat, lng){
+  for(const city of Object.keys(METRO_BOUNDS)){
+    const b = METRO_BOUNDS[city];
+    if(lat >= b.minLat && lat <= b.maxLat && lng >= b.minLng && lng <= b.maxLng) return city;
+  }
+  return null;
 }
 // Auto-set travel mode from location: when the user is inside a covered metro and hasn't chosen a
 // mode themselves, switch to "on foot" (which adds the city layer on top of pit stops — nothing
@@ -2775,10 +2794,17 @@ function insideAnyMetro(lat, lng){
 // force-reverts to road when they leave. It only sets the starting state, as agreed.
 let autoModeApplied = false;
 function maybeAutoSetTravelMode(lat, lng){
+  if(metroKeys().length === 0) return;                          // no city layer exists yet
+  const city = metroAt(lat, lng);
+  if(!city) return;                                             // only act inside a covered metro
+  // Auto-select the metro you're standing in so the drawer's tree and pill match your city.
+  // A manually pinned city (tapped pill, saved to localStorage) always wins over location.
+  if(!localStorage.getItem('selectedMetro') && selectedMetro !== city){
+    setSelectedMetro(city, false);
+    renderLayers();
+  }
   if(autoModeApplied) return;
   if(localStorage.getItem('travelModeChosen') === '1') return; // user already chose — respect it
-  if(metroKeys().length === 0) return;                          // no city layer exists yet
-  if(!insideAnyMetro(lat, lng)) return;                         // only auto-enable inside a metro
   autoModeApplied = true;
   if(travelMode !== 'foot'){
     travelMode = 'foot';
@@ -2933,14 +2959,15 @@ function renderLayers(){
   const sel = document.getElementById('travelModeSelect');
   if(sel && sel.value !== travelMode) sel.value = travelMode;
 
-  // "On foot" shows city locations only — list covered cities as tap-to-jump buttons that
-  // center the map on that metro (useful when you're outside it and the map looks empty).
+  // "On foot" shows city locations only — the pills both jump the map AND pick which city's
+  // options appear in the Metros tree below (only the chosen city is shown, never all of them).
   const cov = document.getElementById('travelModeCoverage');
+  const cities = [...new Set(metros.map(k => CHAIN_REGISTRY[k].metro || 'Other'))];
+  if(!cities.includes(selectedMetro)) selectedMetro = cities[0];
   if(cov){
     if(travelMode === 'foot'){
-      const cities = [...new Set(metros.map(k => CHAIN_REGISTRY[k].metro || 'Other'))];
       cov.innerHTML = `🏙️ Covered — tap to jump: ` +
-        cities.map(c => `<button type="button" class="d-city-jump" data-city="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join(' ');
+        cities.map(c => `<button type="button" class="d-city-jump${c === selectedMetro ? ' sel' : ''}" data-city="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join(' ');
       cov.style.display = '';
     } else {
       cov.style.display = 'none';
@@ -2957,18 +2984,17 @@ function renderLayers(){
     const city = c.metro || 'Other';
     (byCity[city] = byCity[city] || []).push(k);
   });
-  body.innerHTML = Object.keys(byCity).map(city => {
-    const rows = byCity[city].map(key => {
-      const c = CHAIN_REGISTRY[key];
-      const checked = activeChains.has(key) ? 'checked' : '';
-      const kind = c.name;
-      return `<label class="chain-filter-row">
-        <input type="checkbox" class="chain-filter-checkbox" data-chain="${key}" ${checked}>
-        <span class="dot" style="background:${c.color}"></span>${escapeHtml(kind)}
-      </label>`;
-    }).join('');
-    return `<div class="metro-city"><div class="metro-city-name">${escapeHtml(city)}</div>${rows}</div>`;
-  }).join('');
+  // Only the selected city's options are listed — the pills above are the city switcher, so
+  // no per-city group labels are needed here.
+  const showKeys = byCity[selectedMetro] || [];
+  body.innerHTML = `<div class="metro-city">` + showKeys.map(key => {
+    const c = CHAIN_REGISTRY[key];
+    const checked = activeChains.has(key) ? 'checked' : '';
+    return `<label class="chain-filter-row">
+      <input type="checkbox" class="chain-filter-checkbox" data-chain="${key}" ${checked}>
+      <span class="dot" style="background:${c.color}"></span>${escapeHtml(c.name)}
+    </label>`;
+  }).join('') + `</div>`;
 }
 
 // Mode dropdown — everyone. Picks road ⟷ foot, which shows/hides the city layer.
@@ -2992,6 +3018,8 @@ function metroCenter(city){
 document.getElementById('travelModeCoverage')?.addEventListener('click', (e) => {
   const btn = e.target.closest('.d-city-jump');
   if(!btn) return;
+  setSelectedMetro(btn.dataset.city, true);   // this city's options now fill the Metros tree
+  renderLayers();
   const c = metroCenter(btn.dataset.city);
   if(!c) return;
   map.setView(c, Math.max(METRO_MIN_ZOOM + 1, 13), {animate: true});

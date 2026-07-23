@@ -516,3 +516,6 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
   font-weight:700; font-size:.8rem; cursor:pointer;
 }
 #appDrawer .d-city-jump:active{ background:color-mix(in srgb, var(--accent) 14%, transparent); }
+
+/* Selected city pill */
+#appDrawer .d-city-jump.sel{ background:var(--accent); color:#fff; }
