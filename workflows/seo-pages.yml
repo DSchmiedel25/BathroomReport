@@ -1,19 +1,13 @@
-# .github/workflows/seo-pages.yml
-# Regenerates the /guide/ SEO pages whenever you edit location data
-# through the GitHub web UI. You never run anything locally.
 name: Build SEO pages
 
 on:
   push:
-    branches: [main]            # change if your default branch differs
-    paths:                      # only source files trigger it...
+    branches: [main]
+    paths:
       - "*-locations.js"
       - "generate-static-pages.js"
       - ".github/workflows/seo-pages.yml"
-  workflow_dispatch:            # ...plus a manual "Run" button in the Actions tab
-
-# NOTE: the generated outputs (guide/, sitemap.xml, robots.txt) are NOT in
-# the paths list above, so the commit this workflow makes cannot re-trigger it.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -23,27 +17,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-
       - name: Generate static pages
         env:
           LOCATIONS_DIR: "."
           OUT_DIR: "."
           BASE_URL: "https://bathroomreport.app"
-          GA_MEASUREMENT_ID: "G-P30WFPVB80"   # same GA4 property as the app
+          GA_MEASUREMENT_ID: "G-P30WFPVB80"
         run: node generate-static-pages.js
-
       - name: Commit generated pages
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add guide sitemap-index.xml robots.txt
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-          else
-            git commit -m "Rebuild SEO pages [skip ci]"
-            git push
-          fi
+        run: git config user.name "github-actions[bot]" && git config user.email "actions@users.noreply.github.com" && git add guide sitemap-index.xml robots.txt && (git diff --cached --quiet && echo "No changes to commit" || (git commit -m "Rebuild SEO pages [skip ci]" && git push))
