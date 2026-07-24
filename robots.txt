@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://bathroomreport.app/sitemap-index.xml
