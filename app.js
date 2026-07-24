@@ -2547,15 +2547,42 @@ document.querySelectorAll('.onboardingModeBtn').forEach(btn => {
 });
 // ("How it works" opens the info page — wired in index.html's chrome script)
 
-// If this page was opened via a shared link (?loc=xyz), jump straight to that pin
+// If this page was opened via a shared link or a /guide/ SEO page (?loc=xyz),
+// jump straight to that pin. We also report the arrival to GA4 and then scrub the
+// tracking params out of the URL, so a refresh or a re-share doesn't carry UTMs
+// around and the address bar stays clean.
 (function(){
   const params = new URLSearchParams(window.location.search);
   const targetId = params.get('loc');
   if(!targetId) return;
+
   const target = seedLocations.find(l => l.id === targetId);
-  if(target && markers[targetId]){
-    zoomToMarker(markers[targetId]);
+  const found = Boolean(target && markers[targetId]);
+  if(found) zoomToMarker(markers[targetId]);
+
+  // Attribution: where did this deep link come from? ("guide" = an SEO page,
+  // absent = a link someone shared directly.)
+  const source = params.get('utm_source') || 'direct_share';
+  if(typeof gtag === 'function'){
+    gtag('event', 'deeplink_open', {
+      loc_id: targetId,
+      chain: (target && target.n) || '',
+      source: source,
+      campaign: params.get('utm_campaign') || '',
+      // false = the link pointed at a pin we no longer have (renamed/removed id),
+      // which is the signal that a stale /guide/ page is still in Google's index.
+      resolved: found
+    });
   }
+
+  // Strip loc + any utm_* so the URL is shareable and refresh-safe. GA4 has already
+  // captured them by this point. replaceState leaves no extra history entry.
+  const keep = new URLSearchParams();
+  params.forEach((v, k) => {
+    if(k !== 'loc' && !k.startsWith('utm_')) keep.append(k, v);
+  });
+  const qs = keep.toString();
+  history.replaceState({}, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
 })();
 
 // Resize every pin whenever the zoom level changes
