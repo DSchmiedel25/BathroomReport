@@ -31,6 +31,18 @@ const CHAIN_REGISTRY = {
   royalFarms: { name: "Royal Farms", color: '#33691e', textColor: '#ffffff', dataVar: 'royalFarmsLocations' },
   rutters: { name: "Rutter's", color: '#4e342e', textColor: '#ffffff', dataVar: 'ruttersLocations' },
   speedway: { name: "Speedway", color: '#d81e05', textColor: '#ffffff', dataVar: 'speedwayLocations' },
+  // National / regional expansion chains. These stay hidden from the legend and Pit Stops
+  // filter until their matching data file is uploaded (see chainHasData below), so a chain
+  // "turns on" automatically the moment window.<dataVar> is populated — no code change needed.
+  // Each file must set the exact global named in dataVar (e.g. circle-k-locations.js -> window.circleKLocations).
+  circleK: { name: "Circle K", color: '#e4002b', textColor: '#ffffff', dataVar: 'circleKLocations' },
+  travelCentersOfAmerica: { name: "TravelCenters of America", color: '#00519e', textColor: '#ffffff', dataVar: 'travelCentersOfAmericaLocations' },
+  holiday: { name: "Holiday", color: '#f57f29', textColor: '#1c1c1e', dataVar: 'holidayLocations' },
+  jacksons: { name: "Jacksons", color: '#00843d', textColor: '#ffffff', dataVar: 'jacksonsLocations' },
+  plaidPantry: { name: "Plaid Pantry", color: '#0f766e', textColor: '#ffffff', dataVar: 'plaidPantryLocations' },
+  getgo: { name: "GetGo", color: '#b3122b', textColor: '#ffffff', dataVar: 'getgoLocations' },
+  quickChek: { name: "QuickChek", color: '#003da5', textColor: '#ffffff', dataVar: 'quickChekLocations' },
+  townPump: { name: "Town Pump", color: '#8a1f2b', textColor: '#ffffff', dataVar: 'townPumpLocations' },
   nycDunkin: { name: "Dunkin'", color: '#ff6e0c', textColor: '#ffffff', dataVar: 'nycDunkinLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
   nycStarbucks: { name: 'Starbucks', color: '#00704a', textColor: '#ffffff', dataVar: 'nycStarbucksLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
   nycGregorys: { name: 'Gregorys Coffee', color: '#1a1a1a', textColor: '#ffffff', dataVar: 'nycGregorysLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
@@ -44,6 +56,14 @@ const CHAIN_REGISTRY = {
   bosPublic: { name: 'Public restroom', color: '#0057b8', textColor: '#ffffff', dataVar: 'bosPublicLocations', group: 'metro', metro: 'Boston', layer: 'public', shape: 'diamond' }
 };
 const DEFAULT_CHAIN_KEY = 'stewarts';
+
+// A registered chain only counts as "live" once its data file has loaded and has at least one
+// location. Registry entries can therefore be pre-wired ahead of their data; they stay invisible
+// in the legend and Pit Stops filter until window.<dataVar> is a non-empty array.
+function chainHasData(key){
+  const dv = CHAIN_REGISTRY[key] && CHAIN_REGISTRY[key].dataVar;
+  return !!dv && Array.isArray(window[dv]) && window[dv].length > 0;
+}
 
 function chainFor(loc){
   return CHAIN_REGISTRY[(loc && loc.chain) || DEFAULT_CHAIN_KEY] || CHAIN_REGISTRY[DEFAULT_CHAIN_KEY];
@@ -111,6 +131,7 @@ document.getElementById('themeToggle').addEventListener('click', () => {
   if(body){
     const seen = new Set();
     body.innerHTML = Object.keys(CHAIN_REGISTRY).filter(k => {
+      if(!chainHasData(k)) return false; // hide chains whose data file isn't uploaded yet
       const c = CHAIN_REGISTRY[k];
       const sig = c.name + '|' + c.color;
       if(seen.has(sig)) return false;
@@ -2946,7 +2967,7 @@ function renderChainFilter(){
   const wrap = document.getElementById('chainFilter');
   const body = document.getElementById('chainFilterBody');
   if(!wrap || !body) return;
-  const chainKeys = Object.keys(CHAIN_REGISTRY).filter(k => (CHAIN_REGISTRY[k].group || 'pitstop') !== 'metro');
+  const chainKeys = Object.keys(CHAIN_REGISTRY).filter(k => (CHAIN_REGISTRY[k].group || 'pitstop') !== 'metro' && chainHasData(k));
   if(chainKeys.length < 2){
     // Only one chain registered — nothing meaningful to filter, so hide the control entirely
     wrap.style.display = 'none';
