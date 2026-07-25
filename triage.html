@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BathroomReport · Triage</title>
+<style>
+  /* ============================================================
+     Identity: restroom / wayfinding signage.
+     Porcelain ceramic ground, tile-grid cards with grout gaps,
+     signage-blue accent, tracked uppercase labels, tabular nums.
+     System font stack so it runs offline on iPhone / GitHub Pages.
+     ============================================================ */
+  :root{
+    --porcelain:#EAEEF1;
+    --tile:#FFFFFF;
+    --grout:#D3DAE0;
+    --ink:#16232B;
+    --ink-soft:#5B6B75;
+    --sign:#2360C4;
+    --sign-deep:#173F86;
+    --keep:#2E9E6B;
+    --merge:#C2811A;
+    --fix:#D0472F;
+    --shadow:0 1px 0 rgba(22,35,43,.04),0 2px 8px rgba(22,35,43,.06);
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font-family:var(--sans);
+    background:var(--porcelain);
+    color:var(--ink);
+    -webkit-text-size-adjust:100%;
+    line-height:1.45;
+  }
+  .wrap{max-width:940px;margin:0 auto;padding:16px 14px 60px}
+
+  /* ---- signage header plate ---- */
+  .plate{
+    background:var(--sign);
+    color:#fff;
+    border-radius:14px;
+    padding:16px 18px;
+    display:flex;align-items:center;gap:14px;
+    box-shadow:var(--shadow);
+  }
+  .glyph{
+    flex:0 0 auto;width:44px;height:44px;border-radius:9px;
+    background:#fff;color:var(--sign);
+    display:grid;place-items:center;font-size:24px;line-height:1;
+  }
+  .plate h1{font-size:17px;margin:0;letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+  .plate p{margin:2px 0 0;font-size:12.5px;opacity:.85;letter-spacing:.02em}
+
+  .eyebrow{
+    font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--ink-soft);font-weight:700;margin:26px 2px 10px;
+  }
+
+  /* ---- drop zone ---- */
+  .drop{
+    margin-top:14px;background:var(--tile);border:2px dashed var(--grout);
+    border-radius:14px;padding:30px 18px;text-align:center;cursor:pointer;
+    transition:border-color .15s ease,background .15s ease;
+  }
+  .drop:hover,.drop:focus-visible{border-color:var(--sign);background:#fff}
+  .drop.over{border-color:var(--sign);background:#F1F5FB}
+  .drop strong{display:block;font-size:15px;margin-bottom:4px}
+  .drop span{font-size:12.5px;color:var(--ink-soft)}
+  .drop:focus-visible{outline:3px solid var(--sign-deep);outline-offset:3px}
+  input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+  /* ---- tile grid stats ---- */
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+  .stat{
+    background:var(--tile);border-radius:11px;padding:13px 12px;box-shadow:var(--shadow);
+    border-top:3px solid var(--grout);
+  }
+  .stat .n{font-size:26px;font-weight:750;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .stat .k{font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;margin-top:2px}
+  .stat.keep{border-top-color:var(--keep)}
+  .stat.merge{border-top-color:var(--merge)}
+  .stat.fix{border-top-color:var(--fix)}
+
+  /* ---- controls ---- */
+  .panel{background:var(--tile);border-radius:13px;padding:15px 16px;box-shadow:var(--shadow);margin-top:14px}
+  .ctl{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:10px 0}
+  .ctl:first-child{margin-top:0}
+  .ctl label{font-size:13px;font-weight:600}
+  .ctl .hint{font-size:11.5px;color:var(--ink-soft);display:block;font-weight:400}
+  .ctl output{font-family:var(--mono);font-size:13px;font-weight:600;min-width:56px;text-align:right;color:var(--sign-deep)}
+  input[type=range]{flex:1;accent-color:var(--sign);max-width:230px}
+
+  /* ---- buttons ---- */
+  .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  button.act{
+    appearance:none;border:0;border-radius:9px;padding:11px 15px;
+    font-family:var(--sans);font-size:13.5px;font-weight:650;cursor:pointer;
+    letter-spacing:.01em;transition:transform .06s ease,filter .15s ease;
+  }
+  button.act:active{transform:translateY(1px)}
+  button.act:focus-visible{outline:3px solid var(--sign-deep);outline-offset:2px}
+  .primary{background:var(--sign);color:#fff}
+  .ghost{background:var(--porcelain);color:var(--ink)}
+  .primary:hover,.ghost:hover{filter:brightness(1.04)}
+  button.act:disabled{opacity:.4;cursor:not-allowed}
+
+  /* ---- tabs ---- */
+  .tabs{display:flex;gap:4px;margin-top:22px;border-bottom:2px solid var(--grout)}
+  .tab{
+    appearance:none;background:none;border:0;padding:10px 14px;cursor:pointer;
+    font-size:12.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--ink-soft);border-bottom:2px solid transparent;margin-bottom:-2px;
+  }
+  .tab[aria-selected=true]{color:var(--sign-deep);border-bottom-color:var(--sign)}
+  .tab:focus-visible{outline:2px solid var(--sign-deep);outline-offset:2px;border-radius:4px}
+  .view{margin-top:14px}
+  .view[hidden]{display:none}
+
+  /* ---- record cards ---- */
+  .rec{background:var(--tile);border-radius:11px;padding:12px 13px;box-shadow:var(--shadow);margin-bottom:8px;border-left:4px solid var(--grout)}
+  .rec.fix{border-left-color:var(--fix)}
+  .rec.merge{border-left-color:var(--merge)}
+  .rec h4{margin:0 0 3px;font-size:14px}
+  .rec .meta{font-size:12px;color:var(--ink-soft);word-break:break-word}
+  .tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+  .tag{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 7px;border-radius:5px;background:var(--porcelain);color:var(--ink-soft)}
+  .tag.fix{background:#FBE7E2;color:var(--fix)}
+  .tag.merge{background:#F7EAD0;color:var(--merge)}
+  .dupe-child{font-size:11.5px;color:var(--ink-soft);padding:5px 0 0 10px;border-left:2px solid var(--grout);margin-top:6px}
+  .empty{color:var(--ink-soft);font-size:13px;padding:26px 4px;text-align:center}
+
+  textarea{
+    width:100%;min-height:200px;margin-top:10px;border:1px solid var(--grout);border-radius:9px;
+    padding:11px;font-family:var(--mono);font-size:12px;line-height:1.5;background:#FBFCFD;color:var(--ink);resize:vertical;
+  }
+  textarea:focus-visible{outline:2px solid var(--sign);outline-offset:1px}
+  .count-note{font-size:12px;color:var(--ink-soft);margin:2px 2px 0}
+
+  @media (max-width:560px){
+    .grid{grid-template-columns:repeat(2,1fr)}
+    .stat .n{font-size:23px}
+    input[type=range]{max-width:150px}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="plate">
+    <div class="glyph" aria-hidden="true">🚻</div>
+    <div>
+      <h1>Triage</h1>
+      <p>Import a chain GeoJSON · dedupe · flag what needs fixing</p>
+    </div>
+  </header>
+
+  <div class="eyebrow">1 · Load file</div>
+  <label class="drop" id="drop" tabindex="0" role="button" aria-label="Choose or drop a GeoJSON file">
+    <strong id="dropTitle">Drop a GeoJSON file, or tap to choose</strong>
+    <span id="dropSub">.geojson · .json · .js — parsed entirely on your device</span>
+    <input type="file" id="file" accept=".geojson,.json,.js,application/geo+json,application/json">
+  </label>
+
+  <section id="results" hidden>
+
+    <div class="eyebrow">2 · Overview</div>
+    <div class="grid">
+      <div class="stat"><div class="n" id="sTotal">0</div><div class="k">Read in</div></div>
+      <div class="stat keep"><div class="n" id="sKept">0</div><div class="k">Unique</div></div>
+      <div class="stat merge"><div class="n" id="sDupes">0</div><div class="k">Duplicates</div></div>
+      <div class="stat fix"><div class="n" id="sFix">0</div><div class="k">Need fixing</div></div>
+    </div>
+
+    <div class="eyebrow">Tune the matching</div>
+    <div class="panel">
+      <div class="ctl">
+        <label for="dist">Merge radius
+          <span class="hint">How close two pins must be to count as the same store</span>
+        </label>
+        <input type="range" id="dist" min="10" max="200" step="5" value="60">
+        <output id="distOut">60 m</output>
+      </div>
+      <div class="ctl">
+        <label for="name">Name similarity
+          <span class="hint">How alike the names must be to merge (lower = more aggressive)</span>
+        </label>
+        <input type="range" id="name" min="0" max="90" step="5" value="45">
+        <output id="nameOut">0.45</output>
+      </div>
+    </div>
+
+    <div class="eyebrow">3 · Take it away</div>
+    <div class="panel">
+      <div class="row">
+        <button class="act primary" id="dlClean">Download cleaned GeoJSON</button>
+        <button class="act ghost" id="dlQueue">Download enrichment queue</button>
+        <button class="act ghost" id="copyQueue">Copy queue for Claude</button>
+      </div>
+      <p class="count-note" id="queueNote"></p>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" id="t-fix"   role="tab" aria-controls="v-fix"   aria-selected="true">Need fixing</button>
+      <button class="tab" id="t-dupes" role="tab" aria-controls="v-dupes" aria-selected="false">Duplicates</button>
+      <button class="tab" id="t-queue" role="tab" aria-controls="v-queue" aria-selected="false">Queue text</button>
+    </div>
+
+    <div class="view" id="v-fix"   role="tabpanel" aria-labelledby="t-fix"></div>
+    <div class="view" id="v-dupes" role="tabpanel" aria-labelledby="t-dupes" hidden></div>
+    <div class="view" id="v-queue" role="tabpanel" aria-labelledby="t-queue" hidden>
+      <textarea id="queueBox" readonly spellcheck="false"></textarea>
+    </div>
+
+  </section>
+</div>
+
+<script>
+"use strict";
+
+/* ------------------------------------------------------------------
+   Field alias maps — property keys vary wildly across sources.
+   ------------------------------------------------------------------ */
+const ALIASES = {
+  name:    ["name","store_name","storename","title","label","location_name"],
+  address: ["address","addr","street","address1","addr_full","full_address",
+            "formatted_address","street_address","addr:full","addr:street"],
+  city:    ["city","town","municipality","locality","addr:city"],
+  state:   ["state","region","province","st","addr:state"],
+  zip:     ["zip","zip_code","zipcode","postal_code","postcode","postal","addr:postcode"],
+  phone:   ["phone","telephone","tel","phone_number","contact:phone"],
+  hours:   ["hours","opening_hours","hours_of_operation","open_hours"],
+  website: ["website","url","web","contact:website"],
+  chain:   ["chain","brand","operator","company"],
+  store:   ["store_number","storenumber","store_no","store_id","number","unit","ref","store"],
+  id:      ["id","uuid","osm_id","place_id","fid","gid"]
+};
+
+function pick(props, keys){
+  if(!props) return "";
+  const lower = {};
+  for(const k in props) lower[k.toLowerCase()] = props[k];
+  for(const k of keys){
+    const v = lower[k];
+    if(v !== undefined && v !== null && String(v).trim() !== "") return String(v).trim();
+  }
+  return "";
+}
+
+/* ------------------------------------------------------------------
+   Input parsing: GeoJSON FeatureCollection, plain JSON array, or a
+   .js file that wraps an array. Returns array of {props, lat, lng}.
+   ------------------------------------------------------------------ */
+function parseInput(text){
+  let data;
+  const trimmed = text.trim();
+  try{
+    data = JSON.parse(trimmed);
+  }catch(e){
+    // strip common JS export wrapper then grab the array
+    let t = trimmed
+      .replace(/^export\s+default\s+/m,"")
+      .replace(/^export\s+const\s+\w+\s*=\s*/m,"")
+      .replace(/^const\s+\w+\s*=\s*/m,"")
+      .replace(/^module\.exports\s*=\s*/m,"");
+    const a = t.indexOf("["), b = t.lastIndexOf("]");
+    if(a===-1||b===-1) throw new Error("Couldn't find a data array in this file.");
+    data = JSON.parse(t.slice(a,b+1));
+  }
+
+  const rows = [];
+  const push = (props, lat, lng) => rows.push({props: props||{}, lat, lng});
+
+  if(data && data.type === "FeatureCollection" && Array.isArray(data.features)){
+    for(const f of data.features){
+      let lat=null,lng=null;
+      const g = f.geometry;
+      if(g && g.type==="Point" && Array.isArray(g.coordinates)){
+        lng = num(g.coordinates[0]);      // GeoJSON order is [lng, lat]
+        lat = num(g.coordinates[1]);
+      }else if(g && Array.isArray(g.coordinates)){
+        // polygon/multipolygon -> centroid of first ring
+        const c = centroid(g);
+        if(c){ lat=c.lat; lng=c.lng; }
+      }
+      push(f.properties, lat, lng);
+    }
+  }else if(Array.isArray(data)){
+    for(const item of data){
+      const lat = num(item.latitude ?? item.lat ?? item.y);
+      const lng = num(item.longitude ?? item.lng ?? item.lon ?? item.x);
+      push(item, lat, lng);
+    }
+  }else{
+    throw new Error("Unrecognized shape — expected a GeoJSON FeatureCollection or an array.");
+  }
+  return rows;
+}
+
+function num(v){
+  if(v===null||v===undefined||v==="") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function centroid(geom){
+  let ring;
+  if(geom.type==="Polygon") ring = geom.coordinates[0];
+  else if(geom.type==="MultiPolygon") ring = geom.coordinates[0][0];
+  else return null;
+  if(!ring||!ring.length) return null;
+  let x=0,y=0;
+  for(const p of ring){ x+=p[0]; y+=p[1]; }
+  return {lng:x/ring.length, lat:y/ring.length};
+}
+
+/* ------------------------------------------------------------------
+   Normalize each raw row into a flat record (one consistent shape —
+   no nested/flat split).
+   ------------------------------------------------------------------ */
+let UID = 0;
+function toRecord(raw){
+  const p = raw.props;
+  // coords may live in properties if geometry was missing
+  let lat = raw.lat, lng = raw.lng;
+  if(lat===null) lat = num(pick(p,["lat","latitude","y"]));
+  if(lng===null) lng = num(pick(p,["lng","lon","longitude","x"]));
+
+  const rec = {
+    uid: ++UID,
+    chain:   pick(p, ALIASES.chain),
+    store:   pick(p, ALIASES.store),
+    id:      pick(p, ALIASES.id),
+    name:    pick(p, ALIASES.name),
+    address: pick(p, ALIASES.address),
+    city:    pick(p, ALIASES.city),
+    state:   pick(p, ALIASES.state),
+    zip:     pick(p, ALIASES.zip),
+    phone:   pick(p, ALIASES.phone),
+    hours:   pick(p, ALIASES.hours),
+    website: pick(p, ALIASES.website),
+    lat, lng,
+    _original: p,
+    _flags: [],
+    _dupes: []
+  };
+  return rec;
+}
+
+/* completeness score — used to choose the survivor in a dupe group */
+function score(r){
+  let s=0;
+  if(validCoord(r)) s+=3;
+  if(r.address.length>4) s+=2;
+  if(r.city) s+=1;
+  if(r.state) s+=1;
+  if(r.zip) s+=1;
+  if(r.phone) s+=1;
+  if(r.hours) s+=1;
+  if(r.name) s+=1;
+  return s;
+}
+
+function validCoord(r){
+  return r.lat!==null && r.lng!==null &&
+         r.lat>=-90 && r.lat<=90 && r.lng>=-180 && r.lng<=180 &&
+         !(r.lat===0 && r.lng===0);
+}
+// plausible North America box — soft flag only
+function plausibleNA(r){
+  return validCoord(r) && r.lat>=14 && r.lat<=72 && r.lng>=-170 && r.lng<=-52;
+}
+
+/* ------------------------------------------------------------------
+   Quality flags
+   ------------------------------------------------------------------ */
+function flag(r){
+  r._flags = [];
+  if(!validCoord(r)) r._flags.push("NO_COORDS");
+  else if(!plausibleNA(r)) r._flags.push("COORDS_SUSPECT");
+  if(r.address.length < 5) r._flags.push("NO_ADDRESS");
+  if(!r.city)  r._flags.push("NO_CITY");
+  if(!r.state) r._flags.push("NO_STATE");
+  if(!r.zip)   r._flags.push("NO_ZIP");
+  return r._flags;
+}
+// a record "needs fixing" if any hard field is broken (phone/hours don't count)
+const HARD = new Set(["NO_COORDS","COORDS_SUSPECT","NO_ADDRESS","NO_CITY","NO_STATE","NO_ZIP"]);
+function needsFix(r){ return r._flags.some(f=>HARD.has(f)); }
+
+/* ------------------------------------------------------------------
+   Dedupe — spatial grid buckets + haversine + Dice name similarity.
+   Same store_number is treated as a strong match regardless of name.
+   ------------------------------------------------------------------ */
+function haversine(a,b){
+  const R=6371000, toR=Math.PI/180;
+  const dLat=(b.lat-a.lat)*toR, dLng=(b.lng-a.lng)*toR;
+  const la1=a.lat*toR, la2=b.lat*toR;
+  const h=Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function normName(s){
+  return s.toLowerCase()
+    .replace(/[^a-z0-9]+/g," ")
+    .replace(/\b(store|inc|llc|the|shop|shops|market|convenience|gas|station)\b/g," ")
+    .replace(/\s+/g," ").trim();
+}
+function dice(a,b){
+  a=normName(a); b=normName(b);
+  if(!a||!b) return 0;
+  if(a===b) return 1;
+  const bg = s=>{const m=new Map();for(let i=0;i<s.length-1;i++){const g=s.substr(i,2);m.set(g,(m.get(g)||0)+1);}return m;};
+  const A=bg(a),B=bg(b); let inter=0,tot=0;
+  for(const[g,c]of A){tot+=c; if(B.has(g))inter+=Math.min(c,B.get(g));}
+  for(const[,c]of B)tot+=c;
+  return tot? (2*inter)/tot : 0;
+}
+
+function dedupe(records, distM, nameThresh){
+  const cell = 0.02; // ~2.2km grid cells
+  const buckets = new Map();
+  const key = r => `${Math.round(r.lat/cell)}_${Math.round(r.lng/cell)}`;
+
+  for(const r of records){
+    if(validCoord(r)){
+      const k=key(r);
+      if(!buckets.has(k)) buckets.set(k,[]);
+      buckets.get(k).push(r);
+    }
+  }
+
+  const consumed = new Set();
+  const kept = [];
+
+  for(const r of records){
+    if(consumed.has(r.uid)) continue;
+    consumed.add(r.uid);
+
+    if(validCoord(r)){
+      // gather candidates from this + 8 neighboring cells
+      const [cx,cy] = key(r).split("_").map(Number);
+      const cands=[];
+      for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){
+        const b=buckets.get(`${cx+dx}_${cy+dy}`);
+        if(b) for(const c of b) if(!consumed.has(c.uid)) cands.push(c);
+      }
+      for(const c of cands){
+        const sameStore = r.store && c.store && r.store===c.store && r.chain===c.chain;
+        const d = haversine(r,c);
+        if(sameStore || (d<=distM && dice(r.name,c.name)>=nameThresh)){
+          consumed.add(c.uid);
+          r._dupes.push(c);
+        }
+      }
+    }
+    kept.push(r);
+  }
+
+  // survivor = most complete member of each group
+  for(const r of kept){
+    if(r._dupes.length){
+      const group=[r,...r._dupes].sort((a,b)=>score(b)-score(a));
+      const winner=group[0];
+      if(winner!==r){
+        winner._dupes = group.slice(1);
+        r._dupes = [];
+        kept[kept.indexOf(r)] = winner;
+      }
+    }
+  }
+  return kept;
+}
+
+/* ------------------------------------------------------------------
+   Exports
+   ------------------------------------------------------------------ */
+function cleanedGeoJSON(kept){
+  return {
+    type:"FeatureCollection",
+    features: kept.map(r=>({
+      type:"Feature",
+      geometry: validCoord(r) ? {type:"Point",coordinates:[r.lng,r.lat]} : null,
+      properties:{
+        chain:r.chain, store_number:r.store, name:r.name,
+        address:r.address, city:r.city, state:r.state, zip:r.zip,
+        phone:r.phone, hours:r.hours, website:r.website,
+        _flags:r._flags, _merged:r._dupes.length
+      }
+    }))
+  };
+}
+
+function enrichmentQueue(kept){
+  return kept.filter(needsFix).map(r=>{
+    const loc=[r.city,r.state].filter(Boolean).join(", ");
+    const chainName = r.chain || r.name || "convenience store";
+    const q = r.store
+      ? `${chainName} #${r.store}${loc?", "+loc:""}`
+      : `${chainName}${r.address?" "+r.address:""}${loc?", "+loc:""}`;
+    return {
+      ref:r.uid,
+      chain:r.chain, store_number:r.store, name:r.name,
+      known:{address:r.address, city:r.city, state:r.state, zip:r.zip},
+      coords: validCoord(r) ? {lat:r.lat,lng:r.lng} : null,
+      missing:r._flags.filter(f=>HARD.has(f)),
+      places_query:q.replace(/\s+/g," ").trim()
+    };
+  });
+}
+
+/* ------------------------------------------------------------------
+   UI wiring
+   ------------------------------------------------------------------ */
+let RAW=[];              // parsed raw rows (survive re-tuning)
+let CLEAN_JSON="", QUEUE_JSON="";
+
+const $ = id => document.getElementById(id);
+const drop=$("drop"), fileInput=$("file"), results=$("results");
+const distSlider=$("dist"), nameSlider=$("name");
+
+function run(){
+  const distM=Number(distSlider.value);
+  const nameThresh=Number(nameSlider.value)/100;
+  $("distOut").textContent = distM+" m";
+  $("nameOut").textContent = nameThresh.toFixed(2);
+
+  const records = RAW.map(toRecord);
+  records.forEach(flag);
+  const kept = dedupe(records, distM, nameThresh);
+  kept.forEach(flag); // re-flag survivors
+
+  const dupeCount = records.length - kept.length;
+  const fixList = kept.filter(needsFix);
+
+  $("sTotal").textContent = records.length.toLocaleString();
+  $("sKept").textContent  = kept.length.toLocaleString();
+  $("sDupes").textContent = dupeCount.toLocaleString();
+  $("sFix").textContent   = fixList.length.toLocaleString();
+
+  renderFix(fixList);
+  renderDupes(kept.filter(r=>r._dupes.length));
+
+  const clean = cleanedGeoJSON(kept);
+  const queue = enrichmentQueue(kept);
+  CLEAN_JSON = JSON.stringify(clean,null,2);
+  QUEUE_JSON = JSON.stringify(queue,null,2);
+  $("queueBox").value = QUEUE_JSON;
+  $("queueNote").textContent =
+    `${fixList.length.toLocaleString()} records queued for Places enrichment · ${kept.length.toLocaleString()} clean records ready to ship.`;
+
+  results.hidden=false;
+}
+
+const FLAG_LABEL={
+  NO_COORDS:"No coordinates", COORDS_SUSPECT:"Coords look wrong",
+  NO_ADDRESS:"No address", NO_CITY:"No city", NO_STATE:"No state", NO_ZIP:"No ZIP"
+};
+
+function renderFix(list){
+  const v=$("v-fix");
+  if(!list.length){ v.innerHTML=`<p class="empty">Nothing to fix — every record has coordinates and an address. 🎉</p>`; return; }
+  v.innerHTML="";
+  for(const r of list.slice(0,400)){
+    const el=document.createElement("div");
+    el.className="rec fix";
+    const meta=[r.address,[r.city,r.state,r.zip].filter(Boolean).join(" ")].filter(Boolean).join(" · ")||"—";
+    el.innerHTML=`
+      <h4>${esc(r.name||r.chain||"Unnamed store")}${r.store?` <span style="color:var(--ink-soft);font-weight:400">#${esc(r.store)}</span>`:""}</h4>
+      <div class="meta">${esc(meta)}</div>
+      <div class="tags">${r._flags.filter(f=>HARD.has(f)).map(f=>`<span class="tag fix">${FLAG_LABEL[f]||f}</span>`).join("")}</div>`;
+    v.appendChild(el);
+  }
+  if(list.length>400){
+    const n=document.createElement("p");n.className="count-note";
+    n.textContent=`Showing first 400 of ${list.length.toLocaleString()} — the download includes them all.`;
+    v.appendChild(n);
+  }
+}
+
+function renderDupes(list){
+  const v=$("v-dupes");
+  if(!list.length){ v.innerHTML=`<p class="empty">No duplicates found at the current settings.</p>`; return; }
+  v.innerHTML="";
+  for(const r of list.slice(0,300)){
+    const el=document.createElement("div");
+    el.className="rec merge";
+    const kids=r._dupes.map(d=>`<div class="dupe-child">↳ ${esc(d.name||d.chain||"dup")} · ${esc([d.city,d.state].filter(Boolean).join(", ")||"—")}</div>`).join("");
+    el.innerHTML=`
+      <h4>${esc(r.name||r.chain||"Unnamed")} <span class="tag merge">+${r._dupes.length} merged</span></h4>
+      <div class="meta">${esc([r.address,r.city,r.state].filter(Boolean).join(" · ")||"—")}</div>
+      ${kids}`;
+    v.appendChild(el);
+  }
+}
+
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+function loadFile(file){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      RAW=parseInput(reader.result);
+      if(!RAW.length) throw new Error("No records found in this file.");
+      $("dropTitle").textContent=`Loaded ${file.name}`;
+      $("dropSub").textContent=`${RAW.length.toLocaleString()} records — adjust the sliders to re-run`;
+      run();
+      results.scrollIntoView({behavior:"smooth",block:"start"});
+    }catch(err){
+      $("dropTitle").textContent="Couldn't read that file";
+      $("dropSub").textContent=err.message;
+      results.hidden=true;
+    }
+  };
+  reader.onerror=()=>{ $("dropSub").textContent="File read failed — try again."; };
+  reader.readAsText(file);
+}
+
+function download(name,text,type){
+  const blob=new Blob([text],{type});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+/* events */
+drop.addEventListener("click",()=>fileInput.click());
+drop.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();fileInput.click();}});
+fileInput.addEventListener("change",e=>{ if(e.target.files[0]) loadFile(e.target.files[0]); });
+["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
+drop.addEventListener("drop",e=>{ if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+
+let t;
+[distSlider,nameSlider].forEach(s=>s.addEventListener("input",()=>{
+  $("distOut").textContent=distSlider.value+" m";
+  $("nameOut").textContent=(Number(nameSlider.value)/100).toFixed(2);
+  clearTimeout(t); t=setTimeout(()=>{ if(RAW.length) run(); },160);
+}));
+
+$("dlClean").addEventListener("click",()=>download("bathroomreport-cleaned.geojson",CLEAN_JSON,"application/geo+json"));
+$("dlQueue").addEventListener("click",()=>download("enrichment-queue.json",QUEUE_JSON,"application/json"));
+$("copyQueue").addEventListener("click",async()=>{
+  try{ await navigator.clipboard.writeText(QUEUE_JSON); $("copyQueue").textContent="Copied ✓"; }
+  catch{ $("queueBox").select(); document.execCommand("copy"); $("copyQueue").textContent="Copied ✓"; }
+  setTimeout(()=>$("copyQueue").textContent="Copy queue for Claude",1400);
+});
+
+/* tabs */
+const tabs=[["t-fix","v-fix"],["t-dupes","v-dupes"],["t-queue","v-queue"]];
+tabs.forEach(([tid,vid])=>$(tid).addEventListener("click",()=>{
+  tabs.forEach(([t2,v2])=>{
+    const on=t2===tid;
+    $(t2).setAttribute("aria-selected",on);
+    $(v2).hidden=!on;
+  });
+}));
+</script>
+</body>
+</html>
