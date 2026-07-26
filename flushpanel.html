@@ -287,7 +287,7 @@
       </div>
       <div class="hint">Must be unique in that file — ratings key on it, so never reuse one.</div>
 
-      <div class="fld"><label>Name</label><input id="al_n" type="text" placeholder="Stewart's Shops — Example"></div>
+      <div class="fld"><label>Name <span style="opacity:.6">(optional — auto “Street, City”)</span></label><input id="al_n" type="text"></div>
       <div class="fld"><label>Street address</label><input id="al_street" type="text" placeholder="123 Main Street"></div>
       <div class="grid2">
         <div class="fld"><label>City</label><input id="al_city" type="text"></div>
@@ -302,6 +302,7 @@
         <div class="fld"><label>Longitude</label><input id="al_lng" type="text" inputmode="decimal" placeholder="-73.756232"></div>
       </div>
       <div class="fld"><label>Shop # (optional)</label><input id="al_num" type="text"></div>
+      <div class="fld"><label>OSM id (optional)</label><input id="al_osm_id" type="text" placeholder="way/582717369"></div>
 
       <div class="fld">
         <label>Hours</label>
@@ -1142,7 +1143,14 @@ $('#addSave').addEventListener('click', saveAddStore);
   if(!q('al_chain')) return; // panel not present
   CHAINS.forEach(function(c){ var o=document.createElement('option'); o.value=c[1]; o.textContent=c[0]; q('al_chain').appendChild(o); });
 
-  function suggestId(){ return (q('al_chain').value||'loc') + '-add-' + Date.now().toString(36); }
+  function slugify(s){ return String(s).toLowerCase().replace(/[^a-z0-9]+/g,''); }
+  function bareStreet(){ return q('al_street').value.trim().replace(/^\d+[-\s]*/,'').trim(); } // drop leading house number
+  function autoName(){ var st=bareStreet(), city=q('al_city').value.trim(); return (st&&city)?(st+', '+city):(st||city||''); }
+  function suggestId(){ var city=slugify(q('al_city').value), st=slugify(bareStreet());
+    if(city||st) return [city,st].filter(Boolean).join('-');
+    return (q('al_chain').value||'loc')+'-add-'+Date.now().toString(36); }
+  var idTouched=false;
+  function strNum(v){ v=String(v).trim(); return (v!=='' && isFinite(parseFloat(v))) ? v : null; }
   function hm(v){ return v ? v.replace(':','') : ''; }
   function windowStr(o,c){ o=hm(o); c=hm(c); if(!o||!c) return null; return (o==='0000'&&c==='0000')?'24':o+'-'+(c==='0000'?'2400':c); }
   function num6(v){ var n=parseFloat(v); return isFinite(n) ? Math.round(n*1e6)/1e6 : null; }
@@ -1175,17 +1183,15 @@ $('#addSave').addEventListener('click', saveAddStore);
   });
 
   function buildRecord(){
-    var key=q('al_chain').value;
     var street=q('al_street').value.trim(), city=q('al_city').value.trim(),
         state=q('al_state').value.trim().toUpperCase(), zip=q('al_zip').value.trim();
     var addr=[street, city, [state,zip].filter(Boolean).join(' ')].filter(function(x){return x&&x.trim();}).join(', ');
     var rec={};
-    rec.n = q('al_n').value.trim() || (CHAINS.filter(function(c){return c[1]===key;})[0]||['Location'])[0];
+    rec.n = q('al_n').value.trim() || autoName() || (CHAINS.filter(function(c){return c[1]===q('al_chain').value;})[0]||['Location'])[0];
+    var la=strNum(q('al_lat').value), ln=strNum(q('al_lng').value);
+    rec.lat = la===null?'':la; rec.lng = ln===null?'':ln;   // strings, exact as typed
     if(addr) rec.addr=addr;
-    var lat=num6(q('al_lat').value), lng=num6(q('al_lng').value);
-    rec.lat = lat===null?0:lat; rec.lng = lng===null?0:lng;
     rec.id = q('al_id').value.trim() || suggestId();
-    rec.chain = key;
     if(mode==='24') rec.hrs='24';
     else if(mode==='unknown') rec.hrs='';
     else if(mode==='same') rec.hrs = windowStr(q('al_sameOpen').value,q('al_sameClose').value) || '';
@@ -1193,47 +1199,34 @@ $('#addSave').addEventListener('click', saveAddStore);
       if(s.mode==='24') h[d[0]]='24'; else if(s.mode==='closed') h[d[0]]='closed';
       else { var w=windowStr(s.open,s.close); if(w) h[d[0]]=w; } });
       if(Object.keys(h).length) rec.hours=h; else rec.hrs=''; }
+    var ph=q('al_phone').value.trim(); if(ph) rec.phone=ph;
     var numv=q('al_num').value.trim(); if(numv) rec.num=numv;
+    var oid=q('al_osm_id').value.trim(); if(oid) rec.osm_id=oid;
     var osm={}; Array.prototype.forEach.call(document.querySelectorAll('.al_am:checked'), function(cb){ osm[cb.dataset.key]=1; });
     var rt=q('al_restroomType').value; if(rt) osm.restroomType=rt;
     if(Object.keys(osm).length) rec.osm=osm;
-    var meta={}; if(city) meta.city=city; if(state) meta.state=state; if(zip) meta.zip=zip;
-    var ph=q('al_phone').value.trim(); if(ph) meta.phone=ph;
-    meta.dataSource='manual'; meta.lastVerified=new Date().toISOString().slice(0,10);
-    rec.meta=meta;
-    return rec;
+    return rec;   // no chain / meta — the merge stamps chain, and this matches the file format
   }
-  function toJS(rec){
-    var ORDER=['n','addr','lat','lng','id','chain','hrs','hours','num','osm','meta'], ident=/^[A-Za-z_$][\w$]*$/;
-    function val(v,ind){
-      if(v===null) return 'null';
-      if(typeof v==='number') return String(v);
-      if(typeof v==='string') return '"'+esc(v)+'"';
-      if(typeof v==='object'){ var ks=Object.keys(v); if(!ks.length) return '{}';
-        var pad=new Array(ind+2).join('  ');
-        return '{\n'+ks.map(function(k){ var kk=ident.test(k)?k:'"'+esc(k)+'"'; return pad+kk+': '+val(v[k],ind+1); }).join(',\n')+'\n'+new Array(ind+1).join('  ')+'}'; }
-      return '""';
-    }
-    var ord={}; ORDER.forEach(function(k){ if(rec[k]!==undefined) ord[k]=rec[k]; });
-    Object.keys(rec).forEach(function(k){ if(ord[k]===undefined) ord[k]=rec[k]; });
-    return val(ord,0)+',';
-  }
+  function toJS(rec){ return JSON.stringify(rec, null, 2) + ','; }
   function idExists(key,id){ var arr=window[key+'Locations']; return Array.isArray(arr) && arr.some(function(r){ return r && r.id===id; }); }
   function validate(rec){
-    var miss=[]; if(!rec.chain) miss.push('chain'); if(!rec.n) miss.push('name');
-    if(!q('al_lat').value.trim()||num6(q('al_lat').value)===null) miss.push('latitude');
-    if(!q('al_lng').value.trim()||num6(q('al_lng').value)===null) miss.push('longitude');
+    var key=q('al_chain').value;
+    var miss=[]; if(!rec.n) miss.push('name');
+    if(strNum(q('al_lat').value)===null) miss.push('latitude');
+    if(strNum(q('al_lng').value)===null) miss.push('longitude');
     if(!rec.id) miss.push('id');
     var notes=[]; if(miss.length) notes.push('Missing: '+miss.join(', ')+'.');
-    var la=rec.lat, ln=rec.lng;
+    var la=parseFloat(rec.lat), ln=parseFloat(rec.lng);
     if((la&&(la<-90||la>90))||(ln&&(ln<-180||ln>180))) notes.push('Coordinates out of range.');
     else if(la&&ln&&(la<15||la>72||ln>-50)) notes.push('Coordinates look off for the US — check they aren’t reversed.');
-    if(rec.id && idExists(rec.chain, rec.id)) notes.push('That id already exists in '+FILE[rec.chain]+' — generate a new one.');
+    if(rec.id && idExists(key, rec.id)) notes.push('That id already exists in '+FILE[key]+' — change it.');
     if(!rec.addr) notes.push('No address entered (optional, recommended).');
     return notes;
   }
   function render(){
     q('al_file').innerHTML = 'Paste into → <b>'+(FILE[q('al_chain').value]||q('al_chain').value+'-locations.js')+'</b> (window.'+q('al_chain').value+'Locations)';
+    if(!idTouched) q('al_id').value = suggestId();       // id tracks the address until you edit it
+    q('al_n').placeholder = autoName() || 'Street, City';
     var rec=buildRecord();
     q('al_out').textContent = toJS(rec);
     var notes=validate(rec), w=q('al_warn');
@@ -1241,8 +1234,9 @@ $('#addSave').addEventListener('click', saveAddStore);
     else { w.style.display='none'; }
   }
 
-  q('al_regen').addEventListener('click', function(){ q('al_id').value=suggestId(); render(); });
-  q('al_chain').addEventListener('change', function(){ if(!q('al_id').value || /-add-/.test(q('al_id').value)) q('al_id').value=suggestId(); render(); });
+  q('al_id').addEventListener('input', function(){ idTouched=true; });
+  q('al_regen').addEventListener('click', function(){ idTouched=false; q('al_id').value=suggestId(); render(); });
+  q('al_chain').addEventListener('change', function(){ render(); });
   document.querySelector('[data-view="addloc"]').addEventListener('input', render);
   q('al_copy').addEventListener('click', function(){
     var t=q('al_out').textContent;
@@ -1253,12 +1247,12 @@ $('#addSave').addEventListener('click', saveAddStore);
     setTimeout(function(){ q('al_copy').textContent='Copy record'; }, 1400);
   });
   q('al_clear').addEventListener('click', function(){
-    ['al_n','al_street','al_city','al_state','al_zip','al_phone','al_lat','al_lng','al_num','al_sameOpen','al_sameClose'].forEach(function(id){ q(id).value=''; });
+    ['al_n','al_street','al_city','al_state','al_zip','al_phone','al_lat','al_lng','al_num','al_osm_id','al_sameOpen','al_sameClose'].forEach(function(id){ q(id).value=''; });
     q('al_restroomType').value='';
     Array.prototype.forEach.call(document.querySelectorAll('.al_am'), function(c){ c.checked=false; });
     DAYS.forEach(function(d){ dayState[d[0]]={mode:'window',open:'',close:''}; syncChips(d[0]); });
     q('al_bydayBox').querySelectorAll('input[type=time]').forEach(function(i){ i.value=''; });
-    q('al_id').value=suggestId(); render();
+    idTouched=false; q('al_id').value=suggestId(); render();
   });
 
   q('al_id').value=suggestId();
