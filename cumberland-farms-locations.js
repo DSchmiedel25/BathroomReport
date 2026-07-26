@@ -1,4 +1,15 @@
 window.cumberlandFarmsLocations = [
+{
+  "n": "Duanesburg Rd, Schenectady",
+  "lat": "42.78656",
+  "lng": "-73.99781",
+  "addr": "511 Duanesburg Rd, Schenectady, NY 12306",
+  "id": "schenectady-duanesburgrd",
+  "hrs": "24",
+  "osm": {
+    "gas": 1
+  }
+},
   {
     "n": "Russell St, Hadley",
     "lat": "42.342062",
