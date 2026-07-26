@@ -2972,40 +2972,68 @@ function saveDisabledChains(){
   localStorage.setItem('disabledChains', JSON.stringify(Array.from(disabledChains)));
 }
 
+// Road layers are grouped into a few buckets so the control stays short as chains are added.
+// Metros keep their own section; everything else falls into one of these three.
+const TRAVEL_KEYS = ['pilot', 'loves', 'travelCentersOfAmerica', 'bucees'];
+function bucketOf(key){
+  if(key === 'restarea') return 'rest';
+  if(TRAVEL_KEYS.includes(key)) return 'travel';
+  return 'convenience';
+}
+const ROAD_BUCKETS = [
+  { id: 'rest',        name: 'Rest areas',        color: '#1976d2' },
+  { id: 'travel',      name: 'Travel plazas',     color: '#00519e' },
+  { id: 'convenience', name: 'Gas & convenience', color: '#2ea1aa' }
+];
+function chainsInBucket(id){
+  return Object.keys(CHAIN_REGISTRY).filter(k => groupOf(k) !== 'metro' && chainHasData(k) && bucketOf(k) === id);
+}
+
+// One toggle per road bucket, each switching all of its chains on/off through disabledChains.
 function renderChainFilter(){
   const wrap = document.getElementById('chainFilter');
   const body = document.getElementById('chainFilterBody');
   if(!wrap || !body) return;
-  const chainKeys = Object.keys(CHAIN_REGISTRY).filter(k => (CHAIN_REGISTRY[k].group || 'pitstop') !== 'metro' && k !== 'restarea' && chainHasData(k));
-  if(chainKeys.length < 2){
-    // Only one chain registered — nothing meaningful to filter, so hide the control entirely
+  const buckets = ROAD_BUCKETS.map(b => ({ ...b, keys: chainsInBucket(b.id) })).filter(b => b.keys.length);
+  const totalChains = buckets.reduce((n, b) => n + b.keys.length, 0);
+  if(totalChains < 2){
+    // Not enough loaded to filter meaningfully — hide the control entirely
     wrap.style.display = 'none';
     return;
   }
-  const allOn = chainKeys.every(k => activeChains.has(k));
-  const allBtn = `<button type="button" class="chain-all-btn" id="chainSelectAll"${allOn?' disabled':''}>${allOn?'✓ All chains shown':'Select all chains'}</button>`;
-  body.innerHTML = allBtn + chainKeys.map(key => {
-    const chain = CHAIN_REGISTRY[key];
-    const checked = activeChains.has(key) ? 'checked' : '';
+  body.innerHTML = buckets.map(b => {
+    const on = b.keys.every(k => activeChains.has(k));
     return `<label class="chain-filter-row">
-      <input type="checkbox" class="chain-filter-checkbox" data-chain="${key}" ${checked}>
-      <span class="dot" style="background:${chain.color}"></span>${escapeHtml(chain.name)}
+      <input type="checkbox" class="bucket-filter-checkbox" data-bucket="${b.id}" ${on ? 'checked' : ''}>
+      <span class="dot" style="background:${b.color}"></span>${escapeHtml(b.name)}
+      <span style="margin-left:6px;opacity:.5">(${b.keys.length})</span>
     </label>`;
   }).join('');
 }
 
-// "Select all chains" — re-enable every chain at once (clears the disable list).
-document.getElementById('chainFilterBody')?.addEventListener('click', (e) => {
-  if(!e.target.closest('#chainSelectAll')) return;
-  disabledChains.clear();
+// Region toggle: flip every chain in the bucket at once.
+function onBucketToggle(e){
+  const cb = e.target.closest('.bucket-filter-checkbox');
+  if(!cb) return;
+  const keys = chainsInBucket(cb.dataset.bucket);
+  if(cb.checked) keys.forEach(k => disabledChains.delete(k));
+  else keys.forEach(k => disabledChains.add(k));
   activeChains = getActiveChains();
+  // Never allow the whole map to blank out — if nothing is left active, revert this toggle
+  if(activeChains.size === 0){
+    keys.forEach(k => disabledChains.delete(k));
+    activeChains = getActiveChains();
+    cb.checked = true;
+  }
   saveDisabledChains();
   renderChainFilter();
+  renderLayers();
   applyFilters();
-});
+}
+document.getElementById('chainFilterBody')?.addEventListener('change', onBucketToggle);
 
-// Shared by the per-chain checkboxes (under Pitstops) and the per-city public/customer checkboxes
-// (under Metros) — both are entries in CHAIN_REGISTRY toggled through the same disabledChains list.
+// Per-city public/customer checkboxes under Metros — entries in CHAIN_REGISTRY toggled through
+// the same disabledChains list.
 function onSubLayerCheckboxChange(e){
   const cb = e.target.closest('.chain-filter-checkbox');
   if(!cb) return;
@@ -3023,7 +3051,6 @@ function onSubLayerCheckboxChange(e){
   renderLayers();
   applyFilters();
 }
-document.getElementById('chainFilterBody')?.addEventListener('change', onSubLayerCheckboxChange);
 document.getElementById('metroFilterBody')?.addEventListener('change', onSubLayerCheckboxChange);
 
 // ---- Travel mode toggle (on the road / on foot) ------------------------------------------
