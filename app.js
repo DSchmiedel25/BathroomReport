@@ -43,6 +43,7 @@ const CHAIN_REGISTRY = {
   getgo: { name: "GetGo", color: '#b3122b', textColor: '#ffffff', dataVar: 'getgoLocations' },
   quickChek: { name: "QuickChek", color: '#003da5', textColor: '#ffffff', dataVar: 'quickChekLocations' },
   townPump: { name: "Town Pump", color: '#8a1f2b', textColor: '#ffffff', dataVar: 'townPumpLocations' },
+  restarea: { name: "Rest Area", color: '#1976d2', textColor: '#ffffff', dataVar: 'restareaLocations' },
   nycDunkin: { name: "Dunkin'", color: '#ff6e0c', textColor: '#ffffff', dataVar: 'nycDunkinLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
   nycStarbucks: { name: 'Starbucks', color: '#00704a', textColor: '#ffffff', dataVar: 'nycStarbucksLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
   nycGregorys: { name: 'Gregorys Coffee', color: '#1a1a1a', textColor: '#ffffff', dataVar: 'nycGregorysLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
@@ -2608,6 +2609,7 @@ document.querySelectorAll('.onboardingModeBtn').forEach(btn => {
 
 // Resize every pin whenever the zoom level changes
 let lastMetroZoomOk = null;
+let lastRestZoomOk = null;
 map.on('zoomend', () => {
   seedLocations.forEach(loc => {
     const m = markers[loc.id];
@@ -2615,11 +2617,13 @@ map.on('zoomend', () => {
     if(m.isPopupOpen()) resizeOpenMarkerIcon(m); // resize in place; never swap icon on an open popup
     else m.setIcon(makeIcon(loc.id));
   });
-  // Metro zoom gate: only re-run the membership filter when crossing the threshold, not on
-  // every zoom step — applyFilters iterates all markers, so this keeps zooming cheap.
+  // Metro + rest-area zoom gates: only re-run the membership filter when crossing a threshold, not
+  // on every zoom step — applyFilters iterates all markers, so this keeps zooming cheap.
   const metroZoomOk = map.getZoom() >= METRO_MIN_ZOOM;
-  if(metroZoomOk !== lastMetroZoomOk){
+  const restZoomOk = map.getZoom() >= REST_MIN_ZOOM;
+  if(metroZoomOk !== lastMetroZoomOk || restZoomOk !== lastRestZoomOk){
     lastMetroZoomOk = metroZoomOk;
+    lastRestZoomOk = restZoomOk;
     applyFilters();
   }
 });
@@ -2798,7 +2802,9 @@ function applyFilters(){
     // Metro pins are additionally zoom-gated (>= METRO_MIN_ZOOM) in any mode so a zoomed-out
     // map never floods with dense city pins.
     const isMetroLoc = groupOf(m.chainKey || DEFAULT_CHAIN_KEY) === 'metro';
-    const zoomOk = !isMetroLoc || map.getZoom() >= METRO_MIN_ZOOM;
+    const isRestLoc = (m.chainKey || DEFAULT_CHAIN_KEY) === 'restarea';
+    const zoomOk = (!isMetroLoc || map.getZoom() >= METRO_MIN_ZOOM)
+                && (!isRestLoc || map.getZoom() >= REST_MIN_ZOOM);
     const modeOk = travelMode === 'foot' ? isMetroLoc : true;
     const layerOk = zoomOk && modeOk;
     const popupOpen = m.isPopupOpen && m.isPopupOpen();
@@ -2928,6 +2934,9 @@ async function saveTravelModeToAccount(){
 // the map stays pit-stops-only regardless of mode — keeps the road-trip view clean and avoids
 // dumping ~1,400 dense city pins into a zoomed-out map.
 const METRO_MIN_ZOOM = 12;
+// Rest areas are highway features: gate them like metro pins, but at a lower zoom so they appear
+// at regional/route level (not on the whole-country view, where ~1,400 pins would be clutter).
+const REST_MIN_ZOOM = 8;
 
 // Shared with List: does the travel mode allow this location right now?
 // "On the road" allows everything; "On foot" allows only metro/city locations.
@@ -2967,7 +2976,7 @@ function renderChainFilter(){
   const wrap = document.getElementById('chainFilter');
   const body = document.getElementById('chainFilterBody');
   if(!wrap || !body) return;
-  const chainKeys = Object.keys(CHAIN_REGISTRY).filter(k => (CHAIN_REGISTRY[k].group || 'pitstop') !== 'metro' && chainHasData(k));
+  const chainKeys = Object.keys(CHAIN_REGISTRY).filter(k => (CHAIN_REGISTRY[k].group || 'pitstop') !== 'metro' && k !== 'restarea' && chainHasData(k));
   if(chainKeys.length < 2){
     // Only one chain registered — nothing meaningful to filter, so hide the control entirely
     wrap.style.display = 'none';
