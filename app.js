@@ -2008,6 +2008,8 @@ async function attachStoreFeatureHandlers(loc){
   });
 }
 
+let _appliedVoteLocIds = new Set();
+
 async function loadAllRatings(){
   // Loads only THIS user's own votes (a handful of docs). Community ratings are NOT bulk-read
   // anymore — that was thousands of reads on every load and after every auth change. Each
@@ -2045,25 +2047,28 @@ async function loadAllRatings(){
     }
   }catch(e){ console.error('my ratings load failed', e); }
 
-  seedLocations.forEach(loc => {
-    const agg = ratingsCache[loc.id] || emptyAgg();
-    const myVote = voteByLoc[loc.id] || emptyVote();
-    ratingsCache[loc.id] = agg;
-    myVoteCache[loc.id] = myVote;
-    loadedIds.add(loc.id);
-    const marker = markers[loc.id];
+  // Only touch markers whose personal rating state actually changed. The old version rewrote
+  // popup HTML and icons for every location after authentication (13,000+ marker mutations),
+  // which could exhaust Mobile Safari and make iOS reload the page. Include IDs from the prior
+  // identity so logging out or switching accounts correctly clears the old user's rated pins.
+  const currentVoteIds = new Set(Object.keys(voteByLoc));
+  const changedVoteIds = new Set([..._appliedVoteLocIds, ...currentVoteIds]);
+  changedVoteIds.forEach(id => {
+    const loc = locationsById[id];
+    if(!loc) return;
+    const agg = ratingsCache[id] || emptyAgg();
+    const myVote = voteByLoc[id] || emptyVote();
+    ratingsCache[id] = agg;
+    myVoteCache[id] = myVote;
+    loadedIds.add(id);
+    const marker = markers[id];
     if(marker){
-      // Never swap the icon out from under a currently-open popup — replacing the marker's
-      // underlying DOM element while its popup is open is a known way to silently break/close
-      // that popup on some browsers (this was very likely the cause of pins "showing briefly
-      // and disappearing" on Android). Content updates are safe; icon updates wait until closed.
-      if(!marker.isPopupOpen()){
-        marker.setIcon(makeIcon(loc.id));
-      }
+      if(!marker.isPopupOpen()) marker.setIcon(makeIcon(id));
       marker.setPopupContent(popupHtml(loc, agg, myVote));
       if(marker.isPopupOpen()) attachStarHandlers(loc);
     }
   });
+  _appliedVoteLocIds = currentVoteIds;
   updateMostRecentBadge();
   updateMyProgressBadge();
   checkAndUnlockAchievements();
@@ -3075,41 +3080,41 @@ function isConfirmedNotAccessible(loc){
 // viewport, so a small pan doesn't leave blank areas while new pins load in.
 const MARKER_VIEWPORT_PAD = 0.3;
 
+let _filterRunToken = 0;
 function applyFilters(){
-  // Filter the actual marker instances rather than looking them up again by location ID.
-  // This prevents stray pins when imported data has duplicate IDs or a marker lookup is
-  // overwritten: every marker that was created is always evaluated and removed as needed.
-  //
-  // A pin is shown only when it passes the chain + open-now filters AND is inside the
-  // padded viewport. Off-screen pins stay out of the DOM, which is what keeps the map fast
-  // with thousands of locations loaded. A pin whose popup is currently open is always kept
-  // (e.g. a Bathroom Now / list result centered on a pin that a filter would otherwise hide)
-  // so opening it never immediately closes it on the resulting map move.
-  // Clustering owns viewport culling now (removeOutsideVisibleBounds), so applyFilters only
-  // decides membership by the chain / open-now / accessible filters — no bounds check here. A pin
-  // with an open popup is always kept so opening it never immediately removes it.
-  allLocationMarkers.forEach(m => {
-    const loc = m.locationData;
-    if(!loc) return;
-    const openOk = showAllLocations || isLocationOpenNow(loc) !== false; // hide only confirmed-closed; unknown stays visible
-    const accessOk = !hideInaccessible || !isConfirmedNotAccessible(loc); // hide only confirmed-inaccessible; unknown stays visible
-    const chainOk = activeChains.has(m.chainKey || DEFAULT_CHAIN_KEY);
-    // Modes: "On the road" shows EVERYTHING; "On foot" shows ONLY metro/city locations.
-    // Metro pins are additionally zoom-gated (>= METRO_MIN_ZOOM) in any mode so a zoomed-out
-    // map never floods with dense city pins.
-    const isMetroLoc = groupOf(m.chainKey || DEFAULT_CHAIN_KEY) === 'metro';
-    const isRestLoc = (m.chainKey || DEFAULT_CHAIN_KEY) === 'restarea';
-    const zoomOk = (!isMetroLoc || map.getZoom() >= METRO_MIN_ZOOM)
-                && (!isRestLoc || map.getZoom() >= REST_MIN_ZOOM);
-    const modeOk = travelMode === 'foot' ? isMetroLoc : true;
-    const layerOk = zoomOk && modeOk;
-    const popupOpen = m.isPopupOpen && m.isPopupOpen();
-    if((openOk && accessOk && chainOk && layerOk) || popupOpen){
-      if(!markerCluster.hasLayer(m)) markerCluster.addLayer(m);
-    } else {
-      if(markerCluster.hasLayer(m)) markerCluster.removeLayer(m);
+  // Process marker membership in small animation-frame batches. Authentication can change many
+  // saved chain filters at once; doing thousands of MarkerCluster add/remove operations in one
+  // synchronous burst can trigger iOS Safari's page-reload/crash behavior.
+  const runToken = ++_filterRunToken;
+  const batchSize = 350;
+  let index = 0;
+
+  function processBatch(){
+    if(runToken !== _filterRunToken) return; // a newer filter pass superseded this one
+    const stop = Math.min(index + batchSize, allLocationMarkers.length);
+    for(; index < stop; index++){
+      const m = allLocationMarkers[index];
+      const loc = m.locationData;
+      if(!loc) continue;
+      const openOk = showAllLocations || isLocationOpenNow(loc) !== false;
+      const accessOk = !hideInaccessible || !isConfirmedNotAccessible(loc);
+      const chainOk = activeChains.has(m.chainKey || DEFAULT_CHAIN_KEY);
+      const isMetroLoc = groupOf(m.chainKey || DEFAULT_CHAIN_KEY) === 'metro';
+      const isRestLoc = (m.chainKey || DEFAULT_CHAIN_KEY) === 'restarea';
+      const zoomOk = (!isMetroLoc || map.getZoom() >= METRO_MIN_ZOOM)
+                  && (!isRestLoc || map.getZoom() >= REST_MIN_ZOOM);
+      const modeOk = travelMode === 'foot' ? isMetroLoc : true;
+      const popupOpen = m.isPopupOpen && m.isPopupOpen();
+      if((openOk && accessOk && chainOk && zoomOk && modeOk) || popupOpen){
+        if(!markerCluster.hasLayer(m)) markerCluster.addLayer(m);
+      } else if(markerCluster.hasLayer(m)){
+        markerCluster.removeLayer(m);
+      }
     }
-  });
+    if(index < allLocationMarkers.length) requestAnimationFrame(processBatch);
+  }
+
+  requestAnimationFrame(processBatch);
 }
 
 // Clustering now handles which pins render as you pan/zoom (removeOutsideVisibleBounds), so
