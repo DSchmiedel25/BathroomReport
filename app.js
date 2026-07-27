@@ -1037,6 +1037,19 @@ function canonHrsOne(str){
 // Write the caller's own hours report. Doc id = uid enforces one report per user per store; the
 // recomputeHourStatus Cloud Function turns two agreeing eligible reports into verified hours.
 // Fields are exactly the five the security rules allow — nothing else.
+// Half-hour dropdown options (00 and 30 only) — reliable on iOS where <input type=time step>
+// is ignored. value is 24h "HH:MM" so canonHrsOne parses it unchanged; label is 12-hour.
+function halfHourOptions(sel){
+  let out = '<option value="">--</option>';
+  for(let mins = 0; mins < 24*60; mins += 30){
+    const h = Math.floor(mins/60), m = mins%60;
+    const val = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+    const h12 = ((h + 11) % 12) + 1, period = h < 12 ? 'AM' : 'PM';
+    const label = h12 + ':' + String(m).padStart(2,'0') + ' ' + period;
+    out += `<option value="${val}"${val === sel ? ' selected' : ''}>${label}</option>`;
+  }
+  return out;
+}
 async function saveHoursReport(locId, value, kind){
   if(!isLoggedIn()) return false;
   try{
@@ -1265,11 +1278,11 @@ function popupHtml(loc, agg, myVote){
         <button type="button" data-mode="perday" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">📅 Different by day</button>
       </div>
       <div id="hours-single-${loc.id}" style="display:none;margin-top:8px;align-items:center;gap:10px;color:#f6f8fa;font-size:13px;">
-        <label>Open <input type="time" step="1800" id="hr-open-${loc.id}"></label>
-        <label>Close <input type="time" step="1800" id="hr-close-${loc.id}"></label>
+        <label>Open <select id="hr-open-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></label>
+        <label>Close <select id="hr-close-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></label>
       </div>
       <div id="hours-perday-${loc.id}" style="display:none;margin-top:8px;color:#f6f8fa;">
-        ${['mon','tue','wed','thu','fri','sat','sun'].map(d=>`<div style="display:flex;align-items:center;gap:6px;margin:3px 0;font-size:13px;"><span style="width:38px;text-transform:capitalize;">${d}</span><input type="time" step="1800" id="hr-${d}-o-${loc.id}"> – <input type="time" step="1800" id="hr-${d}-c-${loc.id}"></div>`).join('')}
+        ${['mon','tue','wed','thu','fri','sat','sun'].map(d=>`<div style="display:flex;align-items:center;gap:6px;margin:3px 0;font-size:13px;"><span style="width:38px;text-transform:capitalize;">${d}</span><select id="hr-${d}-o-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select> – <select id="hr-${d}-c-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></div>`).join('')}
         <div style="font-size:12px;color:#9aa3ad;margin-top:4px;">Leave a day blank if you're not sure.</div>
       </div>
       <button type="button" class="btn btn-amber hours-submit" id="hours-submit-${loc.id}" style="display:none;margin-top:8px;">Send hours</button>
