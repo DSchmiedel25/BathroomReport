@@ -1,5 +1,3 @@
-// Speedway — deduped + OSM hours re-applied.
-
 window.speedwayLocations = [
   {
     "n": "Grants Pass, OR",
@@ -26797,7 +26795,7 @@ window.speedwayLocations = [
     "addr": "812 Central Ave, Albany, NY 12206",
     "id": "way/100177783",
     "chain": "speedway",
-    "hrs": "",
+    "hrs": "0600-2200",
     "osm": {
       "gas": 1
     },
@@ -26807,7 +26805,10 @@ window.speedwayLocations = [
       "google_place_id": "ChIJ2cmw_6UL3okRWHfoLYPnnCY",
       "google_rating": 4,
       "google_rating_count": 49,
-      "address_status": "filled"
+      "address_status": "filled",
+      "prevHrs": "",
+      "prevHrsSrc": "",
+      "hrsSrc": "admin_override"
     },
     "phone": "+1-518-489-0823"
   },
