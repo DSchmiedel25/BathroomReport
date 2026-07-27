@@ -39,14 +39,23 @@ if git diff --cached --quiet; then
   echo "No location changes to commit. Done."; exit 0
 fi
 
+# Something baked — bump the PWA cache version so devices actually load the new data.
+CUR=$(grep -oE "bathroomreport-v[0-9]+" sw.js | head -1)
+if [ -n "$CUR" ]; then
+  NUM=$(echo "$CUR" | grep -oE "[0-9]+$")
+  NEXT="bathroomreport-v$((NUM+1))"
+  sed -i '' "s/$CUR/$NEXT/g" sw.js
+  echo "cache: $CUR -> $NEXT"
+  git add sw.js
+fi
+
 # Backstop: refuse to commit if a secret or intermediate somehow got staged.
 if git diff --cached --name-only | grep -qiE "serviceAccountKey|overrides\.json|votes-summary\.json|hours-status\.json"; then
   echo ""; echo "🛑 STOP: a secret/intermediate file is staged. Not committing."; exit 1
 fi
 
-git commit -m "Full bake: overrides + community/admin hours + amenities"
+git commit -m "Full bake: overrides + hours + amenities (+cache bump)"
 git push
 echo ""
 echo "✅ Baked, committed, pushed (overrides + hours + amenities)."
-echo "   • If you changed app code, bump sw.js separately."
 echo "   • Clear applied overrides by hand in Firebase Console → Firestore → overrides when confirmed live."
