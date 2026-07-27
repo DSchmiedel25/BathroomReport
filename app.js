@@ -1196,8 +1196,9 @@ function metroPopupHtml(loc, agg, myVote){
     <div class="popup-actions">
       <button class="btn btn-primary directions-btn" id="directions-btn-${loc.id}" data-lat="${loc.lat}" data-lng="${loc.lng}">🧭 Directions</button>
       <button class="btn btn-secondary btn-icon-only share-btn" title="Share" data-shareurl="${shareUrl}" data-sharename="${(loc.n||'').replace(/"/g,'&quot;')}">🔗</button>
-      <button class="btn btn-danger btn-icon-only report-toggle-btn" title="Report an issue" id="report-toggle-${loc.id}">🚩</button>
+      ${isLoggedIn() ? `<button class="btn btn-danger btn-icon-only report-toggle-btn" title="Report an issue" id="report-toggle-${loc.id}">🚩</button>` : ''}
     </div>
+    ${isLoggedIn() ? '' : `<div class="popup-signin-hint" style="margin-top:6px;">🔒 Log in to add hours or report an issue.</div>`}
     <div class="report-section" id="report-section-${loc.id}" style="display:none;">
       <div class="report-heading">Report a problem with this listing</div>
       <div class="report-cats" id="report-cats-${loc.id}">
@@ -1247,11 +1248,33 @@ function popupHtml(loc, agg, myVote){
         : '';
     hoursLine = `<div class="hours-line">🕐 ${hoursText}${statusHtml ? ' · ' + statusHtml : ''}</div>`;
   } else {
-    hoursLine = `<div class="hours-line">🕐 Hours not listed for this store yet — know them? Tap 🚩 below to send them in.</div>`;
+    hoursLine = `<div class="hours-line">🕐 Hours not listed yet — know them? Tap 🕐 Report hours below.</div>`;
   }
   const recency = relativeTimeFromNow(agg.lastRatedAt || agg.lastUpdated);
   const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}</div>` : '';
   const chain = chainFor(loc);
+  // Report hours is offered ONLY where hours are unknown — it fills blanks. Correcting wrong
+  // hours stays in the 🚩 Report-a-problem flow ("Wrong hours").
+  const hoursReportHtml = (hoursText || !isLoggedIn()) ? '' : `
+    <button type="button" class="btn btn-secondary hours-report-toggle" id="hours-report-toggle-${loc.id}" style="margin:6px 0;width:100%;">🕐 Report hours</button>
+    <div class="hours-report-section" id="hours-report-section-${loc.id}" style="display:none;background:#141619;border:1px solid #2a2e35;border-radius:10px;padding:10px;margin-bottom:6px;">
+      <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:#f6f8fa;">What hours is this store open? Two travelers agreeing makes it official.</div>
+      <div id="hours-mode-${loc.id}">
+        <button type="button" data-mode="24" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">🕛 Open 24 hours</button>
+        <button type="button" data-mode="single" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">🕐 Set open &amp; close</button>
+        <button type="button" data-mode="perday" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">📅 Different by day</button>
+      </div>
+      <div id="hours-single-${loc.id}" style="display:none;margin-top:8px;align-items:center;gap:10px;color:#f6f8fa;font-size:13px;">
+        <label>Open <input type="time" step="1800" id="hr-open-${loc.id}"></label>
+        <label>Close <input type="time" step="1800" id="hr-close-${loc.id}"></label>
+      </div>
+      <div id="hours-perday-${loc.id}" style="display:none;margin-top:8px;color:#f6f8fa;">
+        ${['mon','tue','wed','thu','fri','sat','sun'].map(d=>`<div style="display:flex;align-items:center;gap:6px;margin:3px 0;font-size:13px;"><span style="width:38px;text-transform:capitalize;">${d}</span><input type="time" step="1800" id="hr-${d}-o-${loc.id}"> – <input type="time" step="1800" id="hr-${d}-c-${loc.id}"></div>`).join('')}
+        <div style="font-size:12px;color:#9aa3ad;margin-top:4px;">Leave a day blank if you're not sure.</div>
+      </div>
+      <button type="button" class="btn btn-amber hours-submit" id="hours-submit-${loc.id}" style="display:none;margin-top:8px;">Send hours</button>
+      <div class="save-note" id="hours-note-${loc.id}" style="margin-top:6px;"></div>
+    </div>`
   return `<div class="popup-inner" data-locid="${loc.id}">
     <div class="popup-head-row">
       <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${chain.name}</div>
@@ -1260,30 +1283,13 @@ function popupHtml(loc, agg, myVote){
     ${hoursLine}
     <div id="accessible-badge-${loc.id}">${accessibleBadgeHtml(loc.id)}</div>
     ${recencyLine}
-    <button type="button" class="btn btn-secondary hours-report-toggle" id="hours-report-toggle-${loc.id}" style="margin:6px 0;width:100%;">🕐 Report hours</button>
-    <div class="hours-report-section" id="hours-report-section-${loc.id}" style="display:none;">
-      <div class="report-heading">What hours is this store open? Two travelers agreeing makes it official.</div>
-      <div class="report-cats" id="hours-mode-${loc.id}">
-        <button type="button" class="report-cat-btn" data-mode="24">🕛 Open 24 hours</button>
-        <button type="button" class="report-cat-btn" data-mode="single">🕐 Set open &amp; close</button>
-        <button type="button" class="report-cat-btn" data-mode="perday">📅 Different by day</button>
-      </div>
-      <div id="hours-single-${loc.id}" style="display:none;margin-top:6px;align-items:center;gap:8px;">
-        <label style="font-size:13px;">Open <input type="time" id="hr-open-${loc.id}" style="font-size:13px;"></label>
-        <label style="font-size:13px;">Close <input type="time" id="hr-close-${loc.id}" style="font-size:13px;"></label>
-      </div>
-      <div id="hours-perday-${loc.id}" style="display:none;margin-top:6px;">
-        ${['mon','tue','wed','thu','fri','sat','sun'].map(d=>`<div style="display:flex;align-items:center;gap:6px;margin:2px 0;font-size:13px;"><span style="width:38px;text-transform:capitalize;">${d}</span><input type="time" id="hr-${d}-o-${loc.id}" style="font-size:13px;"> – <input type="time" id="hr-${d}-c-${loc.id}" style="font-size:13px;"></div>`).join('')}
-        <div style="font-size:12px;color:#9aa3ad;margin-top:2px;">Leave a day blank if you're not sure.</div>
-      </div>
-      <button type="button" class="btn btn-amber hours-submit" id="hours-submit-${loc.id}" style="display:none;margin-top:6px;">Send hours</button>
-      <div class="save-note" id="hours-note-${loc.id}"></div>
-    </div>
+    ${hoursReportHtml}
     <div class="popup-actions">
       <button class="btn btn-primary directions-btn" id="directions-btn-${loc.id}" data-lat="${loc.lat}" data-lng="${loc.lng}">🧭 Directions</button>
       <button class="btn btn-secondary btn-icon-only share-btn" title="Share" data-shareurl="${shareUrl}" data-sharename="${loc.n.replace(/"/g,'&quot;')}">🔗</button>
-      <button class="btn btn-danger btn-icon-only report-toggle-btn" title="Report an issue" id="report-toggle-${loc.id}">🚩</button>
+      ${isLoggedIn() ? `<button class="btn btn-danger btn-icon-only report-toggle-btn" title="Report an issue" id="report-toggle-${loc.id}">🚩</button>` : ''}
     </div>
+    ${isLoggedIn() ? '' : `<div class="popup-signin-hint" style="margin-top:6px;">🔒 Log in to add hours or report an issue.</div>`}
     <div class="report-section" id="report-section-${loc.id}" style="display:none;">
       <div class="report-heading">Report a problem with this listing</div>
       <div class="report-cats" id="report-cats-${loc.id}">
@@ -1606,7 +1612,8 @@ function attachHoursReportHandler(loc){
       if(submit) submit.style.display = 'inline-block';
       setNote('');
       // visually mark the chosen mode
-      nm.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('selected', x === b));
+      nm.querySelectorAll('[data-mode]').forEach(x => { const on = x === b;
+        x.style.background = on ? '#0e2f33' : '#1b1e23'; x.style.borderColor = on ? '#2ea1aa' : '#2a2e35'; });
     });
   }
 
