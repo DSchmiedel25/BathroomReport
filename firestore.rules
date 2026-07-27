@@ -216,6 +216,31 @@ service cloud.firestore {
     }
 
 
+
+    // ============================================================
+    //  Community hours reports (public submit own; consensus is server-derived)
+    // ============================================================
+    // A signed-in user may write ONLY their own report doc (id == uid) under a store. value/kind
+    // are shape-validated here; the recomputeHourStatus Cloud Function is the real validator and
+    // the only writer of verified state (in hourStatus). No client can forge "verified".
+    match /hourReports/{storeId}/submissions/{uid} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.keys().hasOnly(['uid','value','kind','submittedAt','schemaVersion'])
+        && request.resource.data.kind in ['single','perday']
+        && request.resource.data.schemaVersion == 1;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Server-derived hours consensus. Written ONLY by the recomputeHourStatus Cloud Function
+    // (admin privileges bypass rules). Public read (drives display / bake review); no client write.
+    match /hourStatus/{storeId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // ============================================================
     //  Default deny — anything not listed above is inaccessible
     // ============================================================
