@@ -1641,9 +1641,22 @@ function attachHoursReportHandler(loc){
       } else { setNote('Pick how the hours work first.', true); return; }
       ns.disabled = true; ns.textContent = 'Sending…'; setNote('Sending…', false); if(note) note.style.color = '';
       const ok = await saveHoursReport(loc.id, value, kind);
-      ns.disabled = false; ns.textContent = 'Send hours';
-      if(ok) setNote("Thanks — we'll confirm once another traveler agrees.", false);
-      else   setNote("Couldn't send — check your connection and try again.", true);
+      ns.disabled = false;
+      if(ok){
+        // Brief, obvious confirmation so the tap clearly registered: flash "Submitted", then
+        // collapse the picker and leave a check on the toggle where the "hours thing" was.
+        ns.textContent = '✓ Submitted!';
+        ns.style.background = '#2e7d32'; ns.style.borderColor = '#2e7d32'; ns.style.color = '#fff';
+        setNote("Thanks — we'll confirm once another traveler agrees.", false);
+        setTimeout(() => {
+          if(section) section.style.display = 'none';
+          ns.textContent = 'Send hours'; ns.style.background = ''; ns.style.borderColor = ''; ns.style.color = '';
+          if(newToggle){ newToggle.textContent = '✓ Hours submitted'; newToggle.disabled = true; }
+        }, 1500);
+      } else {
+        ns.textContent = 'Send hours';
+        setNote("Couldn't send — check your connection and try again.", true);
+      }
     });
   }
 }
