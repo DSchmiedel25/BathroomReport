@@ -874,20 +874,6 @@ window.speedwayLocations = [
     "phone": "+1-952-736-3024"
   },
   {
-    "n": "Speedway",
-    "lat": 44.7845581,
-    "lng": -93.2573884,
-    "addr": "",
-    "id": "node/12478452059",
-    "chain": "speedway",
-    "hrs": "",
-    "meta": {
-      "chain": "speedway",
-      "pin_offset_m": 29,
-      "address_status": "duplicate_place"
-    }
-  },
-  {
     "n": "Edina, MN",
     "lat": 44.9050631,
     "lng": -93.3287817,
@@ -972,20 +958,6 @@ window.speedwayLocations = [
     "phone": "+1-763-252-0145"
   },
   {
-    "n": "Speedway",
-    "lat": 45.0814349,
-    "lng": -93.3375595,
-    "addr": "",
-    "id": "node/12478538954",
-    "chain": "speedway",
-    "hrs": "",
-    "meta": {
-      "chain": "speedway",
-      "pin_offset_m": 11,
-      "address_status": "duplicate_place"
-    }
-  },
-  {
     "n": "White Bear Lake, MN",
     "lat": 45.0362019,
     "lng": -92.9853484,
@@ -1022,23 +994,9 @@ window.speedwayLocations = [
       "google_rating_count": 97,
       "address_status": "filled"
     },
-    "phone": "+1-651-633-3848"
-  },
-  {
-    "n": "Speedway",
-    "lat": 45.0352961,
-    "lng": -93.2004836,
-    "addr": "",
-    "id": "node/12478568029",
-    "chain": "speedway",
-    "hrs": "",
+    "phone": "+1-651-633-3848",
     "osm": {
       "gas": 1
-    },
-    "meta": {
-      "chain": "speedway",
-      "pin_offset_m": 7,
-      "address_status": "duplicate_place"
     }
   },
   {
@@ -6129,15 +6087,6 @@ window.speedwayLocations = [
     }
   },
   {
-    "n": "Constance Boulevard Northeast, Ham Lake",
-    "lat": 45.2656415,
-    "lng": -93.2334845,
-    "addr": "1442 Constance Boulevard Northeast, Ham Lake, MN 55304",
-    "id": "node/4533172273",
-    "chain": "speedway",
-    "hrs": ""
-  },
-  {
     "n": "South 11th Street, Niles",
     "lat": 41.8120884,
     "lng": -86.2485481,
@@ -6550,23 +6499,9 @@ window.speedwayLocations = [
       "google_rating_count": 54,
       "address_status": "filled"
     },
-    "phone": "+1-952-745-9262"
-  },
-  {
-    "n": "Speedway",
-    "lat": 44.9887793,
-    "lng": -93.5844546,
-    "addr": "",
-    "id": "node/4810648237",
-    "chain": "speedway",
-    "hrs": "",
+    "phone": "+1-952-745-9262",
     "osm": {
       "gas": 1
-    },
-    "meta": {
-      "chain": "speedway",
-      "pin_offset_m": 7,
-      "address_status": "duplicate_place"
     }
   },
   {
@@ -10053,18 +9988,6 @@ window.speedwayLocations = [
     "lng": -83.5170637,
     "addr": "1177 South State Road, Davison, MI 48423",
     "id": "node/8124328685",
-    "chain": "speedway",
-    "hrs": "",
-    "osm": {
-      "gas": 1
-    }
-  },
-  {
-    "n": "East Bristol Road, Burton",
-    "lat": 42.9746446,
-    "lng": -83.6337259,
-    "addr": "3514 East Bristol Road, Burton, MI 48519",
-    "id": "node/8132984958",
     "chain": "speedway",
     "hrs": "",
     "osm": {
@@ -21990,15 +21913,6 @@ window.speedwayLocations = [
     }
   },
   {
-    "n": "Route 50, Ballston Spa",
-    "lat": 42.9896188,
-    "lng": -73.8510451,
-    "addr": "229 Route 50, Ballston Spa, NY 12020",
-    "id": "node/9427111667",
-    "chain": "speedway",
-    "hrs": ""
-  },
-  {
     "n": "Church Avenue, Ballston Spa",
     "lat": 42.9894383,
     "lng": -73.851308,
@@ -29196,23 +29110,9 @@ window.speedwayLocations = [
       "google_rating_count": 200,
       "address_status": "filled"
     },
-    "phone": "+1-740-947-5921"
-  },
-  {
-    "n": "Speedway",
-    "lat": 39.1286523,
-    "lng": -82.9834814,
-    "addr": "",
-    "id": "way/1069638257",
-    "chain": "speedway",
-    "hrs": "",
+    "phone": "+1-740-947-5921",
     "osm": {
       "gas": 1
-    },
-    "meta": {
-      "chain": "speedway",
-      "pin_offset_m": 29,
-      "address_status": "duplicate_place"
     }
   },
   {
@@ -29613,15 +29513,6 @@ window.speedwayLocations = [
     }
   },
   {
-    "n": "Fabens Road, Fabens",
-    "lat": 31.5182011,
-    "lng": -106.1325228,
-    "addr": "1790 Fabens Road, Fabens, TX 79838",
-    "id": "way/1199663148",
-    "chain": "speedway",
-    "hrs": ""
-  },
-  {
     "n": "Fabens, TX",
     "lat": 31.5183888,
     "lng": -106.1322636,
@@ -29686,23 +29577,6 @@ window.speedwayLocations = [
       "address_status": "filled"
     },
     "phone": "+1-859-282-8655"
-  },
-  {
-    "n": "Speedway",
-    "lat": 44.8411099,
-    "lng": -93.248349,
-    "addr": "",
-    "id": "way/1211331235",
-    "chain": "speedway",
-    "hrs": "",
-    "osm": {
-      "gas": 1
-    },
-    "meta": {
-      "chain": "speedway",
-      "pin_offset_m": 26,
-      "address_status": "duplicate_place"
-    }
   },
   {
     "n": "Shepherdsville",
@@ -30576,18 +30450,6 @@ window.speedwayLocations = [
     }
   },
   {
-    "n": "Oriskany Boulevard, Yorkville",
-    "lat": 43.1150399,
-    "lng": -75.2815603,
-    "addr": "826 Oriskany Boulevard, Yorkville, NY 13495",
-    "id": "way/1429077974",
-    "chain": "speedway",
-    "hrs": "",
-    "osm": {
-      "gas": 1
-    }
-  },
-  {
     "n": "Yorkville, NY",
     "lat": 43.1152951,
     "lng": -75.2813785,
@@ -30603,7 +30465,10 @@ window.speedwayLocations = [
       "google_rating_count": 39,
       "address_status": "filled"
     },
-    "phone": "+1-315-736-0385"
+    "phone": "+1-315-736-0385",
+    "osm": {
+      "gas": 1
+    }
   },
   {
     "n": "West Eames Street, Channahon",
@@ -31298,15 +31163,6 @@ window.speedwayLocations = [
     }
   },
   {
-    "n": "Grand Avenue, Saint Paul",
-    "lat": 44.940548,
-    "lng": -93.1870619,
-    "addr": "2051 Grand Avenue, Saint Paul, MN 55105",
-    "id": "way/172673832",
-    "chain": "speedway",
-    "hrs": ""
-  },
-  {
     "n": "St Paul, MN",
     "lat": 44.9573285,
     "lng": -93.0851711,
@@ -31413,7 +31269,10 @@ window.speedwayLocations = [
       "google_rating_count": 130,
       "address_status": "filled"
     },
-    "phone": "+1-952-854-8156"
+    "phone": "+1-952-854-8156",
+    "osm": {
+      "gas": 1
+    }
   },
   {
     "n": "College Road, Lisle",
@@ -35765,15 +35624,6 @@ window.speedwayLocations = [
     "phone": "+1-810-794-3354"
   },
   {
-    "n": "Kenrick Avenue, Lakeville",
-    "lat": 44.714311,
-    "lng": -93.2782368,
-    "addr": "16180 Kenrick Avenue, Lakeville, MN 55044",
-    "id": "way/528003960",
-    "chain": "speedway",
-    "hrs": ""
-  },
-  {
     "n": "Lakeville, MN",
     "lat": 44.7143028,
     "lng": -93.2786327,
@@ -37217,18 +37067,6 @@ window.speedwayLocations = [
     "phone": "+1-252-793-4313"
   },
   {
-    "n": "US Highway 64 East, Plymouth",
-    "lat": 35.8651773,
-    "lng": -76.7276973,
-    "addr": "1109 US Highway 64 East, Plymouth, NC 27962",
-    "id": "way/640432701",
-    "chain": "speedway",
-    "hrs": "",
-    "osm": {
-      "gas": 1
-    }
-  },
-  {
     "n": "Gallivan Boulevard, Dorchester Center",
     "lat": 42.2838457,
     "lng": -71.0478815,
@@ -38216,15 +38054,6 @@ window.speedwayLocations = [
     }
   },
   {
-    "n": "West Sahuarita Road, Sahuarita",
-    "lat": 31.9572163,
-    "lng": -110.9825205,
-    "addr": "795 West Sahuarita Road, Sahuarita, AZ 85629",
-    "id": "way/740818143",
-    "chain": "speedway",
-    "hrs": ""
-  },
-  {
     "n": "Speedway",
     "lat": 40.4631184,
     "lng": -86.099219,
@@ -38438,23 +38267,9 @@ window.speedwayLocations = [
       "google_rating_count": 99,
       "address_status": "filled"
     },
-    "phone": "+1-763-493-2000"
-  },
-  {
-    "n": "Speedway",
-    "lat": 45.1236166,
-    "lng": -93.3557237,
-    "addr": "",
-    "id": "way/759919890",
-    "chain": "speedway",
-    "hrs": "",
+    "phone": "+1-763-493-2000",
     "osm": {
       "gas": 1
-    },
-    "meta": {
-      "chain": "speedway",
-      "pin_offset_m": 2,
-      "address_status": "duplicate_place"
     }
   },
   {
@@ -39443,15 +39258,6 @@ window.speedwayLocations = [
     }
   },
   {
-    "n": "Radio Drive, Woodbury",
-    "lat": 44.8884209,
-    "lng": -92.9448336,
-    "addr": "4104 Radio Drive, Woodbury, MN 55129",
-    "id": "way/860381000",
-    "chain": "speedway",
-    "hrs": ""
-  },
-  {
     "n": "Poinsett Highway, Greenville",
     "lat": 34.8986597,
     "lng": -82.413114,
@@ -39736,15 +39542,6 @@ window.speedwayLocations = [
     "osm": {
       "gas": 1
     }
-  },
-  {
-    "n": "US 31, Indianapolis",
-    "lat": 39.6360808,
-    "lng": -86.126316,
-    "addr": "8955 US 31, Indianapolis, IN 46227",
-    "id": "way/893593197",
-    "chain": "speedway",
-    "hrs": ""
   },
   {
     "n": "Woodbury, MN",
@@ -40325,19 +40122,6 @@ window.speedwayLocations = [
     "phone": "+1 612 866 7884",
     "osm": {
       "gas": 1
-    }
-  },
-  {
-    "n": "Speedway",
-    "lat": 28.0153833,
-    "lng": -82.2450887,
-    "addr": "",
-    "id": "way/961648246",
-    "chain": "speedway",
-    "hrs": "",
-    "meta": {
-      "chain": "speedway",
-      "address_status": "no_match_nearby"
     }
   },
   {
