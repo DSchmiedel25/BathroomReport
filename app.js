@@ -432,6 +432,8 @@ function isBathroomKey(key){ return BATHROOM_AMENITIES.some(a => a.key === key);
 function amenitySettled(loc, key, summary){
   const conf = (loc && loc.conf) || {};
   const osm  = (loc && loc.osm) || {};
+  const ov = amenityOverrideCache[loc && loc.id];
+  if(ov && ov[key] && ov[key] !== 'unknown') return true;  // admin set it — authoritative
   if(key === 'gas') return true;                      // never asked
   if(conf[key]) return true;                          // baked community confirmation
   if(isConfirmedYes(summary && summary[key])) return true;  // live community confirmation
@@ -533,6 +535,78 @@ function amenityAnswerIcon(a, val){
 // on open so it stays stable as the person answers), and how far through it they are.
 const visitQuestions = {};
 const visitCursor = {};
+
+// ===================== ADMIN-AUTHORITATIVE AMENITIES =====================
+// admins/{uid} can set a store's amenities directly; the answer is authoritative and shows live
+// for everyone. Stored in amenityOverrides/{storeId}; positive answers are merged into loc.conf at
+// read time so every existing "confirmed" display path shows them with no extra plumbing.
+const amenityOverrideCache = {};   // locId -> { accessible:'yes', changing:'no', ... }
+const ADMIN_AMENITY_KEYS = ['accessible','changing','evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'];
+
+async function loadAmenityOverride(loc){
+  try{
+    const {db, doc, getDoc} = await fb();
+    const safeId = String(loc.id).replace(/\//g, '__');   // ids can contain '/'
+    const snap = await getDoc(doc(db, 'amenityOverrides', safeId));
+    const ov = snap.exists() ? (snap.data() || {}) : {};
+    amenityOverrideCache[loc.id] = ov;
+    loc.conf = loc.conf || {};
+    for(const k in ov){ if(ov[k] === 'yes') loc.conf[k] = true; }  // positive → shows as confirmed
+    return ov;
+  }catch(e){ amenityOverrideCache[loc.id] = amenityOverrideCache[loc.id] || {}; return {}; }
+}
+
+async function saveAmenityOverride(locId, key, val){
+  if(!isMapAdmin()) return false;
+  try{
+    const {db, doc, setDoc} = await fb();
+    const safeId = String(locId).replace(/\//g, '__');
+    await setDoc(doc(db, 'amenityOverrides', safeId), { [key]: val }, { merge: true });
+    return true;
+  }catch(e){ return false; }
+}
+
+// Admin-only panel: each feature with Yes / No / — (clear). Only rendered when isMapAdmin().
+function adminAmenityPanelHtml(loc){
+  const ov = amenityOverrideCache[loc.id] || {};
+  const feats = [...BATHROOM_AMENITIES.filter(a => a.key !== 'restroomType'), ...STORE_FEATURES];
+  const rows = feats.map(a => {
+    const cur = ov[a.key] || '';
+    const btn = (val, label) => `<button type="button" class="admin-am-btn" data-key="${a.key}" data-val="${val}" style="padding:3px 9px;margin-left:4px;border-radius:6px;border:1px solid ${cur===val?'#2ea1aa':'#2a2e35'};background:${cur===val?'#0e2f33':'#1b1e23'};color:#f6f8fa;font-size:12px;cursor:pointer;">${label}</button>`;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 0;font-size:13px;color:#f6f8fa;"><span>${a.label}</span><span>${btn('yes','Yes')}${btn('no','No')}${btn('unknown','—')}</span></div>`;
+  }).join('');
+  return `<div class="admin-amenity-panel" id="admin-am-${loc.id}" style="margin:8px 0;padding:10px;border:1px solid #2a2e35;border-radius:10px;background:#141619;">
+    <div style="font-weight:600;font-size:13px;color:#2ea1aa;margin-bottom:6px;">Set amenities (admin) — applied live</div>
+    ${rows}
+    <div class="save-note" id="admin-am-note-${loc.id}" style="font-size:12px;margin-top:4px;"></div>
+  </div>`;
+}
+
+function attachAdminAmenityHandlers(loc){
+  if(!isMapAdmin()) return;
+  const panel = document.getElementById('admin-am-' + loc.id);
+  if(!panel) return;
+  panel.querySelectorAll('.admin-am-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const key = btn.dataset.key, val = btn.dataset.val;
+      const note = document.getElementById('admin-am-note-' + loc.id);
+      if(note){ note.textContent = 'Saving…'; note.style.color = ''; }
+      const ok = await saveAmenityOverride(loc.id, key, val);
+      if(!ok){ if(note){ note.textContent = "Couldn't save — try again."; note.style.color = '#e53935'; } return; }
+      amenityOverrideCache[loc.id] = { ...(amenityOverrideCache[loc.id] || {}), [key]: val };
+      loc.conf = loc.conf || {};
+      if(val === 'yes') loc.conf[key] = true; else delete loc.conf[key];
+      // highlight the chosen button in this row
+      panel.querySelectorAll(`.admin-am-btn[data-key="${key}"]`).forEach(b => {
+        const on = b.dataset.val === val;
+        b.style.borderColor = on ? '#2ea1aa' : '#2a2e35';
+        b.style.background  = on ? '#0e2f33' : '#1b1e23';
+      });
+      if(typeof refreshCommunityBlock === 'function') refreshCommunityBlock(loc);  // badge appears/disappears now
+      if(note){ note.textContent = '✓ Saved — live on the map'; note.style.color = '#2e7d32'; }
+    });
+  });
+}
 
 function renderAmenityStepHtml(myVote, locId){
   // Compute the visit's question list once, on first render for this popup instance.
@@ -1317,6 +1391,7 @@ function popupHtml(loc, agg, myVote){
     <div id="accessible-badge-${loc.id}">${accessibleBadgeHtml(loc.id)}</div>
     ${recencyLine}
     ${hoursReportHtml}
+    ${isMapAdmin() ? adminAmenityPanelHtml(loc) : ''}
     <div class="popup-actions">
       <button class="btn btn-primary directions-btn" id="directions-btn-${loc.id}" data-lat="${loc.lat}" data-lng="${loc.lng}">🧭 Directions</button>
       <button class="btn btn-secondary btn-icon-only share-btn" title="Share" data-shareurl="${shareUrl}" data-sharename="${loc.n.replace(/"/g,'&quot;')}">🔗</button>
@@ -1403,7 +1478,7 @@ function addMarker(loc){
     try{
       // Shared fetch: ratings + amenity tallies + store-feature tallies all come from this one
       // aggregate-doc read (fetchCommunityDoc also fills amenityCache/storeFeatureCache).
-      const data = await fetchCommunityDoc(loc.id);
+      const [data] = await Promise.all([ fetchCommunityDoc(loc.id), loadAmenityOverride(loc) ]);
       if(data && Object.keys(data).length){
         ratingsCache[loc.id] = { ...emptyAgg(), ...data };
         if(marker.isPopupOpen()) marker.setPopupContent(popupHtml(loc, ratingsCache[loc.id], myVoteCache[loc.id]));
@@ -1422,6 +1497,7 @@ function addMarker(loc){
     safeAttach(attachHoursReportHandler);
     safeAttach(attachAmenityHandlers);
     safeAttach(attachStoreFeatureHandlers);
+    safeAttach(attachAdminAmenityHandlers);
     safeAttach(attachOooHandlers);
   });
   markers[loc.id] = marker;
