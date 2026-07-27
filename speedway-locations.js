@@ -10,17 +10,7 @@ window.speedwayLocations = [
     "osm": {
       "gas": 1
     },
-      {
-    "n": "Saratoga Rd, Schenectady",
-    "lat": "42.86936",
-    "lng": "-73.93210",
-    "addr": "246 Saratoga Rd, Schenectady, NY 12302",
-    "id": "schenectady-saratogard",
-    "hrs": "24",
-    "osm": {
-      "gas": 1
-    }
-  },
+     
     "meta": {
       "chain": "speedway",
       "pin_offset_m": 2,
@@ -7408,7 +7398,7 @@ window.speedwayLocations = [
     "addr": "246 Saratoga Road, Schenectady, NY 12302",
     "id": "node/5648414949",
     "chain": "speedway",
-    "hrs": "0500-1000",
+    "hrs": "0500-2200",
     "osm": {
       "gas": 1
     },
