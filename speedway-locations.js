@@ -7397,9 +7397,14 @@ window.speedwayLocations = [
     "addr": "246 Saratoga Road, Schenectady, NY 12302",
     "id": "node/5648414949",
     "chain": "speedway",
-    "hrs": "",
+    "hrs": "0500-1000",
     "osm": {
       "gas": 1
+    },
+    "meta": {
+      "prevHrs": "",
+      "prevHrsSrc": "",
+      "hrsSrc": "admin_override"
     }
   },
   {
@@ -21869,9 +21874,14 @@ window.speedwayLocations = [
     "addr": "527 Aviation Road, Queensbury, NY 12804",
     "id": "node/9425143100",
     "chain": "speedway",
-    "hrs": "",
+    "hrs": "24",
     "osm": {
       "gas": 1
+    },
+    "meta": {
+      "prevHrs": "",
+      "prevHrsSrc": "",
+      "hrsSrc": "admin_override"
     }
   },
   {
@@ -21893,9 +21903,14 @@ window.speedwayLocations = [
     "addr": "66 Main Street, South Glens Falls, NY 12803",
     "id": "node/9427029464",
     "chain": "speedway",
-    "hrs": "",
+    "hrs": "0500-2300",
     "osm": {
       "gas": 1
+    },
+    "meta": {
+      "prevHrs": "",
+      "prevHrsSrc": "",
+      "hrsSrc": "admin_override"
     }
   },
   {
@@ -21929,9 +21944,14 @@ window.speedwayLocations = [
     "addr": "1911 Curry Road, Schenectady, NY 12306",
     "id": "node/9427130566",
     "chain": "speedway",
-    "hrs": "",
+    "hrs": "24",
     "osm": {
       "gas": 1
+    },
+    "meta": {
+      "prevHrs": "",
+      "prevHrsSrc": "",
+      "hrsSrc": "admin_override"
     }
   },
   {
@@ -21941,9 +21961,14 @@ window.speedwayLocations = [
     "addr": "229 South Brandywine Avenue, Schenectady, NY 12307",
     "id": "node/9427177648",
     "chain": "speedway",
-    "hrs": "",
+    "hrs": "24",
     "osm": {
       "gas": 1
+    },
+    "meta": {
+      "prevHrs": "",
+      "prevHrsSrc": "",
+      "hrsSrc": "admin_override"
     }
   },
   {
