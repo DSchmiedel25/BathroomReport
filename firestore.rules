@@ -156,6 +156,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Admin-authoritative amenities. Public read (everyone sees admin-set features live);
+    // only admins write, and only the known amenity/feature keys are allowed.
+    match /amenityOverrides/{storeId} {
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['restroomType','accessible','changing','evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood']);
+    }
+
 
     // ============================================================
     //  Reports (public submit, admin moderate)
