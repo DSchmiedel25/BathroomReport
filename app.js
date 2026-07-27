@@ -1017,6 +1017,48 @@ async function addTip(id, text){
   }
 }
 
+// ---- Community hours reporting -------------------------------------------------
+// Reduce a user-entered window to the app's canonical form ("24" or "HHMM-HHMM"). Mirrors the
+// server-side canonOne in the recomputeHourStatus Cloud Function so honest reports agree exactly.
+// Overnight (close earlier than open) stays a single entry, e.g. "2200-0200".
+function canonHrsOne(str){
+  if(typeof str !== 'string') return null;
+  const t = str.trim();
+  if(/^(24|24\/7|24h)$/i.test(t)) return '24';
+  const m = t.match(/^(\d{1,2}):?(\d{2})\s*-\s*(\d{1,2}):?(\d{2})$/);
+  if(!m) return null;
+  let o = String(+m[1]).padStart(2,'0') + m[2];
+  let c = String(+m[3]).padStart(2,'0') + m[4];
+  if(!/^([01]\d|2[0-4])[0-5]\d$/.test(o) || !/^([01]\d|2[0-4])[0-5]\d$/.test(c)) return null;
+  if(c === '0000') c = '2400';
+  if(o === '0000' && c === '2400') return '24';   // full midnight-to-midnight span
+  return o === c ? '24' : o + '-' + c;
+}
+// Write the caller's own hours report. Doc id = uid enforces one report per user per store; the
+// recomputeHourStatus Cloud Function turns two agreeing eligible reports into verified hours.
+// Fields are exactly the five the security rules allow — nothing else.
+async function saveHoursReport(locId, value, kind){
+  if(!isLoggedIn()) return false;
+  try{
+    const {db, doc, setDoc} = await fb();
+    const uid = window.__currentUser.uid;
+    await setDoc(doc(db, 'hourReports', locId, 'submissions', uid),
+      { uid, value, kind, submittedAt: Date.now(), schemaVersion: 1 });
+    markHoursReported(locId);
+    return true;
+  }catch(e){ return false; }
+}
+// Track the distinct stores this device has reported hours for — feeds the Hours Hero achievement
+// (client-trusted, like the other achievement stats).
+function markHoursReported(locId){
+  try{
+    const k = 'br_hours_reported';
+    const set = new Set(JSON.parse(localStorage.getItem(k) || '[]'));
+    set.add(locId);
+    localStorage.setItem(k, JSON.stringify([...set]));
+  }catch(e){}
+}
+
 // Weekly recap — lightweight activity log, just enough to show "X new this week"
 async function logActivity(type, extra){
   try{
@@ -1218,6 +1260,25 @@ function popupHtml(loc, agg, myVote){
     ${hoursLine}
     <div id="accessible-badge-${loc.id}">${accessibleBadgeHtml(loc.id)}</div>
     ${recencyLine}
+    <button type="button" class="btn btn-secondary hours-report-toggle" id="hours-report-toggle-${loc.id}" style="margin:6px 0;width:100%;">🕐 Report hours</button>
+    <div class="hours-report-section" id="hours-report-section-${loc.id}" style="display:none;">
+      <div class="report-heading">What hours is this store open? Two travelers agreeing makes it official.</div>
+      <div class="report-cats" id="hours-mode-${loc.id}">
+        <button type="button" class="report-cat-btn" data-mode="24">🕛 Open 24 hours</button>
+        <button type="button" class="report-cat-btn" data-mode="single">🕐 Set open &amp; close</button>
+        <button type="button" class="report-cat-btn" data-mode="perday">📅 Different by day</button>
+      </div>
+      <div id="hours-single-${loc.id}" style="display:none;margin-top:6px;align-items:center;gap:8px;">
+        <label style="font-size:13px;">Open <input type="time" id="hr-open-${loc.id}" style="font-size:13px;"></label>
+        <label style="font-size:13px;">Close <input type="time" id="hr-close-${loc.id}" style="font-size:13px;"></label>
+      </div>
+      <div id="hours-perday-${loc.id}" style="display:none;margin-top:6px;">
+        ${['mon','tue','wed','thu','fri','sat','sun'].map(d=>`<div style="display:flex;align-items:center;gap:6px;margin:2px 0;font-size:13px;"><span style="width:38px;text-transform:capitalize;">${d}</span><input type="time" id="hr-${d}-o-${loc.id}" style="font-size:13px;"> – <input type="time" id="hr-${d}-c-${loc.id}" style="font-size:13px;"></div>`).join('')}
+        <div style="font-size:12px;color:#9aa3ad;margin-top:2px;">Leave a day blank if you're not sure.</div>
+      </div>
+      <button type="button" class="btn btn-amber hours-submit" id="hours-submit-${loc.id}" style="display:none;margin-top:6px;">Send hours</button>
+      <div class="save-note" id="hours-note-${loc.id}"></div>
+    </div>
     <div class="popup-actions">
       <button class="btn btn-primary directions-btn" id="directions-btn-${loc.id}" data-lat="${loc.lat}" data-lng="${loc.lng}">🧭 Directions</button>
       <button class="btn btn-secondary btn-icon-only share-btn" title="Share" data-shareurl="${shareUrl}" data-sharename="${loc.n.replace(/"/g,'&quot;')}">🔗</button>
@@ -1319,6 +1380,7 @@ function addMarker(loc){
     safeAttach(attachDirectionsHandler);
     safeAttach(attachShareHandler);
     safeAttach(attachReportHandler);
+    safeAttach(attachHoursReportHandler);
     safeAttach(attachAmenityHandlers);
     safeAttach(attachStoreFeatureHandlers);
     safeAttach(attachOooHandlers);
@@ -1502,6 +1564,79 @@ function attachReportHandler(loc){
       await send(reason);
       if(input) input.value = '';
       newSubmit.disabled = false; newSubmit.textContent = 'Send';
+    });
+  }
+}
+
+// Community hours picker: toggle open, pick a mode, submit a canonical value. Logged-in only;
+// anonymous taps get a sign-in nudge. Mirrors the report-section clone-to-avoid-dupes pattern.
+function attachHoursReportHandler(loc){
+  const toggle  = document.getElementById('hours-report-toggle-' + loc.id);
+  const section = document.getElementById('hours-report-section-' + loc.id);
+  if(!toggle || !section) return;
+  const modeRow   = document.getElementById('hours-mode-' + loc.id);
+  const singleRow = document.getElementById('hours-single-' + loc.id);
+  const perdayRow = document.getElementById('hours-perday-' + loc.id);
+  const submit    = document.getElementById('hours-submit-' + loc.id);
+  const note      = document.getElementById('hours-note-' + loc.id);
+  let mode = null;
+  const setNote = (msg, err) => { if(note){ note.style.color = err ? '#c62828' : '#2f6b3c'; note.textContent = msg || ''; } };
+
+  const newToggle = toggle.cloneNode(true);
+  toggle.parentNode.replaceChild(newToggle, toggle);
+  newToggle.addEventListener('click', () => {
+    if(!isLoggedIn()){
+      section.style.display = 'block';
+      if(modeRow) modeRow.style.display = 'none';
+      setNote('Sign in to report hours — it keeps reports honest (two travelers must agree).', false);
+      if(note) note.style.color = '';
+      return;
+    }
+    section.style.display = section.style.display === 'none' ? 'block' : 'none';
+  });
+
+  if(modeRow){
+    const nm = modeRow.cloneNode(true);
+    modeRow.parentNode.replaceChild(nm, modeRow);
+    nm.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-mode]'); if(!b) return;
+      mode = b.dataset.mode;
+      if(singleRow) singleRow.style.display = (mode === 'single') ? 'flex' : 'none';
+      if(perdayRow) perdayRow.style.display = (mode === 'perday') ? 'block' : 'none';
+      if(submit) submit.style.display = 'inline-block';
+      setNote('');
+      // visually mark the chosen mode
+      nm.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('selected', x === b));
+    });
+  }
+
+  if(submit){
+    const ns = submit.cloneNode(true);
+    submit.parentNode.replaceChild(ns, submit);
+    ns.addEventListener('click', async () => {
+      let value = null, kind = null;
+      if(mode === '24'){ value = '24'; kind = 'single'; }
+      else if(mode === 'single'){
+        const o = (document.getElementById('hr-open-'  + loc.id) || {}).value;
+        const c = (document.getElementById('hr-close-' + loc.id) || {}).value;
+        if(!o || !c){ setNote('Enter both an open and a close time.', true); return; }
+        value = canonHrsOne(o + '-' + c); kind = 'single';
+        if(!value){ setNote("Those times didn't look right.", true); return; }
+      } else if(mode === 'perday'){
+        const days = ['mon','tue','wed','thu','fri','sat','sun']; const map = {};
+        for(const d of days){
+          const o = (document.getElementById('hr-' + d + '-o-' + loc.id) || {}).value;
+          const c = (document.getElementById('hr-' + d + '-c-' + loc.id) || {}).value;
+          if(o && c){ const v = canonHrsOne(o + '-' + c); if(!v){ setNote('Check the ' + d + ' times.', true); return; } map[d] = v; }
+        }
+        if(!Object.keys(map).length){ setNote('Fill in at least one day.', true); return; }
+        value = map; kind = 'perday';
+      } else { setNote('Pick how the hours work first.', true); return; }
+      ns.disabled = true; ns.textContent = 'Sending…'; setNote('Sending…', false); if(note) note.style.color = '';
+      const ok = await saveHoursReport(loc.id, value, kind);
+      ns.disabled = false; ns.textContent = 'Send hours';
+      if(ok) setNote("Thanks — we'll confirm once another traveler agrees.", false);
+      else   setNote("Couldn't send — check your connection and try again.", true);
     });
   }
 }
