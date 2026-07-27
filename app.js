@@ -1614,32 +1614,62 @@ function attachHoursReportHandler(loc){
     section.style.display = section.style.display === 'none' ? 'block' : 'none';
   });
 
+  // Clone the Send button FIRST and keep a reference to the element that's actually in the DOM.
+  // (The old bug: the mode handler flipped display on the pre-clone node, so the visible clone
+  // never un-hid — Send appeared to be missing.)
+  let ns = null;
+  if(submit){ ns = submit.cloneNode(true); submit.parentNode.replaceChild(ns, submit); }
+
+  // Shared submit path — used by the Send button AND by tapping "Open 24 hours".
+  const doSubmit = async (value, kind) => {
+    if(ns){ ns.disabled = true; ns.style.display = 'block'; ns.style.width = '100%'; ns.textContent = 'Sending…'; }
+    setNote('Sending…', false); if(note) note.style.color = '';
+    const ok = await saveHoursReport(loc.id, value, kind);
+    if(ns) ns.disabled = false;
+    if(ok){
+      if(ns){ ns.textContent = '✓ Submitted!'; ns.style.background = '#2e7d32'; ns.style.borderColor = '#2e7d32'; ns.style.color = '#fff'; }
+      setNote("Thanks — we'll confirm once another traveler agrees.", false);
+      setTimeout(() => {
+        if(section) section.style.display = 'none';
+        if(ns){ ns.textContent = 'Send hours'; ns.style.background = ''; ns.style.borderColor = ''; ns.style.color = ''; ns.style.display = 'none'; }
+        if(newToggle){ newToggle.textContent = '✓ Hours submitted'; newToggle.disabled = true; }
+      }, 1500);
+    } else {
+      if(ns) ns.textContent = 'Send hours';
+      setNote("Couldn't send — check your connection and try again.", true);
+    }
+  };
+
   if(modeRow){
     const nm = modeRow.cloneNode(true);
     modeRow.parentNode.replaceChild(nm, modeRow);
     nm.addEventListener('click', (e) => {
       const b = e.target.closest('[data-mode]'); if(!b) return;
       mode = b.dataset.mode;
-      if(singleRow) singleRow.style.display = (mode === 'single') ? 'flex' : 'none';
-      if(perdayRow) perdayRow.style.display = (mode === 'perday') ? 'block' : 'none';
-      if(submit) submit.style.display = 'inline-block';
       setNote('');
-      // visually mark the chosen mode
+      // highlight the chosen mode
       nm.querySelectorAll('[data-mode]').forEach(x => { const on = x === b;
         x.style.background = on ? '#0e2f33' : '#1b1e23'; x.style.borderColor = on ? '#2ea1aa' : '#2a2e35'; });
+      if(mode === '24'){
+        // Unambiguous — submit immediately, no second tap needed.
+        if(singleRow) singleRow.style.display = 'none';
+        if(perdayRow) perdayRow.style.display = 'none';
+        doSubmit('24', 'single');
+        return;
+      }
+      if(singleRow) singleRow.style.display = (mode === 'single') ? 'flex' : 'none';
+      if(perdayRow) perdayRow.style.display = (mode === 'perday') ? 'block' : 'none';
+      if(ns){ ns.style.display = 'block'; ns.style.width = '100%'; }   // reveal the REAL in-DOM button
     });
   }
 
-  if(submit){
-    const ns = submit.cloneNode(true);
-    submit.parentNode.replaceChild(ns, submit);
-    ns.addEventListener('click', async () => {
+  if(ns){
+    ns.addEventListener('click', () => {
       let value = null, kind = null;
-      if(mode === '24'){ value = '24'; kind = 'single'; }
-      else if(mode === 'single'){
+      if(mode === 'single'){
         const o = (document.getElementById('hr-open-'  + loc.id) || {}).value;
         const c = (document.getElementById('hr-close-' + loc.id) || {}).value;
-        if(!o || !c){ setNote('Enter both an open and a close time.', true); return; }
+        if(!o || !c){ setNote('Pick both an open and a close time.', true); return; }
         value = canonHrsOne(o + '-' + c); kind = 'single';
         if(!value){ setNote("Those times didn't look right.", true); return; }
       } else if(mode === 'perday'){
@@ -1652,24 +1682,7 @@ function attachHoursReportHandler(loc){
         if(!Object.keys(map).length){ setNote('Fill in at least one day.', true); return; }
         value = map; kind = 'perday';
       } else { setNote('Pick how the hours work first.', true); return; }
-      ns.disabled = true; ns.textContent = 'Sending…'; setNote('Sending…', false); if(note) note.style.color = '';
-      const ok = await saveHoursReport(loc.id, value, kind);
-      ns.disabled = false;
-      if(ok){
-        // Brief, obvious confirmation so the tap clearly registered: flash "Submitted", then
-        // collapse the picker and leave a check on the toggle where the "hours thing" was.
-        ns.textContent = '✓ Submitted!';
-        ns.style.background = '#2e7d32'; ns.style.borderColor = '#2e7d32'; ns.style.color = '#fff';
-        setNote("Thanks — we'll confirm once another traveler agrees.", false);
-        setTimeout(() => {
-          if(section) section.style.display = 'none';
-          ns.textContent = 'Send hours'; ns.style.background = ''; ns.style.borderColor = ''; ns.style.color = '';
-          if(newToggle){ newToggle.textContent = '✓ Hours submitted'; newToggle.disabled = true; }
-        }, 1500);
-      } else {
-        ns.textContent = 'Send hours';
-        setNote("Couldn't send — check your connection and try again.", true);
-      }
+      doSubmit(value, kind);
     });
   }
 }
