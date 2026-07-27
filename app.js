@@ -1072,7 +1072,10 @@ async function saveHoursReport(locId, value, kind){
   try{
     const {db, doc, setDoc} = await fb();
     const uid = window.__currentUser.uid;
-    await setDoc(doc(db, 'hourReports', locId, 'submissions', uid),
+    // Location ids can contain '/' (OSM ids like way/123) which is illegal in a Firestore doc
+    // path, so slug it to '__' here. fetch-and-bake-hours reverses it when matching records.
+    const safeId = String(locId).replace(/\//g, '__');
+    await setDoc(doc(db, 'hourReports', safeId, 'submissions', uid),
       { uid, value, kind, submittedAt: Date.now(), schemaVersion: 1 });
     markHoursReported(locId);
     return true;

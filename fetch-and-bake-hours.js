@@ -16,7 +16,7 @@ async function main(){
   console.log('Reading hourStatus from Firestore (read-only)\u2026');
   const snap = await db.collection('hourStatus').get();
   const status = {};
-  snap.forEach(d => { status[d.id] = d.data(); });
+  snap.forEach(d => { status[d.id.split('__').join('/')] = d.data(); });  // reverse slash-slug
   console.log('Fetched ' + Object.keys(status).length + ' hourStatus doc(s).');
   fs.writeFileSync(STATUS_JSON, JSON.stringify(status, null, 2));
   // bake into the location files in place (idempotent; reverts downgrades)
