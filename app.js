@@ -1938,6 +1938,14 @@ async function loadAllRatings(){
 // of the app already treats identity) in a new 'achievements' Firestore collection, so this
 // works immediately even signed-out, and syncs across devices once you log in.
 
+// Tiered ("leveled") achievement progress: one rolling bar through ascending milestones.
+// Reveals after the first milestone, rolls toward the next unreached one, "done" at the top.
+function tierProgress(count, tiers){
+  const top = tiers[tiers.length - 1];
+  let total = top;
+  for(const t of tiers){ if(count < t){ total = t; break; } }
+  return { done: count >= top, current: Math.min(count, total), total, revealed: count >= tiers[0] };
+}
 const ACHIEVEMENT_DEFS = [
   { key:'firstFlush', icon:'🚽', name:'First Flush', desc:'Rate your first bathroom',
     calc:s=>({done:s.bathroomRatedCount>=1,current:Math.min(s.bathroomRatedCount,1),total:1})},
@@ -2007,7 +2015,12 @@ const ACHIEVEMENT_DEFS = [
   { key:'summerRoadTrip', icon:'🌞', name:'Summer Road Trip', desc:'Rate a bathroom in June–August', hidden:true,
     calc:s=>({done:s.hasSummer,current:s.hasSummer?1:0,total:1})},
   { key:'vacationMode', icon:'🧳', name:'Vacation Mode', desc:'Rate bathrooms in 5 states within one week', hidden:true,
-    calc:s=>({done:s.maxStatesIn7Days>=5,current:Math.min(s.maxStatesIn7Days,5),total:5})}
+    calc:s=>({done:s.maxStatesIn7Days>=5,current:Math.min(s.maxStatesIn7Days,5),total:5})},
+  // Hours Hero — a single tiered trophy: hidden until your first hours report, then one bar
+  // rolls through 1/5/10/25/50/100 distinct stores you've reported hours for.
+  { key:'hoursHero', icon:'🕰️', name:'Hours Hero', desc:'Report hours at stores to help other travelers',
+    hidden:true, tiers:[1,5,10,25,50,100],
+    calc:s=>tierProgress(s.hoursAddedCount||0, [1,5,10,25,50,100])}
 ];
 
 // We don't have real county data in locations.js, only addresses — so "County Collector"
@@ -2118,7 +2131,10 @@ async function computeAchievementStats(){
     hasEarlyBird, hasNightOwl, hasWinter, hasSummer, weekendCount: weekendDays.size,
     travelPlazaCount, maxStatesIn7Days,
     maxInOneDay, maxStreak: longestConsecutiveDayStreak(dayKeys), maxMilesApart,
-    visitedCount: bathroomRatedCount, totalLocations: seedLocations.length
+    visitedCount: bathroomRatedCount, totalLocations: seedLocations.length,
+    // Hours Hero: distinct stores this device has reported hours for (client-trusted, like the
+    // other achievement stats). Populated by markHoursReported() on each successful report.
+    hoursAddedCount: (() => { try { return new Set(JSON.parse(localStorage.getItem('br_hours_reported') || '[]')).size; } catch(e){ return 0; } })()
   };
 }
 
@@ -2224,7 +2240,7 @@ async function checkAndUnlockAchievements(){
       stored[def.key] = { unlocked: calc.done };
     }
 
-    results[def.key] = { ...def, unlocked: calc.done, unlockedAt: calc.done ? unlockedAt : null, current: calc.current, total: calc.total };
+    results[def.key] = { ...def, unlocked: calc.done, unlockedAt: calc.done ? unlockedAt : null, current: calc.current, total: calc.total, revealed: calc.revealed };
   });
 
   if(changed) await saveStoredAchievements(stored);
@@ -2251,7 +2267,10 @@ function renderBathroomPassport(stats, results){
   if(listEl){
     listEl.innerHTML = ACHIEVEMENT_DEFS.map(def => {
       const r = results[def.key];
-      const secret = def.hidden && !r.unlocked;   // hidden trophy, not yet earned → mask its details
+      // A tiered achievement (Hours Hero) reveals after its first milestone and then shows a
+      // rolling bar, unlike binary hidden trophies which stay masked until fully earned.
+      const tiered = Array.isArray(def.tiers);
+      const secret = def.hidden && !r.unlocked && !(tiered && r.revealed);
       const icon = secret ? '❓' : def.icon;
       const name = secret ? 'Hidden Trophy' : def.name;
       const desc = secret ? 'Keep exploring to reveal this one.' : def.desc;

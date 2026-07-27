@@ -232,6 +232,7 @@
     <button class="nav-link" data-page="requests">＋ Location requests <span class="nav-badge" id="badgeRequests">0</span></button>
     <button class="nav-link" data-page="tips">💬 Tips</button>
     <button class="nav-link" data-page="addloc">➕ Add location</button>
+    <button class="nav-link" data-page="bakereview">🕐 Bake review</button>
     <div class="sidebar-foot">
       <div class="who" id="whoami"></div>
       <button class="btn full" id="signoutBtn">Sign out</button>
@@ -348,6 +349,12 @@
         <button class="btn" id="al_clear" type="button">Clear</button>
       </div>
       <div class="hint" style="margin-top:8px">Paste as a new entry inside the array in the file shown above (before the closing <code>]</code>), then bump <code>sw.js</code> on deploy.</div>
+    </section>
+
+    <!-- Weekly Bake Review (read-only) -->
+    <section class="page" data-view="bakereview">
+      <div class="hint" style="margin-bottom:8px">Community-verified hours waiting to bake, conflicts to resolve, and active admin overrides. Read-only: after reviewing, run <code>node fetch-and-bake-hours.js</code> to bake pending hours into the static files, then push (bump <code>sw.js</code>).</div>
+      <div id="bakeReviewList"><div class="loading">Open to load…</div></div>
     </section>
   </main>
 </div>
@@ -568,11 +575,12 @@ document.querySelectorAll('.nav-link').forEach(btn => btn.addEventListener('clic
   const page = btn.dataset.page;
   document.querySelectorAll('.nav-link').forEach(n => n.classList.toggle('active', n === btn));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.dataset.view === page));
-  const _titles = { reports:'Reports', requests:'Location requests', tips:'Tips', addloc:'Add location' };
-  const _subs = { reports:'Flags on existing locations.', requests:'Submissions for places that aren’t on the map yet.', tips:'Community tips — edit or remove.', addloc:'Generate a paste-ready record for a *-locations.js file — no Firestore.' };
+  const _titles = { reports:'Reports', requests:'Location requests', tips:'Tips', addloc:'Add location', bakereview:'Bake review' };
+  const _subs = { reports:'Flags on existing locations.', requests:'Submissions for places that aren’t on the map yet.', tips:'Community tips — edit or remove.', addloc:'Generate a paste-ready record for a *-locations.js file — no Firestore.', bakereview:'Community-verified hours to review before the next bake.' };
   $('#pageTitle').textContent = _titles[page] || 'Reports';
   $('#pageSub').textContent = _subs[page] || '';
   if(page === 'tips') loadTips();
+  if(page === 'bakereview') loadBakeReview();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }));
 
@@ -971,6 +979,50 @@ $('#requestsList').addEventListener('click', async (e) => {
 
 // ================= TIPS (loaded on demand — keeps the default view cheap) =================
 let allTips = null; // { locId: [tip,...] } built once per session when Tips is first opened
+// ================= BAKE REVIEW (read-only) =================
+// Reads hourStatus (public) and shows what the next bake would touch: community-verified hours
+// not yet baked, conflicts needing a human, and active admin overrides. No writes here —
+// hourStatus is function-only-write, so write-actions (override/clear/recompute) are a separate
+// backend step (see notes). This is the glance-before-bake checkpoint.
+async function loadBakeReview(){
+  const el = document.getElementById('bakeReviewList');
+  el.innerHTML = '<div class="loading">Loading hour status…</div>';
+  try{
+    const snap = await getDocs(collection(db, 'hourStatus'));
+    const rows = [];
+    snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
+    const pending   = rows.filter(r => r.verified && r.revision !== r.bakedRevision);
+    const conflicts = rows.filter(r => r.state === 'conflict');
+    const overrides = rows.filter(r => r.state === 'admin_override');
+    const fmtVal = (r) => {
+      if(r.value == null) return '—';
+      if(typeof r.value === 'object') return Object.entries(r.value).map(([d,v]) => d + ' ' + v).join(', ');
+      return String(r.value);
+    };
+    const fmtWhen = (t) => t ? new Date(t).toLocaleDateString() : '';
+    const block = (title, list, meta) => {
+      if(!list.length) return '<div class="hint" style="margin:10px 0">' + title + ': none.</div>';
+      return '<h3 style="margin:14px 0 6px">' + title + ' (' + list.length + ')</h3>' +
+        list.map(r =>
+          '<div style="padding:10px;margin:6px 0;border:1px solid #1b1e23;border-radius:8px">' +
+            '<div style="font-weight:600;word-break:break-all">' + esc(r.id) + '</div>' +
+            '<div>🕐 ' + esc(fmtVal(r)) + (r.kind === 'perday' ? ' <span style="opacity:.6">(by day)</span>' : '') + '</div>' +
+            '<div style="opacity:.7;font-size:13px">' + esc(meta(r)) + '</div>' +
+          '</div>').join('');
+    };
+    const html =
+      block('✅ Pending confirmed — will bake', pending, r => 'agree ' + (r.agreeCount || 0) + ' · confirmed ' + fmtWhen(r.lastConfirmedAt)) +
+      block('⚠️ Conflicts — need a human', conflicts, r => 'tie at agree ' + (r.agreeCount || 0)) +
+      block('🔒 Admin overrides — active', overrides, r => 'override in effect');
+    el.innerHTML = (pending.length || conflicts.length || overrides.length)
+      ? html
+      : '<div class="hint">Nothing to review — no verified-and-unbaked hours, conflicts, or overrides right now.</div>';
+  }catch(e){
+    console.error('bake review load failed', e);
+    el.innerHTML = '<div class="global-error">Could not load hour status. Check your connection and admin access.</div>';
+  }
+}
+
 async function loadTips(){
   if(allTips){ renderTips(); return; }
   const list = $('#tipsList');
@@ -1207,7 +1259,7 @@ $('#addSave').addEventListener('click', saveAddStore);
     if(Object.keys(osm).length) rec.osm=osm;
     return rec;   // no chain / meta — the merge stamps chain, and this matches the file format
   }
-  function toJS(rec){ return JSON.stringify(rec, null, 2) + ','; }
+  function toJS(rec){ return '  ' + JSON.stringify(rec, null, 2).replace(/\n/g, '\n  ') + ','; }
   function idExists(key,id){ var arr=window[key+'Locations']; return Array.isArray(arr) && arr.some(function(r){ return r && r.id===id; }); }
   function validate(rec){
     var key=q('al_chain').value;
