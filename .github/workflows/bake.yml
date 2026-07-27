@@ -1,0 +1,85 @@
+name: Nightly bake
+
+# Reads Firestore (read-only) and bakes verified overrides + hours + amenities into the
+# static *-locations.js files, bumps the PWA cache, and commits. Runs on GitHub's servers —
+# no Mac needed. Only VERIFIED data bakes (2-user agreement or admin-set); conflicts/singles wait.
+on:
+  schedule:
+    - cron: '0 8 * * *'      # 08:00 UTC daily (~3-4am US Eastern)
+  workflow_dispatch: {}       # also lets you run it by hand from the Actions tab (no terminal)
+
+concurrency:
+  group: nightly-bake         # never let two bakes overlap
+  cancel-in-progress: false
+
+permissions:
+  contents: write             # allow the job to commit & push
+
+jobs:
+  bake:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Restore service account key (from secret)
+        run: |
+          printf '%s' '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > serviceAccountKey.json
+          # sanity: valid JSON?
+          node -e "require('./serviceAccountKey.json')" || { echo "Invalid FIREBASE_SERVICE_ACCOUNT secret"; exit 1; }
+
+      - name: Install firebase-admin
+        run: npm install firebase-admin --no-save
+
+      - name: Bake overrides
+        run: |
+          node fetch-and-bake.js || echo "overrides step had an issue — continuing"
+          if ls baked/*-locations.js >/dev/null 2>&1; then cp baked/*-locations.js .; fi
+
+      - name: Bake hours
+        run: node fetch-and-bake-hours.js || echo "hours step had an issue — continuing"
+
+      - name: Bake amenities
+        run: |
+          node export-votes.js || echo "vote export had an issue — skipping amenity bake"
+          if [ -f votes-summary.json ]; then
+            node bake-confirmed.js votes-summary.json ./*-locations.js || echo "amenity bake had an issue — continuing"
+          fi
+
+      - name: Commit, bump cache, and push (only if something changed)
+        run: |
+          git config user.name  "bake-bot"
+          git config user.email "bake-bot@users.noreply.github.com"
+
+          git add ./*-locations.js
+          if git diff --cached --quiet; then
+            echo "Nothing baked tonight — no changes."; exit 0
+          fi
+
+          # bump PWA cache so devices load the new data
+          CUR=$(grep -oE "bathroomreport-v[0-9]+" sw.js | head -1)
+          if [ -n "$CUR" ]; then
+            NUM=$(echo "$CUR" | grep -oE "[0-9]+$")
+            NEXT="bathroomreport-v$((NUM+1))"
+            sed -i "s/$CUR/$NEXT/g" sw.js
+            echo "cache: $CUR -> $NEXT"
+            git add sw.js
+          fi
+
+          # never commit secrets/intermediates
+          if git diff --cached --name-only | grep -qiE "serviceAccountKey|overrides\.json|votes-summary\.json|hours-status\.json"; then
+            echo "Refusing to commit: a secret/intermediate is staged."; exit 1
+          fi
+
+          git commit -m "Nightly bake: overrides + hours + amenities (+cache bump)"
+          # push, retrying once if the branch moved under us
+          git push || (git pull --rebase --no-edit && git push)
+
+      - name: Clean up key
+        if: always()
+        run: rm -f serviceAccountKey.json
