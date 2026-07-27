@@ -1,5 +1,7 @@
-serviceAccountKey.json
-overrides.json
-baked/
 node_modules/
+baked/
+overrides.json
+serviceAccountKey.json
+votes-summary.json
+hours-status.json
 .DS_Store
