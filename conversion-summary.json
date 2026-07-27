@@ -1,0 +1,62 @@
+[
+  {
+    "chain": "Holiday Stationstores",
+    "source_features": 552,
+    "output_records": 336,
+    "duplicate_clusters_merged": 204,
+    "objects_absorbed": 216,
+    "with_address": 161,
+    "with_known_hours": 32,
+    "with_accessibility": 4
+  },
+  {
+    "chain": "TravelCenters of America",
+    "source_features": 375,
+    "output_records": 273,
+    "duplicate_clusters_merged": 67,
+    "objects_absorbed": 102,
+    "with_address": 180,
+    "with_known_hours": 23,
+    "with_accessibility": 3
+  },
+  {
+    "chain": "GetGo",
+    "source_features": 282,
+    "output_records": 201,
+    "duplicate_clusters_merged": 76,
+    "objects_absorbed": 81,
+    "with_address": 108,
+    "with_known_hours": 30,
+    "with_accessibility": 4
+  },
+  {
+    "chain": "Plaid Pantry",
+    "source_features": 95,
+    "output_records": 94,
+    "duplicate_clusters_merged": 1,
+    "objects_absorbed": 1,
+    "with_address": 77,
+    "with_known_hours": 16,
+    "with_accessibility": 6
+  },
+  {
+    "chain": "QuickChek",
+    "source_features": 213,
+    "output_records": 126,
+    "duplicate_clusters_merged": 81,
+    "objects_absorbed": 87,
+    "with_address": 73,
+    "with_known_hours": 26,
+    "with_accessibility": 8
+  },
+  {
+    "chain": "Jacksons",
+    "source_features": 171,
+    "output_records": 171,
+    "duplicate_clusters_merged": 0,
+    "objects_absorbed": 0,
+    "with_address": 119,
+    "with_known_hours": 16,
+    "with_accessibility": 2
+  }
+]
