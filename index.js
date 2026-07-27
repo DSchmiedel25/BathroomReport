@@ -90,21 +90,33 @@ async function eligible(uid){
   return false;
 }
 
+// Is this uid an admin? admins/{uid} with enabled != false. Admin SDK bypasses rules.
+async function isAdminUid(uid){
+  try { const d = await db.doc('admins/' + uid).get(); return d.exists && d.data().enabled !== false; }
+  catch(e){ return false; }
+}
+
 exports.recomputeHourStatus = onDocumentWritten('hourReports/{storeId}/submissions/{uid}', async (event) => {
   const storeId = event.params.storeId;
   const statusRef = db.doc('hourStatus/' + storeId);
 
-  // Override guard — admin override wins until explicitly cleared.
-  const curSnap = await statusRef.get();
-  if (curSnap.exists && curSnap.data().state === 'admin_override') return;
+  // Admin authority is derived from CURRENT admin submissions on every recompute (below), so there
+  // is no sticky override state to guard here — an admin editing or deleting their report re-derives
+  // the result cleanly.
 
   // Load all submissions, keep valid + eligible, group by canonical key.
   const subs = await db.collection('hourReports/' + storeId + '/submissions').get();
   const groups = {};
+  const adminSubs = [];
   for (const doc of subs.docs){
     const s = doc.data();
     const canon = canonicalize(s.value, s.kind);
     if (!canon) continue;
+    // Admin reports are authoritative — they bypass the community tally entirely.
+    if (await isAdminUid(s.uid)){
+      adminSubs.push({ canon, at: (typeof s.submittedAt === 'number' ? s.submittedAt : 0) });
+      continue;
+    }
     if (!(await eligible(s.uid))) continue;
     const g = groups[canon.key] || (groups[canon.key] = {uids:new Set(), canon});
     g.uids.add(s.uid);
@@ -116,9 +128,14 @@ exports.recomputeHourStatus = onDocumentWritten('hourReports/{storeId}/submissio
     else if (!second || n > second.n){ second = {n}; }
   }
 
-  // Decide next state (recompute from scratch).
+  // Decide next state (recompute from scratch). Admin authority wins outright.
   let next;
-  if (top && top.n >= 2 && (!second || second.n < top.n)){
+  if (adminSubs.length){
+    adminSubs.sort((a, b) => b.at - a.at);   // most recent admin report wins
+    const win = adminSubs[0].canon;
+    next = {verified:true, state:'admin_override', value:win.value, kind:win.kind,
+            agreeCount:adminSubs.length, source:'admin_override'};
+  } else if (top && top.n >= 2 && (!second || second.n < top.n)){
     next = {verified:true, state:'verified', value:top.canon.value, kind:top.canon.kind,
             agreeCount:top.n, source:'community_verified'};
   } else if (top && second && top.n >= 2 && second.n >= 2 && top.n === second.n){
@@ -131,22 +148,22 @@ exports.recomputeHourStatus = onDocumentWritten('hourReports/{storeId}/submissio
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(statusRef);
     const p = snap.exists ? snap.data() : {};
-    if (p.state === 'admin_override') return;
 
+    const nextSource = next.source || (next.verified ? 'community_verified' : (p.source || null));
     const valueChanged = JSON.stringify(p.value) !== JSON.stringify(next.value) || (p.kind||null) !== (next.kind||null);
     const anyChanged =
       (!!p.verified) !== next.verified ||
       (p.state||null) !== next.state ||
       (p.agreeCount||0) !== (next.agreeCount||0) ||
       valueChanged ||
-      (p.source||null) !== (next.verified ? 'community_verified' : (p.source||null));
+      (p.source||null) !== nextSource;
     if (snap.exists && !anyChanged) return;   // nothing to write
 
     const out = {
       verified: next.verified,
       state: next.state,
       agreeCount: next.agreeCount || 0,
-      source: next.verified ? 'community_verified' : (p.source || null),
+      source: nextSource,
       schemaVersion: 1,
       bakedRevision: p.bakedRevision || 0,
       revision: (p.revision || 0) + 1,

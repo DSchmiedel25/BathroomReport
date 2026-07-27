@@ -927,8 +927,25 @@ checkIfBlocked();
 // Firebase Auth resolves whether you're logged in asynchronously — if it turns out you WERE
 // logged in (session remembered from before), re-check/reload anything identity-dependent
 // that may have already run against the wrong (anonymous) fallback ID.
+// Admin-awareness for the map. admins/{uid} is readable ONLY by admins (per the rules), so a
+// successful read means you're an admin; a denied read (thrown) means you're not. This lets the
+// map show admin-only affordances. Authority itself is still enforced server-side, never here.
+window.__isAdmin = false;
+async function refreshAdminFlag(){
+  window.__isAdmin = false;
+  const u = window.__currentUser;
+  if(!u || !u.uid) return;
+  try{
+    const {db, doc, getDoc} = await fb();
+    const snap = await getDoc(doc(db, 'admins', u.uid));
+    window.__isAdmin = snap.exists() && snap.data().enabled !== false;
+  }catch(e){ window.__isAdmin = false; }
+}
+function isMapAdmin(){ return !!window.__isAdmin; }
+
 window.addEventListener('authStateReady', () => {
   checkIfBlocked();
+  refreshAdminFlag();
   if(typeof loadAllRatings === 'function') loadAllRatings();
   if(typeof updateAccountUI === 'function') updateAccountUI();
   if(typeof loadTravelModeFromAccount === 'function') loadTravelModeFromAccount();
@@ -1271,19 +1288,19 @@ function popupHtml(loc, agg, myVote){
   const hoursReportHtml = (hoursText || !isLoggedIn()) ? '' : `
     <button type="button" class="btn btn-secondary hours-report-toggle" id="hours-report-toggle-${loc.id}" style="margin:6px 0;width:100%;">🕐 Report hours</button>
     <div class="hours-report-section" id="hours-report-section-${loc.id}" style="display:none;background:#141619;border:1px solid #2a2e35;border-radius:10px;padding:10px;margin-bottom:6px;">
-      <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:#f6f8fa;">What hours is this store open? Two travelers agreeing makes it official.</div>
+      <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:#f6f8fa;">${isMapAdmin() ? "You're an admin — the hours you set are applied to the map right away." : "What hours is this store open? Two travelers agreeing makes it official."}</div>
       <div id="hours-mode-${loc.id}">
         <button type="button" data-mode="24" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">🕛 Open 24 hours</button>
-        <button type="button" data-mode="single" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">🕐 Set open &amp; close</button>
-        <button type="button" data-mode="perday" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">📅 Different by day</button>
+        <button type="button" data-mode="same" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">🕐 Same hours every day</button>
+        <button type="button" data-mode="sunday" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">📅 Sunday is different</button>
       </div>
-      <div id="hours-single-${loc.id}" style="display:none;margin-top:8px;align-items:center;gap:10px;color:#f6f8fa;font-size:13px;">
+      <div id="hours-same-${loc.id}" style="display:none;margin-top:8px;align-items:center;gap:10px;color:#f6f8fa;font-size:13px;">
         <label>Open <select id="hr-open-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></label>
         <label>Close <select id="hr-close-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></label>
       </div>
-      <div id="hours-perday-${loc.id}" style="display:none;margin-top:8px;color:#f6f8fa;">
-        ${['mon','tue','wed','thu','fri','sat','sun'].map(d=>`<div style="display:flex;align-items:center;gap:6px;margin:3px 0;font-size:13px;"><span style="width:38px;text-transform:capitalize;">${d}</span><select id="hr-${d}-o-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select> – <select id="hr-${d}-c-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></div>`).join('')}
-        <div style="font-size:12px;color:#9aa3ad;margin-top:4px;">Leave a day blank if you're not sure.</div>
+      <div id="hours-sunday-${loc.id}" style="display:none;margin-top:8px;color:#f6f8fa;font-size:13px;">
+        <div style="display:flex;align-items:center;gap:6px;margin:4px 0;"><span style="width:60px;">Mon–Sat</span><select id="hr-ms-o-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select> – <select id="hr-ms-c-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></div>
+        <div style="display:flex;align-items:center;gap:6px;margin:4px 0;"><span style="width:60px;">Sunday</span><select id="hr-su-o-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select> – <select id="hr-su-c-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></div>
       </div>
       <button type="button" class="btn btn-amber hours-submit" id="hours-submit-${loc.id}" style="display:none;margin-top:8px;">Send hours</button>
       <div class="save-note" id="hours-note-${loc.id}" style="margin-top:6px;"></div>
@@ -1594,8 +1611,8 @@ function attachHoursReportHandler(loc){
   const section = document.getElementById('hours-report-section-' + loc.id);
   if(!toggle || !section) return;
   const modeRow   = document.getElementById('hours-mode-' + loc.id);
-  const singleRow = document.getElementById('hours-single-' + loc.id);
-  const perdayRow = document.getElementById('hours-perday-' + loc.id);
+  const sameRow   = document.getElementById('hours-same-' + loc.id);
+  const sundayRow = document.getElementById('hours-sunday-' + loc.id);
   const submit    = document.getElementById('hours-submit-' + loc.id);
   const note      = document.getElementById('hours-note-' + loc.id);
   let mode = null;
@@ -1652,13 +1669,13 @@ function attachHoursReportHandler(loc){
         x.style.background = on ? '#0e2f33' : '#1b1e23'; x.style.borderColor = on ? '#2ea1aa' : '#2a2e35'; });
       if(mode === '24'){
         // Unambiguous — submit immediately, no second tap needed.
-        if(singleRow) singleRow.style.display = 'none';
-        if(perdayRow) perdayRow.style.display = 'none';
+        if(sameRow) sameRow.style.display = 'none';
+        if(sundayRow) sundayRow.style.display = 'none';
         doSubmit('24', 'single');
         return;
       }
-      if(singleRow) singleRow.style.display = (mode === 'single') ? 'flex' : 'none';
-      if(perdayRow) perdayRow.style.display = (mode === 'perday') ? 'block' : 'none';
+      if(sameRow) sameRow.style.display = (mode === 'same') ? 'flex' : 'none';
+      if(sundayRow) sundayRow.style.display = (mode === 'sunday') ? 'block' : 'none';
       if(ns){ ns.style.display = 'block'; ns.style.width = '100%'; }   // reveal the REAL in-DOM button
     });
   }
@@ -1666,21 +1683,21 @@ function attachHoursReportHandler(loc){
   if(ns){
     ns.addEventListener('click', () => {
       let value = null, kind = null;
-      if(mode === 'single'){
+      if(mode === 'same'){
         const o = (document.getElementById('hr-open-'  + loc.id) || {}).value;
         const c = (document.getElementById('hr-close-' + loc.id) || {}).value;
         if(!o || !c){ setNote('Pick both an open and a close time.', true); return; }
         value = canonHrsOne(o + '-' + c); kind = 'single';
         if(!value){ setNote("Those times didn't look right.", true); return; }
-      } else if(mode === 'perday'){
-        const days = ['mon','tue','wed','thu','fri','sat','sun']; const map = {};
-        for(const d of days){
-          const o = (document.getElementById('hr-' + d + '-o-' + loc.id) || {}).value;
-          const c = (document.getElementById('hr-' + d + '-c-' + loc.id) || {}).value;
-          if(o && c){ const v = canonHrsOne(o + '-' + c); if(!v){ setNote('Check the ' + d + ' times.', true); return; } map[d] = v; }
-        }
-        if(!Object.keys(map).length){ setNote('Fill in at least one day.', true); return; }
-        value = map; kind = 'perday';
+      } else if(mode === 'sunday'){
+        const mo = (document.getElementById('hr-ms-o-' + loc.id) || {}).value;
+        const mc = (document.getElementById('hr-ms-c-' + loc.id) || {}).value;
+        const so = (document.getElementById('hr-su-o-' + loc.id) || {}).value;
+        const sc = (document.getElementById('hr-su-c-' + loc.id) || {}).value;
+        if(!mo || !mc || !so || !sc){ setNote('Pick open & close for both Mon–Sat and Sunday.', true); return; }
+        const ms = canonHrsOne(mo + '-' + mc), su = canonHrsOne(so + '-' + sc);
+        if(!ms || !su){ setNote("Those times didn't look right.", true); return; }
+        value = { mon:ms, tue:ms, wed:ms, thu:ms, fri:ms, sat:ms, sun:su }; kind = 'perday';
       } else { setNote('Pick how the hours work first.', true); return; }
       doSubmit(value, kind);
     });

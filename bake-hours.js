@@ -49,7 +49,7 @@ for (const file of locPaths){
     processed++;
     const st = verified[rec.id];
     const meta = rec.meta || {};
-    const isCommunity = meta.hrsSrc === 'community_verified';
+    const isCommunity = meta.hrsSrc === 'community_verified' || meta.hrsSrc === 'admin_override';
 
     if (st){
       // capture the pre-community snapshot exactly once
@@ -64,7 +64,7 @@ for (const file of locPaths){
       } else {
         rec.hrs = st.value; delete rec.hours;
       }
-      meta.hrsSrc = 'community_verified';
+      meta.hrsSrc = (st.source === 'admin_override') ? 'admin_override' : 'community_verified';
       rec.meta = meta;
       fileApplied++;
     } else if (isCommunity){
