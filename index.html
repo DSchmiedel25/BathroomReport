@@ -115,11 +115,16 @@
 </div>
 <div id="mapWrap">
 <div id="topLeftControls">
-<div id="legend">
-<div id="legendToggle">🔑 Key <span id="legendArrow">▾</span></div>
-<div id="legendBody"><!-- Chain color key is rendered by app.js from CHAIN_REGISTRY --></div>
-</div>
+<div id="chainKey">
+<button id="chainKeyPill" aria-expanded="false" aria-controls="chainKeyPanel">🔑 Chains <span id="chainKeyCount"></span> <span id="chainKeyArrow">▾</span></button>
+<div id="chainKeyPanel">
 <button id="openNowToggle" aria-pressed="true">🚫 Hiding closed</button>
+<div class="ck-head" id="chainKeyAreaHead">In this area</div>
+<div id="chainKeyAreaList"></div>
+<button id="chainKeyAllToggle" aria-expanded="false" aria-controls="chainKeyAllList">All chains <span id="chainKeyAllCount"></span> <span id="chainKeyAllArrow">▸</span></button>
+<div id="chainKeyAllList"></div>
+</div>
+</div>
 </div>
 <button id="listViewToggle">📋 List</button>
 <div id="map"></div>
@@ -251,10 +256,6 @@ This is tracked on this device only — log in to sync it across devices.
 </select>
 <div id="travelModeCoverage" class="d-coverage-note" style="display:none"></div>
 </div>
-<div id="chainFilter" class="d-section">
-<div id="chainFilterToggle" class="d-collapse-head">🛣️ Map layers <span id="chainFilterArrow" class="d-collapse-arrow">▾</span></div>
-<div id="chainFilterBody"></div>
-</div>
 <div id="metroFilter" class="d-section" style="display:none">
 <div id="metroFilterToggle" class="d-collapse-head">🏙️ Metros <span id="metroFilterArrow" class="d-collapse-arrow">▾</span></div>
 <div id="metroFilterBody"></div>
@@ -273,7 +274,7 @@ This is tracked on this device only — log in to sync it across devices.
 </select>
 </div>
 </div>
-<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version">v3.2 · 2026-07-28</span></div>
+<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version">v3.3 · 2026-07-28</span></div>
 </nav>
 <!-- Community banner (logged-out) -->
 <div id="communityBanner">

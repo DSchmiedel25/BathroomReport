@@ -131,42 +131,8 @@ document.getElementById('themeToggle').addEventListener('click', () => {
   applyTheme(next);
 });
 
-// Collapsible legend — defaults to collapsed on repeat visits to save screen space, remembers choice
-(function(){
-  const toggle = document.getElementById('legendToggle');
-  const body = document.getElementById('legendBody');
-  const arrow = document.getElementById('legendArrow');
-
-  // Pins are colored by store brand (not community rating), so the key lists chains.
-  // Dedupe by name+color: the same brand registered in multiple metros (e.g. Dunkin' in NYC
-  // and Boston) is one legend entry, not one per city.
-  if(body){
-    const seen = new Set();
-    body.innerHTML = Object.keys(CHAIN_REGISTRY).filter(k => {
-      if(!chainHasData(k)) return false; // hide chains whose data file isn't uploaded yet
-      const c = CHAIN_REGISTRY[k];
-      const sig = c.name + '|' + c.color;
-      if(seen.has(sig)) return false;
-      seen.add(sig); return true;
-    }).map(k => {
-      const c = CHAIN_REGISTRY[k];
-      return `<div><span class="dot" style="background:${c.color}"></span>${c.name}</div>`;
-    }).join('');
-  }
-
-  function setCollapsed(collapsed){
-    body.classList.toggle('collapsed', collapsed);
-    arrow.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
-    localStorage.setItem('legendCollapsed', collapsed ? '1' : '0');
-  }
-
-  const saved = localStorage.getItem('legendCollapsed');
-  setCollapsed(saved === null ? false : saved === '1'); // expanded by default on first visit
-
-  toggle.addEventListener('click', () => {
-    setCollapsed(!body.classList.contains('collapsed'));
-  });
-})();
+// (The old always-rendered legend was replaced by the chain key — see the Chain key module
+// further down, which renders the same swatches as tappable filter rows.)
 
 const map = L.map('map', {
   zoomControl: false,
@@ -3320,9 +3286,8 @@ function modeAllows(loc){
 }
 
 function getActiveChains(){
-  // Chain filtering is a signed-in feature. Logged-out users always see every chain
-  // (the saved disable list is ignored until they log in), so nothing is hidden by default.
-  if(!isLoggedIn()) return new Set(Object.keys(CHAIN_REGISTRY));
+  // Chain filtering is PUBLIC (part of the core restroom-finding experience — the map key
+  // is the filter). The deny-list persists locally for everyone, signed in or not.
   return new Set(Object.keys(CHAIN_REGISTRY).filter(k => !disabledChains.has(k)));
 }
 let activeChains = getActiveChains();
@@ -3332,13 +3297,8 @@ let activeChains = getActiveChains();
 // updateAccountUI() (which fires on every login/logout).
 function syncChainFilterToAuth(){
   activeChains = getActiveChains();
-  renderChainFilter();
   renderLayers();
-  const cf = document.getElementById('chainFilter');
-  if(cf){
-    const multiChain = Object.keys(CHAIN_REGISTRY).length >= 2;
-    cf.style.display = (isLoggedIn() && multiChain && travelMode !== 'foot') ? '' : 'none';
-  }
+  if(typeof renderChainKey === 'function') renderChainKey();
   if(typeof renderNavPref === 'function') renderNavPref();
   applyFilters();
 }
@@ -3350,62 +3310,8 @@ function saveDisabledChains(){
 // Road layers are grouped into a few buckets so the control stays short as chains are added.
 // Metros keep their own section; everything else falls into one of these three.
 const TRAVEL_KEYS = ['pilot', 'loves', 'travelCentersOfAmerica', 'bucees'];
-function bucketOf(key){
-  if(key === 'restarea') return 'rest';
-  if(TRAVEL_KEYS.includes(key)) return 'travel';
-  return 'convenience';
-}
-const ROAD_BUCKETS = [
-  { id: 'rest',        name: 'Rest areas',        color: '#1976d2' },
-  { id: 'travel',      name: 'Travel plazas',     color: '#00519e' },
-  { id: 'convenience', name: 'Gas & convenience', color: '#2ea1aa' }
-];
-function chainsInBucket(id){
-  return Object.keys(CHAIN_REGISTRY).filter(k => groupOf(k) !== 'metro' && chainHasData(k) && bucketOf(k) === id);
-}
-
-// One toggle per road bucket, each switching all of its chains on/off through disabledChains.
-function renderChainFilter(){
-  const wrap = document.getElementById('chainFilter');
-  const body = document.getElementById('chainFilterBody');
-  if(!wrap || !body) return;
-  const buckets = ROAD_BUCKETS.map(b => ({ ...b, keys: chainsInBucket(b.id) })).filter(b => b.keys.length);
-  const totalChains = buckets.reduce((n, b) => n + b.keys.length, 0);
-  if(totalChains < 2){
-    // Not enough loaded to filter meaningfully — hide the control entirely
-    wrap.style.display = 'none';
-    return;
-  }
-  body.innerHTML = buckets.map(b => {
-    const on = b.keys.every(k => activeChains.has(k));
-    return `<label class="chain-filter-row">
-      <input type="checkbox" class="bucket-filter-checkbox" data-bucket="${b.id}" ${on ? 'checked' : ''}>
-      <span class="dot" style="background:${b.color}"></span>${escapeHtml(b.name)}
-      <span style="margin-left:6px;opacity:.5">(${b.keys.length})</span>
-    </label>`;
-  }).join('');
-}
-
-// Region toggle: flip every chain in the bucket at once.
-function onBucketToggle(e){
-  const cb = e.target.closest('.bucket-filter-checkbox');
-  if(!cb) return;
-  const keys = chainsInBucket(cb.dataset.bucket);
-  if(cb.checked) keys.forEach(k => disabledChains.delete(k));
-  else keys.forEach(k => disabledChains.add(k));
-  activeChains = getActiveChains();
-  // Never allow the whole map to blank out — if nothing is left active, revert this toggle
-  if(activeChains.size === 0){
-    keys.forEach(k => disabledChains.delete(k));
-    activeChains = getActiveChains();
-    cb.checked = true;
-  }
-  saveDisabledChains();
-  renderChainFilter();
-  renderLayers();
-  applyFilters();
-}
-document.getElementById('chainFilterBody')?.addEventListener('change', onBucketToggle);
+// (The road-bucket drawer filter was removed — the chain key on the map is now the single
+// filter surface, with per-chain rows for everything currently renderable.)
 
 // Per-city public/customer checkboxes under Metros — entries in CHAIN_REGISTRY toggled through
 // the same disabledChains list.
@@ -3422,7 +3328,7 @@ function onSubLayerCheckboxChange(e){
     cb.checked = true;
   }
   saveDisabledChains();
-  renderChainFilter();
+  if(typeof renderChainKey === 'function') renderChainKey();
   renderLayers();
   applyFilters();
 }
@@ -3441,8 +3347,6 @@ function renderLayers(){
   if(modePref) modePref.style.display = hasMetros ? '' : 'none';
   // Drawer sections follow the mode: "On the road" shows the pit-stop Chains list; "On foot"
   // shows the city tree instead (pit stops are hidden on foot, so their filter would be noise).
-  const cf = document.getElementById('chainFilter');
-  if(cf) cf.style.display = (isLoggedIn() && Object.keys(CHAIN_REGISTRY).some(k => groupOf(k) !== 'metro') && travelMode !== 'foot') ? '' : 'none';
   // Metros section shows in BOTH modes (collapsed by default): road mode renders metro pins too,
   // so their toggles must stay reachable — kept as their own section rather than mixed into the
   // pit-stop Chains list, so the two layers stay legible.
@@ -3537,29 +3441,141 @@ document.getElementById('travelModeCoverage')?.addEventListener('click', (e) => 
   toggle.addEventListener('click', () => setCollapsed(!body.classList.contains('collapsed')));
 })();
 
-// Collapsible chain filter panel — same remembered-collapse pattern as the legend
-(function(){
-  const toggle = document.getElementById('chainFilterToggle');
-  const body = document.getElementById('chainFilterBody');
-  const arrow = document.getElementById('chainFilterArrow');
-  if(!toggle || !body || !arrow) return;
+// ============================================================
+// Chain key — the map key IS the chain filter
+// ============================================================
+// A pill at the top-left expands into a panel: the hide-closed toggle on top, then one
+// tappable row per chain with at least one location in (or within half a screen of) the
+// current view, then a nested "All chains" drawer for everything else. Tapping a row
+// toggles that chain through the same disabledChains deny-list the map has always used,
+// so selections persist across visits and across map movement — a chain deselected here
+// stays deselected while you pan away, and reappears still-deselected when you pan back.
+// Public to everyone: finding (or hiding) a chain is core restroom-finding, not a perk.
 
-  function setCollapsed(collapsed){
-    body.classList.toggle('collapsed', collapsed);
-    arrow.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
-    localStorage.setItem('chainFilterCollapsed', collapsed ? '1' : '0');
+// Is this chain drawable on the map RIGHT NOW (zoom gates + travel mode + data loaded)?
+// The in-area list only offers chains the map could actually show, so the key never
+// contradicts the map.
+function chainRenderableNow(key){
+  if(!chainHasData(key)) return false;
+  const g = groupOf(key);
+  if(travelMode === 'foot' && g !== 'metro') return false;
+  if(g === 'metro' && map.getZoom() < METRO_MIN_ZOOM) return false;
+  if(key === 'restarea' && map.getZoom() < REST_MIN_ZOOM) return false;
+  return true;
+}
+
+// Which chains have at least one location within the padded viewport? One flat pass over
+// seedLocations (~23k raw compares, well under a frame) with an early skip per found chain.
+function chainsInViewport(){
+  let south, north, west, east;
+  try{
+    const b = map.getBounds();
+    const latPad = (b.getNorth() - b.getSouth()) * 0.5;
+    const lngPad = (b.getEast() - b.getWest()) * 0.5;
+    south = b.getSouth() - latPad; north = b.getNorth() + latPad;
+    west  = b.getWest()  - lngPad; east  = b.getEast()  + lngPad;
+  }catch(e){ return null; } // map not ready yet
+  const found = new Set();
+  for(let i = 0; i < seedLocations.length; i++){
+    const loc = seedLocations[i];
+    const k = loc.chain || DEFAULT_CHAIN_KEY;
+    if(found.has(k)) continue;
+    if(loc.lat >= south && loc.lat <= north && loc.lng >= west && loc.lng <= east) found.add(k);
+  }
+  return found;
+}
+
+function chainKeyRowHtml(key){
+  const c = CHAIN_REGISTRY[key];
+  const off = disabledChains.has(key);
+  return `<button type="button" class="ck-row${off ? ' ck-off' : ''}" data-chain="${key}" role="switch" aria-checked="${!off}"><span class="ck-dot" style="background:${c.color}"></span><span class="ck-name">${escapeHtml(c.name)}</span><span class="ck-mark" aria-hidden="true">✓</span></button>`;
+}
+
+// Rebuilds are cheap but not free — skip the DOM write when nothing changed (same chains,
+// same on/off states). The signature covers both lists plus the count in the pill.
+let _chainKeySig = '';
+function renderChainKey(){
+  const areaList = document.getElementById('chainKeyAreaList');
+  const allList = document.getElementById('chainKeyAllList');
+  const countEl = document.getElementById('chainKeyCount');
+  const allCountEl = document.getElementById('chainKeyAllCount');
+  if(!areaList || !allList) return;
+
+  const inView = chainsInViewport();
+  const areaKeys = Object.keys(CHAIN_REGISTRY)
+    .filter(k => chainRenderableNow(k) && inView && inView.has(k))
+    .sort((a, b) => CHAIN_REGISTRY[a].name.localeCompare(CHAIN_REGISTRY[b].name));
+  const allKeys = Object.keys(CHAIN_REGISTRY)
+    .filter(k => chainHasData(k))
+    .sort((a, b) => CHAIN_REGISTRY[a].name.localeCompare(CHAIN_REGISTRY[b].name));
+
+  const sig = areaKeys.join(',') + '|' + allKeys.join(',') + '|' + [...disabledChains].sort().join(',');
+  if(sig === _chainKeySig) return;
+  _chainKeySig = sig;
+
+  areaList.innerHTML = areaKeys.length
+    ? areaKeys.map(chainKeyRowHtml).join('')
+    : '<div class="ck-empty">No mapped chains in this area yet — try zooming out, or tap 📍 We Missed One?</div>';
+  allList.innerHTML = allKeys.map(chainKeyRowHtml).join('');
+  if(countEl) countEl.textContent = areaKeys.length ? String(areaKeys.length) : '';
+  if(allCountEl) allCountEl.textContent = '(' + allKeys.length + ')';
+}
+
+function onChainKeyRowTap(e){
+  const row = e.target.closest('.ck-row');
+  if(!row) return;
+  const key = row.dataset.chain;
+  if(!CHAIN_REGISTRY[key]) return;
+  if(disabledChains.has(key)) disabledChains.delete(key);
+  else disabledChains.add(key);
+  activeChains = getActiveChains();
+  // Never allow the whole map to blank out — if nothing is left active, revert this toggle.
+  if(activeChains.size === 0){
+    disabledChains.delete(key);
+    activeChains = getActiveChains();
+  }
+  saveDisabledChains();
+  renderChainKey();
+  applyFilters();
+  if(navigator.vibrate) navigator.vibrate(5);
+}
+
+(function(){
+  const pill = document.getElementById('chainKeyPill');
+  const panel = document.getElementById('chainKeyPanel');
+  const allToggle = document.getElementById('chainKeyAllToggle');
+  const allList = document.getElementById('chainKeyAllList');
+  if(!pill || !panel) return;
+
+  pill.addEventListener('click', () => {
+    const open = panel.classList.toggle('open');
+    pill.setAttribute('aria-expanded', String(open));
+    const arrow = document.getElementById('chainKeyArrow');
+    if(arrow) arrow.textContent = open ? '▴' : '▾';
+    if(open) renderChainKey(); // fresh list the moment it opens
+  });
+
+  if(allToggle && allList){
+    allToggle.addEventListener('click', () => {
+      const open = allList.classList.toggle('open');
+      allToggle.setAttribute('aria-expanded', String(open));
+      const arrow = document.getElementById('chainKeyAllArrow');
+      if(arrow) arrow.textContent = open ? '▾' : '▸';
+    });
   }
 
-  const saved = localStorage.getItem('chainFilterCollapsed');
-  setCollapsed(saved === null ? false : saved === '1'); // expanded by default in the drawer
+  document.getElementById('chainKeyAreaList')?.addEventListener('click', onChainKeyRowTap);
+  allList?.addEventListener('click', onChainKeyRowTap);
 
-  toggle.addEventListener('click', () => {
-    setCollapsed(!body.classList.contains('collapsed'));
-  });
+  // The in-area list follows the map. moveend fires once per settled pan/zoom (zooms end
+  // with a moveend too), never continuously during a drag — the performance contract.
+  map.on('moveend', renderChainKey);
 })();
-renderChainFilter();
+
+renderChainKey();
 renderLayers();
 applyFilters();
+
 
 // Directions-app preference (drawer, signed-in only). The highlighted button reflects the app
 // that will actually open — the explicit saved choice, or the device default when none is set.

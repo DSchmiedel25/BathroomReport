@@ -678,3 +678,65 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 .d-shop-link:hover {
     background: rgba(46,161,170,.12);
 }
+
+/* ---------- Chain key: the map key IS the chain filter ---------- */
+#chainKey{ position:relative; }
+#chainKeyPill{
+  display:inline-flex; align-items:center; gap:6px; min-height:34px;
+  background:var(--shell-chrome); color:var(--shell-ink);
+  border:1px solid var(--shell-line); border-radius:14px;
+  padding:6px 14px; font-size:14px; font-weight:800;
+  box-shadow:var(--shell-shadow); white-space:nowrap; cursor:pointer;
+}
+#chainKeyCount{ color:var(--shell-muted); font-weight:800; }
+#chainKeyPanel{
+  display:none; margin-top:8px;
+  background:var(--shell-chrome); border:1px solid var(--shell-line);
+  border-radius:14px; box-shadow:var(--shell-shadow); overflow:hidden;
+  width:min(238px, calc(100vw - 24px));
+  flex-direction:column;
+  max-height:min(62vh, calc(100dvh - 210px));
+}
+#chainKeyPanel.open{ display:flex; }
+/* hide-closed toggle lives at the top of the panel as a full-width row */
+#chainKeyPanel #openNowToggle{
+  position:static !important; width:100% !important; border-radius:0 !important;
+  border:0 !important; border-bottom:1px solid var(--shell-line) !important;
+  justify-content:flex-start !important; box-shadow:none !important;
+  min-height:44px; padding:10px 12px !important; font-size:13px !important;
+}
+#chainKeyPanel #openNowToggle.active{
+  background:#2e7d32 !important; color:#fff !important;
+}
+.ck-head{
+  font-size:11px; color:var(--shell-muted); padding:8px 12px 2px;
+  text-transform:uppercase; letter-spacing:.05em; font-weight:800;
+}
+#chainKeyAreaList{ overflow-y:auto; flex:1 1 auto; min-height:0; -webkit-overflow-scrolling:touch; }
+.ck-row{
+  display:flex; align-items:center; gap:9px; width:100%; min-height:44px;
+  padding:9px 12px; background:transparent; border:0; color:var(--shell-ink);
+  font-size:13px; font-weight:600; cursor:pointer; text-align:left;
+}
+.ck-row:active{ background:var(--shell-chrome2); }
+.ck-dot{
+  width:13px; height:13px; border-radius:50%; flex:0 0 13px;
+  border:2px solid #fff; box-shadow:0 0 2px rgba(0,0,0,.5);
+}
+.ck-name{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ck-mark{ color:#00C244; font-weight:800; }
+.ck-off{ opacity:.45; }
+.ck-off .ck-name{ text-decoration:line-through; }
+.ck-off .ck-mark{ visibility:hidden; }
+.ck-empty{ padding:10px 12px 12px; font-size:12px; color:var(--shell-muted); line-height:1.5; }
+#chainKeyAllToggle{
+  display:flex; align-items:center; gap:6px; width:100%; min-height:44px;
+  padding:10px 12px; background:var(--shell-chrome2); border:0;
+  border-top:1px solid var(--shell-line); color:var(--shell-ink);
+  font-size:13px; font-weight:800; cursor:pointer; text-align:left;
+}
+#chainKeyAllCount{ color:var(--shell-muted); font-weight:800; }
+#chainKeyAllArrow{ margin-left:auto; }
+#chainKeyAllList{ display:none; overflow-y:auto; max-height:200px; flex:0 0 auto;
+  border-top:1px solid var(--shell-line); -webkit-overflow-scrolling:touch; }
+#chainKeyAllList.open{ display:block; }
