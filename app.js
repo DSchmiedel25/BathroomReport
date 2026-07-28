@@ -1,3 +1,13 @@
+// ---- Perf instrumentation (Pass A) ----------------------------------------
+// Only active with ?debug=1 in the URL — zero cost for normal users. Logs timing
+// marks to the console so real devices can report where startup time goes.
+const PERF_DEBUG = (() => { try{ return new URLSearchParams(location.search).has('debug'); }catch(e){ return false; } })();
+function perfMark(label){
+  if(!PERF_DEBUG) return;
+  try{ console.log('[perf] ' + label + ' @ ' + Math.round(performance.now()) + 'ms'); }catch(e){}
+}
+perfMark('app.js execute start');
+
 // Location data is loaded from one file per chain (e.g. stewarts-locations.js),
 // each of which sets a single global array — window.stewartsLocations, etc.
 // Nothing in those files needs to say which chain it belongs to; the file
@@ -82,6 +92,7 @@ Object.keys(CHAIN_REGISTRY).forEach(chainKey => {
 
 const locationsById = {};
 seedLocations.forEach(loc => { locationsById[loc.id] = loc; });
+perfMark('location data merged (' + seedLocations.length + ' locations)');
 
 // Total location count shown in the menu (hamburger) drawer footer, above the version —
 // total first, then a breakdown: pit stops and each covered metro separately.
@@ -341,20 +352,32 @@ function sizesForZoom(zoom){
   return {unrated:9, rated:11};
 }
 
+// Icon descriptors are shared, not per-marker: a pin's look depends only on its chain
+// (color + shape) and the current zoom size bucket, so ~20 chains x 5 size buckets covers
+// every marker on the map. Previously every makeIcon() call built a fresh L.divIcon —
+// ~9,000 identical allocations per zoom change — which was a main contributor to memory
+// churn / iOS Safari reloads. Leaflet builds a separate DOM element per marker from the
+// shared descriptor, so in-place tweaks like resizeOpenMarkerIcon stay safe.
+// NOTE: if pins ever encode per-location state again (e.g. the v2 rating-colored centers),
+// add that state to the cache key (e.g. a rating bucket) — do NOT go back to per-id icons.
+const _iconCache = {};
 function makeIcon(id){
-  // Pins are colored by store brand only. They no longer encode community rating, so the
-  // map never has to load aggregate data just to draw pins (that's what caused reads to
-  // scale with the dataset and spike on zoom-out). Rating is shown in the popup, loaded
-  // for a single location when its pin is opened.
-  const chain = chainFor(locationsById[id]);
-  const sizes = sizesForZoom(map.getZoom());
-  const size = sizes.rated; // one uniform size per zoom level
-  return L.divIcon({
-    className:'',
-    html:`<div style="${pinShapeStyle(chain, size)}"></div>`,
-    iconSize:[size, size],
-    iconAnchor:[size/2, size/2]
-  });
+  const loc = locationsById[id];
+  const chainKey = (loc && loc.chain) || DEFAULT_CHAIN_KEY;
+  const chain = chainFor(loc);
+  const size = sizesForZoom(map.getZoom()).rated; // one uniform size per zoom level
+  const cacheKey = chainKey + '|' + size;
+  let icon = _iconCache[cacheKey];
+  if(!icon){
+    icon = L.divIcon({
+      className:'',
+      html:`<div style="${pinShapeStyle(chain, size)}"></div>`,
+      iconSize:[size, size],
+      iconAnchor:[size/2, size/2]
+    });
+    _iconCache[cacheKey] = icon;
+  }
+  return icon;
 }
 
 // Pin shape is the between-layer axis: color still tells you the brand, shape tells you the
@@ -939,35 +962,37 @@ async function logOutAccount(){
 // account, so signing up doesn't wipe out history you already built up on this device.
 async function migrateAnonymousDataToAccount(oldAnonId, newUid, username){
   if(oldAnonId === newUid) return; // nothing to migrate (shouldn't normally happen)
+  // Each phase (votes, achievements) is isolated: one failure must never abort the rest.
+  // Previously a single try/catch wrapped everything, and two writes that the security
+  // rules always deny — deleting old anonymous vote docs (their clientId can't match the
+  // new uid) and the retired checkins collection (all writes blocked) — threw on the first
+  // legacy doc and silently cancelled the achievements transfer too.
+  let fbApi;
+  try{ fbApi = await fb(); }catch(e){ console.error('migrate: firebase unavailable', e); return; }
+  const {db, doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs} = fbApi;
+
+  // Copy each vote this device made over to the new account. Per-doc isolation: one bad
+  // legacy vote (e.g. carrying retired fields the rules now reject) skips just that vote.
+  // The old anonymous doc is left in place — the rules deliberately forbid deleting a doc
+  // whose clientId isn't yours, and that's correct; cleanup is a moderation/server concern.
   try{
-    const {db, doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs} = await fb();
-
-    // Move each vote this device made over to the new account
-    const votesQuery = query(collection(db, 'votes'), where('clientId', '==', oldAnonId));
-    const votesSnap = await getDocs(votesQuery);
+    const votesSnap = await getDocs(query(collection(db, 'votes'), where('clientId', '==', oldAnonId)));
     for(const voteDoc of votesSnap.docs){
-      const data = voteDoc.data();
-      const locId = data.locId;
-      if(!locId) continue;
-      await setDoc(doc(db, 'votes', locId + '_' + newUid), { ...data, clientId: newUid }, { merge: true });
-      await deleteDoc(voteDoc.ref);
+      try{
+        const data = voteDoc.data();
+        const locId = data.locId;
+        if(!locId) continue;
+        await setDoc(doc(db, 'votes', locId + '_' + newUid), { ...data, clientId: newUid }, { merge: true });
+      }catch(e){ console.warn('migrate: vote copy skipped', voteDoc.id, e && e.code); }
     }
+  }catch(e){ console.error('migrate: votes phase failed (continuing)', e); }
 
-    // Move check-ins over too — Bathroom Passport and several achievements (Road Warrior,
-    // Early Bird, Night Owl) depend on check-in history, which would otherwise be silently
-    // orphaned under the old anonymous ID after signing up.
-    const checkinsQuery = query(collection(db, 'checkins'), where('clientId', '==', oldAnonId));
-    const checkinsSnap = await getDocs(checkinsQuery);
-    for(const checkinDoc of checkinsSnap.docs){
-      const data = checkinDoc.data();
-      const locId = data.locId;
-      if(!locId) continue;
-      await setDoc(doc(db, 'checkins', locId + '_' + newUid), { ...data, clientId: newUid }, { merge: true });
-      await deleteDoc(checkinDoc.ref);
-    }
+  // (The old check-ins migration was removed: the checkins collection is retired and its
+  // rules block all writes, so the copy could never succeed — it only threw and aborted.)
 
-    // Carry over any achievement progress already earned on this device, merging into
-    // whatever (if anything) the new account already has rather than overwriting it
+  // Carry over any achievement progress already earned on this device, merging into
+  // whatever (if anything) the new account already has rather than overwriting it.
+  try{
     const oldAchievementsSnap = await getDoc(doc(db, 'achievements', oldAnonId));
     if(oldAchievementsSnap.exists()){
       const oldAchievements = oldAchievementsSnap.data().achievements || {};
@@ -979,11 +1004,11 @@ async function migrateAnonymousDataToAccount(oldAnonId, newUid, username){
         if(newAchievements[k] && newAchievements[k].unlocked) merged[k] = newAchievements[k];
       });
       await setDoc(doc(db, 'achievements', newUid), { achievements: merged }, { merge: true });
-      await deleteDoc(doc(db, 'achievements', oldAnonId));
+      // Best-effort cleanup of the old anonymous doc; the rules only allow deleting your
+      // own uid's doc, so this is expected to fail for device-id docs — that's fine.
+      try{ await deleteDoc(doc(db, 'achievements', oldAnonId)); }catch(e){}
     }
-  }catch(e){
-    console.error('migrateAnonymousDataToAccount failed (non-fatal):', e);
-  }
+  }catch(e){ console.error('migrate: achievements phase failed (continuing)', e); }
 }
 
 // Checked once per page load — if a moderator blocked this device in FlushPanel, further ratings/tips are refused
@@ -2074,6 +2099,7 @@ async function loadAllRatings(){
   checkAndUnlockAchievements();
   maybeShowSupportPrompt();
   map.invalidateSize(); // header height just changed (badges filled in) — tell Leaflet to recalculate
+  perfMark('my ratings applied');
 }
 
 // ============================================================
@@ -2789,6 +2815,7 @@ async function attachTipHandlers(loc){
 
 // Load all seed locations — this is now instant since no storage calls happen until a pin is tapped
 seedLocations.forEach(loc => addMarker(loc));
+perfMark('markers created (' + allLocationMarkers.length + ')');
 loadAllRatings();
 // loadOverrides();  // DISABLED to cut Firestore reads — admin fixes are now baked into the
 //                   *-locations.js files (weekly, via fetch-and-bake.js) instead of read live
@@ -2911,13 +2938,21 @@ document.querySelectorAll('.onboardingModeBtn').forEach(btn => {
 // Resize every pin whenever the zoom level changes
 let lastMetroZoomOk = null;
 let lastRestZoomOk = null;
+let _lastIconSize = sizesForZoom(map.getZoom()).rated; // markers were just built at this bucket
 map.on('zoomend', () => {
-  seedLocations.forEach(loc => {
-    const m = markers[loc.id];
-    if(!m) return;
-    if(m.isPopupOpen()) resizeOpenMarkerIcon(m); // resize in place; never swap icon on an open popup
-    else m.setIcon(makeIcon(loc.id));
-  });
+  // Icons only change when the zoom crosses a size bucket (sizesForZoom has 5 buckets).
+  // Zooming within a bucket used to re-set the icon on all ~9,000 markers for no visual
+  // change at all; now the whole loop is skipped unless the bucket actually changed.
+  const iconSize = sizesForZoom(map.getZoom()).rated;
+  if(iconSize !== _lastIconSize){
+    _lastIconSize = iconSize;
+    seedLocations.forEach(loc => {
+      const m = markers[loc.id];
+      if(!m) return;
+      if(m.isPopupOpen()) resizeOpenMarkerIcon(m); // resize in place; never swap icon on an open popup
+      else m.setIcon(makeIcon(loc.id));
+    });
+  }
   // Metro + rest-area zoom gates: only re-run the membership filter when crossing a threshold, not
   // on every zoom step — applyFilters iterates all markers, so this keeps zooming cheap.
   const metroZoomOk = map.getZoom() >= METRO_MIN_ZOOM;
@@ -3111,11 +3146,13 @@ function applyFilters(){
         markerCluster.removeLayer(m);
       }
     }
-    if(index < allLocationMarkers.length) requestAnimationFrame(processBatch);
+    if(index < allLocationMarkers.length){ requestAnimationFrame(processBatch); }
+    else if(!_firstFilterPassDone){ _firstFilterPassDone = true; perfMark('first filter pass complete (map interactive)'); }
   }
 
   requestAnimationFrame(processBatch);
 }
+let _firstFilterPassDone = false;
 
 // Clustering now handles which pins render as you pan/zoom (removeOutsideVisibleBounds), so
 // applyFilters no longer needs to run on every map move — it runs only when a FILTER changes
