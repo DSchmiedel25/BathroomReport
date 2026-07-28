@@ -1,4 +1,12 @@
-const CACHE_NAME = 'bathroomreport-v119';
+const CACHE_NAME = 'bathroomreport-v130';
+
+// CORE SHELL ONLY — deliberately does NOT precache the chain data files.
+// Precaching all ~5.6 MB of location data forced a full re-download on every cache
+// bump, and the nightly bake bumps the cache most nights. The fetch handler below
+// already caches data files (stale-while-revalidate) the first time they're used,
+// so repeat visits stay instant without shipping the whole fleet on every install.
+// Bonus: this list no longer drifts out of date when chains are added or renamed.
+// (Real offline support, when built, should be an opt-in download — see roadmap.)
 const APP_SHELL = [
   './',
   './index.html',
@@ -8,36 +16,6 @@ const APP_SHELL = [
   './icon-x.png',
   './icon-cashapp.png',
   './firebase.js',
-  './stewarts-locations.js',
-  './cumberland-farms-locations.js',
-  './wawa-locations.js',
-  './fastrac-locations.js',
-  './alltownfresh-locations.js',
-  './byrne-dairy-locations.js',
-  './parkers-locations.js',
-  './sheetz-locations.js',
-  './racetrac-locations.js',
-  './pilot-locations.js',
-  './maverik-locations.js',
-  './quiktrip-locations.js',
-  './loves-locations.js',
-  './bucees-locations.js',
-  './caseys-locations.js',
-  './kwiktrip-locations.js',
-  './royalfarms-locations.js',
-  './rutters-locations.js',
-  './speedway-locations.js',
-  './nyc-dunkin-locations.js',
-  './nyc-starbucks-locations.js',
-  './nyc-gregorys-locations.js',
-  './bos-tatte-locations.js',
-  './bos-dunkin-locations.js',
-  './bos-starbucks-locations.js',
-  './bos-pavement-locations.js',
-  './bos-flour-locations.js',
-  './bos-nero-locations.js',
-  './bos-public-locations.js',
-  './nyc-public-locations.js',
   './app.js',
   './manifest.webmanifest'
 ];
