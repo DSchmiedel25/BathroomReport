@@ -63,7 +63,8 @@ for (const locPath of locPaths) {
     if (Object.keys(confNo).length)  loc.confNo = confNo;
     else if (loc.confNo) delete loc.confNo;
   }
-  fs.writeFileSync(locPath, header + JSON.stringify(arr) + ';\n');
+  // One record per line — same format as the other two bake writers (readable git diffs).
+  fs.writeFileSync(locPath, header + '[\n' + arr.map(r => JSON.stringify(r)).join(',\n') + '\n];\n');
   totalConf += confCount; totalLocsTouched += touched;
   console.log(`${locPath}: ${touched} locations with confirmed features (${confCount} confirmations)`);
 }

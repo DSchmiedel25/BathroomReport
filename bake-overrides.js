@@ -56,7 +56,12 @@ function loadLocationsFile(file){
 }
 
 function serializeLocationsFile(varName, records){
-  return 'window.' + varName + ' = ' + JSON.stringify(records, null, 2) + ';\n';
+  // One record per line: cuts the pretty-printed (2-space indented) format's size by roughly
+  // a third — this whitespace ships to every user on every load — while keeping git diffs
+  // readable (a changed store still shows as one changed line, not a whole-file diff).
+  return 'window.' + varName + ' = [\n' +
+    records.map(r => JSON.stringify(r)).join(',\n') +
+    '\n];\n';
 }
 
 function applyOverride(rec, ov){

@@ -2035,10 +2035,16 @@ async function attachStoreFeatureHandlers(loc){
 
 let _appliedVoteLocIds = new Set();
 
+let _ratingsRunToken = 0;
 async function loadAllRatings(){
   // Loads only THIS user's own votes (a handful of docs). Community ratings are NOT bulk-read
   // anymore — that was thousands of reads on every load and after every auth change. Each
   // location's aggregate now loads on demand when its popup opens (one getDoc per open).
+  // Run token: several paths trigger this near-simultaneously (authStateReady fires alongside
+  // the explicit calls in the login/signup/logout handlers). Only the NEWEST run applies its
+  // results to markers/badges; superseded runs stop after their reads. Prevents the double
+  // full-application pass the perf baseline showed at startup.
+  const _runToken = ++_ratingsRunToken;
   const {db, collection, getDocs, query, where, doc, getDoc, setDoc} = await fb();
 
   const voteByLoc = {};
@@ -2071,6 +2077,8 @@ async function loadAllRatings(){
       }
     }
   }catch(e){ console.error('my ratings load failed', e); }
+
+  if(_runToken !== _ratingsRunToken) return; // a newer auth state superseded this run
 
   // Only touch markers whose personal rating state actually changed. The old version rewrote
   // popup HTML and icons for every location after authentication (13,000+ marker mutations),
@@ -2816,6 +2824,12 @@ async function attachTipHandlers(loc){
 // Load all seed locations — this is now instant since no storage calls happen until a pin is tapped
 seedLocations.forEach(loc => addMarker(loc));
 perfMark('markers created (' + allLocationMarkers.length + ')');
+// This direct call is a RACE SAFETY NET, not redundancy: firebase.js (a module, early in
+// index.html) can finish auth init and fire 'authStateReady' during the ~half second the
+// browser spends parsing the location data files BEFORE app.js runs and registers its
+// listener — a missed event would mean ratings never load this session. When both paths do
+// run, the run token in loadAllRatings makes only the newest apply, so there's no double
+// application (the waste the old code had) — just one spare read in the rare overlap.
 loadAllRatings();
 // loadOverrides();  // DISABLED to cut Firestore reads — admin fixes are now baked into the
 //                   *-locations.js files (weekly, via fetch-and-bake.js) instead of read live
@@ -3122,13 +3136,36 @@ function applyFilters(){
   // synchronous burst can trigger iOS Safari's page-reload/crash behavior.
   const runToken = ++_filterRunToken;
   const batchSize = 350;
+
+  // Viewport-first ordering: at ~23,000 locations a full pass takes 65+ animation frames
+  // (2+ seconds), and in file order the user's own area could be processed LAST. Partition
+  // the indices so markers in (or within half a screen of) the current view are handled in
+  // the first batches — nearby pins appear near-instantly and the rest fill in behind.
+  // Raw lat/lng compares, no allocations per marker. If the map isn't ready, natural order.
+  let order = null;
+  try{
+    const b = map.getBounds();
+    const latPad = (b.getNorth() - b.getSouth()) * 0.5;
+    const lngPad = (b.getEast() - b.getWest()) * 0.5;
+    const south = b.getSouth() - latPad, north = b.getNorth() + latPad;
+    const west  = b.getWest()  - lngPad, east  = b.getEast()  + lngPad;
+    const near = [], far = [];
+    for(let i = 0; i < allLocationMarkers.length; i++){
+      const loc = allLocationMarkers[i].locationData;
+      if(loc && loc.lat >= south && loc.lat <= north && loc.lng >= west && loc.lng <= east) near.push(i);
+      else far.push(i);
+    }
+    order = near.concat(far);
+  }catch(e){ /* map not ready — natural order is still correct, just not prioritized */ }
+
   let index = 0;
 
   function processBatch(){
     if(runToken !== _filterRunToken) return; // a newer filter pass superseded this one
     const stop = Math.min(index + batchSize, allLocationMarkers.length);
     for(; index < stop; index++){
-      const m = allLocationMarkers[index];
+      const m = allLocationMarkers[order ? order[index] : index];
+      if(!m) continue; // marker added after this pass's order snapshot — next pass covers it
       const loc = m.locationData;
       if(!loc) continue;
       const openOk = showAllLocations || isLocationOpenNow(loc) !== false;

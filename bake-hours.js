@@ -37,7 +37,11 @@ function loadFile(file){
   return { varName, records: sandbox.window[varName] };
 }
 function serialize(varName, records){
-  return 'window.' + varName + ' = ' + JSON.stringify(records, null, 2) + ';\n';
+  // One record per line — same format as bake-overrides.js and bake-confirmed.js (see
+  // bake-overrides.js for the rationale). Keep all three writers identical.
+  return 'window.' + varName + ' = [\n' +
+    records.map(r => JSON.stringify(r)).join(',\n') +
+    '\n];\n';
 }
 
 const t0 = Date.now();

@@ -1,5 +1,12 @@
 rules_version = '2';
 
+// ============================================================
+//  Bathroom Report — Firestore security rules
+//  v2.1 — Phase 1 hardening: field allowlists + type validation
+//       on every public write path. No access-level changes
+//       except /activity update+delete (see comment there).
+// ============================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -41,6 +48,52 @@ service cloud.firestore {
         || request.resource.data.status in ['pending','resolved','dismissed'];
     }
 
+    // ---- Phase 1 validation helpers ---------------------------------------
+    // "Absent or the right type" checks — written against the FINAL document
+    // (with merge writes, request.resource.data is the post-merge doc), so a
+    // field a client never sends still passes.
+    function numOrAbsent(k) {
+      return !(k in request.resource.data) || request.resource.data[k] is number;
+    }
+    function strOrAbsent(k) {
+      return !(k in request.resource.data) || request.resource.data[k] is string;
+    }
+    function mapOrAbsent(k) {
+      return !(k in request.resource.data) || request.resource.data[k] is map;
+    }
+    // Star rating: absent, or an integer-ish number 0–5 (0 = not rated yet).
+    function ratingOrAbsent(k) {
+      return !(k in request.resource.data)
+        || (request.resource.data[k] is number
+            && request.resource.data[k] >= 0
+            && request.resource.data[k] <= 5);
+    }
+    // Bounded string: absent, or a string no longer than max chars.
+    function boundedStrOrAbsent(k, max) {
+      return !(k in request.resource.data)
+        || (request.resource.data[k] is string
+            && request.resource.data[k].size() <= max);
+    }
+    // The keys an UPDATE actually touches (ignores pre-existing legacy fields,
+    // so old documents with retired fields can still be updated safely).
+    function touchedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+    // UPDATE-safe validators: only enforce the type if this write is actually
+    // changing the field. Legacy values a merge write carries along untouched
+    // can't fail validation (and can't be modified to something invalid either).
+    function touchedIsBoundedStr(k, max) {
+      return !touchedKeys().hasAny([k])
+        || (request.resource.data[k] is string
+            && request.resource.data[k].size() <= max);
+    }
+    function touchedIsNum(k) {
+      return !touchedKeys().hasAny([k]) || request.resource.data[k] is number;
+    }
+    function touchedIsMap(k) {
+      return !touchedKeys().hasAny([k]) || request.resource.data[k] is map;
+    }
+
 
     // ============================================================
     //  Administrator authorization (managed from the Firebase Console)
@@ -57,10 +110,39 @@ service cloud.firestore {
     // Anyone may READ ratings. Writing requires sign-in AND the doc must be the caller's
     // own vote: its id is "<locId>_<uid>" and its clientId is the caller's uid. This blocks
     // forging votes or overwriting someone else's rating.
+    //
+    // Phase 1 adds shape validation. saveMyVote() writes exactly these fields:
+    //   store, bathroom (0–5), amenities/storeFeatures/amenityMeta (maps),
+    //   clientId, locId, lastUpdated, and optionally username, ratedAt.
+    function validVoteShape() {
+      return strOrAbsent('locId')
+        && ratingOrAbsent('store')
+        && ratingOrAbsent('bathroom')
+        && mapOrAbsent('amenities')
+        && mapOrAbsent('storeFeatures')
+        && mapOrAbsent('amenityMeta')
+        && numOrAbsent('lastUpdated')
+        && numOrAbsent('ratedAt')
+        && boundedStrOrAbsent('username', 40);
+    }
     match /votes/{id} {
       allow read: if true;
-      allow create, update: if ownedByCaller()
-        && id == request.resource.data.locId + '_' + request.auth.uid;
+      allow create: if ownedByCaller()
+        && id == request.resource.data.locId + '_' + request.auth.uid
+        && request.resource.data.keys().hasOnly([
+             'store','bathroom','amenities','storeFeatures','amenityMeta',
+             'clientId','locId','lastUpdated','username','ratedAt'
+           ])
+        && validVoteShape();
+      allow update: if ownedByCaller()
+        && id == request.resource.data.locId + '_' + request.auth.uid
+        // Allowlist what the write CHANGES (not the whole doc) so votes created
+        // before these rules — possibly carrying retired fields — stay updatable.
+        && touchedKeys().hasOnly([
+             'store','bathroom','amenities','storeFeatures','amenityMeta',
+             'clientId','locId','lastUpdated','username','ratedAt'
+           ])
+        && validVoteShape();
       allow delete: if signedIn() && resource.data.clientId == request.auth.uid;
     }
 
@@ -80,18 +162,48 @@ service cloud.firestore {
     // ============================================================
     //  Visitor tips
     // ============================================================
+    // One doc per LOCATION (id = location id) holding a shared `tips` string array.
+    // The app appends via arrayUnion; FlushPanel moderates via arrayRemove/arrayUnion.
+    // Because the doc is shared, per-user ownership can't apply here — instead:
+    //   - only the `tips` field may be touched,
+    //   - it must stay a list, with a sanity cap,
+    //   - non-admins may only GROW it (removal is moderation, admin-only).
     match /tips/{id} {
       allow read: if true;
-      allow write: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['tips'])
+        && request.resource.data.tips is list
+        && request.resource.data.tips.size() <= 200;
+      allow update: if signedIn()
+        && touchedKeys().hasOnly(['tips'])
+        && request.resource.data.tips is list
+        && request.resource.data.tips.size() <= 200
+        && (isAdmin()
+            || !('tips' in resource.data)
+            || request.resource.data.tips.size() >= resource.data.tips.size());
+      allow delete: if isAdmin();
     }
 
 
     // ============================================================
     //  Community activity log (feeds recap/most-recent)
     // ============================================================
+    // The app only ever CREATES activity entries (addDoc in logActivity), with exactly:
+    //   'tip'    → { type, ts, locId, text }
+    //   'rating' → { type, ts, locId, sourceId }
+    // Phase 1 change: update/delete drop from "any signed-in user" to admin-only.
+    // No client code updates or deletes activity docs, so nothing breaks — this just
+    // closes the hole where any account could vandalize or wipe the shared log.
     match /activity/{id} {
       allow read: if true;
-      allow write: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['type','ts','locId','text','sourceId'])
+        && request.resource.data.type in ['tip','rating']
+        && request.resource.data.ts is number
+        && strOrAbsent('locId')
+        && boundedStrOrAbsent('text', 120)
+        && strOrAbsent('sourceId');
+      allow update, delete: if isAdmin();
     }
 
 
@@ -99,9 +211,17 @@ service cloud.firestore {
     //  Per-user achievement progress
     // ============================================================
     // Each doc is keyed by the owner's uid; only that user may write their own.
+    // Phase 1: the doc holds exactly one field — the `achievements` map.
     match /achievements/{id} {
       allow read: if true;
-      allow write: if signedIn() && id == request.auth.uid;
+      allow create: if signedIn() && id == request.auth.uid
+        && request.resource.data.keys().hasOnly(['achievements'])
+        && request.resource.data.achievements is map;
+      allow update: if signedIn() && id == request.auth.uid
+        && touchedKeys().hasOnly(['achievements'])
+        && touchedIsMap('achievements');
+      // Owners could always delete their own doc; keep that unchanged.
+      allow delete: if signedIn() && id == request.auth.uid;
     }
 
 
@@ -137,11 +257,22 @@ service cloud.firestore {
     // Signed-in users may CREATE a report or a "cleared" marker for their own id. Reports are
     // immutable and never deleted from a client — the lifecycle is time-based (they simply age out
     // of the 24h window), so there's nothing to edit or remove.
+    // Phase 1: exact field allowlist + types. reportOutOfOrder sends
+    // { locId, locName, lat, lng, reporterId, ts, cleared:false }; clearOutOfOrder sends
+    // { locId, reporterId, ts, cleared:true }.
     match /outOfOrder/{id} {
       allow read:   if true;
       allow create: if signedIn()
         && request.resource.data.reporterId == request.auth.uid
-        && request.resource.data.locId is string;
+        && request.resource.data.locId is string
+        && request.resource.data.keys().hasOnly([
+             'locId','locName','lat','lng','reporterId','ts','cleared'
+           ])
+        && request.resource.data.ts is number
+        && request.resource.data.cleared is bool
+        && boundedStrOrAbsent('locName', 120)
+        && numOrAbsent('lat')
+        && numOrAbsent('lng');
       allow update, delete: if false;
     }
 
@@ -158,18 +289,60 @@ service cloud.firestore {
 
     // Admin-authoritative amenities. Public read (everyone sees admin-set features live);
     // only admins write, and only the known amenity/feature keys are allowed.
+    // Phase 1: every stored value must be a short string (the panel writes 'yes' / 'no' / '').
     match /amenityOverrides/{storeId} {
       allow read: if true;
-      allow write: if isAdmin()
-        && request.resource.data.keys().hasOnly(['restroomType','accessible','changing','evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood']);
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['restroomType','accessible','changing','evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'])
+        && boundedStrOrAbsent('restroomType', 24)
+        && boundedStrOrAbsent('accessible', 24)
+        && boundedStrOrAbsent('changing', 24)
+        && boundedStrOrAbsent('evCharging', 24)
+        && boundedStrOrAbsent('airPump', 24)
+        && boundedStrOrAbsent('shower', 24)
+        && boundedStrOrAbsent('indoorSeating', 24)
+        && boundedStrOrAbsent('wifi', 24)
+        && boundedStrOrAbsent('grabAndGo', 24)
+        && boundedStrOrAbsent('hotFood', 24);
+      // Merge updates: validate only what this write changes, so a legacy field
+      // riding along untouched can never block an admin edit.
+      allow update: if isAdmin()
+        && touchedKeys().hasOnly(['restroomType','accessible','changing','evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'])
+        && touchedIsBoundedStr('restroomType', 24)
+        && touchedIsBoundedStr('accessible', 24)
+        && touchedIsBoundedStr('changing', 24)
+        && touchedIsBoundedStr('evCharging', 24)
+        && touchedIsBoundedStr('airPump', 24)
+        && touchedIsBoundedStr('shower', 24)
+        && touchedIsBoundedStr('indoorSeating', 24)
+        && touchedIsBoundedStr('wifi', 24)
+        && touchedIsBoundedStr('grabAndGo', 24)
+        && touchedIsBoundedStr('hotFood', 24);
+      allow delete: if isAdmin();
     }
 
 
     // ============================================================
     //  Reports (public submit, admin moderate)
     // ============================================================
+    // NOTE: creates remain unauthenticated at the rules level for now — the app UI only
+    // shows the report button to signed-in users, but requiring sign-in here is the
+    // Phase 4 decision (it would also formally close the door on anonymous submissions
+    // from outside the app). Phase 1 just pins the shape logReport() actually sends.
+    // addr / chain / chainKey / storeNumber / city / state may be null, so only the
+    // always-present primitives are type-checked.
     match /reports/{id} {
-      allow create: if startsPending() && hasNoModeratorFields();
+      allow create: if startsPending() && hasNoModeratorFields()
+        && request.resource.data.keys().hasOnly([
+             'locId','locName','addr','chainKey','chain','storeNumber',
+             'city','state','lat','lng','reporterId','reason','ts','status'
+           ])
+        && request.resource.data.locId is string
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() <= 200
+        && request.resource.data.ts is number
+        && boundedStrOrAbsent('locName', 160)
+        && boundedStrOrAbsent('reporterId', 64);
       allow read:   if isAdmin();
       allow update: if isAdmin() && validReportStatus();
       allow delete: if isAdmin();
@@ -179,8 +352,18 @@ service cloud.firestore {
     // ============================================================
     //  Missing-location submissions (public submit, admin moderate)
     // ============================================================
+    // Anonymous users CAN currently submit these (the floating "missing location" button
+    // shows for everyone), so creates stay unauthenticated — requiring sign-in here is a
+    // feature-removal decision reserved for Phase 4. logMissingLocation() sends exactly
+    // { description, ts } plus optional lat/lng.
     match /missingReports/{id} {
-      allow create: if startsPending() && hasNoModeratorFields();
+      allow create: if startsPending() && hasNoModeratorFields()
+        && request.resource.data.keys().hasOnly(['description','ts','lat','lng','status'])
+        && request.resource.data.description is string
+        && request.resource.data.description.size() <= 600
+        && request.resource.data.ts is number
+        && numOrAbsent('lat')
+        && numOrAbsent('lng');
       allow read:   if isAdmin();
       allow update: if isAdmin() && validReportStatus();
       allow delete: if isAdmin();
@@ -218,9 +401,28 @@ service cloud.firestore {
     // ============================================================
     // Keyed by the owner's uid. Readable by anyone (the leaderboard/credits show display names),
     // but only the owner may write their own doc.
+    // Phase 1: exactly the fields saveMyVote()/loadAllRatings() write —
+    // { uid, username, lastUpdated, ratings } — and uid must match the doc/caller.
     match /users/{uid} {
       allow read: if true;
-      allow write: if signedIn() && uid == request.auth.uid;
+      allow create: if signedIn() && uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid','username','lastUpdated','ratings'])
+        && request.resource.data.uid == uid
+        && boundedStrOrAbsent('username', 40)
+        && numOrAbsent('lastUpdated')
+        && mapOrAbsent('ratings');
+      // Merge updates: validate only what this write changes (legacy fields on
+      // pre-rules docs stay readable and untouched, and can't block the write).
+      // Ownership is enforced by the path (uid == auth.uid); the uid field just
+      // can't be changed to anything else.
+      allow update: if signedIn() && uid == request.auth.uid
+        && touchedKeys().hasOnly(['uid','username','lastUpdated','ratings'])
+        && (!touchedKeys().hasAny(['uid']) || request.resource.data.uid == uid)
+        && touchedIsBoundedStr('username', 40)
+        && touchedIsNum('lastUpdated')
+        && touchedIsMap('ratings');
+      // Owners could always delete their own doc; keep that unchanged.
+      allow delete: if signedIn() && uid == request.auth.uid;
     }
 
 
@@ -238,7 +440,8 @@ service cloud.firestore {
         && request.resource.data.uid == uid
         && request.resource.data.keys().hasOnly(['uid','value','kind','submittedAt','schemaVersion'])
         && request.resource.data.kind in ['single','perday']
-        && request.resource.data.schemaVersion == 1;
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.submittedAt is number;
       allow delete: if signedIn() && request.auth.uid == uid;
     }
 
