@@ -3,6 +3,7 @@
     --header-grad-top:#0d1f33; --muted:#93a5b8; --panel-bg:rgba(11,25,42,.92);
     --panel-border:#2a4056; --placeholder:#7d90a3;
     --font-display: 'Fredoka', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-body: 'Overpass', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     /* Popup card colors — its own deep navy in dark mode, distinct from the app's main
        background, so it reads as a floating "card" rather than blending in */
     --popup-bg:#0f2235; --popup-text:#f5f7fa; --popup-muted:#93a5b8; --popup-border:#2a4056;
@@ -35,7 +36,9 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
     --popup-star-empty:#d5dde1;
   }
   *{box-sizing:border-box;}
-  html, body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--charcoal);color:var(--cream);}
+  html, body{margin:0;height:100%;font-family:var(--font-body);background:var(--charcoal);color:var(--cream);}
+  /* Form controls don't inherit the page font by default — opt them in so the whole UI matches. */
+  button, input, select, textarea{font-family:inherit;}
   body{display:flex;flex-direction:column;}
   #header{
     flex:none;
