@@ -3794,17 +3794,6 @@ window.stewartsLocations = [
     }
   },
   {
-    "n": "Stewart's",
-    "lat": 42.644537,
-    "lng": -73.73689,
-    "addr": "Stewart's",
-    "id": "stewarts-osm-426445737369",
-    "src": "osm",
-    "osm": {
-      "gas": 1
-    }
-  },
-  {
     "n": "Schenectady",
     "lat": 42.76908,
     "lng": -73.87512,

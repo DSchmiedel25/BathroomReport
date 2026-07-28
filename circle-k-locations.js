@@ -1,5 +1,3 @@
-// Circle K — official store list (circlek.com), geocoded via US Census. Hours/amenities from OpenStreetMap where a store matched within 200m.
-
 window.circleKLocations = [
   {
     "n": "S STATE ST, ABBEVILLE",
@@ -48744,7 +48742,12 @@ window.circleKLocations = [
     "lng": "-75.033359",
     "addr": "4228 STATE RT 3, STAR LAKE, NY",
     "id": "circlek-starlake-statert3",
-    "hrs": ""
+    "hrs": "0500-2400",
+    "meta": {
+      "prevHrs": "",
+      "prevHrsSrc": "",
+      "hrsSrc": "admin_override"
+    }
   },
   {
     "n": "E HWY 260, STAR VALLEY",

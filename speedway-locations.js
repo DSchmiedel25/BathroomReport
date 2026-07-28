@@ -10,7 +10,6 @@ window.speedwayLocations = [
     "osm": {
       "gas": 1
     },
-     
     "meta": {
       "chain": "speedway",
       "pin_offset_m": 2,
@@ -7398,7 +7397,7 @@ window.speedwayLocations = [
     "addr": "246 Saratoga Road, Schenectady, NY 12302",
     "id": "node/5648414949",
     "chain": "speedway",
-    "hrs": "0500-2200",
+    "hrs": "24",
     "osm": {
       "gas": 1
     },
@@ -10905,9 +10904,14 @@ window.speedwayLocations = [
     "addr": "123 Freemans Bridge Road, Schenectady, NY 12302",
     "id": "node/8408490168",
     "chain": "speedway",
-    "hrs": "",
+    "hrs": "24",
     "osm": {
       "gas": 1
+    },
+    "meta": {
+      "prevHrs": "",
+      "prevHrsSrc": "",
+      "hrsSrc": "admin_override"
     }
   },
   {
@@ -27478,9 +27482,14 @@ window.speedwayLocations = [
     "addr": "4635 State Route 30, Amsterdam, NY 12010",
     "id": "way/1022418705",
     "chain": "speedway",
-    "hrs": "",
+    "hrs": "24",
     "osm": {
       "gas": 1
+    },
+    "meta": {
+      "prevHrs": "",
+      "prevHrsSrc": "",
+      "hrsSrc": "admin_override"
     }
   },
   {
