@@ -1,0 +1,262 @@
+BATHROOMREPORT — DATA SOURCES REFERENCE
+Compiled 2026-07-29. Everything used or evaluated in one session.
+=================================================================
+
+WHY THIS FILE EXISTS
+--------------------
+Two kinds of source, and they do NOT overlap:
+
+  OpenStreetMap  ->  whether a restroom EXISTS, wheelchair access, changing
+                     tables, amenities. Volunteer-surveyed, so a mapper
+                     standing there notices the bathroom.
+
+  Brand APIs /    ->  HOURS, addresses, phone, first-party coordinates.
+  All the Places      Corporate-published, so hours are accurate and fresh —
+                      but they never mention restrooms.
+
+Neither covers the other. That's the whole reason the community layer exists.
+Rule adopted today: a chain needs a RESTROOM signal, not just locations,
+before it goes on the map.
+
+
+=================================================================
+1. ALL THE PLACES (ATP)  — primary hours source
+=================================================================
+What:     Open-source project running scrapers against thousands of brands'
+          own store locators. Weekly rebuild.
+Licence:  CC0-1.0 (public domain, commercial use fine, no attribution needed)
+Site:     https://www.alltheplaces.xyz
+Spiders:  https://alltheplaces.xyz/spiders.html
+Repo:     https://github.com/alltheplaces/alltheplaces
+API doc:  https://github.com/alltheplaces/alltheplaces/blob/master/API.md
+
+DOWNLOAD ONE CHAIN (phone-friendly, few MB):
+  https://data.alltheplaces.xyz/runs/latest/output/<spider_name>.geojson
+
+  Do NOT download the full build (runs/latest.zip) — 1.4 GB, 4,367 files.
+
+WARNINGS LEARNED THE HARD WAY:
+  * Quality varies wildly BY SPIDER. Always dry-run before writing.
+  * Some spiders emit TWO records per site: "<ref>_fuel" + "<ref>_store"
+    (Casey's) or "<ref>-FUEL" + bare "<ref>" (Stewart's). Hours DIFFER —
+    pumps 24h, store closes 22:00. Always keep the STORE record; taking the
+    fuel one shows "open" at 2am at a locked building.
+  * Whole metros can be missing. Starbucks had ZERO coverage in Manhattan,
+    Brooklyn and Boston while fine in Chicago/LA. Verify your area.
+  * "@source_uri" on every record reveals the brand's real API. That's how
+    the Circle K endpoint was found.
+
+RESULTS BY SPIDER (this session):
+  speedway_us .................. 2,845 recs, 78% hours -> 1,896 fills  ✓
+  caseys_general_store_us ...... 3,787 recs (1,936 after twin-collapse),
+                                 100% hours -> 814 fills  ✓
+  dunkin_us .................... 9,775 recs, 100% hours -> 426 fills  ✓
+                                 (3,729 have weekday/weekend splits)
+  wawa ......................... 917 recs, 97% hours -> 321 fills  ✓
+  kwik_trip .................... 904 recs, 100% hours -> 233 fills  ✓
+  pilot_flying_j ............... 723 recs, 100% hours -> 239 fills  ✓
+  quickchek_us ................. 152 recs, 100% hours -> 83 fills  ✓
+  stewarts_shops_us ............ 738 recs (381 after twins) -> 5 fills
+                                 (96% AGREED with existing data — good
+                                  validation that our hours are correct)
+  circle_k ..................... 6,027 recs, 0% HOURS. Contains 5,071
+                                 Circle K + 339 Holiday + 617 Couche-Tard.
+                                 Use the API instead (section 2).
+  starbucks_us ................. 15,384 recs, 96% hours, but NO NYC/Boston.
+                                 Retry in a month — ATP rebuilds weekly.
+  travelcenters_of_america_us .. 362 recs, 0% hours, no API behind it. Dead.
+  cumberland_farms_us .......... 402 recs (2 parts, no overlap), 0% hours.
+  seven_eleven_ca_us ........... 15,494 recs, 0% hours, NO restroom fields.
+  royal_farms .................. 319 recs, CORRUPT — 24 read "00:00-12:00"
+                                 and 6 "12:00-24:00", a 12-hour-clock bug
+                                 splitting stores into AM/PM halves. SKIPPED.
+  NO SPIDER EXISTS: getgo, jacksons, plaid_pantry, town_pump,
+                    holiday_stationstores (Holiday is inside circle_k)
+
+
+=================================================================
+2. CIRCLE K STORE LOCATOR API  — the big outstanding win
+=================================================================
+What:     Circle K's own public locator. Bounding-box query, no API key.
+          Returns "openingHours":{"alwaysOpen":true} etc.
+Covers:   Circle K + Holiday + Couche-Tard (one run does all three)
+Worth:    6,064 unknown hours = 58% of the entire remaining gap
+
+ENDPOINT:
+  https://api.circlek.com/us/ngrp-store-locator/v1/stations
+    ?bottomRightLongitude=<E>&bottomRightLatitude=<S>
+    &topLeftLongitude=<W>&topLeftLatitude=<N>
+    &maxResults=2000&country=US&brand=CIRCLEK,COUCHE_TARD,HOLIDAY
+
+  Caps at maxResults — a full response means the box was truncated, so
+  subdivide it. tools/fetch-circlek-hours.js handles that automatically.
+  Needs Node 18+ (uses global fetch). Not a phone job.
+
+OFFICIAL ALTERNATIVE (needs a key, sanctioned, documented):
+  https://www.developer.circlek.com/api-documentation-main-page
+  Use this if the public endpoint starts returning 403/429.
+
+
+=================================================================
+3. NYC OPEN DATA — PUBLIC RESTROOMS  — the model city dataset
+=================================================================
+What:     City-maintained. Name, coords, type, operator, SEASONALITY, hours,
+          ADA level, stall counts, changing stations, access notes.
+Dataset:  https://data.cityofnewyork.us/City-Government/Public-Restrooms/i7jb-7jku
+JSON:     https://data.cityofnewyork.us/resource/i7jb-7jku.json?$limit=5000
+Alt:      vzrx-zg6z (operational only), hjae-yuav (parks toilets, older)
+
+RESULT: 1,066 records, 522 matched our 747 ->
+  503 hours, 257 accessible, 145 not accessible, 24 limited,
+  413 changing stations, 101 seasonal, and 40 NOT OPERATIONAL
+  (those were tagged hrs:"closed" — hidden but kept, ids preserved).
+
+CAVEATS:
+  * City says availability changes with maintenance/construction and the
+    data may not be real-time.
+  * Seasonal records give NO dates — 132 flagged, 0 with months. So the app
+    shows "⚠️ Seasonal — may be closed in winter" and does NOT compute a
+    season. Inventing one would be a guess.
+  * Common hours string is "8am-4pm, Open later seasonally" -> written as
+    0800-1600. Understates in summer, never overstates. Deliberate.
+
+
+=================================================================
+4. OPENSTREETMAP / OVERPASS  — restroom existence & accessibility
+=================================================================
+What:     Volunteer-mapped. The ONLY source for things nobody owns:
+          highway rest areas, public toilets, park comfort stations.
+Tool:     https://overpass-turbo.eu
+
+QUERIES USED:
+  Rest areas (US bbox — a lat/lng box is NOT a border, see warning):
+    [out:json][timeout:180];
+    ( node["highway"="rest_area"](24.5,-125,49.5,-66);
+      way["highway"="rest_area"](24.5,-125,49.5,-66);
+      relation["highway"="rest_area"](24.5,-125,49.5,-66); );
+    out center tags;
+
+  Public toilets:      amenity=toilets
+  Toll-road plazas:    highway=services   (NOT rest_area — likely a gap;
+                       NY Thruway / PA & OH Turnpike service plazas)
+
+WARNINGS:
+  * A BOUNDING BOX IS NOT A BORDER. A "US" box swallows Quebec, Ontario and
+    northern Mexico. An export that looked like 158 new US rest areas was
+    152 Quebec ("Halte de...") and 6 Mexico. Real answer: ZERO new.
+  * OSM rest-area coverage is EXHAUSTED for us — 918 US records, 917 already
+    mapped. Remaining lead: 923 previously excluded for "unknown toilets".
+  * OSM hours coverage is poor (~19% on rest areas) — that's WHY we were at
+    63% unknown. Don't source hours from OSM.
+
+
+=================================================================
+5. STATE DOT DATA  — good attributes, NO hours
+=================================================================
+No national rest-area dataset exists. It's state by state.
+
+FIND THEM:
+  https://hub.arcgis.com/search?q=rest%20area
+  Pattern: data-<agency>.opendata.arcgis.com   (e.g. data-wisdot...)
+  Fallback: "<state> DOT rest area GIS open data" or data.<state>.gov
+
+PULL WHOLE LAYER AS GEOJSON (skip the download UI):
+  https://.../FeatureServer/0/query?where=1=1&outFields=*&f=geojson
+  Caps at 1,000 records — page with resultOffset beyond that.
+
+CALTRANS (verified working, last updated 2023-08-15):
+  https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/Rest_Areas/FeatureServer/0
+
+  Fields: RESTROOM flag, HANDICAP, TRAFFIC_DIRECTION (solves the
+  northbound/southbound dedup problem), CITY, ZIPCODE, COUNTY, ROUTE, PHONE.
+  NO HOURS FIELD — closure status lives outside the dataset.
+
+  CORRECTION TO AN EARLIER ASSUMPTION: DOT data does NOT bring hours.
+  It brings attribute quality. For hours, use brand locators.
+
+
+=================================================================
+6. DEAD ENDS — checked, don't repeat
+=================================================================
+  Boston public restrooms .... Analyze Boston has no restroom dataset. The
+                               parks asset layer (park_features_geojson) has
+                               144 "Restroom" entries but 127 are PORTABLE
+                               TOILET SITES, no hours, and only 5 of our 120
+                               pins matched. Not usable.
+  7-Eleven ................... ATP: no hours, no restroom fields.
+                               OSM: toilets tagged on 7 of 746 NY stores
+                               (0.9%). Not addable — can't say a bathroom
+                               even exists.
+  Cumberland Farms ........... ATP no hours; API at
+                               cumberlandfarms.com/api/stores-locator/... 
+                               checked, also no hours.
+  TravelCenters .............. spider scrapes location pages, no API, 0%.
+  National rest-area dataset . does not exist. USGS National Map has
+                               structures, not rest areas.
+
+  NOT YET TRIED: 7-Eleven's v5 GraphQL endpoint
+    https://apis.7-eleven.com/v5/stores/graphql
+    This is what the speedway_us spider uses and it DOES carry hours.
+    Would cover Speedway's remaining 980. Needs a GraphQL query body,
+    so more work than a simple URL.
+
+
+=================================================================
+7. TOOLS BUILT (in tools/)
+=================================================================
+  atp-to-hours.js ........... ATP GeoJSON -> flat records. Collapses
+                              fuel/store twins, emits per-day maps where the
+                              week varies, refuses to guess split shifts.
+  match-hours.js ............ fills missing hours by coordinate match.
+                              DRY RUN BY DEFAULT. Never overwrites existing
+                              hours. Skips ambiguous matches. Validates every
+                              value against the app's format before writing.
+                              Writes a .bak.
+  apply-ev.js ............... sets osm.evCharging from an enrichment file.
+  extract-enrichment.js ..... archives a spider file with provenance.
+  fetch-circlek-hours.js .... walks the Circle K API over a US bbox grid.
+                              NOT YET RUN.
+
+  Usage:
+    node tools/atp-to-hours.js <spider>.geojson out-hours.json
+    node tools/match-hours.js <chain>-locations.js out-hours.json
+    node tools/match-hours.js <chain>-locations.js out-hours.json --write
+
+
+=================================================================
+8. THE APP'S HOURS FORMAT (get this wrong and it fails silently)
+=================================================================
+  loc.hrs      "24" | "HHMM-HHMM" | "closed" | "" (unknown)
+               PARSED WITH parseInt — "05:00-23:00" reads as 5 and 23,
+               i.e. 00:05 to 00:23. FOUR DIGITS, NO COLON.
+  loc.hours    per-day map {mon:"0500-2300", ..., sun:"0600-1900"}
+               Takes precedence over loc.hrs. Was used by 33 of 22,904
+               records before this session.
+  loc.seasonal true -> shows the seasonal caveat, does NOT affect status.
+  "00:00-24:00" must collapse to "24" or it displays "12:00 AM – 12:00 AM".
+
+  Missing hours are NEVER treated as closed. That's a product rule.
+
+
+=================================================================
+9. ARCHIVE  (atp-data/)
+=================================================================
+  11 files, 40,995 records, raw source fields with provenance
+  (spider, collection date, CC-0 licence, archive date).
+
+  Stored RAW rather than mapped to app features on purpose: mapping is a
+  product decision that will change, and ATP publishes weekly with older
+  builds not always retrievable. This is the durable copy.
+
+  Unused signal sitting in there:
+    5,334  Circle K toilets=yes (first-party, 85% of the chain)
+    6,201  Starbucks ownership_type=LS (licensed, not company-run)
+    3,951  located_in — Target 1,652, Safeway 619, Kroger 479.
+           A counter inside a Target has no restroom of its own.
+    9,652  Dunkin drive_through yes/no — drive-through-only may mean no lobby
+   ~9,300  ATM flags, ~2,000 car washes, 723 Pilot truck-access
+   37,824  phone numbers
+
+  Also staged: staged/dunkin-national-staged.json — all 9,652 US Dunkin' in
+  app record shape, 8,563 not currently mapped, 100% with hours. Parked, not
+  deployed. Strip the _onMapAlready field before using.
