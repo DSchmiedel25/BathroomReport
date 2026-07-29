@@ -759,6 +759,21 @@ function seasonalNoteHtml(loc){
     : '';
 }
 
+/* Is it known whether the public may actually use this restroom?
+ *
+ * Businesses (no metroInfo) are implicitly usable — you walk in. Metro/civic entries carry an
+ * explicit access value, EXCEPT the OSM-sourced statewide set where the tag is often absent:
+ * a human confirmed a toilet exists but not who may use it.
+ *
+ * Bathroom Now deprioritises the unknowns rather than dropping them. The asymmetry matters:
+ * getting hours wrong costs a locked door, but getting access wrong sends someone somewhere
+ * they aren't welcome, which is worse for exactly the people who rely on this most. */
+function accessKnown(loc){
+  const mi = loc && loc.metroInfo;
+  if(!mi) return true;
+  return !!mi.access;
+}
+
 // True when the only accessibility signal is OSM's "limited" — partial step-free access.
 function isAccessLimited(loc){
   return !!(loc && ((loc.osm && loc.osm.accessibleLimited) || loc.wheelchair === 'limited'));
@@ -3579,17 +3594,16 @@ function renderChainKey(){
     const keys = allKeys.filter(k => chainBucket(k) === g.id);
     if(!keys.length) return '';
     const on = !keys.every(k => disabledChains.has(k));
-    const n = keys.length;
     if(readOnly){
       return `<div class="d-toggle ck-grouprow d-gated"><span>${g.label}</span>` +
-             `<span class="ck-groupcount">${n}</span><span class="d-switch"><b></b></span></div>`;
+             `<span class="d-switch"><b></b></span></div>`;
     }
     // Reuses the drawer's own switch (same markup as Hide-closed and Appearance) rather than
     // the map key's checkmark. A checkmark reads as "selected"; the question here is
     // shown/hidden, and the drawer already has a control that says exactly that.
     return `<button type="button" class="d-toggle ck-grouprow${on ? ' on' : ''}" data-groupkeys="${keys.join(',')}"` +
       ` role="switch" aria-checked="${on}"><span>${g.label}</span>` +
-      `<span class="ck-groupcount">${n}</span><span class="d-switch"><b></b></span></button>`;
+      `<span class="d-switch"><b></b></span></button>`;
   }).join('');
 
   if(countEl) countEl.textContent = areaKeys.length ? String(areaKeys.length) : '';
@@ -4065,12 +4079,15 @@ function bathroomNowCard(result,fallback=false){
   const ratedWhen = agg.bathroomCount>0 ? relativeTimeFromNow(agg.lastRatedAt || agg.lastUpdated) : '';
   const lastRatedNote = ratedWhen ? ` · rated ${ratedWhen}` : '';
   const hoursMissingNote=open===null?'<br><small>No hours listed for this store — tap "View pin" then 🚩 to send them in.</small>':'';
+  // If we had to fall back to a spot whose access isn't recorded, say so up front rather than
+  // letting someone discover it at the door.
+  const accessNote=!accessKnown(result.loc)?'<br><small>❔ We can\'t confirm this one is open to the public.</small>':'';
   const outsideSelection=!activeChains.has(result.loc.chain || DEFAULT_CHAIN_KEY);
   const chainNote=outsideSelection?`<div class="nearest-alert">Nothing close by in your selected chains, so this ${escapeHtml((CHAIN_REGISTRY[result.loc.chain]||{}).name||'nearby')} location is shown instead.</div>`:'';
   // Filled chain pill so you can see which brand this is at a glance, colored from the registry.
   const chain=CHAIN_REGISTRY[result.loc.chain]||{};
   const chainBadge=chain.name?`<div class="now-chain-badge" style="background:${chain.color};color:${chain.textColor};">${escapeHtml(chain.name)}</div>`:'';
-  return `<div class="bathroom-now-card"><button class="bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':'Closest bathroom by driving distance'}</div>${chainNote}${chainBadge}<b>${result.loc.n}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${lastRatedNote}${hoursMissingNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">Details</button></div></div>`;
+  return `<div class="bathroom-now-card"><button class="bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':'Closest bathroom by driving distance'}</div>${chainNote}${chainBadge}<b>${result.loc.n}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${lastRatedNote}${hoursMissingNote}${accessNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">Details</button></div></div>`;
 }
 // For Bathroom Now: drop any of the top-4 nearest candidates that are in the HARD out-of-order
 // phase, in a SINGLE batched query (Firestore `in` takes up to 10 ids, so 4 = one read cost).
@@ -4171,15 +4188,24 @@ locateBtn.addEventListener('click',()=>{
     const CHAIN_FALLBACK_MILES = 20;
     // Bathroom Now ignores travel mode on purpose: it's the emergency button, so the closest
     // usable bathroom wins even if it's a city/metro spot (e.g. a Dunkin) while in road mode.
-    let eligible = seedLocations.filter(loc =>
-      activeChains.has(loc.chain || DEFAULT_CHAIN_KEY) && isLocationOpenNow(loc) !== false
-    );
-    const nearestSelectedMiles = eligible.reduce((min,loc) => {
+    const notClosed = (loc) => isLocationOpenNow(loc) !== false;
+    const inSelection = (loc) => activeChains.has(loc.chain || DEFAULT_CHAIN_KEY);
+    const nearestMiles = (list) => list.reduce((min,loc) => {
       const d = milesBetween(user.lat, user.lng, loc.lat, loc.lng);
       return d < min ? d : min;
     }, Infinity);
-    if(nearestSelectedMiles > CHAIN_FALLBACK_MILES){
-      eligible = seedLocations.filter(loc => isLocationOpenNow(loc) !== false);
+    // Relax one constraint at a time, and only when nothing acceptable is within reach.
+    // Access-unknown spots come before abandoning the user's chain selection, because an
+    // untagged public toilet nearby beats a chain they didn't pick 30 miles away.
+    let eligible = seedLocations.filter(loc => inSelection(loc) && notClosed(loc) && accessKnown(loc));
+    if(nearestMiles(eligible) > CHAIN_FALLBACK_MILES){
+      eligible = seedLocations.filter(loc => inSelection(loc) && notClosed(loc));
+    }
+    if(nearestMiles(eligible) > CHAIN_FALLBACK_MILES){
+      eligible = seedLocations.filter(loc => notClosed(loc) && accessKnown(loc));
+    }
+    if(nearestMiles(eligible) > CHAIN_FALLBACK_MILES){
+      eligible = seedLocations.filter(notClosed);
     }
     let candidates=eligible.map(loc=>({loc,d:milesBetween(user.lat,user.lng,loc.lat,loc.lng)})).sort((a,b)=>a.d-b.d).slice(0,10).map(x=>x.loc);
     if(!candidates.length){
