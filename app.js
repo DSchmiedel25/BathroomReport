@@ -64,7 +64,11 @@ const CHAIN_REGISTRY = {
   bosPavement: { name: 'Pavement Coffeehouse', color: '#00695c', textColor: '#ffffff', dataVar: 'bosPavementLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
   bosFlour: { name: 'Flour Bakery', color: '#c8506e', textColor: '#ffffff', dataVar: 'bosFlourLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
   bosNero: { name: 'Caffè Nero', color: '#3e2723', textColor: '#ffffff', dataVar: 'bosNeroLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
-  bosPublic: { name: 'Public restroom', color: '#0057b8', textColor: '#ffffff', dataVar: 'bosPublicLocations', group: 'metro', metro: 'Boston', layer: 'public', shape: 'diamond' }
+  bosPublic: { name: 'Public restroom', color: '#0057b8', textColor: '#ffffff', dataVar: 'bosPublicLocations', group: 'metro', metro: 'Boston', layer: 'public', shape: 'diamond' },
+  // Statewide public restrooms (parks, trailheads, small towns). Same treatment as the
+  // city sets, but NOT group:'metro' — 60% of these are rural, so tying them to a metro
+  // would hide most of them behind the city zoom/jump behaviour.
+  nyPublic: { name: 'Public restroom (NY)', color: '#0057b8', textColor: '#ffffff', dataVar: 'nyPublicLocations', layer: 'public', shape: 'diamond' }
 };
 const DEFAULT_CHAIN_KEY = 'stewarts';
 
@@ -3452,14 +3456,14 @@ function chainKeyRowHtml(key, readOnly){
 const TRAVEL_CENTER_KEYS = new Set(['pilotFlyingJ', 'loves', 'bucees', 'travelCentersOfAmerica']);
 function chainBucket(key){
   if(groupOf(key) === 'metro') return 'city';
-  if(key === 'restarea') return 'public';
+  if(key === 'restarea' || key === 'nyPublic') return 'public';
   if(TRAVEL_CENTER_KEYS.has(key)) return 'travel';
   return 'gas';
 }
 const CK_GROUPS = [
   { id: 'gas',    label: '⛽ Gas & convenience' },
   { id: 'travel', label: '🚛 Travel centers' },
-  { id: 'public', label: '🚻 Public rest areas' },
+  { id: 'public', label: '🚻 Public restrooms' },
   { id: 'city',   label: '🏙️ City & metro' }
 ];
 function ckGroupCollapsed(id){
@@ -3530,7 +3534,7 @@ function chainKeyEmptyHtml(inView){
   const z = map.getZoom();
   const zoomBlocked = [];
   if(present.some(k => groupOf(k) === 'metro') && z < METRO_MIN_ZOOM) zoomBlocked.push('city restrooms');
-  if(present.includes('restarea') && z < REST_MIN_ZOOM) zoomBlocked.push('rest areas');
+  if(present.some(k => chainBucket(k) === 'public') && z < REST_MIN_ZOOM) zoomBlocked.push('public restrooms');
   if(zoomBlocked.length && !(travelMode === 'foot' && zoomBlocked[0] !== 'city restrooms')){
     return msg('🔍 Zoom in to see ' + zoomBlocked.join(' and ') + ' around here.');
   }
@@ -4177,11 +4181,28 @@ missingInput.addEventListener('keydown', (e) => {
   if(e.key === 'Enter') submitMissingLocation();
 });
 
-// "Add to Home Screen" suggestion — different instructions per platform, shown once
+// "Add to Home Screen" suggestion — one-tap install where the browser allows it,
+// platform instructions where it doesn't (iOS has no install API), shown once.
 (function(){
   const isStandalone = window.navigator.standalone === true ||
     window.matchMedia('(display-mode: standalone)').matches;
   const alreadyDismissed = localStorage.getItem('hideInstallBanner') === '1';
+
+  // Capture the browser's install offer even before the banner logic runs — Chrome fires
+  // beforeinstallprompt exactly once, early, and only over HTTPS with a valid manifest+SW.
+  // Holding the event lets our own Install button trigger the native dialog on tap.
+  let deferredInstall = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();                       // keep Chrome's mini-infobar from double-prompting
+    deferredInstall = e;
+    if(isStandalone || alreadyDismissed) return;
+    const btn = document.getElementById('installNow');
+    const msgEl = document.getElementById('installMsg');
+    if(btn){
+      btn.hidden = false;
+      if(msgEl) msgEl.innerHTML = 'Get <b>Bathroom Report</b> as an app — one tap, no store.';
+    }
+  });
 
   if(isStandalone || alreadyDismissed) return;
 
@@ -4202,6 +4223,17 @@ missingInput.addEventListener('keydown', (e) => {
   setTimeout(() => {
     document.getElementById('installBanner').classList.add('show');
   }, 1500);
+
+  document.getElementById('installNow')?.addEventListener('click', async () => {
+    if(!deferredInstall) return;
+    deferredInstall.prompt();                 // the native install dialog
+    const choice = await deferredInstall.userChoice;
+    deferredInstall = null;                   // the event is single-use
+    document.getElementById('installBanner').classList.remove('show');
+    // Accepted: the app is installing — never show the banner again. Dismissed the native
+    // dialog: keep our banner eligible for a future visit rather than nagging now.
+    if(choice && choice.outcome === 'accepted') localStorage.setItem('hideInstallBanner', '1');
+  });
 
   document.getElementById('installClose').addEventListener('click', () => {
     document.getElementById('installBanner').classList.remove('show');

@@ -757,3 +757,12 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 }
 #appDrawer .d-tagline i{ font-style:normal; color:var(--accent); }
 .tag-verb{ font-weight:800; letter-spacing:.08em; color:var(--accent); }
+
+/* One-tap Install button in the A2HS banner (only visible when the browser has
+   offered beforeinstallprompt — i.e. installing will actually work). */
+#installBanner #installNow{
+  flex:0 0 auto; min-height:36px; padding:7px 16px; margin-left:8px;
+  background:var(--accent); color:#fff; border:0; border-radius:10px;
+  font-size:14px; font-weight:800; cursor:pointer;
+}
+#installBanner #installNow:active{ filter:brightness(.9); }

@@ -1,7 +1,7 @@
 {
   "name": "BathroomReport",
   "short_name": "BathroomReport",
-  "description": "Find the best bathrooms, rated by the community. Currently featuring Stewart's Shops.",
+  "description": "Find. Rate. Share. Improve. Clean, open public bathrooms at convenience stores, travel stops, and rest areas — rated by the community.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
