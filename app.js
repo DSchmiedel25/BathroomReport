@@ -3477,14 +3477,17 @@ function renderChainKey(){
     .sort((a, b) => CHAIN_REGISTRY[a].name.localeCompare(CHAIN_REGISTRY[b].name));
 
   // Login state is part of the signature: signing in must flip legend → switches immediately.
+  // Zoom and travel mode change the empty-state wording, so they belong in the signature —
+  // otherwise the advice goes stale while the user zooms.
+  const emptyCtx = areaKeys.length ? '' : ('|z' + map.getZoom() + '|' + travelMode);
   const sig = areaKeys.join(',') + '|' + allKeys.join(',') + '|' +
-              [...disabledChains].sort().join(',') + '|' + (readOnly ? 'ro' : 'rw');
+              [...disabledChains].sort().join(',') + '|' + (readOnly ? 'ro' : 'rw') + emptyCtx;
   if(sig === _chainKeySig) return;
   _chainKeySig = sig;
 
   areaList.innerHTML = areaKeys.length
     ? areaKeys.map(k => chainKeyRowHtml(k, readOnly)).join('')
-    : '<div class="ck-empty">No mapped chains in this area yet — try zooming out, or tap 📍 We Missed One?</div>';
+    : chainKeyEmptyHtml(inView);
 
   // The full list is grouped into four collapsible sections. Collapse state is re-applied from
   // localStorage on every rebuild, so a map pan never slams a group shut under the user's finger.
@@ -3502,6 +3505,32 @@ function renderChainKey(){
   const note = document.getElementById('chainKeySigninNote');
   if(note) note.hidden = !readOnly;
   updateChainKeyScrollHint();
+}
+
+// An empty list has three very different causes, and the advice for each is the opposite of
+// the others. Telling someone to zoom OUT when the pins are hidden by a zoom-IN gate (the
+// old blanket message) sends them further from what they're looking for.
+function chainKeyEmptyHtml(inView){
+  const msg = (text) => `<div class="ck-empty">${text}</div>`;
+  const present = inView ? [...inView].filter(k => chainHasData(k)) : [];
+  if(!present.length){
+    // Genuinely nothing mapped nearby — here zooming out is the right advice.
+    return msg('No mapped chains in this area yet — try zooming out, or tap 📍 We Missed One?');
+  }
+
+  const z = map.getZoom();
+  const zoomBlocked = [];
+  if(present.some(k => groupOf(k) === 'metro') && z < METRO_MIN_ZOOM) zoomBlocked.push('city restrooms');
+  if(present.includes('restarea') && z < REST_MIN_ZOOM) zoomBlocked.push('rest areas');
+  if(zoomBlocked.length && !(travelMode === 'foot' && zoomBlocked[0] !== 'city restrooms')){
+    return msg('🔍 Zoom in to see ' + zoomBlocked.join(' and ') + ' around here.');
+  }
+
+  // On foot, pit stops are hidden by design — so a viewport full of them looks empty.
+  if(travelMode === 'foot'){
+    return msg('Only gas &amp; convenience stops are mapped here. Switch to 🚗 On the road in the menu to see them.');
+  }
+  return msg('Nothing mapped at this zoom yet — try zooming out, or tap 📍 We Missed One?');
 }
 
 // Fade + half-cut row only when the in-area list actually overflows — an affordance that lies
