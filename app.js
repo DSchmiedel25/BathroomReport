@@ -21,6 +21,15 @@ perfMark('app.js execute start');
 //   2. Add a <script src="<chain>-locations.js"></script> tag in index.html's
 //      <head>, alongside the other chain data files, before app.js loads.
 //   3. Add one entry below with the chain's real brand color.
+/* Colours are the real brand colour wherever it works. Four are shifted because they collided
+ * with a chain that operates in the same places (measured in CIE Lab, co-visibility computed
+ * from the actual location data, not guessed):
+ *   sheetz   brand red was 10.8 from Circle K's, both PA/OH/VA — Circle K is co-visible with
+ *            38 chains and had nowhere to move, so Sheetz took the shift
+ *   speedway was 8.2 from Sheetz red, same states
+ *   parkers  brand blue was 7.1 from interstate rest-area blue; the brand also uses orange
+ *   *Public  civic restrooms are grey — not a brand, shouldn't look like one
+ * Colour is never the only cue: every row and popup carries the name. */
 const CHAIN_REGISTRY = {
   stewarts: { name: "Stewart's Shops", color: '#5b3a8f', textColor: '#ffffff', dataVar: 'stewartsLocations' },
   cumberlandFarms: { name: "Cumberland Farms", color: '#009639', textColor: '#ffffff', dataVar: 'cumberlandFarmsLocations' },
@@ -28,8 +37,8 @@ const CHAIN_REGISTRY = {
   fastrac: { name: "Fastrac", color: '#0088cc', textColor: '#ffffff', dataVar: 'fastracLocations' },
   alltownFresh: { name: "Alltown Fresh", color: '#6d8c3a', textColor: '#ffffff', dataVar: 'alltownFreshLocations' },
   byrneDairy: { name: "Byrne Dairy", color: '#8a6d1a', textColor: '#ffffff', dataVar: 'byrneDairyLocations' },
-  parkers: { name: "Parker's", color: '#1565c0', textColor: '#ffffff', dataVar: 'parkersLocations' },
-  sheetz: { name: "Sheetz", color: '#ee3124', textColor: '#ffffff', dataVar: 'sheetzLocations' },
+  parkers: { name: "Parker's", color: '#c05621', textColor: '#ffffff', dataVar: 'parkersLocations' },
+  sheetz: { name: "Sheetz", color: '#8c1c13', textColor: '#ffffff', dataVar: 'sheetzLocations' },
   racetrac: { name: "RaceTrac", color: '#00205b', textColor: '#ffffff', dataVar: 'racetracLocations' },
   pilotFlyingJ: { name: "Pilot Flying J", color: '#fdb913', textColor: '#1c1c1e', dataVar: 'pilotLocations' },
   maverik: { name: "Maverik", color: '#b30086', textColor: '#ffffff', dataVar: 'maverikLocations' },
@@ -40,7 +49,7 @@ const CHAIN_REGISTRY = {
   kwiktrip: { name: "Kwik Trip", color: '#3f51b5', textColor: '#ffffff', dataVar: 'kwiktripLocations' },
   royalFarms: { name: "Royal Farms", color: '#33691e', textColor: '#ffffff', dataVar: 'royalFarmsLocations' },
   rutters: { name: "Rutter's", color: '#4e342e', textColor: '#ffffff', dataVar: 'ruttersLocations' },
-  speedway: { name: "Speedway", color: '#d81e05', textColor: '#ffffff', dataVar: 'speedwayLocations' },
+  speedway: { name: "Speedway", color: '#6a1b2a', textColor: '#ffffff', dataVar: 'speedwayLocations' },
   // National / regional expansion chains. These stay hidden from the legend and Pit Stops
   // filter until their matching data file is uploaded (see chainHasData below), so a chain
   // "turns on" automatically the moment window.<dataVar> is populated — no code change needed.
@@ -57,18 +66,18 @@ const CHAIN_REGISTRY = {
   nycDunkin: { name: "Dunkin'", color: '#ff6e0c', textColor: '#ffffff', dataVar: 'nycDunkinLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
   nycStarbucks: { name: 'Starbucks', color: '#00704a', textColor: '#ffffff', dataVar: 'nycStarbucksLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
   nycGregorys: { name: 'Gregorys Coffee', color: '#1a1a1a', textColor: '#ffffff', dataVar: 'nycGregorysLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
-  nycPublic: { name: 'Public restroom', color: '#0057b8', textColor: '#ffffff', dataVar: 'nycPublicLocations', group: 'metro', metro: 'NYC', layer: 'public', shape: 'diamond' },
+  nycPublic: { name: 'Public restroom', color: '#6b7280', textColor: '#ffffff', dataVar: 'nycPublicLocations', group: 'metro', metro: 'NYC', layer: 'public', shape: 'diamond' },
   bosTatte: { name: 'Tatte Bakery', color: '#b5651d', textColor: '#ffffff', dataVar: 'bosTatteLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
   bosDunkin: { name: "Dunkin'", color: '#ff6e0c', textColor: '#ffffff', dataVar: 'bosDunkinLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
   bosStarbucks: { name: 'Starbucks', color: '#00704a', textColor: '#ffffff', dataVar: 'bosStarbucksLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
   bosPavement: { name: 'Pavement Coffeehouse', color: '#00695c', textColor: '#ffffff', dataVar: 'bosPavementLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
   bosFlour: { name: 'Flour Bakery', color: '#c8506e', textColor: '#ffffff', dataVar: 'bosFlourLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
   bosNero: { name: 'Caffè Nero', color: '#3e2723', textColor: '#ffffff', dataVar: 'bosNeroLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
-  bosPublic: { name: 'Public restroom', color: '#0057b8', textColor: '#ffffff', dataVar: 'bosPublicLocations', group: 'metro', metro: 'Boston', layer: 'public', shape: 'diamond' },
+  bosPublic: { name: 'Public restroom', color: '#6b7280', textColor: '#ffffff', dataVar: 'bosPublicLocations', group: 'metro', metro: 'Boston', layer: 'public', shape: 'diamond' },
   // Statewide public restrooms (parks, trailheads, small towns). Same treatment as the
   // city sets, but NOT group:'metro' — 60% of these are rural, so tying them to a metro
   // would hide most of them behind the city zoom/jump behaviour.
-  nyPublic: { name: 'Public restroom (NY)', color: '#0057b8', textColor: '#ffffff', dataVar: 'nyPublicLocations', layer: 'public', shape: 'diamond' }
+  nyPublic: { name: 'Public restroom (NY)', color: '#6b7280', textColor: '#ffffff', dataVar: 'nyPublicLocations', layer: 'public', shape: 'diamond' }
 };
 const DEFAULT_CHAIN_KEY = 'stewarts';
 
@@ -3569,14 +3578,18 @@ function renderChainKey(){
   allList.innerHTML = CK_GROUPS.map(g => {
     const keys = allKeys.filter(k => chainBucket(k) === g.id);
     if(!keys.length) return '';
-    const off = keys.every(k => disabledChains.has(k));
+    const on = !keys.every(k => disabledChains.has(k));
     const n = keys.length;
     if(readOnly){
-      return `<div class="ck-row ck-legend ck-grouprow"><span class="ck-name">${g.label}</span></div>`;
+      return `<div class="d-toggle ck-grouprow d-gated"><span>${g.label}</span>` +
+             `<span class="ck-groupcount">${n}</span><span class="d-switch"><b></b></span></div>`;
     }
-    return `<button type="button" class="ck-row ck-grouprow${off ? ' ck-off' : ''}" data-groupkeys="${keys.join(',')}"` +
-      ` role="switch" aria-checked="${!off}"><span class="ck-name">${g.label}</span>` +
-      `<span class="ck-groupcount">${n}</span><span class="ck-mark" aria-hidden="true">✓</span></button>`;
+    // Reuses the drawer's own switch (same markup as Hide-closed and Appearance) rather than
+    // the map key's checkmark. A checkmark reads as "selected"; the question here is
+    // shown/hidden, and the drawer already has a control that says exactly that.
+    return `<button type="button" class="d-toggle ck-grouprow${on ? ' on' : ''}" data-groupkeys="${keys.join(',')}"` +
+      ` role="switch" aria-checked="${on}"><span>${g.label}</span>` +
+      `<span class="ck-groupcount">${n}</span><span class="d-switch"><b></b></span></button>`;
   }).join('');
 
   if(countEl) countEl.textContent = areaKeys.length ? String(areaKeys.length) : '';

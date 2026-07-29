@@ -735,9 +735,10 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 #chainKeyAllList .ck-row{ padding-left:32px; padding-right:20px; }
 /* Drawer group rows. Same row anatomy as a place row in the map key, so the two lists read
    as one system, but no colour swatch — a group has no single brand colour. */
-.ck-grouprow{ padding-left:20px !important; padding-right:20px !important; font-weight:700; }
-.ck-groupcount{ margin-left:auto; margin-right:10px; font-size:12px; color:var(--shell-muted); font-variant-numeric:tabular-nums; }
-.ck-grouprow.ck-off .ck-groupcount{ opacity:.5; }
+/* Drawer group rows: the drawer's own switch, matching Hide-closed and Appearance above. */
+#appDrawer .ck-grouprow{ width:100% !important; }
+.ck-groupcount{ margin-left:auto; margin-right:12px; font-size:12px; color:var(--shell-muted); font-variant-numeric:tabular-nums; }
+#appDrawer .ck-grouprow:not(.on) .ck-groupcount{ opacity:.45; }
 
 /* ---------- Preferences: collapsible + signed-out gate ---------- */
 #prefsBody.collapsed{ display:none; }
