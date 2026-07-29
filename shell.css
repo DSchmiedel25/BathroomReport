@@ -220,6 +220,9 @@ button, input, select, textarea{ font-family:inherit; }
   padding:15px 20px !important; border-radius:0 !important; text-align:left !important;
 }
 #appDrawer .d-items button:active{ background:var(--shell-chrome2) !important; }
+/* Signed-out hiding for drawer entries (Passport). Needs !important to beat the
+   `display:flex !important` above — an inline style.display can't. */
+#appDrawer .d-items button.is-hidden{ display:none !important; }
 /* Toggle rows (Show all locations, Appearance): switch pinned to the right */
 #appDrawer .d-toggle .d-switch{
   margin-left:auto; width:42px; height:25px; border-radius:999px; background:var(--shell-chrome2);
@@ -437,7 +440,6 @@ body:not(.logged-in) #appDrawer #chainFilter{ display:none !important; }
   width:100% !important; max-width:none !important; margin:0 !important; padding:6px 0 !important;
 }
 #appDrawer #chainFilterToggle,
-#appDrawer #metroFilterToggle,
 /* (Collapse-head rhythm is defined ONCE, further down with the other drawer rhythm rules —
    a second conflicting copy here was the cause of the uneven section spacing.) */
 #appDrawer .d-collapse-arrow{ margin-left:auto; transition:transform .16s; }
@@ -611,7 +613,6 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
    Metros, Passport, FAQ, and the toggles all sit on the same rhythm. */
 #appDrawer .d-items button,
 #appDrawer #chainFilterToggle,
-#appDrawer #metroFilterToggle,
 #appDrawer .d-collapse-head{
   padding:14px 20px !important;              /* same rhythm as .d-section-label */
   min-height:0 !important; margin:0 !important;
@@ -643,8 +644,7 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
   margin:0 20px 13px !important; width:calc(100% - 40px) !important;
 }
 /* Collapse bodies + rows flush and evenly indented. */
-#appDrawer #chainFilterBody, #appDrawer #metroFilterBody{ margin:0 !important; padding:0 0 6px !important; }
-#appDrawer #metroFilterBody .chain-filter-row{ padding:11px 20px 11px 46px !important; }
+#appDrawer #chainFilterBody{ margin:0 !important; padding:0 0 6px !important; }
 #appDrawer .d-coverage-note{ margin:0 20px 12px !important; }
 
 /* ---------- Below-header stat strip (most-recent + this-week, centered) ---------- */

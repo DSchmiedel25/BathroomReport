@@ -3746,8 +3746,10 @@ let accountPanelMode = 'account';
 function applyAuthVisibility(){
   const loggedIn = isLoggedIn();
 
+  // NB: a class, not style.display — `#appDrawer .d-items button` sets `display:flex !important`,
+  // which an inline style can't beat. The .is-hidden rule carries !important to match.
   const passport = document.getElementById('passportToggle');
-  if(passport) passport.style.display = loggedIn ? '' : 'none';
+  if(passport) passport.classList.toggle('is-hidden', !loggedIn);
 
   ['openNowToggle', 'accessibleToggle', 'themeToggle'].forEach(id => {
     const el = document.getElementById(id);
