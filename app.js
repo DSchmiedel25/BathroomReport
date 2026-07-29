@@ -3773,16 +3773,12 @@ document.getElementById('authSignUpBtn').addEventListener('click', async () => {
     updateAccountUI();
     loadAllRatings();
     // Success needs no further reading — close the panel so the map is immediately usable.
-<<<<<<< HEAD
-    setTimeout(() => { document.getElementById('accountPanel')?.classList.remove('show'); note.textContent = ''; }, 900);
-=======
     // Guard: if the user opened Passport in the meantime, leave their panel alone.
     setTimeout(() => {
       if(accountPanelMode === 'passport') return;
       document.getElementById('accountPanel')?.classList.remove('show');
       note.textContent = '';
     }, 900);
->>>>>>> 0b00c316 (v3.4: chain key groups, drawer reorg, tagline, Overpass, store icons)
   } else {
     note.style.color = '#e57373';
     note.textContent = result.reason;
@@ -3806,16 +3802,12 @@ document.getElementById('authLogInBtn').addEventListener('click', async () => {
     updateAccountUI();
     loadAllRatings();
     // Success needs no further reading — close the panel so the map is immediately usable.
-<<<<<<< HEAD
-    setTimeout(() => { document.getElementById('accountPanel')?.classList.remove('show'); note.textContent = ''; }, 900);
-=======
     // Guard: if the user opened Passport in the meantime, leave their panel alone.
     setTimeout(() => {
       if(accountPanelMode === 'passport') return;
       document.getElementById('accountPanel')?.classList.remove('show');
       note.textContent = '';
     }, 900);
->>>>>>> 0b00c316 (v3.4: chain key groups, drawer reorg, tagline, Overpass, store icons)
   } else {
     note.style.color = '#e57373';
     note.textContent = result.reason;

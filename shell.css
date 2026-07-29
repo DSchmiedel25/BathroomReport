@@ -729,15 +729,10 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 /* ---------- Tagline: FIND. RATE. SHARE. IMPROVE. ---------- */
 #appDrawer .d-brand-text{ display:flex; flex-direction:column; gap:2px; min-width:0; }
 #appDrawer .d-tagline{
-<<<<<<< HEAD
-  font-family:var(--font-body); font-size:10px; font-weight:800;
-  letter-spacing:.14em; color:var(--shell-muted); white-space:nowrap;
-=======
   font-family:var(--font-body); font-size:clamp(9px, 2.5vw, 10px); font-weight:800;
   letter-spacing:.1em; color:var(--shell-muted);
   /* No nowrap: at 82%-width on a small phone the full tagline can exceed the space left
      beside the logo and close button. Wrapping to a second line is fine; clipping isn't. */
->>>>>>> 0b00c316 (v3.4: chain key groups, drawer reorg, tagline, Overpass, store icons)
 }
 #appDrawer .d-tagline i{ font-style:normal; color:var(--accent); }
 .tag-verb{ font-weight:800; letter-spacing:.08em; color:var(--accent); }
