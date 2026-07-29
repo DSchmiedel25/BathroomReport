@@ -38,7 +38,7 @@ const CONFIG = {
   appDeepLink: (loc) =>
     `${CONFIG.appUrl}/?loc=${encodeURIComponent(loc.id)}` +
     `&utm_source=guide&utm_medium=organic&utm_campaign=location_page` +
-    `&utm_content=${encodeURIComponent(chainSlug(loc.chain))}`,
+    `&utm_content=${encodeURIComponent(chainSlug(loc))}`,
   siteName: "BathroomReport",
   siteTagline: "Find and rate clean bathrooms at the stops on your route.",
   // Pretty display names where the filename can't produce them:
@@ -56,7 +56,40 @@ const CONFIG = {
  * Each file is executed in a sandbox; any global array that looks
  * like locations is harvested. const/let/var and window.* all work.
  * ==========================================================*/
-function chainFromFilename(file) {
+/* Display names come from the app's own CHAIN_REGISTRY (app.js), matched via the
+ * dataVar each locations file defines (window.kwikTripLocations -> kwikTrip ->
+ * "Kwik Trip"). The registry is the single source of truth the app renders from,
+ * so titles can never drift from what users see on the map again. Overrides and
+ * the filename prettifier remain as fallbacks for files the registry doesn't know. */
+let REGISTRY_NAME_BY_DATAVAR = null;
+function registryNames() {
+  if (REGISTRY_NAME_BY_DATAVAR) return REGISTRY_NAME_BY_DATAVAR;
+  REGISTRY_NAME_BY_DATAVAR = {};
+  try {
+    const appSrc = fs.readFileSync(path.join(CONFIG.locationsDir, "app.js"), "utf8");
+    const seg = appSrc.slice(appSrc.indexOf("CHAIN_REGISTRY"), appSrc.indexOf("DEFAULT_CHAIN_KEY"));
+    // Entries mix quote styles (name: "Stewart's Shops" vs name: 'Wawa'), so anchor on
+    // dataVar and read the name from the same entry with either quoting.
+    const re = /name:\s*(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")[^}]*?dataVar:\s*['"]([\w$]+)['"]/g;
+    let m;
+    while ((m = re.exec(seg))) {
+      const nm = (m[1] ?? m[2]).replace(/\\(['"])/g, "$1");
+      REGISTRY_NAME_BY_DATAVAR[m[3]] = nm;
+    }
+    console.log(`  registry: ${Object.keys(REGISTRY_NAME_BY_DATAVAR).length} chain names loaded from app.js`);
+  } catch (e) {
+    console.warn("  ! could not read CHAIN_REGISTRY from app.js — falling back to overrides/filenames: " + e.message);
+  }
+  return REGISTRY_NAME_BY_DATAVAR;
+}
+function chainFromFilename(file, code) {
+  // 1. the registry name for whatever global this file defines
+  const dv = code && code.match(/window\.([A-Za-z_$][\w$]*)\s*=/);
+  if (dv) {
+    const names = registryNames();
+    if (names[dv[1]]) return names[dv[1]];
+  }
+  // 2. hand overrides, 3. prettified filename
   const stem = path.basename(file).replace(/-locations\.js$/i, "");
   if (CONFIG.chainNameOverrides[stem]) return CONFIG.chainNameOverrides[stem];
   return stem.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
@@ -92,15 +125,21 @@ function readAllLocationFiles() {
   const all = [];
   for (const f of files) {
     const full = path.join(CONFIG.locationsDir, f);
-    const fileChain = chainFromFilename(f);
-    let recs = [];
+    let recs = [], fileChain;
     try {
-      recs = harvest(fs.readFileSync(full, "utf8"));
+      const code = fs.readFileSync(full, "utf8");
+      fileChain = chainFromFilename(f, code);
+      recs = harvest(code);
     } catch (e) {
       console.warn(`  ! skipped ${f}: ${e.message}`);
       continue;
     }
-    recs.forEach((r) => (r.__fileChain = fileChain));
+    let stem = path.basename(f).replace(/-locations\.js$/i, "");
+    // The already-published /guide/ URLs for these two used name-derived slugs
+    // (from the old generator). The published URL always wins — never move it.
+    const SLUG_PIN = { bucees: "buc-ees", pilot: "pilot-flying-j" };
+    stem = SLUG_PIN[stem] || stem;
+    recs.forEach((r) => { r.__fileChain = fileChain; r.__fileSlug = stem; });
     all.push(...recs);
     console.log(`  ${f}: ${recs.length} records  (chain: ${fileChain})`);
   }
@@ -125,6 +164,11 @@ function normalize(raw) {
     // across imports (some records carry none), which used to split one chain
     // across two folders — e.g. /guide/pilot/ and /guide/pilot-flying-j/.
     chain: raw.__fileChain || raw.chain || meta.chain || raw.brand || "Unknown",
+    // URL folder — pinned to the source FILENAME forever. Display names may be
+    // corrected freely (they come from CHAIN_REGISTRY now), but the slug moving
+    // would 404 every already-published /guide/ URL: GitHub Pages cannot redirect,
+    // and bos-dunkin + nyc-dunkin would collapse into one colliding folder.
+    chainSlug: raw.__fileSlug ? slugify(raw.__fileSlug) : null,
     street: parsed.street || rawStreet,
     city: raw.city || meta.city || addr.city || parsed.city || "",
     state: raw.state || meta.state || addr.state || addr.region || parsed.state || "",
@@ -177,13 +221,15 @@ const slugify = (...p) => p.filter(Boolean).join(" ").toLowerCase().normalize("N
   .replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").replace(/-+/g, "-").slice(0, 80);
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
   .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-const chainSlug = (c) => slugify(c);
+// Accepts a location record (preferred: uses the pinned filename slug) or a bare
+// chain-name string (fallback for grouping keys with no record in hand).
+const chainSlug = (c) => (c && typeof c === "object" ? (c.chainSlug || slugify(c.chain)) : slugify(c));
 const locSlug = (l) => slugify(l.street || l.city, l.city, l.id.slice(-4));
 const fullAddress = (l) => [l.street, l.city, [l.state, l.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 const ratingLabel = (r) => (r == null ? "Not yet rated" : r >= 4 ? "Clean" : r >= 3 ? "Okay" : "Rough");
 const groupBy = (arr, fn) => arr.reduce((m, x) => ((m[fn(x)] ??= []).push(x), m), {});
 const S = () => `${CONFIG.baseUrl}/${CONFIG.sectionPath}`;
-const locUrl = (l) => `${S()}/${chainSlug(l.chain)}/${locSlug(l)}/`;
+const locUrl = (l) => `${S()}/${chainSlug(l)}/${locSlug(l)}/`;
 const chainUrl = (c) => `${S()}/${chainSlug(c)}/`;
 const homeUrl = () => `${S()}/`;
 
@@ -335,12 +381,13 @@ ${loc.amenities.length ? `<div class="card"><p class="eyebrow" style="margin-top
 <a class="cta" href="${esc(CONFIG.appDeepLink(loc))}">Open in ${esc(CONFIG.siteName)} →</a>
 <p style="color:var(--muted);font-size:.9rem;margin-top:4px">See it on the live map, add a rating, or report the current status.</p>
 <div class="foot">${loc.updated ? `Last updated ${esc(String(loc.updated))}. ` : ""}Data is community-contributed and may change. ·
-  <a href="${esc(chainUrl(loc.chain))}">More ${esc(loc.chain)} locations</a></div>`;
+  <a href="${esc(`${S()}/${chainSlug(loc)}/`)}">More ${esc(loc.chain)} locations</a></div>`;
   return { url, html: shell({ title, desc, canonical: url, body, jsonLdStr: jsonLd(loc, url), chain: loc.chain, locId: loc.id, pageType: "location" }) };
 }
 
-function chainPage(chain, locs) {
-  const url = chainUrl(chain);
+function chainPage(chainKey, locs) {
+  const chain = locs[0].chain;                       // display name from the registry
+  const url = `${S()}/${chainKey}/`;                 // URL from the pinned slug
   const title = `${chain} Bathroom Ratings by Location | ${CONFIG.siteName}`;
   const desc = `Community bathroom ratings and amenities for ${locs.length} ${chain} locations. Find clean, accessible restrooms before you stop.`;
   const byState = groupBy(locs, (l) => l.state || "Other");
@@ -365,8 +412,8 @@ function homePage(counts) {
   const url = homeUrl();
   const title = `${CONFIG.siteName} — ${CONFIG.siteTagline}`;
   const desc = CONFIG.siteTagline + " Community ratings, amenities and out-of-order alerts across major chains.";
-  const links = Object.keys(counts).sort().map((c) =>
-    `<li><a href="${esc(chainUrl(c))}">${esc(c)}<small>${counts[c]} locations</small></a></li>`).join("");
+  const links = counts.map((c) =>
+    `<li><a href="${esc(`${S()}/${c.slug}/`)}">${esc(c.name)}<small>${c.count} locations</small></a></li>`).join("");
   const body = `<p class="eyebrow">${esc(CONFIG.siteName)}</p><h1>${esc(CONFIG.siteTagline)}</h1>
 <p class="addr">Browse by chain, or open the live map to find the nearest clean stop.</p>
 <a class="cta" href="${esc(CONFIG.appUrl)}/">Open the live map →</a>
@@ -410,13 +457,16 @@ function main() {
     writeFile(path.join(relFromUrl(url), "index.html"), html);
     urls.push(url);
   }
-  const byChain = groupBy(locations, (l) => l.chain);
+  const byChain = groupBy(locations, (l) => l.chainSlug || slugify(l.chain));
   for (const chain of Object.keys(byChain)) {
     const { url, html } = chainPage(chain, byChain[chain]);
     writeFile(path.join(relFromUrl(url), "index.html"), html);
     urls.push(url);
   }
-  const counts = Object.fromEntries(Object.entries(byChain).map(([c, l]) => [c, l.length]));
+  // slug -> {slug, name, count}, sorted by display name for the home page list
+  const counts = Object.entries(byChain)
+    .map(([slugKey, l]) => ({ slug: slugKey, name: l[0].chain, count: l.length }))
+    .sort((a, b) => a.name.localeCompare(b.name));
   const home = homePage(counts);
   writeFile(path.join(relFromUrl(home.url), "index.html"), home.html);
   urls.push(home.url);
