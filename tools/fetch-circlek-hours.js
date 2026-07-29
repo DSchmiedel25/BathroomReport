@@ -57,14 +57,60 @@ function parseHours(st) {
   return '';
 }
 
+/* Capture everything useful in ONE pass. The first version of this script took hours and
+ * discarded the rest, which meant a second run to get data that was already on the wire.
+ * The services array is the important part: NA_PUBLIC_RESTROOMS is Circle K telling us, per
+ * store, that there is a public restroom — first-party and it VARIES between stores, which is
+ * what makes it trustworthy (a flag present on 100% of records is a template, not a fact). */
 function toRecords(stations) {
   const out = [];
   for (const st of stations) {
     const lat = Number(st.latitude), lng = Number(st.longitude);
     if (!isFinite(lat) || !isFinite(lng)) continue;
-    out.push({ id: String(st.id ?? ''), lat, lng, hours: parseHours(st) });
+    const svc = Array.isArray(st.services) ? st.services.map(s => s && s.name).filter(Boolean) : [];
+    const a = st.address || {};
+    const rec = {
+      id: String(st.id ?? ''), lat, lng,
+      hours: parseHours(st),
+      // per-day map when the week actually varies — the app prefers loc.hours over loc.hrs
+      days: parseHoursPerDay(st),
+      restroom: svc.includes('NA_PUBLIC_RESTROOMS') ? 'yes' : '',
+      services: svc,
+      phone: String(st.phoneNumber || '').trim(),
+      addr: [a.street, a.city, [a.state, a.postalCode].filter(Boolean).join(' ')].filter(Boolean).join(', '),
+      state: a.state || '',
+      brand: st.publicBrand || st.brand || ''
+    };
+    if (!rec.days) delete rec.days;
+    out.push(rec);
   }
   return out;
+}
+
+/* Returns a mon..sun map ONLY when the days genuinely differ. When every day is the same the
+ * single `hours` window already says it, and a map would be noise. */
+const DAY_NAMES = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+const DAY_KEYS  = { monday:'mon', tuesday:'tue', wednesday:'wed', thursday:'thu',
+                    friday:'fri', saturday:'sat', sunday:'sun' };
+function parseHoursPerDay(st) {
+  const oh = st.openingHours || st.openingHoursStore || null;
+  if (!oh || typeof oh !== 'object' || oh.alwaysOpen === true) return null;
+  const norm = (v) => {
+    if (v == null) return null;
+    const m = String(v).match(/^(\d{1,2}):?(\d{2})/);
+    return m ? String(m[1]).padStart(2, '0') + m[2] : null;
+  };
+  const map = {};
+  for (const d of DAY_NAMES) {
+    const day = oh[d];
+    if (!day) return null;                       // partial week -> can't build a map
+    const o = norm(day.open ?? day.openTime ?? day.from);
+    const c = norm(day.close ?? day.closeTime ?? day.to);
+    if (!o || !c) return null;
+    map[DAY_KEYS[d]] = (o === c || `${o}-${c}` === '0000-2400') ? '24' : `${o}-${c}`;
+  }
+  const vals = new Set(Object.values(map));
+  return vals.size === 1 ? null : map;           // uniform week -> the single window covers it
 }
 
 async function fetchBox(w, s, e, n, depth = 0) {
@@ -129,7 +175,10 @@ function report(recs) {
   const h24 = recs.filter((r) => r.hours === '24').length;
   const timed = recs.filter((r) => r.hours && r.hours !== '24').length;
   const none = recs.filter((r) => !r.hours).length;
-  console.log(`  24/7: ${h24}   timed: ${timed}   no hours: ${none}`);
+  const perDay = recs.filter((r) => r.days).length;
+  console.log(`  24/7: ${h24}   timed: ${timed}   no hours: ${none}   per-day schedules: ${perDay}`);
+  console.log(`  public restroom confirmed: ${recs.filter((r) => r.restroom === 'yes').length}`);
+  console.log(`  with phone: ${recs.filter((r) => r.phone).length}   with address: ${recs.filter((r) => r.addr).length}`);
   if (seenShapes.size) {
     console.log('  UNPARSED openingHours shapes (not guessed — report these):');
     [...seenShapes.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
