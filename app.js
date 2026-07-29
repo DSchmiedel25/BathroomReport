@@ -741,6 +741,15 @@ function accessIndicatorHtml(locId){
   return `<span class="${cls}" title="${title}" aria-label="${title}">♿</span>`;
 }
 
+// Some public restrooms (park comfort stations especially) only open for part of the year.
+// Sources flag them as seasonal but almost never say WHICH months, so this is shown as a
+// caveat and deliberately does NOT drive open/closed — inventing a season would be a guess.
+function seasonalNoteHtml(loc){
+  return (loc && loc.seasonal)
+    ? '<div class="hours-line seasonal-note">⚠️ Seasonal — may be closed in winter</div>'
+    : '';
+}
+
 // True when the only accessibility signal is OSM's "limited" — partial step-free access.
 function isAccessLimited(loc){
   return !!(loc && ((loc.osm && loc.osm.accessibleLimited) || loc.wheelchair === 'limited'));
@@ -1329,6 +1338,7 @@ function metroPopupHtml(loc, agg, myVote){
     : `<div class="hours-line">🕐 Hours not listed yet — know them? Tap 🚩 below to send them in.</div>`;
   const recency = agg ? relativeTimeFromNow(agg.lastRatedAt || agg.lastUpdated) : '';
   const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}</div>` : '';
+  const seasonalLine = seasonalNoteHtml(loc);
   return `<div class="popup-inner" data-locid="${loc.id}">
     <div class="popup-head-row">
       <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${escapeHtml(chain.name)}</div>
@@ -1338,6 +1348,7 @@ function metroPopupHtml(loc, agg, myVote){
     ${(loc.metroInfo && loc.metroInfo.fee) ? `<div class="hours-line">${loc.metroInfo.fee === 'free' ? '✅ Free to use' : '💰 Paid / fee'}</div>` : ''}
     ${(loc.metroInfo && loc.metroInfo.disposal) ? `<div class="hours-line">🚻 Basic facilities (portable / chemical unit)</div>` : ''}
     ${hoursLine}
+    ${seasonalLine}
     ${recencyLine}
     <div id="accessible-badge-${loc.id}">${accessibleBadgeHtml(loc.id)}</div>
     <div class="popup-actions">
@@ -1400,6 +1411,7 @@ function popupHtml(loc, agg, myVote){
   }
   const recency = relativeTimeFromNow(agg.lastRatedAt || agg.lastUpdated);
   const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}</div>` : '';
+  hoursLine += seasonalNoteHtml(loc);
   const chain = chainFor(loc);
   // Report hours is offered ONLY where hours are unknown — it fills blanks. Correcting wrong
   // hours stays in the 🚩 Report-a-problem flow ("Wrong hours").
