@@ -32,7 +32,9 @@ const CONFIG = {
   sectionPath: "guide",
   // GA4 measurement ID — same property as the app, so guide→app is one funnel.
   // Set to "" to omit analytics from generated pages entirely.
-  gaMeasurementId: process.env.GA_MEASUREMENT_ID || "G-P30WFPVB80",
+  // Microsoft Clarity project id — same project as the app, so guide -> app is one funnel.
+  // Set to "" to omit analytics from generated pages entirely.
+  clarityProjectId: process.env.CLARITY_PROJECT_ID || "xrq6arvfpv",
   // Deep link into the live map, tagged so GA4 attributes the session to the
   // guide page it came from. The app reads ?loc= and zooms to that pin.
   appDeepLink: (loc) =>
@@ -305,24 +307,24 @@ padding:5px 13px;font-size:.86rem;font-weight:600}
 // The click handler fires `guide_cta_click` before navigation so you can see which
 // chains and pages actually drive people into the app.
 function analyticsSnippet() {
-  const id = CONFIG.gaMeasurementId;
+  const id = CONFIG.clarityProjectId;
   if (!id) return "";
-  return `<script async src="https://www.googletagmanager.com/gtag/js?id=${esc(id)}"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', '${esc(id)}');
+  // Microsoft Clarity. The CTA click is tagged as a custom event so guide -> app shows up
+  // as one journey rather than two unrelated sessions.
+  return `<script type="text/javascript">
+  (function(c,l,a,r,i,t,y){
+    c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+    t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+    y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+  })(window, document, "clarity", "script", "${esc(id)}");
   document.addEventListener('click', function(e){
     var a = e.target.closest && e.target.closest('a.cta');
-    if(!a) return;
-    gtag('event', 'guide_cta_click', {
-      chain: document.body.dataset.chain || '',
-      loc_id: document.body.dataset.locid || '',
-      page_type: document.body.dataset.pagetype || ''
-    });
+    if(!a || !window.clarity) return;
+    clarity('event', 'guide_cta_click');
+    clarity('set', 'chain', document.body.dataset.chain || '');
+    clarity('set', 'page_type', document.body.dataset.pagetype || '');
   });
-</script>`;
+  </script>`;
 }
 
 function shell({ title, desc, canonical, body, jsonLdStr, chain, locId, pageType }) {
