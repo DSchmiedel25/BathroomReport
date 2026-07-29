@@ -1369,6 +1369,8 @@ function popupHtml(loc, agg, myVote){
   const shareUrl = `${location.origin}${location.pathname}?loc=${encodeURIComponent(loc.id)}`;
   const hoursText = formatHrsDisplay(loc);
   const openStatus = isLocationOpenNow(loc);
+  // "Today" only where the week actually varies — on a single all-week window it's noise.
+  const hoursPrefix = (hasPerDayHours(loc) && hoursText !== 'Open 24 hours') ? 'Today ' : '';
   let hoursLine = '';
   if(hoursText){
     const statusHtml = openStatus === true
@@ -1376,7 +1378,7 @@ function popupHtml(loc, agg, myVote){
       : openStatus === false
         ? '<span style="color:#c62828;font-weight:700;">Closed now</span>'
         : '';
-    hoursLine = `<div class="hours-line">🕐 ${hoursText}${statusHtml ? ' · ' + statusHtml : ''}</div>`;
+    hoursLine = `<div class="hours-line">🕐 ${hoursPrefix}${hoursText}${statusHtml ? ' · ' + statusHtml : ''}</div>`;
   } else {
     hoursLine = `<div class="hours-line">🕐 Hours not listed yet — know them? Tap 🕐 Report hours below.</div>`;
   }
@@ -3005,6 +3007,14 @@ function formatTime12h(hhmm){
   let h12 = h % 12;
   if(h12 === 0) h12 = 12;
   return `${h12}:${String(m).padStart(2,'0')} ${period}`;
+}
+
+// True when a location carries a per-day schedule rather than one all-week window.
+// Callers use this to label the displayed hours as TODAY's — without that label the same
+// line silently means something different depending on the day it's read, which is
+// misleading for anyone planning ahead rather than going right now.
+function hasPerDayHours(loc){
+  return !!(loc && loc.hours && typeof loc.hours === 'object' && Object.keys(loc.hours).length);
 }
 
 function formatHrsDisplay(loc){
