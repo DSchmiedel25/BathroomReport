@@ -1,0 +1,100 @@
+BATHROOMREPORT — DEPLOY WORKFLOW
+=================================
+Written 2026-07-29, after three near-misses in one session.
+
+
+THE PROBLEM THIS SOLVES
+-----------------------
+Three separate things push to main without asking:
+
+  1. the nightly bake workflow (08:00 UTC)
+  2. the SEO pages Action (fires on any *-locations.js change)
+  3. you, uploading via the GitHub website
+
+So a file you downloaded an hour ago may not be what's deployed. Three times in one session a
+data patch was built against a stale copy:
+
+  - wawa-locations.js       would have reverted 321 hours
+  - circle-k-locations.js   would have reverted 4,583 restroom flags
+  - circle-k-locations.js   again, on the second pass
+
+Each was caught in verification. That's luck, not process.
+
+
+BEFORE ANY DATA WORK
+--------------------
+    ./tools/sync-live.sh
+
+Fetches origin/main and hard-resets to it. It REFUSES if you have uncommitted changes to
+tracked files, so it can't eat work. Untracked files (ck-hours.json, downloads) are untouched.
+
+To check one file without changing anything:
+
+    ./tools/sync-live.sh circle-k-locations.js
+
+Prints IDENTICAL or DIFFERS, and drops the live copy at /tmp/live-<file> so you can compare.
+
+
+BEFORE SENDING A FILE TO BE PATCHED
+-----------------------------------
+Run the single-file check first. If it says DIFFERS, upload the LIVE copy from /tmp, not the
+one in your working folder. The patch is only as good as the base it was built on.
+
+
+DEPLOY PATHS — PICK ONE PER RELEASE
+-----------------------------------
+Mixing them is what caused the outage earlier today (conflict markers committed into app.js
+and pushed live).
+
+  WEB UPLOAD (default for releases)
+    - drag files into the repo root on github.com
+    - bump sw.js if app.js or index.html changed
+    - afterwards, on the Mac: ./tools/sync-live.sh
+
+  TERMINAL
+    - ./tools/sync-live.sh          <- first, always
+    - copy files in
+    - bump sw.js if needed
+    - git add -A && git commit -m "..." && git push
+
+Never both in the same release.
+
+
+THE SW.JS RULE
+--------------
+Bump the cache version when app.js, index.html, shell.css or the manifest changes.
+Data files (*-locations.js) do NOT need a bump.
+
+    CUR=$(grep -oE "bathroomreport-v[0-9]+" sw.js | head -1) && \
+    NUM=$(echo "$CUR" | grep -oE "[0-9]+$") && \
+    sed -i '' "s/$CUR/bathroomreport-v$((NUM+1))/g" sw.js
+
+Data changes take TWO page loads to appear: the service worker serves location files
+stale-while-revalidate, so the first load shows the old data while fetching the new. "I shipped
+it and don't see it" is expected once, not a failure.
+
+
+VERSION NUMBERING
+-----------------
+    x.x.#   data and fixes            Circle K hours -> 2.4.6
+    x.#.x   UI tweaks                 drawer reorg   -> 2.5.0
+    #.x.x   overhaul                  regional loading, redesign -> 3.0.0
+
+
+BEFORE SHIPPING ANY DATA FILE
+-----------------------------
+    - built from the LIVE base, not a snapshot
+    - record count unchanged (or the increase is intended and counted)
+    - no ids lost, no ids duplicated
+    - no pre-existing values overwritten
+    - hours values match "HHMM-HHMM" | "24" | "closed" | ""
+      (the app parses with parseInt — "05:00-23:00" reads as 00:05 to 00:23)
+    - file loads in node and defines the expected window.* global
+    - every registry dataVar has a script tag; every script tag has a file
+
+
+WHEN A NEW SOURCE FILE ARRIVES
+------------------------------
+Extract everything usable in ONE pass before anything ships: hours, addresses, phone,
+accessibility, restroom flags, access context. Three times in one session a single field was
+taken and the rest discarded, which meant re-running the same work on the same records.
