@@ -26,5 +26,6 @@ window.bosNeroLocations = [
 {"n":"Caffè Nero","lat":42.3682796,"lng":-71.0762126,"addr":"100 Cambridgeside Place","id":"node/13384442803","hrs":"","chain":"bosNero","metroInfo":{"access":"customer","hoursRaw":""},"wheelchair":"yes"},
 {"n":"Caffè Nero","lat":42.3390631,"lng":-71.1078713,"addr":"360 Longwood Avenue, Boston, MA 02215","id":"node/13653587552","hrs":"","chain":"bosNero","metroInfo":{"access":"customer","hoursRaw":"Mo-Fr 06:30-18:00"}},
 {"n":"Caffè Nero","lat":42.3503825,"lng":-71.2079148,"addr":"2 Austin Street","id":"node/13655995992","hrs":"","chain":"bosNero","metroInfo":{"access":"customer","hoursRaw":""}},
-{"n":"Caffè Nero","lat":42.5401691,"lng":-70.9417886,"addr":"210 Andover Street, Peabody, MA 01960","id":"node/13952272577","hrs":"","chain":"bosNero","metroInfo":{"access":"customer","hoursRaw":"Mo-Th 07:30-20:00; Fr 07:30-21:00; Sa 08:00-21:00; Su 08:00-18:00"}}
+{"n":"Caffè Nero","lat":42.5401691,"lng":-70.9417886,"addr":"210 Andover Street, Peabody, MA 01960","id":"node/13952272577","hrs":"","chain":"bosNero","metroInfo":{"access":"customer","hoursRaw":"Mo-Th 07:30-20:00; Fr 07:30-21:00; Sa 08:00-21:00; Su 08:00-18:00"}},
+{"n":"Caffè Nero","lat":42.6544292,"lng":-71.1398286,"addr":"77, Main Street, Andover","id":"way/30104577","hrs":"","chain":"bosNero","metroInfo":{"access":"customer","hoursRaw":"06:30-19:00"},"osm":{"toiletsConfirmed":1,"accessible":1}}
 ];

@@ -53,5 +53,8 @@ window.bosStarbucksLocations = [
 {"n":"Starbucks","lat":42.3550475,"lng":-71.0572957,"addr":"75-101 Federal Street, Boston, MA 02110","id":"node/10766381059","hrs":"","chain":"bosStarbucks","metroInfo":{"access":"customer","hoursRaw":""}},
 {"n":"Starbucks","lat":42.3566737,"lng":-71.0504547,"addr":"30 Rowes Wharf, Boston, MA 02110","id":"node/11174651412","hrs":"","chain":"bosStarbucks","metroInfo":{"access":"customer","hoursRaw":"Mo-Fr 05:30-19:00; Sa 06:00-20:00; Su 06:00-19:00"}},
 {"n":"Starbucks","lat":42.3920296,"lng":-71.0132195,"addr":"","id":"node/13338753451","hrs":"","chain":"bosStarbucks","metroInfo":{"access":"customer","hoursRaw":""}},
-{"n":"Starbucks","lat":42.3518047,"lng":-71.0549055,"addr":"","id":"node/13912921162","hrs":"","chain":"bosStarbucks","metroInfo":{"access":"customer","hoursRaw":""}}
+{"n":"Starbucks","lat":42.3518047,"lng":-71.0549055,"addr":"","id":"node/13912921162","hrs":"","chain":"bosStarbucks","metroInfo":{"access":"customer","hoursRaw":""}},
+{"n":"Starbucks","lat":42.7430977,"lng":-71.1593134,"addr":"90, Pleasant Valley Street, Methuen","id":"way/978465154","hrs":"","chain":"bosStarbucks","metroInfo":{"access":"customer","hoursRaw":"Mo-Th 05:30-21:30; Fr 05:30-23:00; Sa 05:30-22:30; Su 05:30-22:00"},"osm":{"toiletsConfirmed":1,"accessible":1}},
+{"n":"Starbucks","lat":42.2932731,"lng":-71.2350802,"addr":"910, Highland Avenue, Needham","id":"node/6900008626","hrs":"","chain":"bosStarbucks","metroInfo":{"access":"customer","hoursRaw":"Mo-Th 05:00-21:00, Fr-Su 05:00-20:30"},"osm":{"toiletsConfirmed":1}},
+{"n":"Starbucks","lat":42.5927706,"lng":-71.2083,"addr":"1800, Main Street, Tewksbury","id":"node/13137112651","hrs":"","chain":"bosStarbucks","metroInfo":{"access":"customer","hoursRaw":"Mo-Fr 04:30-21:00; Sa-Su 05:00-21:00"},"osm":{"toiletsConfirmed":1,"accessible":1}}
 ];

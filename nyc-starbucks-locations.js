@@ -263,5 +263,6 @@ window.nycStarbucksLocations = [
 {"n":"Starbucks","lat":40.7509044,"lng":-73.9752338,"addr":"150 East 42nd Street","id":"node/13416351451","hrs":"","chain":"nycStarbucks","metroInfo":{"access":"customer","hoursRaw":""},"wheelchair":"yes"},
 {"n":"Starbucks","lat":40.7095402,"lng":-74.0105903,"addr":"","id":"node/13753275744","hrs":"","chain":"nycStarbucks","metroInfo":{"access":"public","hoursRaw":""},"wheelchair":"yes"},
 {"n":"Starbucks","lat":40.7884542,"lng":-73.9760086,"addr":"2370 Broadway, 10024","id":"node/13874623731","hrs":"","chain":"nycStarbucks","metroInfo":{"access":"customer","hoursRaw":"Mo-Su 05:00-21:00"}},
-{"n":"Starbucks","lat":40.7529135,"lng":-73.9810755,"addr":"485 5th Avenue","id":"node/13930134963","hrs":"","chain":"nycStarbucks","metroInfo":{"access":"customer","hoursRaw":"05:00-20:00"}}
+{"n":"Starbucks","lat":40.7529135,"lng":-73.9810755,"addr":"485 5th Avenue","id":"node/13930134963","hrs":"","chain":"nycStarbucks","metroInfo":{"access":"customer","hoursRaw":"05:00-20:00"}},
+{"n":"Starbucks","lat":40.7188996,"lng":-73.5896845,"addr":"1228, Hempstead Turnpike, Uniondale","id":"way/588503742","hrs":"","chain":"nycStarbucks","metroInfo":{"access":"customer","hoursRaw":""},"osm":{"toiletsConfirmed":1}}
 ];
