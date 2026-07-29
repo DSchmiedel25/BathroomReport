@@ -100,7 +100,7 @@ button, input, select, textarea{ font-family:inherit; }
 
 /* ---------- Right rail: Where Am I? (icon-only) + List ---------- */
 #whereAmIBtn{
-  position:fixed !important; right:12px !important; top:calc(env(safe-area-inset-top) + 90px) !important;
+  position:absolute !important; right:12px !important; top:12px !important;
   left:auto !important; bottom:auto !important; z-index:600 !important;
   width:46px !important; height:46px !important; border-radius:14px !important;
   background:var(--shell-chrome) !important; border:1px solid var(--shell-line) !important;
@@ -111,7 +111,7 @@ button, input, select, textarea{ font-family:inherit; }
 #whereAmIBtn .map-control-icon{ display:block !important; width:22px !important; height:22px !important; margin:0 !important; stroke:currentColor; fill:none; }
 
 #listViewToggle{
-  position:fixed !important; right:12px !important; top:calc(env(safe-area-inset-top) + 250px) !important;
+  position:absolute !important; right:12px !important; top:70px !important;
   left:auto !important; bottom:auto !important; z-index:600 !important;
   width:46px !important; height:46px !important; border-radius:14px !important;
   background:var(--shell-chrome) !important; border:1px solid var(--shell-line) !important;
@@ -119,7 +119,7 @@ button, input, select, textarea{ font-family:inherit; }
   font-size:0 !important;                                /* hide the "List" text, show icon */
   padding:0 !important; display:grid !important; place-items:center !important;
 }
-#listViewToggle::before{ content:"📋"; font-size:20px; }
+#listViewToggle::before{ content:"📋"; font-size:20px; line-height:1; display:block; }
 
 /* ---------- Legend + Chains: bottom-left stack ---------- */
 #topLeftControls{
@@ -242,19 +242,6 @@ button, input, select, textarea{ font-family:inherit; }
 
 
 /* ---------- Leaflet zoom control: move to the right rail (clear of the bottom banner) + theme dark ---------- */
-.leaflet-control-zoom{
-  position:fixed !important; right:12px !important; top:calc(env(safe-area-inset-top) + 148px) !important;
-  bottom:auto !important; left:auto !important; z-index:600 !important;
-  width:46px !important; height:90px !important; margin:0 !important; box-sizing:border-box !important;
-  border:1px solid var(--shell-line) !important; border-radius:14px !important; overflow:hidden !important;
-  background:var(--shell-chrome) !important; box-shadow:var(--shell-shadow) !important;
-}
-.leaflet-control-zoom a{
-  background:var(--shell-chrome) !important; color:var(--shell-ink) !important;
-  width:100% !important; height:44px !important; line-height:44px !important; font-size:20px !important;
-  box-sizing:border-box !important; margin:0 !important; border:0 !important; border-radius:0 !important;
-}
-.leaflet-control-zoom a:first-child{ border-bottom:1px solid var(--shell-line) !important; }
 
 /* All three rail controls compute to the exact same 46px box so their edges line up. */
 #whereAmIBtn, #listViewToggle { box-sizing:border-box !important; }
@@ -372,7 +359,6 @@ button, input, select, textarea{ font-family:inherit; }
 /* ...and while it's open, hide the floating map controls entirely so nothing overlaps it. */
 body.list-open #whereAmIBtn,
 body.list-open #listViewToggle,
-body.list-open .leaflet-control-zoom,
 body.list-open #missingBtn,
 body.list-open #topLeftControls,
 body.list-open #locateBtn,
@@ -514,6 +500,9 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 
 /* ---------- Accessibility indicator in the pin popup head row ---------- */
 .access-indicator{ font-size:15px; line-height:1; }
+/* Store features as head-row icons (replaces the old "Store amenities" section). */
+.store-icons{ display:inline-flex; align-items:center; gap:5px; }
+.store-icon{ font-size:15px; line-height:1; opacity:.9; }
 .access-indicator.community{ filter:none; }                 /* green-tier: community-confirmed */
 .access-indicator.verified{ opacity:.85; }                  /* teal-tier: OSM-verified */
 

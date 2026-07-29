@@ -144,7 +144,7 @@ const map = L.map('map', {
   doubleTapDragZoom: 'center',
   doubleTapDragZoomOptions: { reverse: true }   // drag DOWN = zoom in (Google Maps direction)
 }).setView([42.65123, -73.75176], 12);
-L.control.zoom({ position: 'bottomright' }).addTo(map);
+// Zoom buttons removed — pinch and double-tap-drag cover zooming, and the rail stays clear.
 
 // Marker clustering (re-added, Option A: clustering owns all markers; the old viewport
 // add/remove culling was removed so the two systems can't fight — that conflict was the likely
@@ -565,10 +565,18 @@ function adminAmenityPanelHtml(loc){
     const btn = (val, label) => `<button type="button" class="admin-am-btn" data-key="${a.key}" data-val="${val}" style="padding:3px 9px;margin-left:4px;border-radius:6px;border:1px solid ${cur===val?'#2ea1aa':'#2a2e35'};background:${cur===val?'#0e2f33':'#1b1e23'};color:#f6f8fa;font-size:12px;cursor:pointer;">${label}</button>`;
     return `<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 0;font-size:13px;color:#f6f8fa;"><span>${a.label}</span><span>${btn('yes','Yes')}${btn('no','No')}${btn('unknown','—')}</span></div>`;
   }).join('');
-  return `<div class="admin-amenity-panel" id="admin-am-${loc.id}" style="margin:8px 0;padding:10px;border:1px solid #2a2e35;border-radius:10px;background:#141619;">
-    <div style="font-weight:600;font-size:13px;color:#2ea1aa;margin-bottom:6px;">Set amenities (admin) — applied live</div>
-    ${rows}
-    <div class="save-note" id="admin-am-note-${loc.id}" style="font-size:12px;margin-top:4px;"></div>
+  // Collapsible so a long popup isn't dominated by admin controls. Open by default, and the
+  // choice is remembered — mid-audit it stays open, otherwise it tucks away.
+  const collapsed = localStorage.getItem('adminAmCollapsed') === '1';
+  return `<div class="admin-amenity-panel" id="admin-am-${loc.id}" style="margin:8px 0;border:1px solid #2a2e35;border-radius:10px;background:#141619;overflow:hidden;">
+    <button type="button" id="admin-am-head-${loc.id}" aria-expanded="${!collapsed}"
+      style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:10px;background:transparent;border:0;font-weight:600;font-size:13px;color:#2ea1aa;cursor:pointer;text-align:left;">
+      <span>Set amenities (admin) — applied live</span><span id="admin-am-arrow-${loc.id}">${collapsed ? '▸' : '▾'}</span>
+    </button>
+    <div id="admin-am-body-${loc.id}" style="padding:0 10px 10px;${collapsed ? 'display:none;' : ''}">
+      ${rows}
+      <div class="save-note" id="admin-am-note-${loc.id}" style="font-size:12px;margin-top:4px;"></div>
+    </div>
   </div>`;
 }
 
@@ -576,6 +584,18 @@ function attachAdminAmenityHandlers(loc){
   if(!isMapAdmin()) return;
   const panel = document.getElementById('admin-am-' + loc.id);
   if(!panel) return;
+  const head = document.getElementById('admin-am-head-' + loc.id);
+  const body = document.getElementById('admin-am-body-' + loc.id);
+  const arrow = document.getElementById('admin-am-arrow-' + loc.id);
+  if(head && body){
+    head.addEventListener('click', () => {
+      const collapse = body.style.display !== 'none';
+      body.style.display = collapse ? 'none' : '';
+      if(arrow) arrow.textContent = collapse ? '▸' : '▾';
+      head.setAttribute('aria-expanded', String(!collapse));
+      localStorage.setItem('adminAmCollapsed', collapse ? '1' : '0');
+    });
+  }
   panel.querySelectorAll('.admin-am-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const key = btn.dataset.key, val = btn.dataset.val;
@@ -797,26 +817,34 @@ function storeFeatureEditorHtml(locId, myVote){
   </div>`;
 }
 
-// True if a location has any OSM-VERIFIED store feature to show (community confirmations now
-// live in the unified block, so they no longer count toward showing this OSM section).
-function storeSectionHasContent(loc){
-  if(loc && loc.osm && loc.osm.gas) return true;   // gas alone is enough to show the section
-  return osmVerifiedBadges(loc, STORE_FEATURES, storeFeatureCache[loc.id]) !== '';
+// Store features render as a compact icon row in the popup head (beside the store name) rather
+// than a labelled section. Gas in particular was never votable — OSM-known, display-only — so a
+// whole section for it read as clutter. Selection rule is unchanged: OSM-verified only, since
+// community-confirmed features already appear in the "Confirmed by visitors" block.
+// Every icon carries title + aria-label — an icon must never be the only cue.
+function storeFeatureIconsHtml(loc, summary){
+  const osm = (loc && loc.osm) || {};
+  const conf = (loc && loc.conf) || {};
+  const pill = (glyph, label) =>
+    `<span class="store-icon" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}" role="img">${glyph}</span>`;
+  const out = [];
+  if(osm.gas) out.push(pill('⛽', 'Gas station'));
+  STORE_FEATURES.forEach(a => {
+    if(!osm[a.key]) return;
+    if(conf[a.key]) return;
+    if(isConfirmedYes(summary && summary[a.key])) return;
+    out.push(pill(amenityAnswerIcon(a, 'yes'), a.label + ' — verified'));
+  });
+  return out.join('');
+}
+
+function refreshStoreIcons(loc){
+  const el = document.getElementById('store-icons-' + loc.id);
+  if(el) el.innerHTML = storeFeatureIconsHtml(loc, storeFeatureCache[loc.id]);
 }
 // Same, for the OSM bathroom-features section (excluding accessible, which has its own badge).
 function osmBathroomHasContent(loc){
   return osmVerifiedBadges(loc, BATHROOM_AMENITIES, amenityCache[loc.id], ['accessible']) !== '';
-}
-
-function storeFeatureSummaryHtml(summary, loc){
-  // OSM-verified store badges only — community confirmations live in the unified block above.
-  // Gas is display-only (OSM-known, never voted on): show it as a quiet teal badge up front.
-  const gasBadge = (loc && loc.osm && loc.osm.gas)
-    ? '<span class="feature-badge verified">⛽ Gas</span>' : '';
-  const verified = gasBadge + osmVerifiedBadges(loc, STORE_FEATURES, summary);
-  if(!summary && !verified) return '<span class="feature-badge unconfirmed">Loading features…</span>';
-  if(!verified) return '<span class="feature-badge unconfirmed">Nothing verified yet</span>';
-  return verified;
 }
 
 async function loadStoreFeatureSummary(locId){
@@ -1376,6 +1404,7 @@ function popupHtml(loc, agg, myVote){
   return `<div class="popup-inner" data-locid="${loc.id}">
     <div class="popup-head-row">
       <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${chain.name}</div>
+      <span class="store-icons" id="store-icons-${loc.id}">${storeFeatureIconsHtml(loc, storeFeatureCache[loc.id])}</span>
     </div>
     <div class="addr addr-title">${loc.addr}${loc.num ? ' &middot; Shop #' + loc.num : ''}</div>
     ${hoursLine}
@@ -1420,10 +1449,7 @@ function popupHtml(loc, agg, myVote){
     </div>
     ${amenityEditorHtml(loc.id, myVote)}
     <div class="feature-summary osm-bathroom-section${osmBathroomHasContent(loc) ? '' : ' is-empty'}"><div class="feature-title">🚻 Bathroom features</div><div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>
-    <div class="store-section${storeSectionHasContent(loc) ? '' : ' is-empty'}">
-      <div class="store-section-head">🏪 Store amenities</div>
-      <div class="feature-summary"><div class="feature-badges" id="store-feature-summary-${loc.id}">${storeFeatureSummaryHtml(storeFeatureCache[loc.id], loc)}</div></div>
-    </div>` : `<div class="popup-signin-hint">🔒 Sign in to rate this bathroom, add tips, or report an issue.</div>`}
+` : `<div class="popup-signin-hint">🔒 Sign in to rate this bathroom, add tips, or report an issue.</div>`}
   </div>`;
 }
 
@@ -1926,32 +1952,17 @@ async function attachAmenityHandlers(loc){
       const fresh = await loadAmenitySummary(loc.id);
       if(summaryEl) summaryEl.innerHTML = amenitySummaryHtml(fresh, loc);
     } else {
-      const freshStore = await loadStoreFeatureSummary(loc.id);
-      const storeEl = document.getElementById('store-feature-summary-' + loc.id);
-      if(storeEl){
-        storeEl.innerHTML = storeFeatureSummaryHtml(freshStore, loc);
-        const section = storeEl.closest('.store-section');
-        if(section) section.classList.toggle('is-empty', !storeEl.querySelector('.feature-badge:not(.unconfirmed)'));
-      }
+      await loadStoreFeatureSummary(loc.id);
+      refreshStoreIcons(loc);
     }
     refreshCommunityBlock(loc);   // a just-cast vote may have crossed the confirm threshold
   });
 }
 
 async function attachStoreFeatureHandlers(loc){
-  const summaryEl=document.getElementById('store-feature-summary-'+loc.id);
-  const summary=await loadStoreFeatureSummary(loc.id);
-  if(summaryEl){
-    summaryEl.innerHTML=storeFeatureSummaryHtml(summary, loc);
-    refreshCommunityBlock(loc);
-    // Collapse the whole "🏪 Store" section when nothing is confirmed or verified, so an empty
-    // section never shows a lonely header.
-    const section = summaryEl.closest('.store-section');
-    if(section){
-      const hasReal = summaryEl.querySelector('.feature-badge:not(.unconfirmed)');
-      section.classList.toggle('is-empty', !hasReal);
-    }
-  }
+  await loadStoreFeatureSummary(loc.id);
+  refreshStoreIcons(loc);
+  refreshCommunityBlock(loc);
 
   const stepOrig = document.getElementById('store-feature-step-' + loc.id);
   if(!stepOrig) return;
@@ -1993,8 +2004,8 @@ async function attachStoreFeatureHandlers(loc){
 
     stepEl.innerHTML = renderStoreFeatureStepHtml(updatedVote);
 
-    const fresh = await loadStoreFeatureSummary(loc.id);
-    if(summaryEl) summaryEl.innerHTML = storeFeatureSummaryHtml(fresh, loc);
+    await loadStoreFeatureSummary(loc.id);
+    refreshStoreIcons(loc);
   });
 }
 
@@ -2401,7 +2412,7 @@ function renderBathroomPassport(stats, results){
   const unlockedCount = Object.values(results).filter(r => r.unlocked).length;
 
   container.innerHTML = `
-    <div class="passport-stat-line">${stats.visitedCount} / ${stats.totalLocations} Shops visited — ${pct}% complete</div>
+    <div class="passport-stat-line">${pct}% complete</div>
     <div class="passport-progress-bar"><div class="passport-progress-fill" style="width:${Math.min(100,pct)}%;"></div></div>
     <div class="passport-mini-stats">
       <div>🚻 ${stats.bathroomRatedCount} bathrooms reviewed</div>
