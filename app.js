@@ -3866,6 +3866,13 @@ document.getElementById('authSignUpBtn').addEventListener('click', async () => {
     note.textContent = 'Account created! You\'re logged in.';
     updateAccountUI();
     loadAllRatings();
+    // Success needs no further reading — close the panel so the map is usable immediately.
+    // Guarded: if the user opened Passport in the meantime, leave their panel alone.
+    setTimeout(() => {
+      if(accountPanelMode === 'passport') return;
+      document.getElementById('accountPanel')?.classList.remove('show');
+      note.textContent = '';
+    }, 900);
   } else {
     note.style.color = '#e57373';
     note.textContent = result.reason;
@@ -3888,6 +3895,13 @@ document.getElementById('authLogInBtn').addEventListener('click', async () => {
     _leaderboardLoaded = false;   // re-fetch so the board reflects the logged-in user
     updateAccountUI();
     loadAllRatings();
+    // Success needs no further reading — close the panel so the map is usable immediately.
+    // Guarded: if the user opened Passport in the meantime, leave their panel alone.
+    setTimeout(() => {
+      if(accountPanelMode === 'passport') return;
+      document.getElementById('accountPanel')?.classList.remove('show');
+      note.textContent = '';
+    }, 900);
   } else {
     note.style.color = '#e57373';
     note.textContent = result.reason;
