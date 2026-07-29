@@ -15,22 +15,20 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="https://bathroomreport.app/guide/styles.css">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"ConvenienceStore","name":"RaceTrac — Middleburg","url":"https://bathroomreport.app/guide/racetrac/1930-gregory-clary-way-middleburg-2684/","address":{"@type":"PostalAddress","streetAddress":"1930 Gregory Clary Way","addressLocality":"Middleburg","addressRegion":"FL","postalCode":"32068","addressCountry":"US"},"geo":{"@type":"GeoCoordinates","latitude":30.096615,"longitude":-81.843089}}</script>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-P30WFPVB80"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-P30WFPVB80');
+<script type="text/javascript">
+  (function(c,l,a,r,i,t,y){
+    c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+    t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+    y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+  })(window, document, "clarity", "script", "xrq6arvfpv");
   document.addEventListener('click', function(e){
     var a = e.target.closest && e.target.closest('a.cta');
-    if(!a) return;
-    gtag('event', 'guide_cta_click', {
-      chain: document.body.dataset.chain || '',
-      loc_id: document.body.dataset.locid || '',
-      page_type: document.body.dataset.pagetype || ''
-    });
+    if(!a || !window.clarity) return;
+    clarity('event', 'guide_cta_click');
+    clarity('set', 'chain', document.body.dataset.chain || '');
+    clarity('set', 'page_type', document.body.dataset.pagetype || '');
   });
-</script>
+  </script>
 </head>
 <body data-chain="RaceTrac" data-locid="racetrac-atp-2684" data-pagetype="location">
 <header class="topbar"><div class="wrap"><a href="https://bathroomreport.app/guide/">▸ BathroomReport</a></div></header>

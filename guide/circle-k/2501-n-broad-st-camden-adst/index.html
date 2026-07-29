@@ -15,22 +15,20 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="https://bathroomreport.app/guide/styles.css">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"ConvenienceStore","name":"Circle K — CAMDEN","url":"https://bathroomreport.app/guide/circle-k/2501-n-broad-st-camden-adst/","address":{"@type":"PostalAddress","streetAddress":"2501 N BROAD ST","addressLocality":"CAMDEN","addressRegion":"SC","addressCountry":"US"},"geo":{"@type":"GeoCoordinates","latitude":34.272096,"longitude":-80.609493}}</script>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-P30WFPVB80"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-P30WFPVB80');
+<script type="text/javascript">
+  (function(c,l,a,r,i,t,y){
+    c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+    t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+    y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+  })(window, document, "clarity", "script", "xrq6arvfpv");
   document.addEventListener('click', function(e){
     var a = e.target.closest && e.target.closest('a.cta');
-    if(!a) return;
-    gtag('event', 'guide_cta_click', {
-      chain: document.body.dataset.chain || '',
-      loc_id: document.body.dataset.locid || '',
-      page_type: document.body.dataset.pagetype || ''
-    });
+    if(!a || !window.clarity) return;
+    clarity('event', 'guide_cta_click');
+    clarity('set', 'chain', document.body.dataset.chain || '');
+    clarity('set', 'page_type', document.body.dataset.pagetype || '');
   });
-</script>
+  </script>
 </head>
 <body data-chain="Circle K" data-locid="circlek-camden-nbroadst" data-pagetype="location">
 <header class="topbar"><div class="wrap"><a href="https://bathroomreport.app/guide/">▸ BathroomReport</a></div></header>

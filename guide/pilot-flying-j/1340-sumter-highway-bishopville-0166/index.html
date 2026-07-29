@@ -15,22 +15,20 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="https://bathroomreport.app/guide/styles.css">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"ConvenienceStore","name":"Pilot Flying J — Bishopville","url":"https://bathroomreport.app/guide/pilot-flying-j/1340-sumter-highway-bishopville-0166/","address":{"@type":"PostalAddress","streetAddress":"1340 Sumter Highway","addressLocality":"Bishopville","addressRegion":"SC","postalCode":"29010","addressCountry":"US"},"geo":{"@type":"GeoCoordinates","latitude":34.192365,"longitude":-80.283028},"openingHours":"Mo-Su 00:00-23:59"}</script>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-P30WFPVB80"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-P30WFPVB80');
+<script type="text/javascript">
+  (function(c,l,a,r,i,t,y){
+    c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+    t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+    y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+  })(window, document, "clarity", "script", "xrq6arvfpv");
   document.addEventListener('click', function(e){
     var a = e.target.closest && e.target.closest('a.cta');
-    if(!a) return;
-    gtag('event', 'guide_cta_click', {
-      chain: document.body.dataset.chain || '',
-      loc_id: document.body.dataset.locid || '',
-      page_type: document.body.dataset.pagetype || ''
-    });
+    if(!a || !window.clarity) return;
+    clarity('event', 'guide_cta_click');
+    clarity('set', 'chain', document.body.dataset.chain || '');
+    clarity('set', 'page_type', document.body.dataset.pagetype || '');
   });
-</script>
+  </script>
 </head>
 <body data-chain="Pilot Flying J" data-locid="pilot-0166" data-pagetype="location">
 <header class="topbar"><div class="wrap"><a href="https://bathroomreport.app/guide/">▸ BathroomReport</a></div></header>
