@@ -484,7 +484,7 @@ const BATHROOM_AMENITIES = [
       single:'Single',
       multiple:"Men's & women's"
     }},
-  {key:'accessible', label:'Handicap accessible', stateIcons:{yes:'♿️'}},
+  {key:'accessible', label:'Wheelchair accessible', stateIcons:{yes:'♿️'}},
   {key:'changing', label:'Changing table', stateIcons:{yes:'🚼'}}
 ];
 const amenityCache = {};
@@ -686,7 +686,7 @@ function amenitySummaryHtml(summary, loc){
 }
 
 // Same "confirmed" rule as the summary badges (at least 2 yes-votes, and more yes than no),
-// specifically for handicap-accessible — used both for the prominent popup badge and for
+// specifically for wheelchair accessibility — used both for the prominent popup badge and for
 // filtering the list view.
 function isConfirmedAccessible(summary){
   if(!summary || !summary.accessible) return false;
@@ -713,12 +713,12 @@ function accessibleBadgeHtml(locId){
   // Community confirmations are the strongest signal and win when present.
   const summary = amenityCache[locId];
   if(summary && isConfirmedAccessible(summary)){
-    return '<div class="accessible-badge">♿ Handicap accessible — confirmed by visitors</div>';
+    return '<div class="accessible-badge">♿ Wheelchair accessible — confirmed by visitors</div>';
   }
   const loc = locationsById[locId];
   // Baked community confirmation (from a prior votes bake) also counts as visitor-confirmed.
   if(loc && loc.conf && loc.conf.accessible){
-    return '<div class="accessible-badge">♿ Handicap accessible — confirmed by visitors</div>';
+    return '<div class="accessible-badge">♿ Wheelchair accessible — confirmed by visitors</div>';
   }
   // Fall back to accessibility data baked into the location files (sourced from
   // OpenStreetMap wheelchair / toilets:wheelchair tags at bake time).
@@ -1297,7 +1297,6 @@ function metroPopupHtml(loc, agg, myVote){
       <button class="btn btn-secondary btn-icon-only share-btn" title="Share" data-shareurl="${shareUrl}" data-sharename="${(loc.n||'').replace(/"/g,'&quot;')}">🔗</button>
       ${isLoggedIn() ? `<button class="btn btn-danger btn-icon-only report-toggle-btn" title="Report an issue" id="report-toggle-${loc.id}">🚩</button>` : ''}
     </div>
-    ${isLoggedIn() ? '' : `<div class="popup-signin-hint" style="margin-top:6px;">🔒 Log in to add hours or report an issue.</div>`}
     <div class="report-section" id="report-section-${loc.id}" style="display:none;">
       <div class="report-heading">Report a problem with this listing</div>
       <div class="report-cats" id="report-cats-${loc.id}">
@@ -1329,7 +1328,7 @@ function metroPopupHtml(loc, agg, myVote){
       </div>
     </div>
     ${amenityEditorHtml(loc.id, myVote)}
-    <div class="feature-summary osm-bathroom-section${osmBathroomHasContent(loc) ? '' : ' is-empty'}"><div class="feature-title">🚻 Bathroom features</div><div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>` : `<div class="popup-signin-hint">🔒 Sign in to rate this bathroom and see visitor tips.</div>`}
+    <div class="feature-summary osm-bathroom-section${osmBathroomHasContent(loc) ? '' : ' is-empty'}"><div class="feature-title">🚻 Bathroom features</div><div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>` : `<div class="popup-signin-hint">🔒 Sign in to rate this bathroom, add tips, or report an issue.</div>`}
   </div>`;
 }
 
@@ -1389,7 +1388,6 @@ function popupHtml(loc, agg, myVote){
       <button class="btn btn-secondary btn-icon-only share-btn" title="Share" data-shareurl="${shareUrl}" data-sharename="${loc.n.replace(/"/g,'&quot;')}">🔗</button>
       ${isLoggedIn() ? `<button class="btn btn-danger btn-icon-only report-toggle-btn" title="Report an issue" id="report-toggle-${loc.id}">🚩</button>` : ''}
     </div>
-    ${isLoggedIn() ? '' : `<div class="popup-signin-hint" style="margin-top:6px;">🔒 Log in to add hours or report an issue.</div>`}
     <div class="report-section" id="report-section-${loc.id}" style="display:none;">
       <div class="report-heading">Report a problem with this listing</div>
       <div class="report-cats" id="report-cats-${loc.id}">
@@ -1425,7 +1423,7 @@ function popupHtml(loc, agg, myVote){
     <div class="store-section${storeSectionHasContent(loc) ? '' : ' is-empty'}">
       <div class="store-section-head">🏪 Store amenities</div>
       <div class="feature-summary"><div class="feature-badges" id="store-feature-summary-${loc.id}">${storeFeatureSummaryHtml(storeFeatureCache[loc.id], loc)}</div></div>
-    </div>` : `<div class="popup-signin-hint">🔒 Sign in to rate this bathroom and see visitor tips.</div>`}
+    </div>` : `<div class="popup-signin-hint">🔒 Sign in to rate this bathroom, add tips, or report an issue.</div>`}
   </div>`;
 }
 
