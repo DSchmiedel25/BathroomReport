@@ -766,3 +766,8 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
   font-size:14px; font-weight:800; cursor:pointer;
 }
 #installBanner #installNow:active{ filter:brightness(.9); }
+
+/* OSM wheelchair=limited — partial step-free access. Visually distinct from a full
+   accessible confirmation so it can never be mistaken for one. */
+.access-indicator.limited{ opacity:.6; }
+.accessible-badge.access-limited{ opacity:.85; font-style:italic; }

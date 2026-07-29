@@ -727,10 +727,23 @@ function accessIndicatorHtml(locId){
   const summary = amenityCache[locId];
   const communityYes = (summary && isConfirmedAccessible(summary)) || (loc.conf && loc.conf.accessible);
   const osmYes = (loc.osm && loc.osm.accessible) || loc.wheelchair === 'yes' || loc.wheelchair === 'designated';
-  if(!communityYes && !osmYes) return '';
+  // OSM wheelchair=limited: partially step-free (tight turns, assistance may be needed).
+  // Deliberately NOT folded into "accessible" — someone who needs step-free access and finds
+  // a door they can't use is worse off than someone who was told it was uncertain.
+  const limited = isAccessLimited(loc);
+  if(!communityYes && !osmYes && !limited) return '';
+  if(!communityYes && !osmYes && limited){
+    const t = 'Limited step-free access — verified';
+    return `<span class="access-indicator limited" title="${t}" aria-label="${t}">♿</span>`;
+  }
   const cls = communityYes ? 'access-indicator community' : 'access-indicator verified';
   const title = communityYes ? 'Wheelchair accessible — confirmed by visitors' : 'Wheelchair accessible — verified';
   return `<span class="${cls}" title="${title}" aria-label="${title}">♿</span>`;
+}
+
+// True when the only accessibility signal is OSM's "limited" — partial step-free access.
+function isAccessLimited(loc){
+  return !!(loc && ((loc.osm && loc.osm.accessibleLimited) || loc.wheelchair === 'limited'));
 }
 
 function accessibleBadgeHtml(locId){
@@ -749,6 +762,9 @@ function accessibleBadgeHtml(locId){
   const osmAccessible = loc && ((loc.osm && loc.osm.accessible) || loc.wheelchair === 'yes' || loc.wheelchair === 'designated');
   if(osmAccessible){
     return '<div class="accessible-badge">♿ Wheelchair accessible — verified</div>';
+  }
+  if(isAccessLimited(loc)){
+    return '<div class="accessible-badge access-limited">♿ Limited step-free access — verified</div>';
   }
   return '';
 }
@@ -3109,6 +3125,9 @@ function isConfirmedNotAccessible(loc){
     || (loc.osm && loc.osm.accessible)
     || loc.wheelchair === 'yes' || loc.wheelchair === 'designated';
   if(yes) return false;                                   // any positive confirmation keeps it visible
+  // "limited" is not a confirmed no — hiding it would remove an option that may well work,
+  // so it survives the filter while never being labelled fully accessible.
+  if(isAccessLimited(loc)) return false;
   const no = (loc.confNo && loc.confNo.accessible)        // community-confirmed no
     || (loc.osm && loc.osm.accessibleNo)                  // OSM wheelchair=no
     || loc.wheelchair === 'no';                           // legacy baked no
