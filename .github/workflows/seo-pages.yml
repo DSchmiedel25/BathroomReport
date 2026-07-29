@@ -12,6 +12,12 @@ on:
 permissions:
   contents: write
 
+# Two runs overlapping would both generate 18k+ files and then fight over the push.
+# Let a newer run wait for the older one instead of racing it.
+concurrency:
+  group: seo-pages
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,8 +35,28 @@ jobs:
           LOCATIONS_DIR: "."
           OUT_DIR: "."
           BASE_URL: "https://bathroomreport.app"
-          GA_MEASUREMENT_ID: "G-P30WFPVB80"
+          CLARITY_PROJECT_ID: "xrq6arvfpv"
         run: node generate-static-pages.js
 
       - name: Commit generated pages
-        run: git config user.name "github-actions[bot]" && git config user.email "actions@users.noreply.github.com" && git add guide sitemap-index.xml robots.txt && (git diff --cached --quiet && echo "No changes to commit" || (git commit -m "Rebuild SEO pages [skip ci]" && git push))
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "actions@users.noreply.github.com"
+          git add guide sitemap-index.xml robots.txt
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Rebuild SEO pages [skip ci]"
+          # A web upload or the nightly bake can land between checkout and push.
+          # Rebase onto whatever arrived and retry rather than failing the run.
+          for i in 1 2 3; do
+            if git pull --rebase --autostash origin main && git push; then
+              echo "Pushed on attempt $i"
+              exit 0
+            fi
+            echo "Push failed, retrying ($i)..."
+            sleep 10
+          done
+          echo "Could not push after 3 attempts"
+          exit 1
