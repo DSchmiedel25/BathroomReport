@@ -56,8 +56,57 @@ function fromOsm(v) {
     });
     if (ranges.every((r) => r && r === ranges[0])) return ranges[0];
   }
+  const perDay = fromOsmPerDay(s);
+  if (perDay) return perDay;                       // object -> caller writes loc.hours
   unconverted.set(s, (unconverted.get(s) || 0) + 1);
   return '';
+}
+
+/* Weekday/weekend splits ("Mo-Sa 05:00-19:00; Su 06:00-19:00") are extremely common —
+ * roughly 40% of Dunkin'. The app already supports a per-day `loc.hours` map keyed
+ * mon..sun and prefers it over the single `hrs` window, so those cases don't have to be
+ * thrown away. Returns a day map, or null when the string still can't be represented
+ * (split shifts like "00:00-01:00,04:00-24:00" have no single window per day). */
+const OSM_DAYS = { mo:'mon', tu:'tue', we:'wed', th:'thu', fr:'fri', sa:'sat', su:'sun' };
+const DAY_SEQ = ['mo','tu','we','th','fr','sa','su'];
+function fromOsmPerDay(s) {
+  const out = {};
+  for (const chunk of s.split(';').map((p) => p.trim()).filter(Boolean)) {
+    const m = chunk.match(/^([A-Za-z,\-]+)\s+(.+)$/);
+    if (!m) return null;
+    const dayPart = m[1], timePart = m[2].trim();
+    if (/,/.test(timePart)) return null;           // split shift — not representable
+    let val;
+    if (/^(off|closed)$/i.test(timePart)) val = 'closed';
+    else {
+      const t = timePart.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+      if (!t) return null;
+      const o = hhmm(t[1]), c = hhmm(t[2]);
+      if (!o || !c) return null;
+      val = collapse(o, c);
+    }
+    for (const tok of dayPart.split(',')) {
+      const r = tok.trim().toLowerCase();
+      if (r === 'ph') continue;                    // public holidays — no per-day slot
+      const rng = r.match(/^([a-z]{2})-([a-z]{2})$/);
+      if (rng) {
+        let i = DAY_SEQ.indexOf(rng[1]), j = DAY_SEQ.indexOf(rng[2]);
+        if (i < 0 || j < 0) return null;
+        for (let k = 0; k < 7; k++) {              // wraps (e.g. Sa-Su, Fr-Mo)
+          const idx = (i + k) % 7;
+          out[OSM_DAYS[DAY_SEQ[idx]]] = val;
+          if (idx === j) break;
+        }
+      } else if (OSM_DAYS[r]) {
+        out[OSM_DAYS[r]] = val;
+      } else return null;
+    }
+  }
+  const keys = Object.keys(out);
+  if (keys.length < 7) return null;                // partial week -> leave unknown
+  const vals = new Set(Object.values(out));
+  if (vals.size === 1) return [...vals][0];        // all days equal -> plain string
+  return out;
 }
 
 /* Some spiders emit one record per FACILITY at a single site — Casey's publishes
@@ -102,11 +151,15 @@ for (const f of feats) {
   if (!isFinite(lat) || !isFinite(lng)) continue;
   const hours = fromOsm(p.opening_hours);
   if (!hours) noHours++;
-  out.push({ id: p.ref || f.id || '', lat, lng, hours });
+  const rec = { id: p.ref || f.id || '', lat, lng };
+  if (hours && typeof hours === 'object') rec.days = hours; else rec.hours = hours || '';
+  out.push(rec);
 }
 
 const h24 = out.filter((r) => r.hours === '24').length;
 const timed = out.filter((r) => r.hours && r.hours !== '24').length;
+const perDay = out.filter((r) => r.days).length;
+if (perDay) console.log(`  per-day schedules: ${perDay}`);
 console.log(`${inFile}: ${feats.length} features -> ${out.length} usable`);
 console.log(`  24/7: ${h24}   timed: ${timed}   no usable hours: ${noHours}`);
 if (unconverted.size) {

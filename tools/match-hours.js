@@ -86,7 +86,8 @@ scraped.forEach((s, i) => {
   if (!isFinite(la) || !isFinite(ln)) return;
   const k = Math.round(la / CELL) + ':' + Math.round(ln / CELL);
   if (!grid.has(k)) grid.set(k, []);
-  grid.get(k).push({ i, la, ln, hrs: normHours(s.hours ?? s.hrs ?? s.openingHours) });
+  // `days` = per-day map ({mon:"0500-1900",…}); the app prefers loc.hours over loc.hrs.
+  grid.get(k).push({ i, la, ln, hrs: normHours(s.hours ?? s.hrs ?? s.openingHours), days: s.days || null });
 });
 function candidates(la, ln) {
   const out = [];
@@ -99,7 +100,7 @@ function candidates(la, ln) {
 }
 
 // ---- match ----
-let filled = 0, already = 0, noMatch = 0, ambiguous = 0, matchedNoHours = 0, badFormat = 0;
+let filled = 0, filledDays = 0, already = 0, noMatch = 0, ambiguous = 0, matchedNoHours = 0, badFormat = 0;
 const ambiguousList = [], unmatchedList = [];
 for (const loc of locs) {
   const la = Number(loc.lat), ln = Number(loc.lng);
@@ -114,10 +115,22 @@ for (const loc of locs) {
     ambiguous++; if (ambiguousList.length < 20) ambiguousList.push(loc.id);
     continue;                                        // too close to call — leave it alone
   }
-  const hrs = inRange[0].hrs;
+  const { hrs, days } = inRange[0];
+  const hasExisting = (loc.hrs && String(loc.hrs).trim()) ||
+                      (loc.hours && typeof loc.hours === 'object' && Object.keys(loc.hours).length);
+  if (days) {
+    const vals = Object.values(days);
+    if (vals.length !== 7 || vals.some(v => v !== '24' && v !== 'closed' && !/^\d{4}-\d{4}$/.test(v))) {
+      badFormat++; continue;
+    }
+    if (hasExisting) { already++; continue; }
+    loc.hours = days;                 // per-day map wins over the single window
+    filledDays++; filled++;
+    continue;
+  }
   if (!hrs) { matchedNoHours++; continue; }
   if (hrs !== '24' && !/^\d{4}-\d{4}$/.test(hrs)) { badFormat++; continue; }   // never write a shape the app can't parse
-  if (loc.hrs && String(loc.hrs).trim()) { already++; continue; }   // never overwrite
+  if (hasExisting) { already++; continue; }
   loc.hrs = hrs;
   filled++;
 }
@@ -125,7 +138,7 @@ for (const loc of locs) {
 console.log('locations file : ' + locFile + '  (' + locs.length + ' records)');
 console.log('locator export : ' + scrapeFile + '  (' + scraped.length + ' stores)');
 console.log('match radius   : ' + RADIUS + 'm\n');
-console.log('  FILLED hours          : ' + filled);
+console.log('  FILLED hours          : ' + filled + (filledDays ? '  (' + filledDays + ' per-day schedules)' : ''));
 console.log('  already had hours     : ' + already);
 console.log('  matched, no hours     : ' + matchedNoHours);
 console.log('  ambiguous (skipped)   : ' + ambiguous);
