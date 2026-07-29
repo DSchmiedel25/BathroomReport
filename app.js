@@ -125,6 +125,7 @@ function applyTheme(theme){
   if(typeof setMapTilesForTheme === 'function') setMapTilesForTheme(theme);
 }
 document.getElementById('themeToggle').addEventListener('click', () => {
+  if(!isLoggedIn()) return;                       // gated: anonymous keeps the default theme
   const current = document.documentElement.getAttribute('data-theme') || 'dark';
   const next = current === 'light' ? 'dark' : 'light';
   localStorage.setItem('theme', next);
@@ -3313,26 +3314,6 @@ const TRAVEL_KEYS = ['pilot', 'loves', 'travelCentersOfAmerica', 'bucees'];
 // (The road-bucket drawer filter was removed — the chain key on the map is now the single
 // filter surface, with per-chain rows for everything currently renderable.)
 
-// Per-city public/customer checkboxes under Metros — entries in CHAIN_REGISTRY toggled through
-// the same disabledChains list.
-function onSubLayerCheckboxChange(e){
-  const cb = e.target.closest('.chain-filter-checkbox');
-  if(!cb) return;
-  const key = cb.dataset.chain;
-  if(cb.checked) disabledChains.delete(key); else disabledChains.add(key);
-  activeChains = getActiveChains();
-  // Never allow every registered layer to be switched off at once — that would just blank the map
-  if(activeChains.size === 0){
-    disabledChains.delete(key);
-    activeChains = getActiveChains();
-    cb.checked = true;
-  }
-  saveDisabledChains();
-  if(typeof renderChainKey === 'function') renderChainKey();
-  renderLayers();
-  applyFilters();
-}
-document.getElementById('metroFilterBody')?.addEventListener('change', onSubLayerCheckboxChange);
 
 // ---- Travel mode toggle (on the road / on foot) ------------------------------------------
 // The one open control: shown to everyone, but only once a metro layer actually exists in the
@@ -3343,14 +3324,7 @@ function renderLayers(){
   const metros = metroKeys();
   const hasMetros = metros.length > 0;
   const modePref = document.getElementById('travelModePref');
-  const mFilter = document.getElementById('metroFilter');
   if(modePref) modePref.style.display = hasMetros ? '' : 'none';
-  // Drawer sections follow the mode: "On the road" shows the pit-stop Chains list; "On foot"
-  // shows the city tree instead (pit stops are hidden on foot, so their filter would be noise).
-  // Metros section shows in BOTH modes (collapsed by default): road mode renders metro pins too,
-  // so their toggles must stay reachable — kept as their own section rather than mixed into the
-  // pit-stop Chains list, so the two layers stay legible.
-  if(mFilter) mFilter.style.display = (hasMetros && isLoggedIn()) ? '' : 'none';
   if(!hasMetros) return;
 
   const sel = document.getElementById('travelModeSelect');
@@ -3371,27 +3345,9 @@ function renderLayers(){
     }
   }
 
-  // City detail (per-metro public/customer checkboxes) — a signed-in refinement, gated like chains.
-  const body = document.getElementById('metroFilterBody');
-  if(!body) return;
-  if(!isLoggedIn()){ body.innerHTML = ''; return; }
-  const byCity = {};
-  metros.forEach(k => {
-    const c = CHAIN_REGISTRY[k];
-    const city = c.metro || 'Other';
-    (byCity[city] = byCity[city] || []).push(k);
-  });
-  // Only the selected city's options are listed — the pills above are the city switcher, so
-  // no per-city group labels are needed here.
-  const showKeys = byCity[selectedMetro] || [];
-  body.innerHTML = `<div class="metro-city">` + showKeys.map(key => {
-    const c = CHAIN_REGISTRY[key];
-    const checked = activeChains.has(key) ? 'checked' : '';
-    return `<label class="chain-filter-row">
-      <input type="checkbox" class="chain-filter-checkbox" data-chain="${key}" ${checked}>
-      <span class="dot" style="background:${c.color}"></span>${escapeHtml(c.name)}
-    </label>`;
-  }).join('') + `</div>`;
+  // (The per-city Metros tree was removed — metro chains are location-based now: they appear
+  // in the key's "In this area" list when you're zoomed into a covered city, and are always
+  // reachable in the drawer's All chains list.)
 }
 
 // Mode dropdown — everyone. Picks road ⟷ foot, which shows/hides the city layer.
@@ -3423,23 +3379,6 @@ document.getElementById('travelModeCoverage')?.addEventListener('click', (e) => 
   document.getElementById('drawerClose')?.click();
 });
 
-// Collapsible Metros panel — same remembered-collapse pattern as the Chains filter, so the
-// city checkbox tree isn't permanently stuck open in the drawer.
-(function(){
-  const toggle = document.getElementById('metroFilterToggle');
-  const body = document.getElementById('metroFilterBody');
-  const arrow = document.getElementById('metroFilterArrow');
-  if(!toggle || !body || !arrow) return;
-  function setCollapsed(collapsed){
-    body.classList.toggle('collapsed', collapsed);
-    toggle.classList.toggle('collapsed-toggle', collapsed);
-    arrow.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
-    localStorage.setItem('metroFilterCollapsed', collapsed ? '1' : '0');
-  }
-  const saved = localStorage.getItem('metroFilterCollapsed');
-  setCollapsed(saved === null ? true : saved === '1'); // collapsed by default — expand on demand
-  toggle.addEventListener('click', () => setCollapsed(!body.classList.contains('collapsed')));
-})();
 
 // ============================================================
 // Chain key — the map key IS the chain filter
@@ -3485,10 +3424,38 @@ function chainsInViewport(){
   return found;
 }
 
-function chainKeyRowHtml(key){
+// Two renderings of the same row. Signed in: a real switch you can tap. Signed out: a plain
+// legend entry — not a button, no checkmark, nothing that invites a tap it can't honour.
+// (Deliberately no toast/popup on tap; a single quiet line at the panel foot does the telling.)
+function chainKeyRowHtml(key, readOnly){
   const c = CHAIN_REGISTRY[key];
   const off = disabledChains.has(key);
-  return `<button type="button" class="ck-row${off ? ' ck-off' : ''}" data-chain="${key}" role="switch" aria-checked="${!off}"><span class="ck-dot" style="background:${c.color}"></span><span class="ck-name">${escapeHtml(c.name)}</span><span class="ck-mark" aria-hidden="true">✓</span></button>`;
+  const dot = `<span class="ck-dot" style="background:${c.color}"></span>`;
+  const name = `<span class="ck-name">${escapeHtml(c.name)}</span>`;
+  if(readOnly){
+    return `<div class="ck-row ck-legend">${dot}${name}</div>`;
+  }
+  return `<button type="button" class="ck-row${off ? ' ck-off' : ''}" data-chain="${key}" role="switch" aria-checked="${!off}">${dot}${name}<span class="ck-mark" aria-hidden="true">✓</span></button>`;
+}
+
+// Which of the four All-chains groups a chain belongs to. Registry-driven where the registry
+// already knows (group:'metro' = city layer); only the travel/public sets are hand-kept.
+const TRAVEL_CENTER_KEYS = new Set(['pilotFlyingJ', 'loves', 'bucees', 'travelCentersOfAmerica']);
+function chainBucket(key){
+  if(groupOf(key) === 'metro') return 'city';
+  if(key === 'restarea') return 'public';
+  if(TRAVEL_CENTER_KEYS.has(key)) return 'travel';
+  return 'gas';
+}
+const CK_GROUPS = [
+  { id: 'gas',    label: '⛽ Gas & convenience' },
+  { id: 'travel', label: '🚛 Travel centers' },
+  { id: 'public', label: '🚻 Public rest areas' },
+  { id: 'city',   label: '🏙️ City & metro' }
+];
+function ckGroupCollapsed(id){
+  const v = localStorage.getItem('ckGroup_' + id);
+  return v === null ? true : v === '1';   // groups start collapsed — the drawer stays calm
 }
 
 // Rebuilds are cheap but not free — skip the DOM write when nothing changed (same chains,
@@ -3498,9 +3465,9 @@ function renderChainKey(){
   const areaList = document.getElementById('chainKeyAreaList');
   const allList = document.getElementById('chainKeyAllList');
   const countEl = document.getElementById('chainKeyCount');
-  const allCountEl = document.getElementById('chainKeyAllCount');
   if(!areaList || !allList) return;
 
+  const readOnly = !isLoggedIn();
   const inView = chainsInViewport();
   const areaKeys = Object.keys(CHAIN_REGISTRY)
     .filter(k => chainRenderableNow(k) && inView && inView.has(k))
@@ -3509,19 +3476,60 @@ function renderChainKey(){
     .filter(k => chainHasData(k))
     .sort((a, b) => CHAIN_REGISTRY[a].name.localeCompare(CHAIN_REGISTRY[b].name));
 
-  const sig = areaKeys.join(',') + '|' + allKeys.join(',') + '|' + [...disabledChains].sort().join(',');
+  // Login state is part of the signature: signing in must flip legend → switches immediately.
+  const sig = areaKeys.join(',') + '|' + allKeys.join(',') + '|' +
+              [...disabledChains].sort().join(',') + '|' + (readOnly ? 'ro' : 'rw');
   if(sig === _chainKeySig) return;
   _chainKeySig = sig;
 
   areaList.innerHTML = areaKeys.length
-    ? areaKeys.map(chainKeyRowHtml).join('')
+    ? areaKeys.map(k => chainKeyRowHtml(k, readOnly)).join('')
     : '<div class="ck-empty">No mapped chains in this area yet — try zooming out, or tap 📍 We Missed One?</div>';
-  allList.innerHTML = allKeys.map(chainKeyRowHtml).join('');
+
+  // The full list is grouped into four collapsible sections. Collapse state is re-applied from
+  // localStorage on every rebuild, so a map pan never slams a group shut under the user's finger.
+  allList.innerHTML = CK_GROUPS.map(g => {
+    const keys = allKeys.filter(k => chainBucket(k) === g.id);
+    if(!keys.length) return '';
+    const collapsed = ckGroupCollapsed(g.id);
+    return `<button type="button" class="ck-group${collapsed ? ' collapsed' : ''}" data-group="${g.id}" aria-expanded="${!collapsed}">` +
+      `<span>${g.label}</span><span class="ck-group-arrow">${collapsed ? '▸' : '▾'}</span></button>` +
+      `<div class="ck-group-body${collapsed ? ' collapsed' : ''}" data-group-body="${g.id}">` +
+      keys.map(k => chainKeyRowHtml(k, readOnly)).join('') + `</div>`;
+  }).join('');
+
   if(countEl) countEl.textContent = areaKeys.length ? String(areaKeys.length) : '';
-  if(allCountEl) allCountEl.textContent = '(' + allKeys.length + ')';
+  const note = document.getElementById('chainKeySigninNote');
+  if(note) note.hidden = !readOnly;
+  updateChainKeyScrollHint();
+}
+
+// Fade + half-cut row only when the in-area list actually overflows — an affordance that lies
+// when there's nothing to scroll is worse than none.
+function updateChainKeyScrollHint(){
+  const wrap = document.getElementById('chainKeyScrollWrap');
+  const list = document.getElementById('chainKeyAreaList');
+  if(!wrap || !list) return;
+  wrap.classList.toggle('has-more', list.scrollHeight > list.clientHeight + 2);
+}
+
+// Group header taps: collapse/expand, remember, flip the arrow. Returns false when handled.
+function onChainKeyGroupTap(e){
+  const head = e.target.closest('.ck-group');
+  if(!head) return true;
+  const id = head.dataset.group;
+  const body = document.querySelector('.ck-group-body[data-group-body="' + id + '"]');
+  const collapsed = head.classList.toggle('collapsed');
+  if(body) body.classList.toggle('collapsed', collapsed);
+  head.setAttribute('aria-expanded', String(!collapsed));
+  const arrow = head.querySelector('.ck-group-arrow');
+  if(arrow) arrow.textContent = collapsed ? '▸' : '▾';
+  localStorage.setItem('ckGroup_' + id, collapsed ? '1' : '0');
+  return false;
 }
 
 function onChainKeyRowTap(e){
+  if(!isLoggedIn()) return;              // signed out the rows are a legend, not controls
   const row = e.target.closest('.ck-row');
   if(!row) return;
   const key = row.dataset.chain;
@@ -3543,7 +3551,6 @@ function onChainKeyRowTap(e){
 (function(){
   const pill = document.getElementById('chainKeyPill');
   const panel = document.getElementById('chainKeyPanel');
-  const allToggle = document.getElementById('chainKeyAllToggle');
   const allList = document.getElementById('chainKeyAllList');
   if(!pill || !panel) return;
 
@@ -3555,23 +3562,52 @@ function onChainKeyRowTap(e){
     if(open) renderChainKey(); // fresh list the moment it opens
   });
 
-  if(allToggle && allList){
-    allToggle.addEventListener('click', () => {
-      const open = allList.classList.toggle('open');
-      allToggle.setAttribute('aria-expanded', String(open));
-      const arrow = document.getElementById('chainKeyAllArrow');
-      if(arrow) arrow.textContent = open ? '▾' : '▸';
-    });
-  }
-
   document.getElementById('chainKeyAreaList')?.addEventListener('click', onChainKeyRowTap);
-  allList?.addEventListener('click', onChainKeyRowTap);
+  // The full list now lives in the hamburger drawer ("All chains") but shares the same rows,
+  // state and handler — it's the safety net for a chain that's off or outside the viewport.
+  // Group headers collapse; chain rows toggle.
+  allList?.addEventListener('click', (e) => {
+    if(onChainKeyGroupTap(e) !== false) onChainKeyRowTap(e);
+  });
 
   // The in-area list follows the map. moveend fires once per settled pan/zoom (zooms end
   // with a moveend too), never continuously during a drag — the performance contract.
   map.on('moveend', renderChainKey);
 })();
 
+// Drawer "Preferences" — remembered collapse, same pattern as the other drawer sections.
+(function(){
+  const toggle = document.getElementById('prefsToggle');
+  const body = document.getElementById('prefsBody');
+  const arrow = document.getElementById('prefsArrow');
+  if(!toggle || !body || !arrow) return;
+  const setCollapsed = (collapsed) => {
+    body.classList.toggle('collapsed', collapsed);
+    arrow.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+    localStorage.setItem('prefsCollapsed', collapsed ? '1' : '0');
+  };
+  const saved = localStorage.getItem('prefsCollapsed');
+  setCollapsed(saved === null ? true : saved === '1');
+  toggle.addEventListener('click', () => setCollapsed(!body.classList.contains('collapsed')));
+})();
+
+// Drawer "All chains" — holds the grouped full list moved out of the map key.
+(function(){
+  const toggle = document.getElementById('allChainsToggle');
+  const body = document.getElementById('chainKeyAllList');
+  const arrow = document.getElementById('allChainsArrow');
+  if(!toggle || !body || !arrow) return;
+  const setCollapsed = (collapsed) => {
+    body.classList.toggle('collapsed', collapsed);
+    arrow.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+    localStorage.setItem('allChainsCollapsed', collapsed ? '1' : '0');
+  };
+  const saved = localStorage.getItem('allChainsCollapsed');
+  setCollapsed(saved === null ? true : saved === '1');
+  toggle.addEventListener('click', () => setCollapsed(!body.classList.contains('collapsed')));
+})();
+
+applyAuthVisibility();
 renderChainKey();
 renderLayers();
 applyFilters();
@@ -3594,17 +3630,20 @@ renderNavPref();
 // confirmed-closed spots (open + unknown-hours stay visible). Tapping it off shows
 // everything, including confirmed-closed. Drives the same `showAllLocations` state.
 // The label itself changes with the state so on/off is unambiguous.
+// Hide-closed now lives in the drawer's Preferences as a switch, matching the accessibility
+// toggle beside it. Same `showAllLocations` state; on = confirmed-closed hidden (the default).
 (function(){
   const t = document.getElementById('openNowToggle');
   if(!t) return;
   const sync = () => {
-    const filtering = !showAllLocations;          // filtering = confirmed-closed hidden
-    t.classList.toggle('active', filtering);
+    const filtering = !showAllLocations;
+    t.classList.toggle('on', filtering);
     t.setAttribute('aria-pressed', String(filtering));
-    t.textContent = filtering ? '🚫 Hiding closed' : '👁 Showing all';
   };
   sync();
+  window.syncOpenNowToggle = sync;
   t.addEventListener('click', () => {
+    if(!isLoggedIn()) return;                     // gated: anonymous keeps the defaults
     showAllLocations = !showAllLocations;
     sync();
     applyFilters();
@@ -3622,7 +3661,9 @@ renderNavPref();
     t.setAttribute('aria-pressed', String(hideInaccessible));
   };
   sync();
+  window.syncAccessibleToggle = sync;
   t.addEventListener('click', () => {
+    if(!isLoggedIn()) return;                     // gated: anonymous keeps the defaults
     hideInaccessible = !hideInaccessible;
     sync();
     applyFilters();
@@ -3671,9 +3712,43 @@ document.getElementById('listViewClose').addEventListener('click',()=>{document.
 // re-run updateAccountUI with no argument; defaulting to this keeps the current view intact.
 let accountPanelMode = 'account';
 
+// Signed-out shaping of the drawer + key, in one place so every auth change agrees:
+//  • Passport is a signed-in feature — hide the entry rather than teasing it.
+//  • Preferences are gated; anonymous users keep the defaults (confirmed-closed hidden).
+//  • The chain key re-renders as a read-only legend.
+function applyAuthVisibility(){
+  const loggedIn = isLoggedIn();
+
+  const passport = document.getElementById('passportToggle');
+  if(passport) passport.style.display = loggedIn ? '' : 'none';
+
+  ['openNowToggle', 'accessibleToggle', 'themeToggle'].forEach(id => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.disabled = !loggedIn;
+    el.classList.toggle('d-gated', !loggedIn);
+  });
+  const gateNote = document.getElementById('prefsGateNote');
+  if(gateNote) gateNote.hidden = loggedIn;
+
+  // Signing out returns the map to the anonymous defaults, so nobody is stranded with a
+  // filter they can no longer reach.
+  if(!loggedIn){
+    let changed = false;
+    if(showAllLocations){ showAllLocations = false; changed = true; }
+    if(hideInaccessible){ hideInaccessible = false; changed = true; }
+    if(typeof window.syncOpenNowToggle === 'function') window.syncOpenNowToggle();
+    if(typeof window.syncAccessibleToggle === 'function') window.syncAccessibleToggle();
+    if(changed) applyFilters();
+  }
+
+  renderChainKey();
+}
+
 function updateAccountUI(passportMode){
   if(passportMode === undefined) passportMode = (accountPanelMode === 'passport');
   const loggedIn = isLoggedIn();
+  applyAuthVisibility();
   // In passport mode both auth sections stay hidden — the panel is showing the Passport view.
   if(passportMode){
     document.getElementById('loggedOutView').style.display = 'none';

@@ -80,17 +80,13 @@
 /* ---------- Open Now pill dropped — map is open-by-default now ---------- */
 /* "Open now" filter — left pill under Chains, matching the other shell pills.
    .active = filtering to open (confirmed-closed hidden); inactive = showing all. */
-#openNowToggle{
-  position:static !important; align-self:flex-start !important;
-  display:inline-flex; align-items:center; gap:6px;
-  background:var(--shell-chrome) !important; color:var(--shell-ink) !important;
-  border:1px solid var(--shell-line) !important; border-radius:14px !important;
-  padding:6px 14px !important; font-size:14px !important; font-weight:800 !important;
-  box-shadow:var(--shell-shadow) !important; width:auto !important;
-  white-space:nowrap; cursor:pointer;
-}
-#openNowToggle.active{
-  background:#2e7d32 !important; border-color:#2e7d32 !important; color:#fff !important;
+/* Hide-closed moved into the drawer's Preferences as a switch. styles.css still positions
+   #openNowToggle absolutely (it was one of the original map controls: position:absolute;
+   right:10px; top:10px; width:148px). Without this reset it tears out of the drawer's flow
+   and floats over the brand header — keep it, even though it looks redundant. */
+#appDrawer #openNowToggle{
+  position:static !important; top:auto !important; right:auto !important; left:auto !important;
+  width:100% !important; min-height:0 !important; z-index:auto !important;
 }
 
 /* ---------- Right rail: Where Am I? (icon-only) + List ---------- */
@@ -433,11 +429,8 @@ body:not(.logged-in) #appDrawer #chainFilter{ display:none !important; }
 }
 #appDrawer #chainFilterToggle,
 #appDrawer #metroFilterToggle,
-#appDrawer .d-collapse-head{
-  display:flex !important; align-items:center; gap:10px;
-  padding:14px 20px !important; margin:0 !important;
-  font-size:15px !important; font-weight:700 !important; color:var(--shell-ink) !important; cursor:pointer;
-}
+/* (Collapse-head rhythm is defined ONCE, further down with the other drawer rhythm rules —
+   a second conflicting copy here was the cause of the uneven section spacing.) */
 #appDrawer .d-collapse-arrow{ margin-left:auto; transition:transform .16s; }
 #appDrawer .d-collapse-head:active{ background:var(--shell-chrome2); }
 #appDrawer #chainFilterToggle #chainFilterArrow{ margin-left:auto; transition:transform .16s; }
@@ -611,15 +604,16 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 #appDrawer #chainFilterToggle,
 #appDrawer #metroFilterToggle,
 #appDrawer .d-collapse-head{
-  padding:13px 20px !important;
+  padding:14px 20px !important;              /* same rhythm as .d-section-label */
   min-height:0 !important; margin:0 !important;
   display:flex !important; align-items:center; gap:10px;
+  font-size:15px !important; font-weight:700 !important; color:var(--shell-ink) !important;
+  cursor:pointer;
 }
 /* Both collapse arrows pinned to the far right, identically (fixes Metros
    sitting inline while Pit Stops was far-right). */
 #appDrawer .d-collapse-arrow,
-#appDrawer #chainFilterArrow,
-#appDrawer #metroFilterArrow{ margin-left:auto !important; transition:transform .16s; }
+#appDrawer #chainFilterArrow{ margin-left:auto !important; transition:transform .16s; }
 
 /* Sections: no padding of their own — children provide it — with a single
    divider before each group. First group (after Passport/FAQ) divides too. */
@@ -698,21 +692,21 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
   max-height:min(62vh, calc(100dvh - 210px));
 }
 #chainKeyPanel.open{ display:flex; }
-/* hide-closed toggle lives at the top of the panel as a full-width row */
-#chainKeyPanel #openNowToggle{
-  position:static !important; width:100% !important; border-radius:0 !important;
-  border:0 !important; border-bottom:1px solid var(--shell-line) !important;
-  justify-content:flex-start !important; box-shadow:none !important;
-  min-height:44px; padding:10px 12px !important; font-size:13px !important;
-}
-#chainKeyPanel #openNowToggle.active{
-  background:#2e7d32 !important; color:#fff !important;
-}
 .ck-head{
   font-size:11px; color:var(--shell-muted); padding:8px 12px 2px;
   text-transform:uppercase; letter-spacing:.05em; font-weight:800;
 }
-#chainKeyAreaList{ overflow-y:auto; flex:1 1 auto; min-height:0; -webkit-overflow-scrolling:touch; }
+/* Scroll affordance: cap the in-area list at 4.5 rows so a half-cut row shows there's more,
+   and fade the bottom edge — but only when it actually overflows (see updateChainKeyScrollHint). */
+.ck-scrollwrap{ position:relative; flex:1 1 auto; min-height:0; display:flex; }
+#chainKeyAreaList{
+  overflow-y:auto; flex:1 1 auto; min-height:0; max-height:calc(4.5 * 44px);
+  -webkit-overflow-scrolling:touch;
+}
+.ck-scrollwrap.has-more::after{
+  content:''; position:absolute; left:0; right:0; bottom:0; height:26px; pointer-events:none;
+  background:linear-gradient(to bottom, transparent, var(--shell-chrome));
+}
 .ck-row{
   display:flex; align-items:center; gap:9px; width:100%; min-height:44px;
   padding:9px 12px; background:transparent; border:0; color:var(--shell-ink);
@@ -729,14 +723,28 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 .ck-off .ck-name{ text-decoration:line-through; }
 .ck-off .ck-mark{ visibility:hidden; }
 .ck-empty{ padding:10px 12px 12px; font-size:12px; color:var(--shell-muted); line-height:1.5; }
-#chainKeyAllToggle{
-  display:flex; align-items:center; gap:6px; width:100%; min-height:44px;
-  padding:10px 12px; background:var(--shell-chrome2); border:0;
-  border-top:1px solid var(--shell-line); color:var(--shell-ink);
-  font-size:13px; font-weight:800; cursor:pointer; text-align:left;
+/* Signed-out: rows are a legend, not controls — no checkmark, no press state, no pointer. */
+.ck-row.ck-legend{ cursor:default; }
+.ck-row.ck-legend:active{ background:transparent; }
+.ck-signin-note{
+  padding:10px 12px 12px; font-size:12px; color:var(--shell-muted);
+  border-top:1px solid var(--shell-line); line-height:1.4;
 }
-#chainKeyAllCount{ color:var(--shell-muted); font-weight:800; }
-#chainKeyAllArrow{ margin-left:auto; }
-#chainKeyAllList{ display:none; overflow-y:auto; max-height:200px; flex:0 0 auto;
-  border-top:1px solid var(--shell-line); -webkit-overflow-scrolling:touch; }
-#chainKeyAllList.open{ display:block; }
+
+/* ---------- All chains (drawer): four collapsible groups ---------- */
+#chainKeyAllList{ overflow:hidden; }
+#chainKeyAllList.collapsed{ display:none; }
+#chainKeyAllList .ck-row{ padding-left:32px; padding-right:20px; }
+.ck-group{
+  display:flex; align-items:center; width:100%; min-height:44px;
+  padding:9px 20px; background:transparent; border:0; color:var(--shell-ink);
+  font-size:14px; font-weight:700; cursor:pointer; text-align:left;
+}
+.ck-group:active{ background:var(--shell-chrome2); }
+.ck-group-arrow{ margin-left:auto; color:var(--shell-muted); }
+.ck-group-body.collapsed{ display:none; }
+
+/* ---------- Preferences: collapsible + signed-out gate ---------- */
+#prefsBody.collapsed{ display:none; }
+#appDrawer .d-toggle.d-gated{ opacity:.45; cursor:default; }
+.d-gate-note{ padding:2px 20px 14px; font-size:12px; color:var(--shell-muted); }
