@@ -47,7 +47,7 @@
   box-shadow:none !important; object-fit:contain;
 }
 #headerBrand h1{
-  font-size:clamp(15px, 4.4vw, 20px) !important; font-weight:700 !important; letter-spacing:.02em !important;
+  font-size:clamp(12px, 3.4vw, 16px) !important; font-weight:900 !important; letter-spacing:.02em !important;
   margin:0 !important; white-space:nowrap; color:var(--shell-ink) !important; line-height:1;
   font-family:var(--font-display);
 }
@@ -80,8 +80,18 @@
 /* ---------- Open Now pill dropped — map is open-by-default now ---------- */
 /* "Open now" filter — left pill under Chains, matching the other shell pills.
    .active = filtering to open (confirmed-closed hidden); inactive = showing all. */
-/* (The hide-closed control moved into the drawer as a standard d-toggle switch — the
-   drawer's shared button rules style it; no on-map pill styling needed anymore.) */
+#openNowToggle{
+  position:static !important; align-self:flex-start !important;
+  display:inline-flex; align-items:center; gap:6px;
+  background:var(--shell-chrome) !important; color:var(--shell-ink) !important;
+  border:1px solid var(--shell-line) !important; border-radius:14px !important;
+  padding:6px 14px !important; font-size:14px !important; font-weight:800 !important;
+  box-shadow:var(--shell-shadow) !important; width:auto !important;
+  white-space:nowrap; cursor:pointer;
+}
+#openNowToggle.active{
+  background:#2e7d32 !important; border-color:#2e7d32 !important; color:#fff !important;
+}
 
 /* ---------- Right rail: Where Am I? (icon-only) + List ---------- */
 #whereAmIBtn{
@@ -194,7 +204,7 @@
 #appDrawer.open{ transform:none; }
 #appDrawer .d-brand{ display:flex; align-items:center; gap:10px; padding:2px 18px 16px; border-bottom:1px solid var(--shell-line); }
 #appDrawer .d-brand img{ width:40px; height:40px; object-fit:contain; }
-#appDrawer .d-brand b{ font-size:18px; font-weight:700; letter-spacing:.02em; color:var(--shell-ink); font-family:var(--font-display); }
+#appDrawer .d-brand b{ font-size:16px; font-weight:900; letter-spacing:.02em; color:var(--shell-ink); font-family:var(--font-display); }
 #appDrawer .d-brand b .wm-accent{ color:var(--accent); }
 #appDrawer .d-items{ display:flex; flex-direction:column; padding:8px 0; flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; }
 /* All drawer rows share one left-aligned layout so icons + labels line up */
@@ -423,8 +433,12 @@ body:not(.logged-in) #appDrawer #chainFilter{ display:none !important; }
 }
 #appDrawer #chainFilterToggle,
 #appDrawer #metroFilterToggle,
-/* (Collapse-head rhythm is defined ONCE, further down with the other drawer rhythm
-   rules — a second conflicting copy here caused the uneven section spacing.) */
+#appDrawer .d-collapse-head{
+  display:flex !important; align-items:center; gap:10px;
+  padding:14px 20px !important; margin:0 !important;
+  font-size:15px !important; font-weight:700 !important; color:var(--shell-ink) !important; cursor:pointer;
+}
+#appDrawer .d-collapse-arrow{ margin-left:auto; transition:transform .16s; }
 #appDrawer .d-collapse-head:active{ background:var(--shell-chrome2); }
 #appDrawer #chainFilterToggle #chainFilterArrow{ margin-left:auto; transition:transform .16s; }
 #appDrawer #chainFilterToggle:active{ background:var(--shell-chrome2); }
@@ -496,9 +510,6 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 
 /* ---------- Accessibility indicator in the pin popup head row ---------- */
 .access-indicator{ font-size:15px; line-height:1; }
-/* Store features as head-row icons (replaces the old "Store amenities" section). */
-.store-icons{ display:inline-flex; align-items:center; gap:5px; }
-.store-icon{ font-size:15px; line-height:1; opacity:.9; }
 .access-indicator.community{ filter:none; }                 /* green-tier: community-confirmed */
 .access-indicator.verified{ opacity:.85; }                  /* teal-tier: OSM-verified */
 
@@ -600,10 +611,9 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 #appDrawer #chainFilterToggle,
 #appDrawer #metroFilterToggle,
 #appDrawer .d-collapse-head{
-  padding:14px 20px !important;
+  padding:13px 20px !important;
   min-height:0 !important; margin:0 !important;
   display:flex !important; align-items:center; gap:10px;
-  font-size:15px !important; font-weight:700 !important; color:var(--shell-ink) !important; cursor:pointer;
 }
 /* Both collapse arrows pinned to the far right, identically (fixes Metros
    sitting inline while Pit Stops was far-right). */
@@ -688,6 +698,16 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
   max-height:min(62vh, calc(100dvh - 210px));
 }
 #chainKeyPanel.open{ display:flex; }
+/* hide-closed toggle lives at the top of the panel as a full-width row */
+#chainKeyPanel #openNowToggle{
+  position:static !important; width:100% !important; border-radius:0 !important;
+  border:0 !important; border-bottom:1px solid var(--shell-line) !important;
+  justify-content:flex-start !important; box-shadow:none !important;
+  min-height:44px; padding:10px 12px !important; font-size:13px !important;
+}
+#chainKeyPanel #openNowToggle.active{
+  background:#2e7d32 !important; color:#fff !important;
+}
 .ck-head{
   font-size:11px; color:var(--shell-muted); padding:8px 12px 2px;
   text-transform:uppercase; letter-spacing:.05em; font-weight:800;
@@ -709,30 +729,14 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 .ck-off .ck-name{ text-decoration:line-through; }
 .ck-off .ck-mark{ visibility:hidden; }
 .ck-empty{ padding:10px 12px 12px; font-size:12px; color:var(--shell-muted); line-height:1.5; }
-/* "All chains" now lives in the hamburger drawer as its own section; the rows reuse
-   .ck-row so the two lists look and behave identically. */
-#chainKeyAllList{ overflow-y:auto; max-height:260px; margin-top:4px;
-  -webkit-overflow-scrolling:touch; }
-#chainKeyAllList.collapsed{ display:none; }
-#chainKeyAllList .ck-row{ padding-left:32px; padding-right:20px; }
-.ck-group{
-  display:flex; align-items:center; width:100%; min-height:44px;
-  padding:9px 20px; background:transparent; border:0; color:var(--shell-ink);
-  font-size:14px; font-weight:700; cursor:pointer; text-align:left;
+#chainKeyAllToggle{
+  display:flex; align-items:center; gap:6px; width:100%; min-height:44px;
+  padding:10px 12px; background:var(--shell-chrome2); border:0;
+  border-top:1px solid var(--shell-line); color:var(--shell-ink);
+  font-size:13px; font-weight:800; cursor:pointer; text-align:left;
 }
-.ck-group:active{ background:var(--shell-chrome2); }
-.ck-group-arrow{ margin-left:auto; color:var(--shell-muted); }
-.ck-group-body.collapsed{ display:none; }
-
-#prefsBody.collapsed{ display:none; }
-
-/* ---------- Tagline: FIND. RATE. SHARE. IMPROVE. ---------- */
-#appDrawer .d-brand-text{ display:flex; flex-direction:column; gap:2px; min-width:0; }
-#appDrawer .d-tagline{
-  font-family:var(--font-body); font-size:clamp(9px, 2.5vw, 10px); font-weight:800;
-  letter-spacing:.1em; color:var(--shell-muted);
-  /* No nowrap: at 82%-width on a small phone the full tagline can exceed the space left
-     beside the logo and close button. Wrapping to a second line is fine; clipping isn't. */
-}
-#appDrawer .d-tagline i{ font-style:normal; color:var(--accent); }
-.tag-verb{ font-weight:800; letter-spacing:.08em; color:var(--accent); }
+#chainKeyAllCount{ color:var(--shell-muted); font-weight:800; }
+#chainKeyAllArrow{ margin-left:auto; }
+#chainKeyAllList{ display:none; overflow-y:auto; max-height:200px; flex:0 0 auto;
+  border-top:1px solid var(--shell-line); -webkit-overflow-scrolling:touch; }
+#chainKeyAllList.open{ display:block; }

@@ -248,6 +248,7 @@ map.on('popupopen', () => {
   document.getElementById('missingBtn').style.display = 'none';
   document.getElementById('missingPanel').classList.remove('show');
   document.getElementById('topLeftControls').style.display = 'none';
+  document.getElementById('openNowToggle').style.display = 'none';
   document.getElementById('listViewToggle').style.display = 'none';
   document.getElementById('passportToggle').style.display = 'none';
   document.getElementById('whereAmIBtn').style.display = 'none';
@@ -261,6 +262,7 @@ map.on('popupclose', () => {
   document.getElementById('locateBtn').style.display = '';
   document.getElementById('missingBtn').style.display = '';
   document.getElementById('topLeftControls').style.display = '';
+  document.getElementById('openNowToggle').style.display = '';
   document.getElementById('listViewToggle').style.display = '';
   document.getElementById('passportToggle').style.display = '';
   document.getElementById('whereAmIBtn').style.display = '';
@@ -562,18 +564,10 @@ function adminAmenityPanelHtml(loc){
     const btn = (val, label) => `<button type="button" class="admin-am-btn" data-key="${a.key}" data-val="${val}" style="padding:3px 9px;margin-left:4px;border-radius:6px;border:1px solid ${cur===val?'#2ea1aa':'#2a2e35'};background:${cur===val?'#0e2f33':'#1b1e23'};color:#f6f8fa;font-size:12px;cursor:pointer;">${label}</button>`;
     return `<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 0;font-size:13px;color:#f6f8fa;"><span>${a.label}</span><span>${btn('yes','Yes')}${btn('no','No')}${btn('unknown','—')}</span></div>`;
   }).join('');
-  // Collapsible so a long popup isn't dominated by admin controls; OPEN by default and the
-  // choice is remembered across popups (admins mid-audit keep it open; otherwise tuck it away).
-  const collapsed = localStorage.getItem('adminAmCollapsed') === '1';
-  return `<div class="admin-amenity-panel" id="admin-am-${loc.id}" style="margin:8px 0;border:1px solid #2a2e35;border-radius:10px;background:#141619;overflow:hidden;">
-    <button type="button" class="admin-am-head" id="admin-am-head-${loc.id}" aria-expanded="${!collapsed}"
-      style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:10px;background:transparent;border:0;font-weight:600;font-size:13px;color:#2ea1aa;cursor:pointer;text-align:left;">
-      <span>Set amenities (admin) — applied live</span><span id="admin-am-arrow-${loc.id}">${collapsed ? '▸' : '▾'}</span>
-    </button>
-    <div id="admin-am-body-${loc.id}" style="padding:0 10px 10px;${collapsed ? 'display:none;' : ''}">
+  return `<div class="admin-amenity-panel" id="admin-am-${loc.id}" style="margin:8px 0;padding:10px;border:1px solid #2a2e35;border-radius:10px;background:#141619;">
+    <div style="font-weight:600;font-size:13px;color:#2ea1aa;margin-bottom:6px;">Set amenities (admin) — applied live</div>
     ${rows}
     <div class="save-note" id="admin-am-note-${loc.id}" style="font-size:12px;margin-top:4px;"></div>
-    </div>
   </div>`;
 }
 
@@ -581,19 +575,6 @@ function attachAdminAmenityHandlers(loc){
   if(!isMapAdmin()) return;
   const panel = document.getElementById('admin-am-' + loc.id);
   if(!panel) return;
-  // Collapse/expand header — state remembered for the next popup too.
-  const head = document.getElementById('admin-am-head-' + loc.id);
-  const body = document.getElementById('admin-am-body-' + loc.id);
-  const arrow = document.getElementById('admin-am-arrow-' + loc.id);
-  if(head && body){
-    head.addEventListener('click', () => {
-      const collapse = body.style.display !== 'none';
-      body.style.display = collapse ? 'none' : '';
-      if(arrow) arrow.textContent = collapse ? '▸' : '▾';
-      head.setAttribute('aria-expanded', String(!collapse));
-      localStorage.setItem('adminAmCollapsed', collapse ? '1' : '0');
-    });
-  }
   panel.querySelectorAll('.admin-am-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const key = btn.dataset.key, val = btn.dataset.val;
@@ -815,36 +796,26 @@ function storeFeatureEditorHtml(locId, myVote){
   </div>`;
 }
 
-// Store features render as a compact icon row in the popup head (next to the store name)
-// rather than a labelled "Store amenities" section — gas in particular was never votable
-// (OSM-known, display-only), so a whole section for it read as clutter.
-// Same selection rule the old section used: OSM-verified only. Community-confirmed features
-// stay in the "Confirmed by visitors" block, so nothing is shown twice.
-// Every icon carries a title + aria-label — an icon alone must never be the only cue.
-function storeFeatureIconsHtml(loc, summary){
-  const osm = (loc && loc.osm) || {};
-  const conf = (loc && loc.conf) || {};
-  const pill = (glyph, label) =>
-    `<span class="store-icon" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}" role="img">${glyph}</span>`;
-  const out = [];
-  if(osm.gas) out.push(pill('⛽', 'Gas station'));
-  STORE_FEATURES.forEach(a => {
-    if(!osm[a.key]) return;
-    if(conf[a.key]) return;                       // community-confirmed → shown in that block
-    if(isConfirmedYes(summary && summary[a.key])) return;
-    out.push(pill(amenityAnswerIcon(a, 'yes'), a.label + ' — verified'));
-  });
-  return out.join('');
-}
-
-// Repaint the head-row icons after community/OSM data arrives for this location.
-function refreshStoreIcons(loc){
-  const el = document.getElementById('store-icons-' + loc.id);
-  if(el) el.innerHTML = storeFeatureIconsHtml(loc, storeFeatureCache[loc.id]);
+// True if a location has any OSM-VERIFIED store feature to show (community confirmations now
+// live in the unified block, so they no longer count toward showing this OSM section).
+function storeSectionHasContent(loc){
+  if(loc && loc.osm && loc.osm.gas) return true;   // gas alone is enough to show the section
+  return osmVerifiedBadges(loc, STORE_FEATURES, storeFeatureCache[loc.id]) !== '';
 }
 // Same, for the OSM bathroom-features section (excluding accessible, which has its own badge).
 function osmBathroomHasContent(loc){
   return osmVerifiedBadges(loc, BATHROOM_AMENITIES, amenityCache[loc.id], ['accessible']) !== '';
+}
+
+function storeFeatureSummaryHtml(summary, loc){
+  // OSM-verified store badges only — community confirmations live in the unified block above.
+  // Gas is display-only (OSM-known, never voted on): show it as a quiet teal badge up front.
+  const gasBadge = (loc && loc.osm && loc.osm.gas)
+    ? '<span class="feature-badge verified">⛽ Gas</span>' : '';
+  const verified = gasBadge + osmVerifiedBadges(loc, STORE_FEATURES, summary);
+  if(!summary && !verified) return '<span class="feature-badge unconfirmed">Loading features…</span>';
+  if(!verified) return '<span class="feature-badge unconfirmed">Nothing verified yet</span>';
+  return verified;
 }
 
 async function loadStoreFeatureSummary(locId){
@@ -1405,7 +1376,6 @@ function popupHtml(loc, agg, myVote){
   return `<div class="popup-inner" data-locid="${loc.id}">
     <div class="popup-head-row">
       <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${chain.name}</div>
-      <span class="store-icons" id="store-icons-${loc.id}">${storeFeatureIconsHtml(loc, storeFeatureCache[loc.id])}</span>
     </div>
     <div class="addr addr-title">${loc.addr}${loc.num ? ' &middot; Shop #' + loc.num : ''}</div>
     ${hoursLine}
@@ -1451,7 +1421,10 @@ function popupHtml(loc, agg, myVote){
     </div>
     ${amenityEditorHtml(loc.id, myVote)}
     <div class="feature-summary osm-bathroom-section${osmBathroomHasContent(loc) ? '' : ' is-empty'}"><div class="feature-title">🚻 Bathroom features</div><div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>
-` : `<div class="popup-signin-hint">🔒 Sign in to rate this bathroom and see visitor tips.</div>`}
+    <div class="store-section${storeSectionHasContent(loc) ? '' : ' is-empty'}">
+      <div class="store-section-head">🏪 Store amenities</div>
+      <div class="feature-summary"><div class="feature-badges" id="store-feature-summary-${loc.id}">${storeFeatureSummaryHtml(storeFeatureCache[loc.id], loc)}</div></div>
+    </div>` : `<div class="popup-signin-hint">🔒 Sign in to rate this bathroom and see visitor tips.</div>`}
   </div>`;
 }
 
@@ -1954,17 +1927,32 @@ async function attachAmenityHandlers(loc){
       const fresh = await loadAmenitySummary(loc.id);
       if(summaryEl) summaryEl.innerHTML = amenitySummaryHtml(fresh, loc);
     } else {
-      await loadStoreFeatureSummary(loc.id);
-      refreshStoreIcons(loc);
+      const freshStore = await loadStoreFeatureSummary(loc.id);
+      const storeEl = document.getElementById('store-feature-summary-' + loc.id);
+      if(storeEl){
+        storeEl.innerHTML = storeFeatureSummaryHtml(freshStore, loc);
+        const section = storeEl.closest('.store-section');
+        if(section) section.classList.toggle('is-empty', !storeEl.querySelector('.feature-badge:not(.unconfirmed)'));
+      }
     }
     refreshCommunityBlock(loc);   // a just-cast vote may have crossed the confirm threshold
   });
 }
 
 async function attachStoreFeatureHandlers(loc){
-  await loadStoreFeatureSummary(loc.id);
-  refreshStoreIcons(loc);
-  refreshCommunityBlock(loc);
+  const summaryEl=document.getElementById('store-feature-summary-'+loc.id);
+  const summary=await loadStoreFeatureSummary(loc.id);
+  if(summaryEl){
+    summaryEl.innerHTML=storeFeatureSummaryHtml(summary, loc);
+    refreshCommunityBlock(loc);
+    // Collapse the whole "🏪 Store" section when nothing is confirmed or verified, so an empty
+    // section never shows a lonely header.
+    const section = summaryEl.closest('.store-section');
+    if(section){
+      const hasReal = summaryEl.querySelector('.feature-badge:not(.unconfirmed)');
+      section.classList.toggle('is-empty', !hasReal);
+    }
+  }
 
   const stepOrig = document.getElementById('store-feature-step-' + loc.id);
   if(!stepOrig) return;
@@ -2006,8 +1994,8 @@ async function attachStoreFeatureHandlers(loc){
 
     stepEl.innerHTML = renderStoreFeatureStepHtml(updatedVote);
 
-    await loadStoreFeatureSummary(loc.id);
-    refreshStoreIcons(loc);
+    const fresh = await loadStoreFeatureSummary(loc.id);
+    if(summaryEl) summaryEl.innerHTML = storeFeatureSummaryHtml(fresh, loc);
   });
 }
 
@@ -3325,6 +3313,26 @@ const TRAVEL_KEYS = ['pilot', 'loves', 'travelCentersOfAmerica', 'bucees'];
 // (The road-bucket drawer filter was removed — the chain key on the map is now the single
 // filter surface, with per-chain rows for everything currently renderable.)
 
+// Per-city public/customer checkboxes under Metros — entries in CHAIN_REGISTRY toggled through
+// the same disabledChains list.
+function onSubLayerCheckboxChange(e){
+  const cb = e.target.closest('.chain-filter-checkbox');
+  if(!cb) return;
+  const key = cb.dataset.chain;
+  if(cb.checked) disabledChains.delete(key); else disabledChains.add(key);
+  activeChains = getActiveChains();
+  // Never allow every registered layer to be switched off at once — that would just blank the map
+  if(activeChains.size === 0){
+    disabledChains.delete(key);
+    activeChains = getActiveChains();
+    cb.checked = true;
+  }
+  saveDisabledChains();
+  if(typeof renderChainKey === 'function') renderChainKey();
+  renderLayers();
+  applyFilters();
+}
+document.getElementById('metroFilterBody')?.addEventListener('change', onSubLayerCheckboxChange);
 
 // ---- Travel mode toggle (on the road / on foot) ------------------------------------------
 // The one open control: shown to everyone, but only once a metro layer actually exists in the
@@ -3335,7 +3343,14 @@ function renderLayers(){
   const metros = metroKeys();
   const hasMetros = metros.length > 0;
   const modePref = document.getElementById('travelModePref');
+  const mFilter = document.getElementById('metroFilter');
   if(modePref) modePref.style.display = hasMetros ? '' : 'none';
+  // Drawer sections follow the mode: "On the road" shows the pit-stop Chains list; "On foot"
+  // shows the city tree instead (pit stops are hidden on foot, so their filter would be noise).
+  // Metros section shows in BOTH modes (collapsed by default): road mode renders metro pins too,
+  // so their toggles must stay reachable — kept as their own section rather than mixed into the
+  // pit-stop Chains list, so the two layers stay legible.
+  if(mFilter) mFilter.style.display = (hasMetros && isLoggedIn()) ? '' : 'none';
   if(!hasMetros) return;
 
   const sel = document.getElementById('travelModeSelect');
@@ -3356,9 +3371,27 @@ function renderLayers(){
     }
   }
 
-  // (The per-city Metros checkbox tree was removed — metro chains are location-based now:
-  // they appear in the map key's "In this area" list when you're zoomed into a covered
-  // city, and are always reachable in the drawer's All chains list.)
+  // City detail (per-metro public/customer checkboxes) — a signed-in refinement, gated like chains.
+  const body = document.getElementById('metroFilterBody');
+  if(!body) return;
+  if(!isLoggedIn()){ body.innerHTML = ''; return; }
+  const byCity = {};
+  metros.forEach(k => {
+    const c = CHAIN_REGISTRY[k];
+    const city = c.metro || 'Other';
+    (byCity[city] = byCity[city] || []).push(k);
+  });
+  // Only the selected city's options are listed — the pills above are the city switcher, so
+  // no per-city group labels are needed here.
+  const showKeys = byCity[selectedMetro] || [];
+  body.innerHTML = `<div class="metro-city">` + showKeys.map(key => {
+    const c = CHAIN_REGISTRY[key];
+    const checked = activeChains.has(key) ? 'checked' : '';
+    return `<label class="chain-filter-row">
+      <input type="checkbox" class="chain-filter-checkbox" data-chain="${key}" ${checked}>
+      <span class="dot" style="background:${c.color}"></span>${escapeHtml(c.name)}
+    </label>`;
+  }).join('') + `</div>`;
 }
 
 // Mode dropdown — everyone. Picks road ⟷ foot, which shows/hides the city layer.
@@ -3390,6 +3423,23 @@ document.getElementById('travelModeCoverage')?.addEventListener('click', (e) => 
   document.getElementById('drawerClose')?.click();
 });
 
+// Collapsible Metros panel — same remembered-collapse pattern as the Chains filter, so the
+// city checkbox tree isn't permanently stuck open in the drawer.
+(function(){
+  const toggle = document.getElementById('metroFilterToggle');
+  const body = document.getElementById('metroFilterBody');
+  const arrow = document.getElementById('metroFilterArrow');
+  if(!toggle || !body || !arrow) return;
+  function setCollapsed(collapsed){
+    body.classList.toggle('collapsed', collapsed);
+    toggle.classList.toggle('collapsed-toggle', collapsed);
+    arrow.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+    localStorage.setItem('metroFilterCollapsed', collapsed ? '1' : '0');
+  }
+  const saved = localStorage.getItem('metroFilterCollapsed');
+  setCollapsed(saved === null ? true : saved === '1'); // collapsed by default — expand on demand
+  toggle.addEventListener('click', () => setCollapsed(!body.classList.contains('collapsed')));
+})();
 
 // ============================================================
 // Chain key — the map key IS the chain filter
@@ -3441,27 +3491,6 @@ function chainKeyRowHtml(key){
   return `<button type="button" class="ck-row${off ? ' ck-off' : ''}" data-chain="${key}" role="switch" aria-checked="${!off}"><span class="ck-dot" style="background:${c.color}"></span><span class="ck-name">${escapeHtml(c.name)}</span><span class="ck-mark" aria-hidden="true">✓</span></button>`;
 }
 
-// Which of the four All-chains groups a chain belongs to. Registry-driven where the
-// registry already knows (group:'metro' = city layer); the travel/public sets are the
-// only hand-kept lists, and they're tiny.
-const TRAVEL_CENTER_KEYS = new Set(['pilotFlyingJ', 'loves', 'bucees', 'travelCentersOfAmerica']);
-function chainBucket(key){
-  if(groupOf(key) === 'metro') return 'city';
-  if(key === 'restarea') return 'public';
-  if(TRAVEL_CENTER_KEYS.has(key)) return 'travel';
-  return 'gas';
-}
-const CK_GROUPS = [
-  { id: 'gas',    label: '⛽ Gas & convenience' },
-  { id: 'travel', label: '🚛 Travel centers' },
-  { id: 'public', label: '🚻 Public rest areas' },
-  { id: 'city',   label: '🏙️ City & metro' }
-];
-function ckGroupCollapsed(id){
-  const v = localStorage.getItem('ckGroup_' + id);
-  return v === null ? true : v === '1';   // groups start collapsed — the drawer stays calm
-}
-
 // Rebuilds are cheap but not free — skip the DOM write when nothing changed (same chains,
 // same on/off states). The signature covers both lists plus the count in the pill.
 let _chainKeySig = '';
@@ -3469,6 +3498,7 @@ function renderChainKey(){
   const areaList = document.getElementById('chainKeyAreaList');
   const allList = document.getElementById('chainKeyAllList');
   const countEl = document.getElementById('chainKeyCount');
+  const allCountEl = document.getElementById('chainKeyAllCount');
   if(!areaList || !allList) return;
 
   const inView = chainsInViewport();
@@ -3486,35 +3516,9 @@ function renderChainKey(){
   areaList.innerHTML = areaKeys.length
     ? areaKeys.map(chainKeyRowHtml).join('')
     : '<div class="ck-empty">No mapped chains in this area yet — try zooming out, or tap 📍 We Missed One?</div>';
-
-  // The full list is grouped: four collapsible sections, each the same rows as the key.
-  // Collapse state is re-applied from localStorage on every rebuild so a map move never
-  // slams a group shut (or open) under the user's finger.
-  allList.innerHTML = CK_GROUPS.map(g => {
-    const keys = allKeys.filter(k => chainBucket(k) === g.id);
-    if(!keys.length) return '';
-    const collapsed = ckGroupCollapsed(g.id);
-    return `<button type="button" class="ck-group${collapsed ? ' collapsed' : ''}" data-group="${g.id}" aria-expanded="${!collapsed}">` +
-      `<span>${g.label}</span><span class="ck-group-arrow">${collapsed ? '▸' : '▾'}</span></button>` +
-      `<div class="ck-group-body${collapsed ? ' collapsed' : ''}" data-group-body="${g.id}">` +
-      keys.map(chainKeyRowHtml).join('') + `</div>`;
-  }).join('');
+  allList.innerHTML = allKeys.map(chainKeyRowHtml).join('');
   if(countEl) countEl.textContent = areaKeys.length ? String(areaKeys.length) : '';
-}
-
-// Group header taps: collapse/expand, remember, and flip the arrow — no re-render needed.
-function onChainKeyGroupTap(e){
-  const head = e.target.closest('.ck-group');
-  if(!head) return true;
-  const id = head.dataset.group;
-  const body = document.querySelector('.ck-group-body[data-group-body="' + id + '"]');
-  const collapsed = head.classList.toggle('collapsed');
-  if(body) body.classList.toggle('collapsed', collapsed);
-  head.setAttribute('aria-expanded', String(!collapsed));
-  const arrow = head.querySelector('.ck-group-arrow');
-  if(arrow) arrow.textContent = collapsed ? '▸' : '▾';
-  localStorage.setItem('ckGroup_' + id, collapsed ? '1' : '0');
-  return false;
+  if(allCountEl) allCountEl.textContent = '(' + allKeys.length + ')';
 }
 
 function onChainKeyRowTap(e){
@@ -3539,6 +3543,8 @@ function onChainKeyRowTap(e){
 (function(){
   const pill = document.getElementById('chainKeyPill');
   const panel = document.getElementById('chainKeyPanel');
+  const allToggle = document.getElementById('chainKeyAllToggle');
+  const allList = document.getElementById('chainKeyAllList');
   if(!pill || !panel) return;
 
   pill.addEventListener('click', () => {
@@ -3549,49 +3555,21 @@ function onChainKeyRowTap(e){
     if(open) renderChainKey(); // fresh list the moment it opens
   });
 
+  if(allToggle && allList){
+    allToggle.addEventListener('click', () => {
+      const open = allList.classList.toggle('open');
+      allToggle.setAttribute('aria-expanded', String(open));
+      const arrow = document.getElementById('chainKeyAllArrow');
+      if(arrow) arrow.textContent = open ? '▾' : '▸';
+    });
+  }
+
   document.getElementById('chainKeyAreaList')?.addEventListener('click', onChainKeyRowTap);
-  // The full list lives in the hamburger drawer ("All chains") but shares the exact same
-  // rows, state, and tap handler — it's the safety net for finding a chain that's turned
-  // off or outside the current view. Group headers collapse; rows toggle.
-  document.getElementById('chainKeyAllList')?.addEventListener('click', (e) => {
-    if(onChainKeyGroupTap(e) !== false) onChainKeyRowTap(e);
-  });
+  allList?.addEventListener('click', onChainKeyRowTap);
 
   // The in-area list follows the map. moveend fires once per settled pan/zoom (zooms end
   // with a moveend too), never continuously during a drag — the performance contract.
   map.on('moveend', renderChainKey);
-})();
-
-// Drawer "Preferences" section — same remembered-collapse pattern as the other drawer sections.
-(function(){
-  const toggle = document.getElementById('prefsToggle');
-  const body = document.getElementById('prefsBody');
-  const arrow = document.getElementById('prefsArrow');
-  if(!toggle || !body || !arrow) return;
-  function setCollapsed(collapsed){
-    body.classList.toggle('collapsed', collapsed);
-    arrow.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
-    localStorage.setItem('prefsCollapsed', collapsed ? '1' : '0');
-  }
-  const saved = localStorage.getItem('prefsCollapsed');
-  setCollapsed(saved === null ? true : saved === '1'); // collapsed by default — the drawer stays calm
-  toggle.addEventListener('click', () => setCollapsed(!body.classList.contains('collapsed')));
-})();
-
-// Drawer "All chains" section — same remembered-collapse pattern as the other drawer sections.
-(function(){
-  const toggle = document.getElementById('allChainsToggle');
-  const body = document.getElementById('chainKeyAllList');
-  const arrow = document.getElementById('allChainsArrow');
-  if(!toggle || !body || !arrow) return;
-  function setCollapsed(collapsed){
-    body.classList.toggle('collapsed', collapsed);
-    arrow.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
-    localStorage.setItem('allChainsCollapsed', collapsed ? '1' : '0');
-  }
-  const saved = localStorage.getItem('allChainsCollapsed');
-  setCollapsed(saved === null ? true : saved === '1'); // collapsed by default — it's the safety net
-  toggle.addEventListener('click', () => setCollapsed(!body.classList.contains('collapsed')));
 })();
 
 renderChainKey();
@@ -3612,17 +3590,18 @@ document.getElementById('navAppSelect')?.addEventListener('change', (e) => {
 });
 renderNavPref();
 
-// Closed-locations filter — a drawer switch (Preferences). On by default → the map hides
-// confirmed-closed spots (open + unknown-hours stay visible). Switching it off shows
-// everything, including confirmed-closed. Drives the same `showAllLocations` state and
-// uses the same d-toggle switch pattern as the accessibility filter below it.
+// Closed-locations filter — a left pill on the map. On by default → the map hides
+// confirmed-closed spots (open + unknown-hours stay visible). Tapping it off shows
+// everything, including confirmed-closed. Drives the same `showAllLocations` state.
+// The label itself changes with the state so on/off is unambiguous.
 (function(){
   const t = document.getElementById('openNowToggle');
   if(!t) return;
   const sync = () => {
     const filtering = !showAllLocations;          // filtering = confirmed-closed hidden
-    t.classList.toggle('on', filtering);
+    t.classList.toggle('active', filtering);
     t.setAttribute('aria-pressed', String(filtering));
+    t.textContent = filtering ? '🚫 Hiding closed' : '👁 Showing all';
   };
   sync();
   t.addEventListener('click', () => {
@@ -3772,13 +3751,6 @@ document.getElementById('authSignUpBtn').addEventListener('click', async () => {
     note.textContent = 'Account created! You\'re logged in.';
     updateAccountUI();
     loadAllRatings();
-    // Success needs no further reading — close the panel so the map is immediately usable.
-    // Guard: if the user opened Passport in the meantime, leave their panel alone.
-    setTimeout(() => {
-      if(accountPanelMode === 'passport') return;
-      document.getElementById('accountPanel')?.classList.remove('show');
-      note.textContent = '';
-    }, 900);
   } else {
     note.style.color = '#e57373';
     note.textContent = result.reason;
@@ -3801,13 +3773,6 @@ document.getElementById('authLogInBtn').addEventListener('click', async () => {
     _leaderboardLoaded = false;   // re-fetch so the board reflects the logged-in user
     updateAccountUI();
     loadAllRatings();
-    // Success needs no further reading — close the panel so the map is immediately usable.
-    // Guard: if the user opened Passport in the meantime, leave their panel alone.
-    setTimeout(() => {
-      if(accountPanelMode === 'passport') return;
-      document.getElementById('accountPanel')?.classList.remove('show');
-      note.textContent = '';
-    }, 900);
   } else {
     note.style.color = '#e57373';
     note.textContent = result.reason;
