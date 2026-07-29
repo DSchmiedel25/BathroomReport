@@ -211,7 +211,7 @@ function positionSelectedMarker(marker, animate = false){
 function zoomToMarker(marker){
   if(!marker) return;
 
-  // The marker's chain may currently be hidden by the Chains filter (e.g. Bathroom Now
+  // The marker's chain may currently be hidden by the Places filter (e.g. Bathroom Now
   // or a search result pointing at a location outside the selected chains). Force it
   // visible for this one lookup rather than silently failing to open — the normal filter
   // reasserts itself next time applyFilters() runs (e.g. any checkbox change).
@@ -3401,7 +3401,7 @@ function renderLayers(){
 
   // (The per-city Metros tree was removed — metro chains are location-based now: they appear
   // in the key's "In this area" list when you're zoomed into a covered city, and are always
-  // reachable in the drawer's All chains list.)
+  // reachable in the drawer's All places list.)
 }
 
 // Mode dropdown — everyone. Picks road ⟷ foot, which shows/hides the city layer.
@@ -3569,7 +3569,7 @@ function chainKeyEmptyHtml(inView){
   const present = inView ? [...inView].filter(k => chainHasData(k)) : [];
   if(!present.length){
     // Genuinely nothing mapped nearby — here zooming out is the right advice.
-    return msg('No mapped chains in this area yet — try zooming out, or tap 📍 We Missed One?');
+    return msg('No mapped places in this area yet — try zooming out, or tap 📍 We Missed One?');
   }
 
   const z = map.getZoom();
