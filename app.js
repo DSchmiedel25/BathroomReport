@@ -3196,9 +3196,8 @@ function applyFilters(){
       const isRestLoc = (m.chainKey || DEFAULT_CHAIN_KEY) === 'restarea';
       const zoomOk = (!isMetroLoc || map.getZoom() >= METRO_MIN_ZOOM)
                   && (!isRestLoc || map.getZoom() >= REST_MIN_ZOOM);
-      const modeOk = travelMode === 'foot' ? isMetroLoc : true;
       const popupOpen = m.isPopupOpen && m.isPopupOpen();
-      if((openOk && accessOk && chainOk && zoomOk && modeOk) || popupOpen){
+      if((openOk && accessOk && chainOk && zoomOk) || popupOpen){
         if(!markerCluster.hasLayer(m)) markerCluster.addLayer(m);
       } else if(markerCluster.hasLayer(m)){
         markerCluster.removeLayer(m);
@@ -3287,15 +3286,9 @@ function maybeAutoSetTravelMode(lat, lng){
     setSelectedMetro(city, false);
     renderLayers();
   }
-  if(autoModeApplied) return;
-  if(localStorage.getItem('travelModeChosen') === '1') return; // user already chose — respect it
-  autoModeApplied = true;
-  if(travelMode !== 'foot'){
-    travelMode = 'foot';
-    saveTravelMode();
-    renderLayers();
-    applyFilters();
-  }
+  // Auto-switching travel mode was removed: now that mode only affects driving vs walking
+  // directions, silently flipping it based on someone's surroundings would change their
+  // navigation without asking. The setting is explicit.
 }
 
 // Account sync for travel mode (3c). Signed-in users get their choice persisted to their own
@@ -3334,10 +3327,12 @@ const METRO_MIN_ZOOM = 12;
 // at regional/route level (not on the whole-country view, where ~1,400 pins would be clutter).
 const REST_MIN_ZOOM = 8;
 
-// Shared with List: does the travel mode allow this location right now?
-// "On the road" allows everything; "On foot" allows only metro/city locations.
+// Travel mode is a DIRECTIONS preference only — it picks driving vs walking in the handoff
+// to the maps app (see buildNavUrl). It deliberately does NOT filter which locations show:
+// hiding every gas station because someone is on foot removed options they might still want,
+// and the chain/group toggles are the right tool for choosing what appears.
 function modeAllows(loc){
-  return travelMode === 'foot' ? groupOf(loc.chain || DEFAULT_CHAIN_KEY) === 'metro' : true;
+  return true;
 }
 
 function getActiveChains(){
@@ -3481,15 +3476,43 @@ function chainsInViewport(){
 // Two renderings of the same row. Signed in: a real switch you can tap. Signed out: a plain
 // legend entry — not a button, no checkmark, nothing that invites a tap it can't honour.
 // (Deliberately no toast/popup on tap; a single quiet line at the panel foot does the telling.)
-function chainKeyRowHtml(key, readOnly){
-  const c = CHAIN_REGISTRY[key];
-  const off = disabledChains.has(key);
+/* One row per DISPLAY NAME, not per registry key.
+ *
+ * Several chains exist once per metro — nycDunkin + bosDunkin, nycStarbucks + bosStarbucks,
+ * nycPublic + bosPublic — and each pair shares a display name, so the list showed
+ * "Public restroom" twice with no way to tell them apart. A user doesn't care that the data
+ * is split by city; they want one switch.
+ *
+ * Grouping by name rather than de-duplicating by hand means a chain added to a third city
+ * can never reintroduce the problem: the renderer resolves it instead of relying on someone
+ * remembering to keep names unique. */
+function groupKeysByName(keys){
+  const byName = new Map();
+  for(const k of keys){
+    const nm = (CHAIN_REGISTRY[k] || {}).name || k;
+    if(!byName.has(nm)) byName.set(nm, []);
+    byName.get(nm).push(k);
+  }
+  if(window.__brDebug){
+    for(const [nm, ks] of byName) if(ks.length > 1)
+      console.warn('[chain key] display name "' + nm + '" shared by: ' + ks.join(', ') + ' — merged into one row');
+  }
+  return byName;
+}
+
+// A merged row is "on" unless every chain behind it is off, so a half-on state reads as on
+// rather than silently hiding pins the user thinks are showing.
+function chainKeyRowHtml(keys, readOnly){
+  const list = Array.isArray(keys) ? keys : [keys];
+  const c = CHAIN_REGISTRY[list[0]];
+  if(!c) return '';
+  const off = list.every(k => disabledChains.has(k));
   const dot = `<span class="ck-dot" style="background:${c.color}"></span>`;
   const name = `<span class="ck-name">${escapeHtml(c.name)}</span>`;
   if(readOnly){
     return `<div class="ck-row ck-legend">${dot}${name}</div>`;
   }
-  return `<button type="button" class="ck-row${off ? ' ck-off' : ''}" data-chain="${key}" role="switch" aria-checked="${!off}">${dot}${name}<span class="ck-mark" aria-hidden="true">✓</span></button>`;
+  return `<button type="button" class="ck-row${off ? ' ck-off' : ''}" data-chain="${list.join(',')}" role="switch" aria-checked="${!off}">${dot}${name}<span class="ck-mark" aria-hidden="true">✓</span></button>`;
 }
 
 // Which of the four All-chains groups a chain belongs to. Registry-driven where the registry
@@ -3507,10 +3530,6 @@ const CK_GROUPS = [
   { id: 'public', label: '🚻 Public restrooms' },
   { id: 'city',   label: '🏙️ City & metro' }
 ];
-function ckGroupCollapsed(id){
-  const v = localStorage.getItem('ckGroup_' + id);
-  return v === null ? true : v === '1';   // groups start collapsed — the drawer stays calm
-}
 
 // Rebuilds are cheap but not free — skip the DOM write when nothing changed (same chains,
 // same on/off states). The signature covers both lists plus the count in the pill.
@@ -3540,19 +3559,24 @@ function renderChainKey(){
   _chainKeySig = sig;
 
   areaList.innerHTML = areaKeys.length
-    ? areaKeys.map(k => chainKeyRowHtml(k, readOnly)).join('')
+    ? [...groupKeysByName(areaKeys).values()].map(ks => chainKeyRowHtml(ks, readOnly)).join('')
     : chainKeyEmptyHtml(inView);
 
-  // The full list is grouped into four collapsible sections. Collapse state is re-applied from
-  // localStorage on every rebuild, so a map pan never slams a group shut under the user's finger.
+  // The drawer holds four GROUP toggles, not individual places. Coarse control lives here;
+  // the map key does per-place. Turning a group ON clears every disabled chain inside it,
+  // which makes the drawer the recovery path when a place you switched off is no longer in
+  // your viewport (switch off Sheetz in PA, drive to NY, and it's not in the key to find).
   allList.innerHTML = CK_GROUPS.map(g => {
     const keys = allKeys.filter(k => chainBucket(k) === g.id);
     if(!keys.length) return '';
-    const collapsed = ckGroupCollapsed(g.id);
-    return `<button type="button" class="ck-group${collapsed ? ' collapsed' : ''}" data-group="${g.id}" aria-expanded="${!collapsed}">` +
-      `<span>${g.label}</span><span class="ck-group-arrow">${collapsed ? '▸' : '▾'}</span></button>` +
-      `<div class="ck-group-body${collapsed ? ' collapsed' : ''}" data-group-body="${g.id}">` +
-      keys.map(k => chainKeyRowHtml(k, readOnly)).join('') + `</div>`;
+    const off = keys.every(k => disabledChains.has(k));
+    const n = keys.length;
+    if(readOnly){
+      return `<div class="ck-row ck-legend ck-grouprow"><span class="ck-name">${g.label}</span></div>`;
+    }
+    return `<button type="button" class="ck-row ck-grouprow${off ? ' ck-off' : ''}" data-groupkeys="${keys.join(',')}"` +
+      ` role="switch" aria-checked="${!off}"><span class="ck-name">${g.label}</span>` +
+      `<span class="ck-groupcount">${n}</span><span class="ck-mark" aria-hidden="true">✓</span></button>`;
   }).join('');
 
   if(countEl) countEl.textContent = areaKeys.length ? String(areaKeys.length) : '';
@@ -3596,18 +3620,31 @@ function updateChainKeyScrollHint(){
   wrap.classList.toggle('has-more', list.scrollHeight > list.clientHeight + 2);
 }
 
-// Group header taps: collapse/expand, remember, flip the arrow. Returns false when handled.
+/* Drawer group toggle. Returns false when it handled the tap.
+ *
+ * Turning a group ON clears every disabled chain inside it rather than merely un-disabling
+ * the group, which makes it a reset for that category. That is deliberate: it's the only way
+ * back for a place you switched off somewhere you're no longer standing, since the map key
+ * only lists what's currently around you. The cost is that turning a group on discards
+ * per-place choices within it, which is what "turn this whole category on" should mean. */
 function onChainKeyGroupTap(e){
-  const head = e.target.closest('.ck-group');
-  if(!head) return true;
-  const id = head.dataset.group;
-  const body = document.querySelector('.ck-group-body[data-group-body="' + id + '"]');
-  const collapsed = head.classList.toggle('collapsed');
-  if(body) body.classList.toggle('collapsed', collapsed);
-  head.setAttribute('aria-expanded', String(!collapsed));
-  const arrow = head.querySelector('.ck-group-arrow');
-  if(arrow) arrow.textContent = collapsed ? '▸' : '▾';
-  localStorage.setItem('ckGroup_' + id, collapsed ? '1' : '0');
+  if(!isLoggedIn()) return true;               // signed out these are a legend, not controls
+  const row = e.target.closest('.ck-grouprow');
+  if(!row) return true;
+  const keys = String(row.dataset.groupkeys || '').split(',').filter(k => CHAIN_REGISTRY[k]);
+  if(!keys.length) return false;
+  const before = new Set(disabledChains);
+  const turningOff = !keys.every(k => disabledChains.has(k));
+  keys.forEach(k => turningOff ? disabledChains.add(k) : disabledChains.delete(k));
+  activeChains = getActiveChains();
+  if(activeChains.size === 0){                 // never blank the whole map
+    disabledChains = before;
+    activeChains = getActiveChains();
+  }
+  saveDisabledChains();
+  renderChainKey();
+  applyFilters();
+  if(navigator.vibrate) navigator.vibrate(5);
   return false;
 }
 
@@ -3615,14 +3652,18 @@ function onChainKeyRowTap(e){
   if(!isLoggedIn()) return;              // signed out the rows are a legend, not controls
   const row = e.target.closest('.ck-row');
   if(!row) return;
-  const key = row.dataset.chain;
-  if(!CHAIN_REGISTRY[key]) return;
-  if(disabledChains.has(key)) disabledChains.delete(key);
-  else disabledChains.add(key);
+  // A row can stand for several registry keys (same display name in different metros).
+  const keys = String(row.dataset.chain || '').split(',').filter(k => CHAIN_REGISTRY[k]);
+  if(!keys.length) return;
+  const before = new Set(disabledChains);
+  // Turning the row off means all of them off; on means all on — never leave a mixed state,
+  // which would show as "on" while some pins stayed hidden.
+  const turningOff = !keys.every(k => disabledChains.has(k));
+  keys.forEach(k => turningOff ? disabledChains.add(k) : disabledChains.delete(k));
   activeChains = getActiveChains();
   // Never allow the whole map to blank out — if nothing is left active, revert this toggle.
   if(activeChains.size === 0){
-    disabledChains.delete(key);
+    disabledChains = before;
     activeChains = getActiveChains();
   }
   saveDisabledChains();
