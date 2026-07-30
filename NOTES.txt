@@ -1,49 +1,96 @@
-BAKE CONSISTENCY + REST AREAS — v2.6.2
-======================================
+FOUR FILES — two never deployed, two cleanups
+=============================================
 
-Upload all 6 files to the repo root. BUMP sw.js.
+Upload all four to the repo root. No sw.js bump.
 
-  app.js  index.html  shell.css  manifest.webmanifest
-  bake-confirmed.js
-  restarea-locations.js
+  circle-k-locations.js     restroom + hours that never went live
+  holiday-locations.js      data that was inside a file you already sent
+  pilot-locations.js        45 Canadian records removed
+  restarea-locations.js     1 Bahamas record removed
 
-TWO BUGS FOUND BY CHECKING THE BAKE
 
-1. bake-confirmed.js used MIN_YES = 2 while app.js uses CONFIRM_THRESHOLD = 3.
+                    before -> after
+  map total          28,123    28,111
+  with hours         18,866    19,810   (67% -> 70%)
+  restroom confirmed      0     5,582
+  restroom unconf         0     1,032
 
-   The file's own comment claimed it applied "the SAME rule the app uses live". The app was
-   raised to 3 in v2.6 and this was never updated, so every nightly bake has been promoting
-   features to loc.conf at 2 votes while the live app required 3 — a pin could show a
-   confirmed badge from baked data that the live rule disagreed with. Now 3, with a note on
-   both sides.
+The count drops by 12 because 46 non-US records come off while Holiday adds 34.
 
-2. isConfirmedNoRestroom (shipped in v2.6.0 tonight) only read live votes.
 
-   It checked amenityCache, which is populated per-location when a popup opens. So the
-   "community said there is no restroom here" hide did nothing on page load — it only took
-   effect for pins you had already tapped, which is the one moment the hide is pointless.
+1. CIRCLE K — the pass-2 file was never uploaded
 
-   isConfirmedNotAccessible already got this right by reading loc.confNo, the value written by
-   bake-confirmed.js. Mine now does the same, in this order:
+                 live -> now
+  with hours     5,010   5,766   (+756, 17 per-day)
+  restroom +         0   5,338
+  restroom ?         0     353
 
-     live confirmed YES   -> visible   (overturns a stale baked no without waiting for a bake)
-     live confirmed NO    -> hidden
-     baked loc.confNo     -> hidden    (works on page load, for every pin)
+Rebuilt from the file in the repo you sent for the audit — which IS the deployed state — so it
+can't revert anything. Both matching passes in one run: within 120 m (rejecting cases where a
+second station sits within 40 m, i.e. twin records), then 120 m–1 km requiring the house number
+AND a shared street word to agree. 49 records failed the address test and got nothing, correctly.
 
-   Tested against five vote states; all five correct.
 
-STILL WORTH DOING, NOT DONE HERE
+2. HOLIDAY — 362 stations were sitting in the Circle K API fetch
 
-FIELD_MAP in bake-overrides.js allows hrs, hours, addr, city, state, zipCode, phone, lat, lng
-and locName. It does not include `seasonal`, so an admin cannot clear a wrongly-flagged
-seasonal record from FlushPanel. Left alone because adding a field to the bake allowlist
-touches the unattended nightly job, and that deserves its own change rather than riding along
-with this one.
+                 live -> now
+  records          336     370   (+34)
+  with hours        32     265   (+233, 54 per-day)
+  restroom +         0     244
 
-REST AREAS
+Circle K acquired Holiday, and the store-locator API is queried with
+brand=CIRCLEK,COUCHE_TARD,HOLIDAY. The fetch already run for Circle K contained every Holiday
+station with hours, per-day schedules, phone, address and the restroom flag. None was applied,
+because I filtered that file for the brand I was looking at instead of asking what was in it.
 
-restarea-locations.js  1,518 -> 2,336 (+818). See the earlier notes for the evidence tiers;
-672 of the additions carry osm.restroomUnconfirmed and are deprioritised by Bathroom Now.
+New records: AK 23, MN 8, ND 1, WI 1, MI 1. Alaska was nearly blank.
 
-That interacts directly with bug 2 above: those 672 are exactly the records the community will
-vote "no restroom" on, and until this fix the resulting hide would not have applied on load.
+144 API stations had no Holiday match within 1 km. Checked against EVERY chain rather than just
+Holiday, 110 were already mapped — 107 as Circle K, 2 Casey's, 1 Pilot: same stores under the
+acquiring brand. Only 34 were genuinely absent. Matching Holiday alone would have added 110
+duplicate pins.
+
+
+3. PILOT — 45 Canadian records removed
+
+826 -> 781. The ATP pilot spider covers Canada and the extraction never filtered by country.
+Every removal verified individually as Canadian by province code, postal code, or latitude:
+AB 14, BC 6, SK 5, MB 5, ON 4, plus 11 identified by postal code alone (Pass Lake, London,
+Ayr, Tilbury, Lancaster, Fort Erie, Napanee, Brantford, Sault Ste Marie, Mississauga, Etobicoke).
+
+These were the most isolated "US" pins on the map and were distorting every coverage measurement.
+
+
+4. REST AREAS — 1 Bahamas record removed
+
+2,336 -> 2,335. restarea-2171 at 25.0788, -77.3397 is Nassau, Bahamas. It came in with the 818
+rest areas I added; my border polyline interpolates to Florida Keys latitude at that longitude,
+so it passed the check. It was the single most isolated pin in the dataset at 183 miles from
+anything, which is how it surfaced.
+
+
+WHAT THIS ANSWERS: the sparsest part of the map
+
+With non-US records gone, the most isolated bathroom in the lower 48 is the Circle K at
+505 E Grand Crossing, Mobridge, South Dakota — 131 km / 82 miles from the next nearest, in
+Pierre. That's a 90-minute drive between options, on US-12.
+
+  82 mi  Mobridge, SD          -> Pierre, SD
+  75 mi  Mosby, MT (MT-200)    -> Lewistown, MT
+  52 mi  Plentywood, MT        -> Williston, ND
+  45 mi  Huron, SD             -> Mitchell, SD
+  44 mi  Chadron, NE           -> Hot Springs, SD
+  39 mi  Douglas, WY           -> Cheyenne River rest area
+  37 mi  Albion, NE
+
+Closing those needs chains with no ATP file on hand: Cenex (large in the Dakotas), Kwik Shop
+(Kansas), Loaf 'N Jug, Coborn's, Bosselman / Pump & Pantry (Nebraska), Common Cents.
+
+
+VERIFIED
+  zero duplicate ids across all 28,111 records
+  zero records outside the US, excluding legitimate Alaska and Hawaii
+  zero pre-existing hours overwritten in any of the four files
+  zero fields changed outside hrs / hours / osm
+  every Pilot removal individually confirmed Canadian
+  9 malformed hrs values remain, all pre-existing; 0 malformed per-day
