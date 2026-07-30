@@ -1,0 +1,95 @@
+name: Checks
+
+# Runs tools/audit-ui.js on every push and pull request touching the app.
+#
+# These checks exist because each one corresponds to a bug that actually shipped and stayed
+# invisible — a rules rejection that showed "Save failed" and nothing else, a bake that reported
+# success while applying zero overrides, a quarter of the map silently unratable. Every one was
+# found by reading files, long after the fact. Running them on push is what turns that into
+# feedback in under a minute.
+#
+# Deliberately NOT scheduled: a red run here should always point at a commit.
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+    paths:
+      - "app.js"
+      - "index.html"
+      - "flushpanel.html"
+      - "firestore.rules"
+      - "functions/index.js"
+      - "shell.css"
+      - "styles.css"
+      - "*-locations.js"
+      - "tools/audit-ui.js"
+      - ".github/workflows/checks.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Parse errors are worth catching separately: audit-ui.js loads app.js as text for several
+      # checks, so a syntax error there could pass silently while the app is broken in the browser.
+      - name: Syntax check every JS file we ship
+        run: |
+          fail=0
+          for f in app.js generate-static-pages.js tools/audit-ui.js functions/index.js \
+                   bake-overrides.js bake-hours.js bake-confirmed.js fetch-and-bake-hours.js sw.js; do
+            [ -f "$f" ] || continue
+            node --check "$f" || { echo "::error file=$f::syntax error"; fail=1; }
+          done
+          exit $fail
+
+      # Every *-locations.js must evaluate and define exactly one array global. A file that throws
+      # here is one that would break the map on load — and it is how compact-locations.js silently
+      # killed the nightly bake for weeks.
+      - name: Location data files load
+        run: |
+          node -e "
+            const fs = require('fs');
+            const g = {};
+            let files = 0, bad = [];
+            for (const f of fs.readdirSync('.')) {
+              if (!f.endsWith('-locations.js') || f === 'compact-locations.js') continue;
+              files++;
+              const before = Object.keys(g).length;
+              try { new Function('window', fs.readFileSync(f, 'utf8'))(g); }
+              catch (e) { bad.push(f + ': ' + e.message); continue; }
+              if (Object.keys(g).length !== before + 1) bad.push(f + ': defined ' + (Object.keys(g).length - before) + ' globals, expected 1');
+            }
+            let total = 0;
+            for (const a of Object.values(g)) if (Array.isArray(a)) total += a.length;
+            console.log(files + ' data files, ' + total + ' records');
+            if (bad.length) { bad.forEach(b => console.error('::error::' + b)); process.exit(1); }
+          "
+
+      - name: UI and data audit
+        run: node tools/audit-ui.js
+
+      # The generator asserts on an unresolvable slug collision, so running it is a real check —
+      # two locations that would overwrite each other's page fail the build here instead of one
+      # page quietly disappearing.
+      - name: SEO generator dry run
+        run: |
+          if [ -f generate-static-pages.js ]; then
+            OUT_DIR=$(mktemp -d) node generate-static-pages.js > /tmp/seo.log 2>&1 || {
+              echo "::error::SEO generator failed"; tail -30 /tmp/seo.log; exit 1; }
+            grep -iE "collision|Usable" /tmp/seo.log || true
+          fi

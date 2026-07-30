@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bathroomreport-v202';
+const CACHE_NAME = 'bathroomreport-v203';
 
 // CORE SHELL ONLY — deliberately does NOT precache the chain data files.
 // Precaching all ~5.6 MB of location data forced a full re-download on every cache
@@ -17,6 +17,10 @@ const APP_SHELL = [
   './icon-cashapp.png',
   './firebase.js',
   './app.js',
+  // Vendored map plugins. Same-origin now, so they can be precached — as unpkg URLs they were
+  // cross-origin and the shell could never be genuinely offline-capable.
+  './leaflet-doubletapdrag.js',
+  './leaflet-doubletapdragzoom.js',
   './manifest.webmanifest'
 ];
 

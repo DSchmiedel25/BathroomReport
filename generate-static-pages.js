@@ -275,8 +275,25 @@ const homeUrl = () => `${S()}/`;
 /* ============================================================
  * 5. STRUCTURED DATA
  * ==========================================================*/
+/* schema.org type by what the place actually IS.
+ *
+ * Every page was emitted as ConvenienceStore, including rest areas, municipal restrooms and
+ * cafes — structured data contradicting its own page. Search engines can discount an entire
+ * JSON-LD block on that basis, so a wrong type is worse than a generic one. Keyed off the source
+ * FILENAME slug, which is already pinned and never changes.
+ *
+ * Rest areas are TouristInformationCenter: schema.org has no RestArea, and that is the type
+ * highway authorities' own sites use. Municipal restrooms are CivicStructure. */
+function schemaTypeFor(loc) {
+  const s = loc.chainSlug || "";
+  if (s === "restarea") return "TouristInformationCenter";
+  if (/(^|-)public$/.test(s)) return "CivicStructure";
+  if (/starbucks|dunkin|tatte|nero|flour|pavement|gregorys/.test(s)) return "CafeOrCoffeeShop";
+  return "ConvenienceStore";
+}
+
 function jsonLd(loc, url) {
-  const d = { "@context": "https://schema.org", "@type": "ConvenienceStore",
+  const d = { "@context": "https://schema.org", "@type": schemaTypeFor(loc),
     name: `${loc.chain}${loc.city ? " — " + loc.city : ""}`, url,
     address: { "@type": "PostalAddress", streetAddress: loc.street || undefined,
       addressLocality: loc.city || undefined, addressRegion: loc.state || undefined,
@@ -379,6 +396,9 @@ function shell({ title, desc, canonical, body, jsonLdStr, chain, locId, pageType
 <meta property="og:url" content="${esc(canonical)}">
 <meta property="og:site_name" content="${esc(CONFIG.siteName)}">
 <meta property="og:image" content="${esc(CONFIG.baseUrl)}/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="${esc(CONFIG.siteName)}">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="${esc(S())}/styles.css">
 ${jsonLdStr ? `<script type="application/ld+json">${jsonLdStr}</script>` : ""}

@@ -207,8 +207,22 @@ async function eligible(uid){
         Date.now() - new Date(u.metadata.creationTime).getTime() >= 7*24*3600*1000) return true;
   } catch(e){ /* ignore */ }
   try {
-    const c = await db.collection('votes').where('clientId','==',uid).count().get();
-    if (c.data().count >= 10) return true;
+    /* Count RATINGS, not vote documents.
+     *
+     * count() counted every vote doc for this uid — but a vote document exists as soon as someone
+     * answers an amenity question, with bathroom still 0. So answering amenity prompts at ten
+     * locations granted hours-consensus eligibility without ever rating a bathroom, which is not
+     * what the comment above promises.
+     *
+     * select('bathroom') fetches one field per doc rather than the whole vote, and avoids the
+     * composite index a where('bathroom','>',0) count would need. */
+    const snap = await db.collection('votes').where('clientId','==',uid).select('bathroom').get();
+    let ratings = 0;
+    for (const d of snap.docs) {
+      const b = d.get('bathroom');
+      if (typeof b === 'number' && b > 0) ratings++;
+    }
+    if (ratings >= 10) return true;
   } catch(e){ /* ignore */ }
   return false;
 }
@@ -251,18 +265,34 @@ exports.recomputeHourStatus = onDocumentWritten('hourReports/{storeId}/submissio
   const subs = await tx.get(db.collection('hourReports/' + storeId + '/submissions'));
   const groups = {};
   const adminSubs = [];
+  const valid = [];        // parsed submissions, before per-uid resolution
   for (const doc of subs.docs){
     const s = doc.data();
     const canon = canonicalize(s.value, s.kind);
     if (!canon) continue;
+    valid.push({ uid: s.uid, canon, at: (typeof s.submittedAt === 'number' ? s.submittedAt : 0) });
+  }
+
+  /* Resolve each DISTINCT uid once, in parallel.
+   *
+   * This used to call isAdminUid() and eligible() inside the loop, sequentially, for every
+   * submission — so N submissions meant up to 2N round trips awaited one after another, and the
+   * same person submitting at several stores was re-checked every time. eligible() alone reads
+   * Auth plus a votes query. */
+  const uids = [...new Set(valid.map((v) => v.uid).filter(Boolean))];
+  const [adminFlags, eligibleFlags] = await Promise.all([
+    Promise.all(uids.map((u) => isAdminUid(u).catch(() => false))),
+    Promise.all(uids.map((u) => eligible(u).catch(() => false))),
+  ]);
+  const isAdminBy = new Map(uids.map((u, i) => [u, adminFlags[i]]));
+  const isEligibleBy = new Map(uids.map((u, i) => [u, eligibleFlags[i]]));
+
+  for (const v of valid){
     // Admin reports are authoritative — they bypass the community tally entirely.
-    if (await isAdminUid(s.uid)){
-      adminSubs.push({ canon, at: (typeof s.submittedAt === 'number' ? s.submittedAt : 0) });
-      continue;
-    }
-    if (!(await eligible(s.uid))) continue;
-    const g = groups[canon.key] || (groups[canon.key] = {uids:new Set(), canon});
-    g.uids.add(s.uid);
+    if (isAdminBy.get(v.uid)){ adminSubs.push({ canon: v.canon, at: v.at }); continue; }
+    if (!isEligibleBy.get(v.uid)) continue;
+    const g = groups[v.canon.key] || (groups[v.canon.key] = {uids:new Set(), canon: v.canon});
+    g.uids.add(v.uid);
   }
   let top = null, second = null;
   for (const k in groups){
