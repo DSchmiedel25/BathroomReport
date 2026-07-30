@@ -5,3 +5,7 @@ serviceAccountKey.json
 votes-summary.json
 hours-status.json
 .DS_Store
+
+firestore-debug.log
+firebase-debug.log
+ui-debug.log
