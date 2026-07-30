@@ -10,6 +10,44 @@ const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 initializeApp();
 const db = getFirestore();
 
+/* Firestore treats '/' as a path separator, so aggregates/node/123 is a three-segment path and
+ * db.doc() throws. 6,595 location ids were OSM-derived and contained a slash, so this trigger
+ * failed server-side for a quarter of the map — the same defect the client had. The data files
+ * now carry the safe form, but locId is read out of a vote DOCUMENT here, and vote docs written
+ * before the rename still hold the raw value, so normalise on read. Matches fsId() in app.js
+ * and flushpanel.html. */
+function fsId(id) {
+  return String(id == null ? '' : id).replace(/\//g, '__');
+}
+
+/* Amenity and store-feature answer tallies.
+ *
+ * The client has always read aggregates/{locId}.amen and the comment here claimed this function
+ * maintained it — it did not. It returned early on any amenity-only change, so `amen` was never
+ * written by anything and amenityCache was permanently all-zeros. Every live community
+ * confirmation was inert: the accessibility badge, restroom-setup answers, and the hasRestroom
+ * hide. The only working path was the nightly export-votes -> bake-confirmed bake, and that was
+ * crashing until 2026-07-30. So this feature had never reached a user by either route.
+ *
+ * Keys are not enumerated here on purpose: whatever keys appear in a vote's amenities /
+ * storeFeatures maps get tallied, so adding an amenity in app.js needs no function redeploy.
+ * Values are compared as strings; 'yes' and 'no' are the only ones that move a counter. */
+function amenityDeltas(before, after) {
+  const deltas = {};
+  for (const field of ['amenities', 'storeFeatures']) {
+    const b = (before && before[field]) || {};
+    const a = (after && after[field]) || {};
+    for (const key of new Set([...Object.keys(b), ...Object.keys(a)])) {
+      const bv = String(b[key] == null ? '' : b[key]);
+      const av = String(a[key] == null ? '' : a[key]);
+      if (bv === av) continue;
+      if (bv === 'yes' || bv === 'no') deltas[`amen.${key}.${bv}`] = (deltas[`amen.${key}.${bv}`] || 0) - 1;
+      if (av === 'yes' || av === 'no') deltas[`amen.${key}.${av}`] = (deltas[`amen.${key}.${av}`] || 0) + 1;
+    }
+  }
+  return deltas;
+}
+
 exports.recomputeBathroomAggregate = onDocumentWritten('votes/{voteId}', async (event) => {
   const before = event.data.before.exists ? event.data.before.data() : null;
   const after  = event.data.after.exists  ? event.data.after.data()  : null;
@@ -20,20 +58,37 @@ exports.recomputeBathroomAggregate = onDocumentWritten('votes/{voteId}', async (
 
   const sumDelta   = a - b;
   const countDelta = (a > 0 ? 1 : 0) - (b > 0 ? 1 : 0);
-  // Amenity-only / tip-only edits (and re-saving the same star value) don't change the average.
-  if (sumDelta === 0 && countDelta === 0) return;
+  const amen       = amenityDeltas(before, after);
+
+  // Nothing changed that any counter tracks (e.g. a lastUpdated-only touch).
+  if (sumDelta === 0 && countDelta === 0 && Object.keys(amen).length === 0) return;
 
   const locId = (after && after.locId) || (before && before.locId);
   if (!locId) return;
 
-  await db.doc(`aggregates/${locId}`).set({
-    bathroomSum:   FieldValue.increment(sumDelta),
-    bathroomCount: FieldValue.increment(countDelta),
+  const patch = {
+    // Versioned so a future change to this document's shape has a clean migration point.
+    // NOTE: `amen` counts votes from this function's deploy forward. Amenity answers cast
+    // before it existed were never tallied and are not backfilled here — aggregates are
+    // derived from `votes`, so a one-off recompute can correct them if the numbers ever
+    // look wrong.
+    schemaVersion: 2,
     lastUpdated:   Date.now(),
     // Stamp only when the new state includes a real rating (not on rating removal), so the
     // client's "rated X ago" line reflects the most recent actual rating.
     ...(a > 0 ? { lastRatedAt: Date.now() } : {}),
-  }, {merge: true});
+  };
+  if (sumDelta !== 0)   patch.bathroomSum   = FieldValue.increment(sumDelta);
+  if (countDelta !== 0) patch.bathroomCount = FieldValue.increment(countDelta);
+
+  const ref = db.doc(`aggregates/${fsId(locId)}`);
+  await ref.set(patch, {merge: true});
+  // Nested counters need dot-path updates; set() with merge would replace the nested object.
+  if (Object.keys(amen).length) {
+    const inc = {};
+    for (const [path, n] of Object.entries(amen)) inc[path] = FieldValue.increment(n);
+    await ref.update(inc);
+  }
 });
 
 
@@ -98,7 +153,9 @@ async function isAdminUid(uid){
 
 exports.recomputeHourStatus = onDocumentWritten('hourReports/{storeId}/submissions/{uid}', async (event) => {
   const storeId = event.params.storeId;
-  const statusRef = db.doc('hourStatus/' + storeId);
+  // storeId comes from the hourReports path, which app.js already sanitises — normalise anyway
+  // so a document written by any other path cannot produce an odd-segment path here.
+  const statusRef = db.doc('hourStatus/' + fsId(storeId));
 
   // Admin authority is derived from CURRENT admin submissions on every recompute (below), so there
   // is no sticky override state to guard here — an admin editing or deleting their report re-derives
