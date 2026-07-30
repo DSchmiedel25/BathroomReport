@@ -1304,24 +1304,53 @@ async function saveMyVote(id, data){
 
 // Short community tips ("need a key", "buzzer required", etc.) — shared, max 50 chars each
 const MAX_TIP_LENGTH = 50;
+/* Tips live in tips/{locId}/entries/{entryId}, one document per tip, owned by its author.
+ *
+ * They used to be a single shared `tips` string array per location, which could not be secured:
+ * Firestore rules cannot iterate a list, so append-only was approximated by comparing SIZE, and
+ * any signed-in user could rewrite or reorder every existing tip as long as the array did not
+ * shrink. Per-document ownership makes that impossible.
+ *
+ * Reads cover BOTH shapes so tips written under the old one keep showing without a migration
+ * step. The legacy array is now admin-write-only, so it can only shrink from here; once it is
+ * confirmed empty the legacy read below can go, saving one read per popup. */
 async function loadTips(id){
+  const out = [];
+  const {db, doc, getDoc, collection, getDocs} = await fb();
+  // legacy: the shared array, if this location still has one
   try{
-    const {db, doc, getDoc} = await fb();
     const snap = await getDoc(doc(db, 'tips', fsId(id)));
-    if(!snap.exists()) return [];
-    return (snap.data().tips || []).slice(-8); // show up to the 8 most recent
-  }catch(e){
-    console.error('loadTips failed', id, e && (e.code || e.message));
-    return [];
-  }
+    if(snap.exists()){
+      (snap.data().tips || []).forEach(t => {
+        if(typeof t === 'string' && t) out.push({ text: t, ts: 0 });
+      });
+    }
+  }catch(e){ console.error('loadTips legacy failed', id, e && (e.code || e.message)); }
+  // current: one document per tip
+  try{
+    const snap = await getDocs(collection(db, 'tips', fsId(id), 'entries'));
+    snap.forEach(d => {
+      const r = d.data();
+      if(r && typeof r.text === 'string' && r.text) out.push({ text: r.text, ts: r.ts || 0, id: d.id });
+    });
+  }catch(e){ console.error('loadTips entries failed', id, e && (e.code || e.message)); }
+  // Oldest first so the newest sit at the bottom, as before. Legacy entries carry ts 0 and
+  // therefore stay above anything written since the change, which is the right order for them.
+  out.sort((a, b) => a.ts - b.ts);
+  return out.slice(-8).map(t => t.text);   // show up to the 8 most recent
 }
 async function addTip(id, text){
   try{
-    const {db, doc, setDoc, arrayUnion} = await fb();
-    await setDoc(doc(db, 'tips', fsId(id)), { tips: arrayUnion(text) }, { merge: true });
+    const {db, collection, addDoc} = await fb();
+    const uid = (window.__currentUser && window.__currentUser.uid) || null;
+    if(!uid) return false;                 // the rules require an owner; fail rather than 403
+    await addDoc(collection(db, 'tips', fsId(id), 'entries'), {
+      text, uid, ts: Date.now()
+    });
     logActivity('tip', { locId: id, text });
     return true;
   }catch(e){
+    console.error('addTip failed', id, e && (e.code || e.message));
     return false;
   }
 }

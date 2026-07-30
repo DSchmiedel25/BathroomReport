@@ -474,7 +474,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, arrayRemove, arrayUnion
+  getFirestore, collection, collectionGroup, getDocs, getDoc, doc, addDoc, setDoc, updateDoc, deleteDoc, arrayRemove, arrayUnion
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
@@ -1053,9 +1053,28 @@ async function loadTips(){
   const list = $('#tipsList');
   list.innerHTML = '<div class="loading">Loading tips…</div>';
   try{
-    const snap = await getDocs(collection(db, 'tips'));
+    /* Two shapes. The legacy shared array (tips/{locId}.tips) is now admin-write-only and can
+     * only shrink; new tips are one document each under tips/{locId}/entries. A collectionGroup
+     * query gets every entry across all locations in one read, and the parent location id comes
+     * off the reference. Unordered on purpose — ordering server-side would need a composite
+     * index, and the volume here is small enough to sort in the browser. */
     allTips = {};
-    snap.forEach(d => { const t = (d.data() && d.data().tips) || []; if(t.length) allTips[d.id] = t.slice(); });
+    const legacy = await getDocs(collection(db, 'tips'));
+    legacy.forEach(d => {
+      const t = (d.data() && d.data().tips) || [];
+      if(t.length) allTips[d.id] = t.map(text => ({ text, legacy: true }));
+    });
+    try{
+      const entries = await getDocs(collectionGroup(db, 'entries'));
+      entries.forEach(d => {
+        const parent = d.ref.parent.parent;
+        if(!parent) return;
+        const r = d.data() || {};
+        if(typeof r.text !== 'string' || !r.text) return;
+        (allTips[parent.id] = allTips[parent.id] || []).push({ text: r.text, id: d.id, ts: r.ts || 0 });
+      });
+    }catch(err){ console.error('tip entries load failed', err); }
+    Object.keys(allTips).forEach(k => allTips[k].sort((a,b) => (a.ts||0) - (b.ts||0)));
     renderTips();
   }catch(e){
     console.error('tips load failed', e);
@@ -1071,7 +1090,7 @@ function renderTips(){
     const seed = locById[locId];
     const name = (seed && seed.n) || locId;
     const rows = allTips[locId].map((t,i) =>
-      `<div class="tip-row"><span class="tip-text">${esc(t)}</span>` +
+      `<div class="tip-row"><span class="tip-text">${esc(t.text)}${t.legacy ? ' <em style="opacity:.6">(legacy)</em>' : ''}</span>` +
       `<span class="tip-acts">` +
       `<button class="mini" data-act="edit-tip" data-loc="${esc(locId)}" data-i="${i}">✎ Edit</button>` +
       `<button class="mini danger" data-act="del-tip" data-loc="${esc(locId)}" data-i="${i}">✕ Remove</button>` +
@@ -1084,12 +1103,18 @@ $('#tipsList').addEventListener('click', async (e) => {
   const locId = btn.dataset.loc, i = parseInt(btn.dataset.i, 10);
   const tips = allTips && allTips[locId];
   if(!tips || tips[i] === undefined) return;
-  const oldText = tips[i];
+  const entry = tips[i];
+  const oldText = entry.text;
+  /* Two storage shapes, so two removal paths. A legacy tip lives in the shared array and comes
+   * out with arrayRemove; a current one is its own document and is simply deleted. Entries are
+   * immutable by rule, so an "edit" is a delete plus a fresh entry — which also means the edited
+   * tip is attributed to the admin doing the editing, not the original author. */
   if(btn.dataset.act === 'del-tip'){
     if(!confirm('Remove this tip permanently?\n\n"' + oldText + '"')) return;
     btn.disabled = true;
     try{
-      await updateDoc(doc(db, 'tips', fsId(locId)), { tips: arrayRemove(oldText) });
+      if(entry.legacy) await updateDoc(doc(db, 'tips', fsId(locId)), { tips: arrayRemove(oldText) });
+      else await deleteDoc(doc(db, 'tips', fsId(locId), 'entries', entry.id));
       tips.splice(i, 1); if(!tips.length) delete allTips[locId];
       renderTips(); toast('Tip removed.');
     }catch(err){ console.error(err); toast('Could not remove tip.', true); btn.disabled = false; }
@@ -1100,9 +1125,17 @@ $('#tipsList').addEventListener('click', async (e) => {
     if(!trimmed){ toast('Tip cannot be empty.', true); return; }
     if(trimmed === oldText) return;
     try{
-      await updateDoc(doc(db, 'tips', fsId(locId)), { tips: arrayRemove(oldText) });
-      await updateDoc(doc(db, 'tips', fsId(locId)), { tips: arrayUnion(trimmed) });
-      tips[i] = trimmed; renderTips(); toast('Tip updated.');
+      if(entry.legacy){
+        await updateDoc(doc(db, 'tips', fsId(locId)), { tips: arrayRemove(oldText) });
+        await updateDoc(doc(db, 'tips', fsId(locId)), { tips: arrayUnion(trimmed) });
+        entry.text = trimmed;
+      } else {
+        await deleteDoc(doc(db, 'tips', fsId(locId), 'entries', entry.id));
+        const ref = await addDoc(collection(db, 'tips', fsId(locId), 'entries'),
+          { text: trimmed, uid: (currentUser && currentUser.uid) || '', ts: Date.now() });
+        entry.text = trimmed; entry.id = ref.id;
+      }
+      renderTips(); toast('Tip updated.');
     }catch(err){ console.error(err); toast('Could not update tip.', true); }
   }
 });

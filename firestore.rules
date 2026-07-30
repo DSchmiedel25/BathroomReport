@@ -194,20 +194,37 @@ service cloud.firestore {
     //   - only the `tips` field may be touched,
     //   - it must stay a list, with a sanity cap,
     //   - non-admins may only GROW it (removal is moderation, admin-only).
+    /* LEGACY shape: one shared document per location holding a `tips` string array.
+     *
+     * This could not be secured. The rule tried to enforce append-only by comparing list SIZE,
+     * but Firestore rules cannot iterate a list, so there is no way to verify the old array is a
+     * prefix of the new one. Any signed-in user could replace or reorder every existing tip as
+     * long as the array did not shrink, and element types and lengths were never checked.
+     *
+     * Writes are now admin-only. Reads stay open so tips written under the old shape keep
+     * displaying while they exist; new tips go to the entries subcollection below. Once the
+     * legacy documents are confirmed empty, this block and the legacy read in loadTips can go. */
     match /tips/{id} {
       allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    /* One document per tip, owned by its author. Ownership is checkable per document, which is
+     * exactly what a shared array made impossible. Tips are immutable — an edit is a delete plus
+     * a new entry — so there is no update path to abuse. */
+    match /tips/{locId}/entries/{entryId} {
+      allow read: if true;
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['tips'])
-        && request.resource.data.tips is list
-        && request.resource.data.tips.size() <= 200;
-      allow update: if signedIn()
-        && touchedKeys().hasOnly(['tips'])
-        && request.resource.data.tips is list
-        && request.resource.data.tips.size() <= 200
-        && (isAdmin()
-            || !('tips' in resource.data)
-            || request.resource.data.tips.size() >= resource.data.tips.size());
-      allow delete: if isAdmin();
+        && request.resource.data.keys().hasOnly(['text','uid','ts'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 50
+        && request.resource.data.ts is int
+        && request.resource.data.ts <= request.time.toMillis() + 60000
+        && request.resource.data.ts > 1700000000000;
+      allow update: if false;
+      allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
     }
 
 
