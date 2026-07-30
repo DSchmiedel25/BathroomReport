@@ -28,8 +28,14 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/leaflet-doubletapdrag"></script>
-<script src="https://unpkg.com/leaflet-doubletapdragzoom"></script>
+<!-- Vendored 2026-07-30 from unpkg: leaflet-doubletapdrag@0.1.2 and
+     leaflet-doubletapdragzoom@0.3.2. They were loaded UNVERSIONED from unpkg, which resolves to
+     "latest" — so a breaking release by someone else would have taken the map's one-handed zoom
+     down with no deploy from us, and there would have been nothing in this repo to explain it.
+     Self-hosting also means they are same-origin, so the service worker can finally cache them:
+     the map plugins were the one part of the shell that could never work offline. -->
+<script src="leaflet-doubletapdrag.js" defer></script>
+<script src="leaflet-doubletapdragzoom.js" defer></script>
 <script type="module" src="firebase.js"></script>
 <script defer src="stewarts-locations.js"></script>
 <script defer src="cumberland-farms-locations.js"></script>
@@ -281,7 +287,7 @@ This is tracked on this device only. Log in to sync it across devices.
 </select>
 </div>
 </div>
-<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.12.0">v2.12.0 · 2026-07-30</span></div>
+<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.13.0">v2.13.0 · 2026-07-30</span></div>
 </nav>
 <!-- Community banner (logged-out) -->
 <div id="communityBanner">

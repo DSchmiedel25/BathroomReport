@@ -1,5 +1,16 @@
 {
   "dependencies": {
     "firebase-admin": "^14.2.0"
+  },
+  "name": "bathroomreport",
+  "private": true,
+  "scripts": {
+    "test:rules": "firebase emulators:exec --only firestore --project bathroomreport-rules-test 'jest tests/rules.test.js'",
+    "audit": "node tools/audit-ui.js"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase": "^10.12.2",
+    "jest": "^29.7.0"
   }
 }
