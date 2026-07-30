@@ -70,6 +70,27 @@ service cloud.firestore {
     /* A vote's amenity maps were validated only as `is map` — any number of keys, any values.
      * Bound both so one write can't carry a large arbitrary payload. 24 keys is well clear of the
      * ~11 amenities and store features the app actually sends. */
+    /* An amenity map may only contain KNOWN keys with KNOWN values.
+     *
+     * Bounding the size was not enough. The Cloud Function turns these keys into Firestore field
+     * paths, so a crafted key produced `amen.a.b.c.yes` — a level deeper than the schema — or
+     * `amen..yes`, whose empty segment Firestore rejects outright, throwing and taking the
+     * rating update down with it. The function now allowlists keys independently; this closes
+     * the same hole at the door, so bad data never lands in a vote at all.
+     *
+     * Mirrors BATHROOM_AMENITIES and STORE_FEATURES in app.js. Adding an amenity means adding it
+     * here, in AMENITY_KEYS in functions/index.js, and in app.js. Three places is the cost of
+     * not letting a client name a server field path. */
+    function knownAmenityMap(k) {
+      return !(k in request.resource.data)
+        || (request.resource.data[k] is map
+            && request.resource.data[k].keys().hasOnly([
+                 'restroomType','accessible','changing','hasRestroom',
+                 'evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'
+               ])
+            && request.resource.data[k].values().hasOnly(['yes','no','unknown','single','multiple','']));
+    }
+
     function boundedMapOrAbsent(k, maxKeys) {
       return !(k in request.resource.data)
         || (request.resource.data[k] is map
@@ -136,8 +157,10 @@ service cloud.firestore {
       return strOrAbsent('locId')
         && ratingOrAbsent('store')
         && ratingOrAbsent('bathroom')
-        && boundedMapOrAbsent('amenities', 24)
-        && boundedMapOrAbsent('storeFeatures', 24)
+        && knownAmenityMap('amenities')
+        && knownAmenityMap('storeFeatures')
+        // amenityMeta holds per-key not-sure counters, shaped { key: { notSure: n } }, so its
+        // VALUES are maps rather than the enum above. Keys are still restricted the same way.
         && boundedMapOrAbsent('amenityMeta', 24)
         && numOrAbsent('lastUpdated')
         && numOrAbsent('ratedAt')
