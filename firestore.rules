@@ -81,6 +81,23 @@ service cloud.firestore {
      * Mirrors BATHROOM_AMENITIES and STORE_FEATURES in app.js. Adding an amenity means adding it
      * here, in AMENITY_KEYS in functions/index.js, and in app.js. Three places is the cost of
      * not letting a client name a server field path. */
+    /* An admin amenity override may only hold a KNOWN answer.
+     *
+     * These were bounded strings of up to 24 characters, so any 24-character string was accepted
+     * where only a handful of values mean anything. The app compares them literally — anything
+     * else silently reads as "not set" — and the same value enum is already enforced on community
+     * votes, so an admin override was the looser of the two paths. '' is the clear-this-override
+     * value the panel writes. */
+    function amenityValueOrAbsent(k) {
+      return !(k in request.resource.data)
+        || request.resource.data[k] in ['yes','no','unknown','single','multiple',''];
+    }
+
+    function touchedIsAmenityValue(k) {
+      return !touchedKeys().hasAny([k])
+        || request.resource.data[k] in ['yes','no','unknown','single','multiple',''];
+    }
+
     function knownAmenityMap(k) {
       return !(k in request.resource.data)
         || (request.resource.data[k] is map
@@ -386,32 +403,32 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isAdmin()
         && request.resource.data.keys().hasOnly(['restroomType','accessible','changing','hasRestroom','evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'])
-        && boundedStrOrAbsent('restroomType', 24)
-        && boundedStrOrAbsent('accessible', 24)
-        && boundedStrOrAbsent('changing', 24)
-        && boundedStrOrAbsent('hasRestroom', 24)
-        && boundedStrOrAbsent('evCharging', 24)
-        && boundedStrOrAbsent('airPump', 24)
-        && boundedStrOrAbsent('shower', 24)
-        && boundedStrOrAbsent('indoorSeating', 24)
-        && boundedStrOrAbsent('wifi', 24)
-        && boundedStrOrAbsent('grabAndGo', 24)
-        && boundedStrOrAbsent('hotFood', 24);
+        && amenityValueOrAbsent('restroomType')
+        && amenityValueOrAbsent('accessible')
+        && amenityValueOrAbsent('changing')
+        && amenityValueOrAbsent('hasRestroom')
+        && amenityValueOrAbsent('evCharging')
+        && amenityValueOrAbsent('airPump')
+        && amenityValueOrAbsent('shower')
+        && amenityValueOrAbsent('indoorSeating')
+        && amenityValueOrAbsent('wifi')
+        && amenityValueOrAbsent('grabAndGo')
+        && amenityValueOrAbsent('hotFood');
       // Merge updates: validate only what this write changes, so a legacy field
       // riding along untouched can never block an admin edit.
       allow update: if isAdmin()
         && touchedKeys().hasOnly(['restroomType','accessible','changing','hasRestroom','evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'])
-        && touchedIsBoundedStr('restroomType', 24)
-        && touchedIsBoundedStr('accessible', 24)
-        && touchedIsBoundedStr('changing', 24)
-        && touchedIsBoundedStr('hasRestroom', 24)
-        && touchedIsBoundedStr('evCharging', 24)
-        && touchedIsBoundedStr('airPump', 24)
-        && touchedIsBoundedStr('shower', 24)
-        && touchedIsBoundedStr('indoorSeating', 24)
-        && touchedIsBoundedStr('wifi', 24)
-        && touchedIsBoundedStr('grabAndGo', 24)
-        && touchedIsBoundedStr('hotFood', 24);
+        && touchedIsAmenityValue('restroomType')
+        && touchedIsAmenityValue('accessible')
+        && touchedIsAmenityValue('changing')
+        && touchedIsAmenityValue('hasRestroom')
+        && touchedIsAmenityValue('evCharging')
+        && touchedIsAmenityValue('airPump')
+        && touchedIsAmenityValue('shower')
+        && touchedIsAmenityValue('indoorSeating')
+        && touchedIsAmenityValue('wifi')
+        && touchedIsAmenityValue('grabAndGo')
+        && touchedIsAmenityValue('hotFood');
       allow delete: if isAdmin();
     }
 

@@ -1,75 +1,94 @@
-v2.9.4 — URGENT: FlushPanel override saves are broken, and it is my fault
-==========================================================================
+v2.9.6 — A2-02 and SEC-08
+==========================
+Flat zip, no subfolders.
 
-UPLOAD FIRST
-  flushpanel.html    the fix
-  index.html         version stamp only. BUMP sw.js.
-  tools/audit-ui.js  check 14, so this cannot happen again
+WHERE EACH FILE GOES
+  app.js            repo root      BUMP sw.js
+  index.html        repo root      version stamp only
+  firestore.rules   publish in the Firebase console
 
-  No rules change. No data change. No app.js change.
-  The rules are FINE — the error message blaming them was wrong.
-
-
-WHAT BROKE
-  Your screenshot said "Could not save — check the overrides write rule." The rule was never the
-  problem. Look at the bottom of that screenshot: raw JavaScript comment text was rendering as
-  visible page content —
-
-      "...and THROWS: 6,595 location ids were OSM-derived and contained..."
-
-  That is my comment. If it is visible on the page, the code around it is not in a script block.
-
-  In Phase 1 I inserted the fsId() helper into flushpanel.html by searching for the first
-  occurrence of a comment banner. That anchor matched a position AFTER the final closing script
-  tag. So:
-     - the browser rendered the comment as page text
-     - fsId was undefined inside the module where all 10 call sites live
-     - every doc(db,'overrides', fsId(locId)) threw ReferenceError
-     - the catch swallowed it and blamed the Firestore rule
-
-  Reports still listed, because that path does not use fsId. Only overrides and tips did — which
-  is exactly the symptom you hit.
-
-  This has been live since Phase 1 shipped. Every override you saved since then failed.
-
-FIXED
-  fsId now lives inside the module block (bytes 26895-64904), before all 10 uses. Verified by
-  locating the enclosing block, not by eyeballing indentation.
+STILL NOT DEPLOYED FROM THE LAST BATCH
+  functions/index.js — needs `firebase deploy --only functions` from the Mac. The transaction,
+  the admin fix, amenity tallies, the hours regex and lastRatedBy are all still dormant.
 
 
-AND A SECOND BUG I CREATED WHILE FIXING THE FIRST
-  My replacement comment explained the mistake by writing the closing script sequence literally.
-  The HTML parser ends a script block at that sequence REGARDLESS of JavaScript context — inside
-  a comment, inside a string, anywhere. That would have truncated the module and broken the panel
-  far worse than the bug I was fixing.
+1. A2-02 — one account could suppress everyone's outage reports
+---------------------------------------------------------------
+`reports.filter(t => t > clearedAfter)` meant ANY single clear cancelled EVERY report at a
+location. Three people report a broken bathroom, one account taps "it's working now", all three
+vanish — and nothing stopped that account doing it again the moment they were re-filed.
 
-  Caught because I re-derived the block boundaries after editing instead of trusting the edit.
-  The comment now says "closing script tag" in words, and warns the next person.
+The rules cannot fix this. They cannot tell whether someone is present, whether the restroom is
+genuinely restored, or whose report is whose. So the authority model is now in the client and it
+is deliberately asymmetric:
+
+  YOUR OWN report        one clear from you cancels it. You are withdrawing your own statement,
+                         which needs nobody else's agreement.
+  SOMEONE ELSE'S report  cancelling it takes as many DISTINCT clearers as there are outstanding
+                         reporters. One account cannot overrule three people.
+
+Server-derived consensus is still the better long-term answer, and the audit is right about that.
+This is the part that works without one, and it removes the single-account suppression case.
+
+Tested 8/8:
+  1 report, no clear                     1 live
+  author withdraws their own             0 live
+  a stranger clears a lone report        0 live
+  3 reports, ONE stranger clears         3 live   <- this is the fix
+  3 reports, THREE strangers clear       0 live
+  clear predating the report             1 live   (stale clears do not count)
+  2 reports, 1 withdrawn + 1 stranger    0 live
+  future-dated clear                     ignored
+
+FOUND WHILE FIXING IT: the same logic existed TWICE
+  Bathroom Now's filter had its own simpler copy. Fixing only the popup would have left a single
+  account still able to suppress reports there. Both now call one resolveOooReports(), so they
+  cannot drift apart again. Three dead locals were removed from loadOoo; I listed exactly which
+  lines of executable code were deleted before deleting them, because the surrounding block was
+  all comment.
 
 
-GUARD — check 14
-  Two rules, both from mistakes made today:
-    every top-level function must be inside a script block
-    no script block may contain a literal closing-script sequence
-  Verified: it FAILS on the file as it shipped ("function fsId() is declared outside every script
-  block") and passes on the fix. index.html: 49 blocks clean. flushpanel.html: 42 blocks clean.
+2. SEC-08 — admin amenity overrides accepted any 24-character string
+---------------------------------------------------------------------
+Override values were `boundedStrOrAbsent(..., 24)`. I tightened community VOTES to an enum in the
+Audit #2 pass and left overrides, so the admin path was the looser of the two — which is
+backwards.
+
+Now an enum: yes, no, unknown, single, multiple, or empty (the panel's clear value).
+
+Checked against what actually writes them before changing anything: the admin panel emits exactly
+yes / no / unknown, all three accepted. Now rejected: "YES", "yes " with a trailing space,
+"maybe", markup, and any long string. The app compares these literally, so anything outside the
+enum silently read as "not set" anyway — it was accepted at the door and then ignored.
+
+22 validators changed, 11 on create and 11 on update.
 
 
 WHAT I VERIFIED
-  fsId inside the module block, before all 10 uses, defined exactly once
-  no stray closing-script sequence in any block of either file
-  flushpanel ids unique, divs balanced, script tags balanced
-  CHAIN_TABLE still 40 rows, still 40 dataset script tags
-  14 audit checks pass
+  the clearing rule across 8 scenarios, including stale and future-dated clears
+  both call sites now share one implementation
+  every value the admin panel emits is still accepted
+  6 JS files parse · 15 audit checks pass · rules balanced · both html well-formed
 
 WHAT I COULD NOT VERIFY
-  The panel in a browser. Please open FlushPanel and save an override on any location — that is
-  the exact path that has been failing. If the comment text at the bottom of your screenshot is
-  gone, the script block is intact.
+  Real multi-user behaviour. The clearing rule is tested as a pure function against constructed
+  document sets, not against several accounts reporting and clearing the same bathroom. The
+  logic is deterministic, but the interaction is not something I can exercise.
 
 
-WHAT THIS SAYS ABOUT MY EARLIER CHECKING
-  I verified that file repeatedly today — ids unique, divs balanced, script tags balanced, all
-  Firestore paths normalised. Every one of those passed while the panel was broken, because none
-  of them asked whether the code was in a position to RUN. Balanced tags do not mean working
-  code. That is the gap check 14 closes.
+WHAT IS STILL OPEN AFTER THIS
+  Needs the Mac:
+    firebase deploy --only functions   ·  git rm the six stray files  ·  curl the Leaflet plugins
+  Needs you:
+    the 7 pairs in duplicate-review.txt  ·  a real device regression pass
+  Real work, not started:
+    A2-04 markers — ~15 MB retained at startup, measured; needs a device memory timeline before
+                    I touch the cluster plugin again
+    APP-02 — the users ratings map grows unbounded toward the 1 MiB document ceiling
+    no emulator test suite — audit-ui.js is static analysis and has never exercised a live rule
+  Decision:
+    SEC-01/02 report spam needs App Check
+  Unresolvable from here:
+    RB-05 — I argue it is inert because anonymous votes cannot exist under current rules. That
+            depends on there being no legacy device-id votes, which needs a Firestore query to
+            confirm rather than an argument.

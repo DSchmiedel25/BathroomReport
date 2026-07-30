@@ -2948,29 +2948,62 @@ function oooStatus(reports, now){
 // Lazy per-popup read of a location's out-of-order reports (mirrors the aggregate read pattern —
 // one query when a pin's popup opens, cached). "Cleared" reports (cleared:true) are ignored, so an
 // "It's working now" tap ends the cycle without waiting for the 24h timer.
+/* Which out-of-order reports are still live, given every document for one location.
+ *
+ * One clear used to cancel EVERYONE's reports. Three people report a broken bathroom, one account
+ * taps "it's working now", and all three vanish — with nothing stopping the same account doing it
+ * again the moment they are re-filed.
+ *
+ * The rules cannot fix this. They cannot tell whether someone is present, whether the restroom is
+ * genuinely restored, or whose report is whose. So the authority model lives here, and it is
+ * deliberately asymmetric:
+ *
+ *   YOUR OWN report        one clear from you cancels it. You are withdrawing your own
+ *                          statement, which needs nobody else's agreement.
+ *   SOMEONE ELSE'S report  cancelling it takes as many DISTINCT clearers as there are
+ *                          outstanding reporters. One account cannot overrule three people.
+ *
+ * Server-derived consensus is the better long-term answer. This is the part that works without
+ * one, and it removes the "a single account suppresses everything" case entirely.
+ *
+ * Shared by the popup and by Bathroom Now's filter. Those were two separate implementations of
+ * the same rule, and only one of them got fixed the first time. */
+function resolveOooReports(rows){
+  // A future timestamp cannot be trusted: the whole lifecycle is derived from them, and documents
+  // written before the rules clamped ts are still out there. 60s absorbs ordinary clock skew.
+  const notFuture = (t) => typeof t === 'number' && t <= Date.now() + 60000;
+  const reportsBy = new Map();   // reporterId -> newest report ts
+  const clearsBy  = new Map();   // reporterId -> newest clear ts
+  for(const r of (rows || [])){
+    if(!r || !notFuture(r.ts)) continue;
+    const who = typeof r.reporterId === 'string' && r.reporterId ? r.reporterId : '(anon)';
+    const bucket = r.cleared ? clearsBy : reportsBy;
+    if(!bucket.has(who) || r.ts > bucket.get(who)) bucket.set(who, r.ts);
+  }
+  const outstanding = [...reportsBy.keys()].filter(k => {
+    const c = clearsBy.get(k);
+    return !(c && c >= reportsBy.get(k));
+  }).length;
+  const live = [];
+  for(const [who, ts] of reportsBy){
+    const ownClear = clearsBy.get(who);
+    if(ownClear && ownClear >= ts) continue;                 // withdrawn by its author
+    // The author's own clear never counts toward overruling anyone else.
+    const overrules = [...clearsBy.entries()].filter(([k, t]) => k !== who && t >= ts).length;
+    if(overrules >= outstanding) continue;
+    live.push(ts);
+  }
+  return live;
+}
+
 const oooCache = {};
 async function loadOoo(locId){
   try{
     const {db, collection, query, where, getDocs} = await fb();
     const snap = await getDocs(query(collection(db, 'outOfOrder'), where('locId', '==', locId)));
-    const reports = [];
-    let clearedAfter = 0;
-    /* Ignore anything stamped in the future. The whole lifecycle is derived from timestamps, and
-     * the rules used to accept any number for ts, so a single document could break it in either
-     * direction and never expire:
-     *   cleared:true dated years ahead  -> every real report is filtered out, permanently
-     *   cleared:false dated years ahead -> `age` goes negative, so the hard phase never ends
-     * The rules now clamp ts on write, but existing documents predate that, and a client should
-     * not trust a timestamp it can check. 60s of slack absorbs ordinary clock skew. */
-    const notFuture = (t) => typeof t === 'number' && t <= Date.now() + 60000;
-    snap.forEach(d => {
-      const r = d.data();
-      if(!notFuture(r.ts)) return;
-      if(r.cleared){ if(r.ts > clearedAfter) clearedAfter = r.ts; }
-      else reports.push(r.ts);
-    });
-    // Drop any report at/older than the most recent "it's working now" — that tap ends the cycle.
-    const live = reports.filter(t => t > clearedAfter);
+    // The authority rule and the future-timestamp guard both live in resolveOooReports,
+    // so the popup and Bathroom Now cannot drift apart again.
+    const live = resolveOooReports(Array.from(snap.docs, d => d.data() || {}));
     oooCache[locId] = live;
     return live;
   }catch(e){ console.error('loadOoo failed', e); return []; }
@@ -4548,10 +4581,10 @@ async function filterOutHardOoo(candidates){
     snap.forEach(d => { const r = d.data(); (byLoc[r.locId] = byLoc[r.locId] || []).push(r); });
     const hardSet = new Set();
     for(const id of ids){
-      const rows = byLoc[id] || [];
-      let clearedAfter = 0; const reports = [];
-      rows.forEach(r => { if(r.cleared){ if(r.ts > clearedAfter) clearedAfter = r.ts; } else reports.push(r.ts); });
-      const live = reports.filter(t => t > clearedAfter);
+      // Same authority rule as the popup — see resolveOooReports. This used to be a second,
+      // simpler implementation, so a single account could still suppress reports here even after
+      // the popup was fixed.
+      const live = resolveOooReports(byLoc[id] || []);
       if(oooStatus(live).phase === 'hard') hardSet.add(id);
     }
     if(!hardSet.size) return candidates;
