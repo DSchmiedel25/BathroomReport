@@ -297,5 +297,31 @@ console.log('\nhours canonicaliser');
   }
 }
 
+// ---- 11: no record may be both doubted and claiming a toilet ----
+console.log('\nrestroom signal consistency');
+{
+  const g = {};
+  for (const f of fs.readdirSync('.')) {
+    if (!f.endsWith('-locations.js') || f === 'compact-locations.js') continue;
+    const src = fs.readFileSync(f, 'utf8');
+    if (/^\s*#!/.test(src)) continue;
+    try { new Function('window', src)(g); } catch (e) { /* reported by check 5 */ }
+  }
+  let conflict = 0, doubted = 0;
+  for (const arr of Object.values(g)) {
+    if (!Array.isArray(arr)) continue;
+    for (const r of arr) {
+      if (!r || !r.osm || !r.osm.restroomUnconfirmed) continue;
+      doubted++;
+      // Asking "is there a public restroom here?" at a place whose own source data already says
+      // yes wastes the one question slot that can prune the map. restroomDoubted() guards this at
+      // runtime; this catches the data getting into that state in the first place.
+      if (r.osm.restroomConfirmed || (r.meta && r.meta.toilets === 'yes')) conflict++;
+    }
+  }
+  if (conflict) fail(`${conflict} record(s) are flagged restroomUnconfirmed AND claim a toilet`);
+  else pass(`${doubted} doubted record(s), none of them also claiming a toilet`);
+}
+
 console.log('\n' + (failures ? failures + ' FAILURE(S)' : 'all UI checks passed') + '\n');
 process.exit(failures ? 1 : 0);
