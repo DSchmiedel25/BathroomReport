@@ -9,16 +9,29 @@
 <!-- Bundled location data (free — plain JS, no Firestore reads). Used only to
      pre-fill the Fix panel with a location's current values. The report list
      itself renders from each report's own snapshot and needs none of this. -->
+<!-- All 40 location datasets. This block used to list 18, so 13,915 records — half the
+     map, including Speedway, Casey's and every metro/public chain — could not be loaded
+     for moderation at all. tools/audit-ui.js now fails the build if this drifts from
+     index.html again. -->
 <script src="stewarts-locations.js" defer></script>
+<script src="cumberland-farms-locations.js" defer></script>
+<script src="wawa-locations.js" defer></script>
+<script src="fastrac-locations.js" defer></script>
 <script src="alltownfresh-locations.js" defer></script>
 <script src="byrne-dairy-locations.js" defer></script>
 <script src="parkers-locations.js" defer></script>
 <script src="sheetz-locations.js" defer></script>
 <script src="racetrac-locations.js" defer></script>
-<script src="wawa-locations.js" defer></script>
-<script src="cumberland-farms-locations.js" defer></script>
-<script src="fastrac-locations.js" defer></script>
-<!-- Expansion chains: 404 harmlessly until uploaded, then auto-appear in the Add-store chain picker -->
+<script src="pilot-locations.js" defer></script>
+<script src="maverik-locations.js" defer></script>
+<script src="quiktrip-locations.js" defer></script>
+<script src="loves-locations.js" defer></script>
+<script src="bucees-locations.js" defer></script>
+<script src="caseys-locations.js" defer></script>
+<script src="kwiktrip-locations.js" defer></script>
+<script src="royalfarms-locations.js" defer></script>
+<script src="rutters-locations.js" defer></script>
+<script src="speedway-locations.js" defer></script>
 <script src="circle-k-locations.js" defer></script>
 <script src="travelcenters-locations.js" defer></script>
 <script src="holiday-locations.js" defer></script>
@@ -28,6 +41,18 @@
 <script src="quickchek-locations.js" defer></script>
 <script src="town-pump-locations.js" defer></script>
 <script src="restarea-locations.js" defer></script>
+<script src="nyc-dunkin-locations.js" defer></script>
+<script src="nyc-starbucks-locations.js" defer></script>
+<script src="nyc-gregorys-locations.js" defer></script>
+<script src="bos-tatte-locations.js" defer></script>
+<script src="bos-dunkin-locations.js" defer></script>
+<script src="bos-starbucks-locations.js" defer></script>
+<script src="bos-pavement-locations.js" defer></script>
+<script src="bos-flour-locations.js" defer></script>
+<script src="bos-nero-locations.js" defer></script>
+<script src="bos-public-locations.js" defer></script>
+<script src="nyc-public-locations.js" defer></script>
+<script src="ny-public-locations.js" defer></script>
 
 <style>
   :root{
@@ -1187,22 +1212,60 @@ $('#addSave').addEventListener('click', saveAddStore);
 // ===== Add location — static-record generator (self-contained, no Firestore) =====
 (function(){
   var q = function(id){ return document.getElementById(id); };
-  var CHAINS = [
-    ["Stewart's","stewarts"],["Wawa","wawa"],["Sheetz","sheetz"],["Kwik Trip","kwiktrip"],
-    ["Casey's","caseys"],["QuikTrip","quiktrip"],["Speedway","speedway"],["Maverik","maverik"],
-    ["RaceTrac","racetrac"],["Cumberland Farms","cumberlandFarms"],["Royal Farms","royalfarms"],
-    ["Parker's","parkers"],["Rutter's","rutters"],["Byrne Dairy","byrneDairy"],["Fastrac","fastrac"],
-    ["Buc-ee's","bucees"],["AllTown Fresh","alltownfresh"],["Pilot","pilot"],["Love's","loves"],
-    ["Circle K","circleK"],["TravelCenters of America","travelCentersOfAmerica"],["Holiday","holiday"],
-    ["Jacksons","jacksons"],["Plaid Pantry","plaidPantry"],["GetGo","getgo"],["QuickChek","quickChek"],
-    ["Town Pump","townPump"],["Rest Area","restarea"]
+  /* ONE table: display name, CHAIN_REGISTRY key, filename.
+   *
+   * This replaced three hand-kept lists that had each drifted independently — a CHAINS array
+   * missing most chains, a FILE map that derived filenames from the key by a camel-to-kebab rule
+   * that was wrong for five of them (pilotFlyingJ -> "pilot-flying-j-locations.js", which does not
+   * exist), and seven manual patches layered on top to cover some but not all of the failures.
+   *
+   * Keys here are CHAIN_REGISTRY keys, not suffix-stripped globals: the app knows Pilot as
+   * 'pilotFlyingJ'. Generated from index.html's script order plus the registry, and verified
+   * against both by tools/audit-ui.js. */
+  var CHAIN_TABLE = [
+    ["Stewart's Shops","stewarts","stewarts-locations.js"],
+    ["Cumberland Farms","cumberlandFarms","cumberland-farms-locations.js"],
+    ["Wawa","wawa","wawa-locations.js"],
+    ["Fastrac","fastrac","fastrac-locations.js"],
+    ["Alltown Fresh","alltownFresh","alltownfresh-locations.js"],
+    ["Byrne Dairy","byrneDairy","byrne-dairy-locations.js"],
+    ["Parker's","parkers","parkers-locations.js"],
+    ["Sheetz","sheetz","sheetz-locations.js"],
+    ["RaceTrac","racetrac","racetrac-locations.js"],
+    ["Pilot Flying J","pilotFlyingJ","pilot-locations.js"],
+    ["Maverik","maverik","maverik-locations.js"],
+    ["QuikTrip","quiktrip","quiktrip-locations.js"],
+    ["Love's","loves","loves-locations.js"],
+    ["Buc-ee's","bucees","bucees-locations.js"],
+    ["Casey's","caseys","caseys-locations.js"],
+    ["Kwik Trip","kwiktrip","kwiktrip-locations.js"],
+    ["Royal Farms","royalFarms","royalfarms-locations.js"],
+    ["Rutter's","rutters","rutters-locations.js"],
+    ["Speedway","speedway","speedway-locations.js"],
+    ["Circle K","circleK","circle-k-locations.js"],
+    ["TravelCenters of America","travelCentersOfAmerica","travelcenters-locations.js"],
+    ["Holiday","holiday","holiday-locations.js"],
+    ["Jacksons","jacksons","jacksons-locations.js"],
+    ["Plaid Pantry","plaidPantry","plaid-pantry-locations.js"],
+    ["GetGo","getgo","getgo-locations.js"],
+    ["QuickChek","quickChek","quickchek-locations.js"],
+    ["Town Pump","townPump","town-pump-locations.js"],
+    ["Rest Area","restarea","restarea-locations.js"],
+    ["Dunkin'","nycDunkin","nyc-dunkin-locations.js"],
+    ["Starbucks","nycStarbucks","nyc-starbucks-locations.js"],
+    ["Gregorys Coffee","nycGregorys","nyc-gregorys-locations.js"],
+    ["Tatte Bakery","bosTatte","bos-tatte-locations.js"],
+    ["Dunkin'","bosDunkin","bos-dunkin-locations.js"],
+    ["Starbucks","bosStarbucks","bos-starbucks-locations.js"],
+    ["Pavement Coffeehouse","bosPavement","bos-pavement-locations.js"],
+    ["Flour Bakery","bosFlour","bos-flour-locations.js"],
+    ["Caffè Nero","bosNero","bos-nero-locations.js"],
+    ["Public restroom","bosPublic","bos-public-locations.js"],
+    ["Public restroom","nycPublic","nyc-public-locations.js"],
+    ["Public restroom (NY)","nyPublic","ny-public-locations.js"],
   ];
-  var FILE = {}; CHAINS.forEach(function(c){ FILE[c[1]] = c[1].replace(/([A-Z])/g,'-$1').toLowerCase().replace(/^-/,'') + '-locations.js'; });
-  // a couple of filenames don't follow the camel->kebab rule:
-  FILE.cumberlandFarms='cumberland-farms-locations.js'; FILE.byrneDairy='byrne-dairy-locations.js';
-  FILE.circleK='circle-k-locations.js'; FILE.travelCentersOfAmerica='travelcenters-locations.js';
-  FILE.plaidPantry='plaid-pantry-locations.js'; FILE.quickChek='quickchek-locations.js';
-  FILE.townPump='town-pump-locations.js';
+  var CHAINS = CHAIN_TABLE.map(function(r){ return [r[0], r[1]]; });
+  var FILE = {}; CHAIN_TABLE.forEach(function(r){ FILE[r[1]] = r[2]; });
   var DAYS = [["sun","Sun"],["mon","Mon"],["tue","Tue"],["wed","Wed"],["thu","Thu"],["fri","Fri"],["sat","Sat"]];
   var mode = 'unknown';
   var dayState = {};
