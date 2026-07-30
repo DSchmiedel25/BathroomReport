@@ -830,19 +830,36 @@ function seasonalNoteHtml(loc){
     : '';
 }
 
-/* Is it known whether the public may actually use this restroom?
+/* Access is ONE three-state answer for every location: public, customer, or unknown.
  *
- * Businesses (no metroInfo) are implicitly usable — you walk in. Metro/civic entries carry an
- * explicit access value, EXCEPT the OSM-sourced statewide set where the tag is often absent:
- * a human confirmed a toilet exists but not who may use it.
+ * PUBLIC is the default and carries no flag. A convenience store, a travel plaza, a rest area —
+ * you walk in. Assuming otherwise would bury 27,000 usable restrooms behind a caveat nobody
+ * needs.
  *
- * Bathroom Now deprioritises the unknowns rather than dropping them. The asymmetry matters:
- * getting hours wrong costs a locked door, but getting access wrong sends someone somewhere
- * they aren't welcome, which is worse for exactly the people who rely on this most. */
+ * CUSTOMER and UNKNOWN are the exceptions, and only those are worth surfacing:
+ *   customer  the operator's data says so (metro cafes, where you buy something first)
+ *   unknown   the source described this place and did NOT evidence a restroom — 353 Circle K
+ *             stores whose own API lists air and ATM but omits the restroom it lists for the
+ *             other 5,950, and 651 rest-area polygons and bare points with no facility tags.
+ *             Those are not "we forgot to look", they are "we looked and found nothing".
+ *
+ * Read from wherever the source put it. metroInfo.access came from the metro imports and
+ * osm.restroomUnconfirmed from the chain ones; unifying them in the DATA would mean rewriting
+ * thousands of records to say what this function can derive. One reader, no migration. */
+function accessState(loc){
+  const mi = (loc && loc.metroInfo) || null;
+  if(mi && mi.access === 'customer') return 'customer';
+  if(mi && mi.access === 'public')   return 'public';
+  if(mi && !mi.access)               return 'unknown';   // metro import with the tag absent
+  if(loc && loc.osm && loc.osm.restroomUnconfirmed) return 'unknown';
+  return 'public';
+}
+
+// Kept as a thin wrapper: Bathroom Now deprioritises unknowns rather than dropping them. The
+// asymmetry matters — getting hours wrong costs a locked door, but sending someone somewhere
+// they aren't welcome is worse for exactly the people who rely on this most.
 function accessKnown(loc){
-  const mi = loc && loc.metroInfo;
-  if(!mi) return true;
-  return !!mi.access;
+  return accessState(loc) !== 'unknown';
 }
 
 /* Is this a location where "is there even a restroom?" is worth asking?
@@ -1527,14 +1544,43 @@ function oooHardHtml(loc, status){
     </div>`;
 }
 
-// Access badge for metro locations — the "can I actually use this?" answer, shown first.
-// Customer chains (Dunkin/Starbucks) default to "customers only"; civic toilets are "public".
-function metroAccessBadge(loc){
-  const a = (loc.metroInfo && loc.metroInfo.access) || '';
+/* The "can I actually use this?" answer.
+ *
+ * Only the exceptions get a badge. Public is the default for every location, and stamping
+ * "✅ Public restroom" on 27,000 pins would turn the one line that matters into wallpaper —
+ * a badge everything carries tells you nothing.
+ *
+ * `force` keeps the metro popup's existing behaviour, where access leads the card and the
+ * positive case is worth stating because those chains vary. */
+function accessBadge(loc, force){
+  const a = accessState(loc);
   if(a === 'customer') return '<div class="access-badge access-customer">🔑 Customers only</div>';
-  if(a === 'public')   return '<div class="access-badge access-public">✅ Public restroom</div>';
-  return '<div class="access-badge access-unknown">❔ Access unknown</div>';
+  if(a === 'unknown'){
+    /* THREE unknowns, and wording them the same would misinform in two directions.
+     *
+     * 1. Metro entry with no access tag — a human confirmed a toilet EXISTS; what's missing is
+     *    who may use it. Calling that "unconfirmed" would be wrong about a demonstrably real
+     *    civic toilet.
+     *
+     * 2. A STORE the source described without listing a restroom — 353 Circle Ks whose own API
+     *    lists air and ATM but omits the restroom it lists for the other 5,950. A staffed
+     *    convenience store almost certainly has one, so lead optimistic and let a visitor settle
+     *    it. "Probably" is honest here.
+     *
+     * 3. A rest area that is a bare OSM point, an untagged polygon, or a picnic area — 671 of
+     *    them. "Probably" would be a lie: plenty are a pull-off with a bench and a bin. Someone
+     *    leaving the interstate on that promise is the exact failure this app exists to prevent,
+     *    so this one stays hedged. */
+    if(loc && loc.metroInfo)
+      return '<div class="access-badge access-unknown">❔ Access unknown</div>';
+    const facility = (loc && loc.meta && loc.meta.facility) || '';
+    if(facility === 'bare' || facility === 'polygon' || facility === 'picnic')
+      return '<div class="access-badge access-unknown">❔ Unconfirmed — may be a pull-off only</div>';
+    return '<div class="access-badge access-unknown">🤞 Probably — nobody\'s confirmed yet</div>';
+  }
+  return force ? '<div class="access-badge access-public">✅ Public restroom</div>' : '';
 }
+function metroAccessBadge(loc){ return accessBadge(loc, true); }
 
 // Metro (city) popup — for non-gas-station locations. Leads with access, shows accessibility and
 // hours (hours are DISPLAYED as text, never computed into an open/closed status, since OSM hours
@@ -1552,9 +1598,9 @@ function metroPopupHtml(loc, agg, myVote){
   const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}</div>` : '';
   const seasonalLine = seasonalNoteHtml(loc);
   // A doubted store shows the caveat until the community settles it either way.
-  const restroomDoubtLine = (restroomDoubted(loc) && !(loc.conf && loc.conf.hasRestroom)
-      && !isConfirmedYes((amenityCache[loc.id]||{}).hasRestroom))
-    ? '<div class="hours-line restroom-doubt">❔ Not listed as having a public restroom — can you confirm?</div>' : '';
+  // The access badge above now carries this — one statement per fact, not two lines saying the
+  // same thing in different words.
+  const restroomDoubtLine = '';
   return `<div class="popup-inner" data-locid="${loc.id}">
     <div class="popup-head-row">
       <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${escapeHtml(chain.name)}</div>
@@ -1662,6 +1708,7 @@ function popupHtml(loc, agg, myVote){
       <span class="store-icons" id="store-icons-${loc.id}">${storeFeatureIconsHtml(loc, storeFeatureCache[loc.id])}</span>
     </div>
     <div class="addr addr-title">${escapeHtml(loc.addr)}${loc.num ? ' &middot; Shop #' + escapeHtml(loc.num) : ''}</div>
+    ${accessBadge(loc)}
     ${hoursLine}
     <div id="accessible-badge-${loc.id}">${accessibleBadgeHtml(loc.id)}</div>
     ${recencyLine}

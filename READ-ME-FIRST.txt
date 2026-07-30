@@ -1,73 +1,74 @@
-v2.8.5 — coordinate corrections + CI
-=====================================
+v2.9.0 — one access model, three states
+========================================
+(replaces the earlier v2.9.0 zip — badge wording changed)
 
 WHAT IS IN THIS BATCH
-  cumberland-farms-locations.js   1 coordinate corrected
-  circle-k-locations.js           1 coordinate corrected, 2 duplicate records merged away
-  index.html                      version stamp only. BUMP sw.js.
-  .github/workflows/checks.yml    NEW (this is the v2.8.4 file — include it if you have not
-                                  already shipped v2.8.4)
+  app.js       accessState() + accessBadge(); badge added to the pit-stop popup;
+               the separate "not listed as having a public restroom" line retired
+  index.html   version stamp only. BUMP sw.js.
+  styles.css   comment only — the badge is no longer metro-specific
 
-  No app.js, no rules, no functions.
+  No rules, no functions, no data. Minor bump because the UI reads differently.
 
 WHAT WAS STILL UNSHIPPED FROM EARLIER
-  functions/index.js — I gave you this as index.js separately. Still needs:
+  functions/index.js — sent separately as index.js, needs
       firebase deploy --only functions
-  Four fixes are not live without it: the fsId path fix, aggregates.amen tallies, the
-  24:01-24:59 hours regex, and the stale-verified-metadata fix.
-  If v2.8.4 has not shipped, checks.yml is in this zip too. Nothing else outstanding.
+  Four fixes are not live without it. Nothing else outstanding.
 
 
-THE CORRECTIONS — all three from your verification
---------------------------------------------------
-1. Cumberland Farms, Bridgewater MA
-   bridgewater-pleasantst sat on the Main St store's exact coordinate. Moved 3.46 km to
-   41.971890, -71.008410 (1001 Pleasant St). I padded your 5 decimals to 6 so the stored
-   precision matches what you supplied rather than implying more.
+HOW IT READS
+  Public is the default and carries NO badge. Only the exceptions do — 88% of the map shows
+  nothing, because a badge everything carries tells you nothing.
 
-2. Circle K, Franklin TN
-   1501 Murfreesboro Rd and 1501 New Hwy 96 W were one store under two road names. Kept
-   Murfreesboro Rd per your call, moved it 75m to 35.914000, -86.820580, dropped the alias.
+    24,739  (no badge)                                  public, assumed
+       983  🔑 Customers only                           operator says so
+     1,333  ❔ Access unknown                            toilet confirmed, who may use it isn't
+       361  🤞 Probably — nobody's confirmed yet         stores
+       671  ❔ Unconfirmed — may be a pull-off only      bare rest areas
 
-3. Circle K, Jacksonville FL
-   3631 Blanding Blvd and the same address "Bldg 2" were one store. Merged; the survivor
-   absorbed anything the dropped record had.
+  A community "no" still hides the pin at CONFIRM_THRESHOLD, unchanged.
 
-Every correction records provenance — coord_prev, coord_corrected, coord_source, and for the
-merges, mergedFrom plus altAddress. altAddress matters: the Circle K API returns these stores
-under BOTH names, so a future import that does not recognise the alias would re-add them.
+WHY THE UNKNOWN SPLITS THREE WAYS
+  Wording them alike would misinform in two directions.
 
-  28,089 -> 28,087 records
+  A metro entry with no access tag has a toilet a human confirmed; what's missing is who may use
+  it. Calling that "unconfirmed" would be wrong about a demonstrably real civic toilet.
 
+  A store the source described without listing a restroom — 353 Circle Ks whose own API lists air
+  and ATM but omits the restroom it lists for the other 5,950 — almost certainly has one. Lead
+  optimistic, let a visitor settle it.
+
+  A bare OSM point, an untagged polygon, or a picnic area is a different bet. "Probably" would be
+  a lie: plenty are a pull-off with a bench and a bin. Someone leaving the interstate on that
+  promise is the exact failure this app exists to prevent.
+
+NO DATA MIGRATION
+  metroInfo.access came from the metro imports, osm.restroomUnconfirmed from the chain ones, and
+  meta.facility from the rest-area tiering. Rewriting thousands of records to unify them would be
+  a migration for something one reader derives.
 
 WHAT I VERIFIED
-  Each supplied coordinate sanity-checked before applying: inside a plausible town box, lat/lng
-  not transposed, and the move distance sensible (3.46 km for a genuine relocation, 75m for a
-  refinement).
-  ZERO exact-coordinate groups with different addresses now exist, across all 28,087 records.
-  DATA-01 and DATA-07 are both fully closed — DATA-01 had been open since the first audit.
-  app.js parses · all 11 audit checks pass · 40 data files load, one global each · SEO generator
-  exits 0 with no collisions.
+  accessState 7/7 across every input shape; accessBadge across all seven rendering cases.
+  Distribution counted on the real data, not estimated.
+  .access-badge CSS exists for all three states, survived the dead-declaration strip I did
+  earlier, and shell.css does not override it.
+  app.js parses; 11 audit checks pass; css and html balanced.
 
 WHAT I COULD NOT VERIFY
-  That the coordinates are right. They are yours; I checked they are plausible and consistent,
-  not that they are correct. And whether a second Circle K really does exist at Blanding Blvd —
-  I took your word and merged.
+  How the badge looks in the pit-stop popup — it has never rendered there. The CSS was written
+  for the metro card, same position under the address. Worth a look at one of the 353 flagged
+  Circle Ks and at a bare rest area.
 
+A NOTE ON THE DASHES
+  I removed the em dashes from these two badges, then put them back. They belong here: this is a
+  label and its qualifier, the same shape as "♿ Wheelchair accessible — confirmed by visitors"
+  and "⚠️ Seasonal — may be closed in winter" sitting directly beside them. The earlier sweep was
+  of PROSE in index.html, where an em dash mid-sentence reads as affected. 48 label-style dashes
+  remain in app.js and are staying.
 
-REMAINING WORK
-  Needs the Mac:
-    firebase deploy --only functions      (the index.js I sent separately)
-    git rm index.js quiktrip-locations.json bathroomreport-nyc-public.zip robots.pdf sw.pdf tools/tools
-    curl the two Leaflet plugins          PWA-02
-  Worth doing, not started:
-    SEO-03  og:image points at /og.png, which does not exist — every one of ~22,000 pages and
-            every link you share has a blank preview card. Most visible remaining issue.
-    SEO-02  5,750 pages are typed ConvenienceStore when they are rest areas, public restrooms
-            or cafes.
-  Product decision:
-    SEC-01/02  report spam needs App Check, not rules
-  Closed won't-fix, with measurements:
-    RB-08   marker construction and the viewport scan, both measured and cheap; the previous
-            attempt at culling caused the Android races
-    SEC-09  the block check fails open deliberately, and the comment says so
+STILL OPEN
+  Mac:      firebase deploy --only functions · git rm the six stray files · curl the Leaflet
+            plugins (PWA-02)
+  You:      the 7 pairs in duplicate-review.txt
+  Decision: SEC-01/02 report spam needs App Check
+  Won't-fix, measured: RB-08 marker construction · SEC-09 block check fails open by design

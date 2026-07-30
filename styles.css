@@ -727,7 +727,9 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
 #onboardingMode .onboardingModeHint{ display:block; margin-top:8px; opacity:.7;
 }
 
-/* Metro popup: access badge (customers-only / public / unknown) */
+/* Access badge — every popup, not just metro. Three states, and only the exceptions render:
+   public is the default for 88% of locations and carries no badge, because a badge everything
+   has tells you nothing. */
 .access-badge{ display:inline-block; font-weight:700; font-size:13px; padding:4px 10px;
   border-radius:999px; margin:2px 0 4px;
 }
