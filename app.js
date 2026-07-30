@@ -436,6 +436,38 @@ function stampBuildDate(){
   if(v && v.dataset.version) v.textContent = v.dataset.version + ' \u00b7 ' + BUILD_DATE;
 }
 
+/* ============================================================
+ * Firestore document ids
+ * ============================================================
+ * Firestore treats '/' as a path separator, so doc(db,'votes','node/123_uid') resolves to the
+ * three-segment path votes/node/123_uid and THROWS — doc() requires an even segment count.
+ * 6,595 location ids (23.5% of the map) were OSM-derived and contained a slash, so every
+ * rating, aggregate read, tip and admin override silently failed for them: Speedway entirely,
+ * plus every metro and public-restroom chain. Each call site was wrapped in try/catch returning
+ * an empty value, so nothing surfaced to the user or the console.
+ *
+ * The data files now carry the safe form and preserve the original in meta.srcId. This helper
+ * stays as the boundary guard anyway, because:
+ *   - previously shared links still carry the raw form (?loc=node%2F123)
+ *   - reports / outOfOrder / missingReports / activity store locId as a FIELD, with slashes,
+ *     and those writes succeeded (auto-id addDoc), so old docs must stay resolvable
+ *   - a future import can reintroduce slashed ids
+ *
+ * There is deliberately NO inverse. It cannot be written correctly: 39 ids contain two slashes
+ * (merged records like node/A+node/B) and one contains a genuine double underscore
+ * (gp/ChIJTzsjNj5744kRK__m7xpIOck), so no single replace rule reconstructs both. Use
+ * meta.srcId, which is exact. */
+/* The interstate travel-center chains. ONE definition, shared by chainBucket() and the Truck
+ * Stop Hero achievement. Three separate lists used to exist with three different contents:
+ * the achievement's omitted travelCentersOfAmerica, and a third (since removed) still named
+ * 'pilot', which has never been a CHAIN_REGISTRY key. Keys here must exist in CHAIN_REGISTRY —
+ * tools/audit-ui.js enforces that. */
+const TRAVEL_CENTER_KEYS = new Set(['pilotFlyingJ', 'loves', 'bucees', 'travelCentersOfAmerica']);
+
+function fsId(id){
+  return String(id == null ? '' : id).replace(/\//g, '__');
+}
+
 const CONFIRM_THRESHOLD = 3;
 function isConfirmedYes(x){ return !!x && x.yes >= CONFIRM_THRESHOLD && x.yes > x.no; }
 function isConfirmedNo(x){  return !!x && x.no  >= CONFIRM_THRESHOLD && x.no  > x.yes; }
@@ -587,7 +619,7 @@ const ADMIN_AMENITY_KEYS = ['accessible','changing','evCharging','airPump','show
 async function loadAmenityOverride(loc){
   try{
     const {db, doc, getDoc} = await fb();
-    const safeId = String(loc.id).replace(/\//g, '__');   // ids can contain '/'
+    const safeId = fsId(loc.id);
     const snap = await getDoc(doc(db, 'amenityOverrides', safeId));
     const ov = snap.exists() ? (snap.data() || {}) : {};
     amenityOverrideCache[loc.id] = ov;
@@ -601,7 +633,7 @@ async function saveAmenityOverride(locId, key, val){
   if(!isMapAdmin()) return false;
   try{
     const {db, doc, setDoc} = await fb();
-    const safeId = String(locId).replace(/\//g, '__');
+    const safeId = fsId(locId);
     await setDoc(doc(db, 'amenityOverrides', safeId), { [key]: val }, { merge: true });
     return true;
   }catch(e){ return false; }
@@ -902,7 +934,7 @@ function fetchCommunityDoc(locId){
     let data = {};
     try{
       const {db, doc, getDoc} = await fb();
-      const snap = await getDoc(doc(db, 'aggregates', locId));
+      const snap = await getDoc(doc(db, 'aggregates', fsId(locId)));
       data = snap.exists() ? (snap.data() || {}) : {};
     }catch(e){ console.error('community doc load failed', e); }
     const amen = data.amen || {};
@@ -1104,20 +1136,40 @@ async function migrateAnonymousDataToAccount(oldAnonId, newUid, username){
   try{ fbApi = await fb(); }catch(e){ console.error('migrate: firebase unavailable', e); return; }
   const {db, doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs} = fbApi;
 
-  // Copy each vote this device made over to the new account. Per-doc isolation: one bad
-  // legacy vote (e.g. carrying retired fields the rules now reject) skips just that vote.
-  // The old anonymous doc is left in place — the rules deliberately forbid deleting a doc
-  // whose clientId isn't yours, and that's correct; cleanup is a moderation/server concern.
+  /* Copy each vote this device made over to the new account, then REMOVE the original so the
+   * aggregate trigger counts one physical rating once. Leaving both docs in place inflated the
+   * public average permanently — one rating became two the moment someone signed up.
+   *
+   * In practice this loop finds nothing today: the votes rule requires signedIn() via
+   * ownedByCaller() AND pins the doc id to request.auth.uid, so a vote keyed to a device id can
+   * never have been created. The copy-and-delete is here so that if anonymous rating is ever
+   * enabled, the migration is correct from the first day rather than quietly double-counting.
+   *
+   * Delete only AFTER a confirmed copy, and only per-document, so a failure can never destroy a
+   * rating it did not successfully move. A delete denied by rules (the caller is now the new uid,
+   * while the old doc's clientId is the device id) is logged and skipped, not treated as fatal. */
   try{
     const votesSnap = await getDocs(query(collection(db, 'votes'), where('clientId', '==', oldAnonId)));
+    let copied = 0, removed = 0;
     for(const voteDoc of votesSnap.docs){
       try{
         const data = voteDoc.data();
         const locId = data.locId;
         if(!locId) continue;
-        await setDoc(doc(db, 'votes', locId + '_' + newUid), { ...data, clientId: newUid }, { merge: true });
+        await setDoc(doc(db, 'votes', fsId(locId) + '_' + newUid), { ...data, clientId: newUid }, { merge: true });
+        copied++;
+        try{
+          await deleteDoc(voteDoc.ref);
+          removed++;
+        }catch(delErr){
+          // The copy succeeded, so no rating is lost — but both docs now exist and the trigger
+          // will count both. Surfaced loudly because it is the exact double-count this guards.
+          console.warn('migrate: original vote could not be removed — aggregate may double-count',
+                       voteDoc.id, delErr && delErr.code);
+        }
       }catch(e){ console.warn('migrate: vote copy skipped', voteDoc.id, e && e.code); }
     }
+    if(copied) console.log('migrate: ' + copied + ' vote(s) copied, ' + removed + ' original(s) removed');
   }catch(e){ console.error('migrate: votes phase failed (continuing)', e); }
 
   // (The old check-ins migration was removed: the checkins collection is retired and its
@@ -1187,7 +1239,7 @@ window.addEventListener('authStateReady', () => {
 async function loadAggregate(id){
   try{
     const {db, doc, getDoc} = await fb();
-    const snap = await getDoc(doc(db, 'aggregates', id));
+    const snap = await getDoc(doc(db, 'aggregates', fsId(id)));
     if(!snap.exists()) return emptyAgg();
     return { ...emptyAgg(), ...snap.data() };
   }catch(e){
@@ -1201,7 +1253,7 @@ async function loadAggregate(id){
 async function loadMyVote(id){
   try{
     const {db, doc, getDoc} = await fb();
-    const snap = await getDoc(doc(db, 'votes', id + '_' + getEffectiveId()));
+    const snap = await getDoc(doc(db, 'votes', fsId(id) + '_' + getEffectiveId()));
     if(!snap.exists()) return emptyVote();
     return { ...emptyVote(), ...snap.data() };
   }catch(e){
@@ -1224,7 +1276,7 @@ async function saveMyVote(id, data){
       payload.ratedAt = Date.now();
       if(myVoteCache[id]) myVoteCache[id].ratedAt = payload.ratedAt;
     }
-    await setDoc(doc(db, 'votes', id + '_' + clientId), payload, { merge: true });
+    await setDoc(doc(db, 'votes', fsId(id) + '_' + clientId), payload, { merge: true });
     // Mirror this rating into the user's OWN profile doc (users/{uid}) so the Passport and the
     // whole "my ratings" load cost ONE read no matter how many ratings they have. The votes doc
     // above stays the source of truth for the aggregate Cloud Function. Logged-in only (the rules
@@ -1248,7 +1300,7 @@ const MAX_TIP_LENGTH = 50;
 async function loadTips(id){
   try{
     const {db, doc, getDoc} = await fb();
-    const snap = await getDoc(doc(db, 'tips', id));
+    const snap = await getDoc(doc(db, 'tips', fsId(id)));
     if(!snap.exists()) return [];
     return (snap.data().tips || []).slice(-8); // show up to the 8 most recent
   }catch(e){
@@ -1258,7 +1310,7 @@ async function loadTips(id){
 async function addTip(id, text){
   try{
     const {db, doc, setDoc, arrayUnion} = await fb();
-    await setDoc(doc(db, 'tips', id), { tips: arrayUnion(text) }, { merge: true });
+    await setDoc(doc(db, 'tips', fsId(id)), { tips: arrayUnion(text) }, { merge: true });
     logActivity('tip', { locId: id, text });
     return true;
   }catch(e){
@@ -1306,7 +1358,7 @@ async function saveHoursReport(locId, value, kind){
     const uid = window.__currentUser.uid;
     // Location ids can contain '/' (OSM ids like way/123) which is illegal in a Firestore doc
     // path, so slug it to '__' here. fetch-and-bake-hours reverses it when matching records.
-    const safeId = String(locId).replace(/\//g, '__');
+    const safeId = fsId(locId);
     await setDoc(doc(db, 'hourReports', safeId, 'submissions', uid),
       { uid, value, kind, submittedAt: Date.now(), schemaVersion: 1 });
     markHoursReported(locId);
@@ -1351,13 +1403,13 @@ async function loadWeeklyRecap(){
       if(item.deleted === true) return;
       if(item.type === 'rating' && item.sourceId){
         checks.push(
-          getDoc(doc(db, 'votes', item.sourceId))
+          getDoc(doc(db, 'votes', fsId(item.sourceId)))
             .then(vSnap => vSnap.exists() ? 'rating' : null)
             .catch(() => null)
         );
       } else if(item.type === 'tip' && item.locId && typeof item.text === 'string'){
         checks.push(
-          getDoc(doc(db, 'tips', item.locId))
+          getDoc(doc(db, 'tips', fsId(item.locId)))
             .then(tSnap => {
               const tips = tSnap.exists() && Array.isArray(tSnap.data().tips) ? tSnap.data().tips : [];
               return tips.includes(item.text) ? 'tip' : null;
@@ -2415,9 +2467,10 @@ async function computeAchievementStats(){
     v && v.amenities && (v.amenities.accessible === 'yes' || v.amenities.accessible === 'no')
   ).length;
 
-  // Truck Stop Hero — ratings at the big interstate travel-center chains.
-  const TRAVEL_CENTER_CHAINS = new Set(['pilotFlyingJ','loves','bucees']);
-  const travelPlazaCount = rated.filter(r => TRAVEL_CENTER_CHAINS.has(r.loc.chain)).length;
+  // Truck Stop Hero — ratings at the big interstate travel-center chains. Uses the single
+  // canonical set; the local copy this replaced omitted travelCentersOfAmerica, so rating a TA
+  // never counted toward the achievement.
+  const travelPlazaCount = rated.filter(r => TRAVEL_CENTER_KEYS.has(r.loc.chain)).length;
 
   // Vacation Mode — most distinct states rated within any single 7-day window.
   const stateDated = rated
@@ -3052,7 +3105,10 @@ document.querySelectorAll('.onboardingModeBtn').forEach(btn => {
 // around and the address bar stays clean.
 (function(){
   const params = new URLSearchParams(window.location.search);
-  const targetId = params.get('loc');
+  // A link shared before the id rename carries the raw form (?loc=node%2F123). Normalise it so
+  // those links keep resolving; meta.srcId holds the original if it is ever needed.
+  const rawTarget = params.get('loc');
+  const targetId = rawTarget ? fsId(rawTarget) : rawTarget;
   if(!targetId) return;
 
   const target = seedLocations.find(l => l.id === targetId);
@@ -3516,11 +3572,10 @@ function saveDisabledChains(){
   localStorage.setItem('disabledChains', JSON.stringify(Array.from(disabledChains)));
 }
 
-// Road layers are grouped into a few buckets so the control stays short as chains are added.
-// Metros keep their own section; everything else falls into one of these three.
-const TRAVEL_KEYS = ['pilot', 'loves', 'travelCentersOfAmerica', 'bucees'];
 // (The road-bucket drawer filter was removed — the chain key on the map is now the single
-// filter surface, with per-chain rows for everything currently renderable.)
+// filter surface, with per-chain rows for everything currently renderable. The TRAVEL_KEYS
+// constant that lived here went with it; it had drifted to contain 'pilot', which is not a
+// CHAIN_REGISTRY key — the canonical key is 'pilotFlyingJ'. Use TRAVEL_CENTER_KEYS.)
 
 
 // ---- Travel mode toggle (on the road / on foot) ------------------------------------------
@@ -3676,7 +3731,7 @@ function chainKeyRowHtml(keys, readOnly){
 
 // Which of the four All-chains groups a chain belongs to. Registry-driven where the registry
 // already knows (group:'metro' = city layer); only the travel/public sets are hand-kept.
-const TRAVEL_CENTER_KEYS = new Set(['pilotFlyingJ', 'loves', 'bucees', 'travelCentersOfAmerica']);
+// (TRAVEL_CENTER_KEYS is defined once, near CHAIN_REGISTRY, and shared with the achievements.)
 function chainBucket(key){
   if(groupOf(key) === 'metro') return 'city';
   if(key === 'restarea' || key === 'nyPublic') return 'public';

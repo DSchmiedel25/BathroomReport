@@ -1,196 +1,148 @@
-v2.6.5 — audit fixes, drawer alignment, and a script so this can't recur
-========================================================================
+PHASE 1 — v2.7.0
+================
+The silent data-loss cluster. A quarter of the map could not be rated; nobody saw an error.
 
-Supersedes every earlier zip. 16 files to upload, 6 to delete.
+UPLOAD
+  app.js  index.html  flushpanel.html          -> repo root, BUMP sw.js
+  13 *-locations.js files                      -> repo root
+  tools/audit-ui.js                            -> tools/
+  functions/index.js                           -> functions/,  then:
+                                                  firebase deploy --only functions
 
-UPLOAD (repo root, except the two in folders)
-  app.js  index.html  styles.css  shell.css  flushpanel.html    <- BUMP sw.js
-  firestore.rules                            <- firebase deploy --only firestore:rules
-  bake-overrides.js  bake-hours.js  bake-confirmed.js  fetch-and-bake-hours.js
-  circle-k-locations.js  nyc-dunkin-locations.js  jacksons-locations.js
-  .github/workflows/bake.yml
-  tools/audit-ui.js                          <- chmod +x tools/audit-ui.js
-
-DELETE
-  git rm index.js quiktrip-locations.json bathroomreport-nyc-public.zip robots.pdf sw.pdf tools/tools
-
-coordinate-review.txt and this file are for you, not the repo.
+  No rules change in this phase. No SEO rebuild — guide URLs are name-derived slugs, not ids.
 
 
-========================================================================
-THE POINT OF THIS RELEASE: tools/audit-ui.js
-========================================================================
+WHAT WAS BROKEN
+---------------
+Firestore treats '/' as a path separator. doc(db,'votes','node/123_uid') resolves to
+votes/node/123_uid — three segments — and doc() throws, because it requires an even count.
 
-You said the alignment and date problems should have been caught in the last audit. You were
-right, and the reason they weren't is that my checks only find what I thought to query. So the
-three missing checks are now a script instead of a note.
+6,595 of 28,123 location ids (23.5%) were OSM-derived and contained a slash:
 
-    node tools/audit-ui.js        # exits non-zero on failure, so it can gate a commit
+  speedway 3,180   nyPublic 1,405   nycPublic 983   nycDunkin 396   nycStarbucks 266
+  bosPublic 120    bosDunkin 103    bosStarbucks 58   + 6 smaller metro chains
 
-Run against the repo you sent me, it reports 18 FAILURES — every bug you found by eye:
+A sanitiser already existed and was applied in exactly two of seven places. Missing from:
+votes, aggregates and tips in app.js; ALL FOUR collections in flushpanel.html, which had no
+sanitising at all; and functions/index.js, which built aggregates/${locId} server-side.
 
-    icon slot        FAIL  emoji outside .d-ico: "❓ FAQ: How it works"
-                     FAIL  emoji outside .d-ico: "🛍️ Gift shop"
-                     ... 9 rows total
-    stale selectors  FAIL  #passportToggle is a drawer row but still has
-                           position:absolute + justify-content:center
-                     FAIL  #openNowToggle   same
-    constants        FAIL  more than one date string: July 14, 2026 | July 21, 2026
+Every call site was wrapped in try/catch returning an empty value, so the failure was silent:
 
-Against this release: all checks pass.
-
-WHAT IT CHECKS, AND WHICH BUG EACH ONE CAME FROM
-
-  1. SIBLING GEOMETRY — all four drawer row types must be flex, gap 10px, same left padding.
-     Came from: Gift shop is an <a>, so `.d-items button` never reached it. 16px vs 20px.
-
-  2. ICON SLOT CONTEXT — no emoji may sit outside a .d-ico span.
-     Came from: every icon was inline text, and emoji advance widths differ, so each label
-     started at a different x.
-
-  3. STALE SELECTORS — no drawer id may carry position:absolute or justify-content:center.
-     Came from: #passportToggle left in the old floating map-control stack. Invisible to a
-     conflict check because nothing competed with it.
-
-  4. DUPLICATED CONSTANTS — CONFIRM_THRESHOLD vs MIN_YES, and more than one date string.
-     Came from: three hand-typed dates that had drifted to July 14 / 21 / 30, and the earlier
-     MIN_YES=2 vs CONFIRM_THRESHOLD=3 mismatch.
-
-Check 3 found a bug I had missed even while writing the fix: #openNowToggle moved into the
-drawer as "Hide confirmed closed" but kept position:absolute and justify-content:center. It
-LOOKS fine today only because margin-left:auto on the switch masks it — one rule change from
-mattering, and the identical rule that centred Passport. Removed, along with its dead
-#openNowToggle.active green-pill rule (the JS uses .on now, verified).
+  rating a Speedway            -> write threw, nothing saved, no error shown
+  opening any metro popup      -> aggregate read threw, community average never appeared
+  tips on those locations      -> invisible and unsavable
+  admin override in FlushPanel -> failed
+  the aggregate Cloud Function -> failed for the same records
 
 
-========================================================================
-DRAWER ALIGNMENT — four causes
-========================================================================
+WHAT CHANGED
+------------
+1. ids renamed in 13 data files: 'node/123' -> 'node__123'. 6,595 records. Zero collisions.
 
-A. Passport was CENTRED. styles.css still listed #passportToggle in the old map-control stack
-   (position:absolute, justify-content:center). shell.css overrides display, width and
-   text-align for drawer buttons but never justify-content.
-   My v2.6.3 dead-CSS pass could NOT have caught it — that pass only removed declarations where
-   shell.css sets the same property, and nothing competed with this one.
+2. THE ORIGINAL IS PRESERVED: meta.srcId holds the raw form on all 6,595.
 
-B. Gift shop sat 4px left. An <a class="d-shop-link">, so the button rule never applied:
-   padding 14px 16px vs 20px, weight 600 vs 700, display:block vs flex.
+   There is deliberately no inverse helper. It cannot be written correctly — 39 ids contain two
+   slashes (merged records like node/A+node/B) and one contains a genuine double underscore
+   (gp/ChIJTzsjNj5744kRK__m7xpIOck), so no single replace rule reconstructs both, and a
+   plausible-looking one would corrupt data in exactly the debugging context you'd trust it.
+   meta.srcId is exact. Verified: it reproduces the new id for all 6,595 records.
 
-C. Every label started at a different x, because icons were inline text. Fixed with a
-   fixed-width column: #appDrawer .d-ico{ flex:0 0 1.6em; display:inline-flex; justify-content:center; }
-   Ten static rows plus the four group toggles. CK_GROUPS had the emoji baked into the label
-   string, so it was split into { icon, label }; both renderers updated, labels now escaped.
+3. fsId() at every Firestore boundary in app.js, flushpanel.html and functions/index.js.
+   Not redundant now that the data is clean, because:
+     - links shared before this change still carry ?loc=node%2F123
+     - reports / outOfOrder / missingReports / activity store locId as a FIELD, with slashes,
+       and those writes DID succeed (auto-id addDoc) — read-time normalisation keeps them
+       resolvable, which is why NO Firestore migration is needed
+     - a future import can reintroduce slashed ids
+   Verified: all three implementations agree on 8 inputs including null, undefined and a number,
+   and the function is idempotent, so applying it to an already-safe id is a no-op.
 
-D. [from your second screenshot] "Getting around" and "Directions app" still butted against
-   their icons. They are .d-section-label divs, not buttons — never given display:flex or gap,
-   so .d-ico had no flex context: flex-basis ignored, gap inert. Now flex with gap 10px like
-   every other row.
+4. RB-04 — live amenity confirmation has NEVER worked, and now does.
+   fetchCommunityDoc reads aggregates/{locId}.amen. The Cloud Function returned early on any
+   amenity-only change and never wrote `amen`, so amenityCache was permanently all-zeros. The
+   accessibility badge, restroom-setup answers and the hasRestroom hide were all inert. The only
+   other route was the nightly export-votes -> bake-confirmed bake, which was crashing until
+   yesterday. So the feature had never reached a user by either path.
 
+   The trigger now tallies amenity and store-feature answers via nested dot-path increments, and
+   stamps schemaVersion: 2. Amenity keys are NOT enumerated in the function — whatever keys
+   appear in a vote get tallied, so adding an amenity in app.js needs no redeploy.
+   Unit-tested, 8/8: first vote, yes->no change, vote deleted, unchanged, non-yes/no value
+   ignored, store features, the new hasRestroom key, and a rating-only change.
 
-========================================================================
-THE DATE PROBLEM — fixed at the root
-========================================================================
+   KNOWN LIMIT: `amen` counts votes from this deploy forward. Answers cast before it existed were
+   never tallied and are not backfilled. Aggregates are derived from `votes`, so a one-off
+   recompute can correct them if the numbers ever look wrong.
 
-Three hand-typed dates, already drifted: drawer stamp 2026-07-30, onboarding July 14, FAQ
-July 21. Now one value:
+5. RB-05 — signing up no longer double-counts. The migration copied each anonymous vote to the
+   new uid and deliberately left the original, so the trigger counted both and one rating became
+   two in the public average, permanently. Now it deletes the original after a CONFIRMED copy,
+   per-document, so a failure can never destroy a rating it did not move. A denied delete is
+   logged loudly rather than swallowed.
 
-    const BUILD_DATE = '2026-07-30';      // app.js, beside CONFIRM_THRESHOLD
+   WORTH KNOWING: this loop finds nothing today. The votes rule requires signedIn() via
+   ownedByCaller() AND pins the doc id to request.auth.uid, so a vote keyed to a device id could
+   never have been created — the audit inferred the bug from the code without checking whether
+   the source documents can exist. The fix is in so that if anonymous rating is ever enabled, the
+   migration is correct from day one.
 
-buildDateLong() formats it for prose; stampBuildDate() fills .onboardingUpdated, .hiw-updated
-and the drawer stamp (which carries data-version="v2.6.5" so version and date compose from one
-place). ON EACH RELEASE change BUILD_DATE and data-version; nothing else shows a date. The
-markup keeps July 30 as a no-JS fallback. Parsed as parts, not new Date(), so it can't shift a
-day backwards west of GMT — tested at 2026-01-01, 2026-07-30, 2026-12-25.
+6. ADMIN-02 and two related bugs. Three travel-chain constants existed with three different
+   contents:
+     TRAVEL_CENTER_CHAINS  pilotFlyingJ, loves, bucees            <- achievement; OMITTED TA
+     TRAVEL_KEYS           'pilot', loves, travelCenters, bucees  <- dead; 'pilot' isn't a key
+     TRAVEL_CENTER_KEYS    all four                               <- correct
+   So rating a TravelCenters location never counted toward Truck Stop Hero. Now one definition,
+   shared. The dead constant is gone.
 
-
-========================================================================
-THE 13 AUDIT FINDINGS
-========================================================================
-
-FIXED
-
-1  [CRITICAL] The nightly bake was silently broken. compact-locations.js is a script, not data,
-   but matched the *-locations.js glob every bake step uses; its shebang is a SyntaxError in the
-   new Function(...) loaders, and bake.yml swallowed it with `|| echo "...continuing"`. Runs
-   reported success while EVERY FlushPanel override baked into nothing.
-   FIX: looksLikeDataFile() content check in all three loaders, skip logged.
-   Fixing it exposed a SECOND crash: the chain-map loop dereferenced loaded[f].varName for the
-   skipped file. Now iterates Object.keys(loaded).
-   PROVEN end to end against a copy of the real repo — 28,123 indexed, override applied, record
-   count preserved. Before the fix, that run died on the first file.
-
-1b bake.yml now emits ::warning:: annotations, so the next failure shows on the run summary.
-
-1c [found while verifying 1] Fixing the crash made a data-loss path live. bake-hours.js is
-   authoritative: a record flagged community_verified whose id is ABSENT from the status file is
-   REVERTED. fetch-and-bake-hours.js wrote whatever Firestore returned with no emptiness check,
-   so one transient error would wipe every community-verified hour. Confirmed with an empty
-   status file: 10 records reverted. fetch-and-bake.js already guarded this; the hours fetcher
-   did not. FIX: refuse to bake an empty fetch. Protects 10 records today (speedway 8,
-   circleK 1, stewarts 1).
-
-2  Two true duplicates removed. 28,125 -> 28,123.
-     circlek-tampa-ntelecommpkwy   "TELECOMM" vs "TELECOM", same address, 0.0m
-     node/11761691198              0.1m from 100 1st Avenue, no address of its own
-
-4  hasRestroom is now admin-correctable — it was missing from the amenityOverrides allowlist, so
-   a wrong community vote on any of the 672 flagged rest areas or 354 flagged Circle Ks could not
-   be overridden from FlushPanel.
-
-6  85 dead CSS declarations removed from styles.css. 31 remain and are correct (multi-selector
-   rules whose other selectors still need them). Includes the stale --accent:#38b8bb.
-
-8  firestore.rules no longer claims a leaderboard Cloud Function that isn't deployed.
-
-11 aria-label added to installClose, listViewClose, accountClose. cbClose used U+00D7 (×) among
-   five U+2715 (✕); normalised.
-
-13 flushpanel.html "Handicap accessible" -> "Wheelchair accessible".
-
-BONUS jacksons-way-615371860 had sat:"" and sun:"" in per-day hours — neither open nor closed.
-   Those days now read as unknown. Last malformed per-day value in the dataset.
-
-NOT FIXED, DELIBERATELY
-
-3  Two stores share one coordinate — NOT duplicates. Two real addresses at identical lat/lng, so
-   one pin of each pair is misplaced: Circle K Franklin TN (Murfreesboro Rd / New Hwy 96 W) and
-   Cumberland Farms Bridgewater MA (Pleasant St / Main St), plus an ambiguous Jacksonville
-   "BLDG 2". Needs an authoritative coordinate I cannot derive. See coordinate-review.txt.
-
-5  amenityOverrides has no writer — read in three places, written by nothing. A missing feature.
-
-7  Four features have working JS and no HTML (loadLeaderboard, updateMyProgressBadge, support
-   prompt, recap pills). All null-guarded. Documented rather than deleted, since
-   Community/leaderboard is planned.
-
-10 WITHDRAWN — my false positive. "Where Am I?" has an inline SVG icon plus an aria-label; my
-   check only looked for emoji. The real point is that three primary controls use emoji and one
-   uses SVG. The SVG is the better implementation, so it stands; unifying is your design call.
+   FlushPanel derived chain keys by stripping 'Locations' off the global name, giving 'pilot'
+   where the registry says 'pilotFlyingJ' — a new store added through the panel was written with
+   a chain the app doesn't know, so it never rendered. Now a table, with audit-ui.js failing the
+   build if the registry gains another mismatch.
 
 
-========================================================================
-RE-AUDIT
-========================================================================
-  [ok] node tools/audit-ui.js — all checks pass (18 failures against the pre-fix repo)
-  [ok] app.js and all four bake scripts parse
-  [ok] 28,123 records across 40 globals, ZERO duplicate ids
-  [ok] 40 registry dataVars <-> 40 script tags <-> 40 files
-  [ok] index.html ids unique; div/span/button balanced; css + rules braces balanced
-  [ok] all four drawer row types: flex, gap 10px, 20px left padding
-  [ok] 10 drawer rows, every emoji inside a .d-ico slot
-  [ok] 19 drawer ids carry no leftover positioning rules
-  [ok] one date string in the markup; buildDateLong tested across three dates
-  [ok] no icon-only button missing aria-label; zero U+00D7
-  [ok] 9 malformed hrs values remain, all pre-existing; 0 malformed per-day
-  [ok] bake skips compact-locations.js, logs it, and applies a real override
+NEW GUARD CHECKS — tools/audit-ui.js
+------------------------------------
+  node tools/audit-ui.js        # non-zero exit on failure
 
-STILL NOT VERIFIABLE BY ME: the rendered result. The script checks structure, not pixels. Please
-reopen the drawer and confirm all seven rows — Passport, FAQ, Gift shop, Getting around, All
-places, Preferences, Directions app — share one left edge, and that the FAQ reads July 30.
+Run against the pre-Phase-1 tree it reports 19 failures — every bug above:
+  6595 ids contain "/"          ·  1 "__" id without meta.srcId
+  9 unnormalised doc() paths in app.js   ·  7 in flushpanel.html
+  pilotLocations mapping absent
 
-AFTER DEPLOYING
-  1. bump sw.js
-  2. firebase deploy --only firestore:rules
-  3. run the bake by hand from the Actions tab and watch it — it should log
-     "Skipped non-data file(s): compact-locations.js" and then apply the overrides that have
-     been silently accumulating.
+Against this build: all checks pass.
+
+These are the checks whose absence caused the bug. Two of seven call sites remembered to
+sanitise, five did not, and nothing enforced it.
+
+
+VERIFIED
+--------
+  28,123 records · 0 ids containing "/" · 6,595 meta.srcId · 0 duplicate ids
+  no record lost and no field changed except id and meta.srcId, matched by srcId across the rename
+  fsId agrees across all three files on 8 inputs; idempotent
+  amenityDeltas 8/8 unit cases
+  app.js, functions/index.js, audit-ui.js, bake-overrides.js all parse
+  html ids unique and balanced; css balanced
+
+
+NOT VERIFIABLE BY ME
+--------------------
+  Whether reports/outOfOrder docs exist with slashed locId values. Read-time normalisation makes
+  it moot, which is why it was not a blocker.
+  Whether current aggregate totals are already inflated. Needs a Firestore query.
+  The live rating flow end to end. The fsId round-trip and the amenity deltas are unit-tested;
+  the popup, the vote write and the trigger firing are not, by me.
+
+AFTER DEPLOYING — worth testing in this order
+  1. rate a Speedway. It should save, and reload with your stars intact. That path has never
+     worked.
+  2. open the same popup again — the community average should appear.
+  3. answer an amenity question, reload, and confirm the answer persists. That is RB-04.
+  4. in FlushPanel, save an override on a Speedway. That has never worked either.
+
+
+PHASE 2 PREVIEW — rules hardening, not started
+  RB-02 the tips array is not append-only despite the comment (I misread this in my own audit)
+  RB-03 any signed-in user can clear or prolong a location outage
+  RB-06 admin activation uses enabled != false, so a null reads as enabled
+  SEC-01..06 unauthenticated report spam, unvalidated vote maps, public UID-linked rating history

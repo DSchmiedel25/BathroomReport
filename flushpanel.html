@@ -756,7 +756,7 @@ async function openFix(report){
 
   // Merge any existing override on top (one read).
   try{
-    const ovSnap = await getDoc(doc(db, 'overrides', locId));
+    const ovSnap = await getDoc(doc(db, 'overrides', fsId(locId)));
     if(ovSnap.exists()){
       const ov = ovSnap.data();
       OVERRIDE_TEXT_FIELDS.forEach(f => { if(ov[f] !== undefined) eff[f] = ov[f]; });
@@ -829,7 +829,7 @@ async function removePin(){
 
   $('#fixRemove').disabled = true;
   try{
-    await setDoc(doc(db, 'overrides', locId), payload, { merge: true });
+    await setDoc(doc(db, 'overrides', fsId(locId)), payload, { merge: true });
     // Resolve the report too if the checkbox is on (mirrors saveFix's resolve behavior).
     if($('#resolveOnSave') && $('#resolveOnSave').checked && _rpt){
       try{
@@ -903,7 +903,7 @@ async function saveFix(){
   $('#fixSave').disabled = true;
   try{
     // merge:true so we only touch the changed fields and keep any prior override data.
-    await setDoc(doc(db, 'overrides', locId), patch, { merge: true });
+    await setDoc(doc(db, 'overrides', fsId(locId)), patch, { merge: true });
 
     // Keep the bundled seed index in sync so re-opening shows the new values.
     if(!locById[locId]) locById[locId] = { id: locId };
@@ -1064,7 +1064,7 @@ $('#tipsList').addEventListener('click', async (e) => {
     if(!confirm('Remove this tip permanently?\n\n"' + oldText + '"')) return;
     btn.disabled = true;
     try{
-      await updateDoc(doc(db, 'tips', locId), { tips: arrayRemove(oldText) });
+      await updateDoc(doc(db, 'tips', fsId(locId)), { tips: arrayRemove(oldText) });
       tips.splice(i, 1); if(!tips.length) delete allTips[locId];
       renderTips(); toast('Tip removed.');
     }catch(err){ console.error(err); toast('Could not remove tip.', true); btn.disabled = false; }
@@ -1075,8 +1075,8 @@ $('#tipsList').addEventListener('click', async (e) => {
     if(!trimmed){ toast('Tip cannot be empty.', true); return; }
     if(trimmed === oldText) return;
     try{
-      await updateDoc(doc(db, 'tips', locId), { tips: arrayRemove(oldText) });
-      await updateDoc(doc(db, 'tips', locId), { tips: arrayUnion(trimmed) });
+      await updateDoc(doc(db, 'tips', fsId(locId)), { tips: arrayRemove(oldText) });
+      await updateDoc(doc(db, 'tips', fsId(locId)), { tips: arrayUnion(trimmed) });
       tips[i] = trimmed; renderTips(); toast('Tip updated.');
     }catch(err){ console.error(err); toast('Could not update tip.', true); }
   }
@@ -1084,11 +1084,26 @@ $('#tipsList').addEventListener('click', async (e) => {
 
 
 // ===== Add a brand-new store from a location request =====
+/* Registry keys are NOT derivable from the global name: pilotLocations belongs to the registry
+ * key 'pilotFlyingJ', not 'pilot'. Stripping the suffix wrote new stores with a chain key the
+ * app does not know, so they never rendered. This table is the authority; it mirrors
+ * CHAIN_REGISTRY's dataVar mapping in app.js. tools/audit-ui.js fails the build if the two
+ * disagree. */
+const DATAVAR_TO_CHAIN_KEY = {
+  // The only current mismatch: pilotLocations belongs to registry key 'pilotFlyingJ'.
+  // Every other dataVar strips cleanly. Kept as a table rather than a special case so the next
+  // divergence is a one-line addition, and audit-ui.js fails the build if one appears untabled.
+  pilotLocations: 'pilotFlyingJ'
+};
+function chainKeyForDataVar(varName){
+  if(DATAVAR_TO_CHAIN_KEY[varName]) return DATAVAR_TO_CHAIN_KEY[varName];
+  return varName.replace(/Locations$/, '');
+}
 function chainOptions(){
   const out = [];
   for(const key of Object.keys(window)){
     if(Array.isArray(window[key]) && /Locations$/.test(key)){
-      const ck = key.replace(/Locations$/, '');
+      const ck = chainKeyForDataVar(key);
       const label = ck.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).trim();
       out.push({ key: ck, label });
     }
@@ -1150,7 +1165,7 @@ async function saveAddStore(){
 
   $('#addSave').disabled = true;
   try{
-    await setDoc(doc(db, 'overrides', id), patch, { merge: true });
+    await setDoc(doc(db, 'overrides', fsId(id)), patch, { merge: true });
     locById[id] = { id, n: name, chain, lat, lng, addr: patch.addr };  // so a second add can't reuse the id
     if($('#addRemove').checked){
       await deleteDoc(doc(db, 'missingReports', currentAdd.reqId));
@@ -1313,3 +1328,13 @@ $('#addSave').addEventListener('click', saveAddStore);
 </script>
 </body>
 </html>
+    /* Firestore treats '/' as a path separator, so doc(db,'overrides','node/123') resolves to a
+     * three-segment path and THROWS. 6,595 location ids were OSM-derived and contained a slash —
+     * Speedway entirely, plus every metro and public chain — so every override and tip edit made
+     * from this panel silently failed for a quarter of the map. This panel had NO sanitising at
+     * all. The data files now carry the safe form (original preserved in meta.srcId), but reads
+     * still normalise so any override created earlier under a raw id keeps resolving. */
+    function fsId(id){
+      return String(id == null ? '' : id).replace(/\//g, '__');
+    }
+
