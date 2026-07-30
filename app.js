@@ -1212,7 +1212,15 @@ async function migrateAnonymousDataToAccount(oldAnonId, newUid, username){
       }catch(e){ console.warn('migrate: vote copy skipped', voteDoc.id, e && e.code); }
     }
     if(copied) console.log('migrate: ' + copied + ' vote(s) copied, ' + removed + ' original(s) removed');
-  }catch(e){ console.error('migrate: votes phase failed (continuing)', e); }
+  }catch(e){
+    /* Expected now, and not an error. `votes` reads are owner-scoped, and this query filters by a
+     * DEVICE id rather than the caller's uid, so it is not provably within the rule and Firestore
+     * denies the list. That is fine: the create rule requires signedIn() and pins the doc id to
+     * request.auth.uid, so a vote keyed to a device id cannot exist to be migrated. Logged at
+     * debug volume so it does not read as a failure on every signup. */
+    if(e && e.code === 'permission-denied') console.log('migrate: no device-scoped votes to migrate (expected)');
+    else console.error('migrate: votes phase failed (continuing)', e);
+  }
 
   // (The old check-ins migration was removed: the checkins collection is retired and its
   // rules block all writes, so the copy could never succeed — it only threw and aborted.)
@@ -1496,11 +1504,13 @@ async function loadWeeklyRecap(){
       const item = d.data();
       if(item.deleted === true) return;
       if(item.type === 'rating' && item.sourceId){
-        checks.push(
-          getDoc(doc(db, 'votes', fsId(item.sourceId)))
-            .then(vSnap => vSnap.exists() ? 'rating' : null)
-            .catch(() => null)
-        );
+        /* Trusted without re-reading the vote. That read required permission to see OTHER
+         * people's vote documents, and a vote carries the raw uid, the location and the
+         * timestamp — so a publicly readable `votes` collection let anyone reconstruct where a
+         * named person had been. The collection is now owner-only, and recomputeBathroomAggregate
+         * deletes the activity entry when its vote is deleted, so the log stays honest without
+         * every client being able to audit it. */
+        checks.push(Promise.resolve('rating'));
       } else if(item.type === 'tip' && item.locId && typeof item.text === 'string'){
         checks.push(
           getDoc(doc(db, 'tips', fsId(item.locId)))
@@ -2259,11 +2269,21 @@ async function attachAmenityHandlers(loc){
       if(value === 'yes') cell.yes++;
       if(value === 'no')  cell.no++;
     }
+    /* Snapshot before committing optimistically. The cached vote and the local tally bump above
+     * were applied before the write and never undone on failure, so a rejected answer left the
+     * confirmed-by-visitors block showing a count the server never accepted — and the next write
+     * for this location would carry the phantom answer along with it. */
+    const prevVote = myVoteCache[loc.id];
+    const prevCache = JSON.parse(JSON.stringify(bathroom ? (amenityCache[loc.id] || {}) : (storeFeatureCache[loc.id] || {})));
     myVoteCache[loc.id] = updatedVote;
 
     const ok = await saveMyVote(loc.id, updatedVote);
     if(!ok){
-      if(note){ note.style.color = '#c62828'; note.textContent = 'Could not save — try again.'; }
+      if(prevVote === undefined) delete myVoteCache[loc.id];
+      else myVoteCache[loc.id] = prevVote;
+      if(bathroom) amenityCache[loc.id] = prevCache;
+      else storeFeatureCache[loc.id] = prevCache;
+      if(note){ note.style.color = '#c62828'; note.textContent = 'Could not save — nothing was recorded.'; }
       allBtns.forEach(b => b.disabled = false);
       return;
     }
@@ -2318,11 +2338,21 @@ async function attachStoreFeatureHandlers(loc){
     const myVote = myVoteCache[loc.id] || emptyVote();
     const storeFeatures = { ...(myVote.storeFeatures || {}), [key]: value };
     const updatedVote = { ...myVote, storeFeatures };
+    /* Snapshot before committing optimistically. The cached vote and the local tally bump above
+     * were applied before the write and never undone on failure, so a rejected answer left the
+     * confirmed-by-visitors block showing a count the server never accepted — and the next write
+     * for this location would carry the phantom answer along with it. */
+    const prevVote = myVoteCache[loc.id];
+    const prevCache = JSON.parse(JSON.stringify(storeFeatureCache[loc.id] || {}));   // this handler is store-features only
     myVoteCache[loc.id] = updatedVote;
 
     const ok = await saveMyVote(loc.id, updatedVote);
     if(!ok){
-      if(note){ note.style.color = '#c62828'; note.textContent = 'Could not save — try again.'; }
+      if(prevVote === undefined) delete myVoteCache[loc.id];
+      else myVoteCache[loc.id] = prevVote;
+      storeFeatureCache[loc.id] = prevCache;
+
+      if(note){ note.style.color = '#c62828'; note.textContent = 'Could not save — nothing was recorded.'; }
       allBtns.forEach(b => b.disabled = false);
       return;
     }
@@ -3152,6 +3182,17 @@ function attachStarHandlers(loc){
           myVote.wasHiddenGem = true;
         }
 
+        /* Snapshot before the optimistic update so a rejected write can be undone.
+         *
+         * The bump below is applied BEFORE the write and used to have no rollback: a rejected
+         * rating left the new average on screen, the stars filled, and myVoteCache holding a
+         * value that was never stored — which then fed the achievement counters. The user saw
+         * "Save failed" next to a rating that looked saved. */
+        const rollback = {
+          sum: agg[sumKey], count: agg[countKey],
+          vote: myVote[type], hiddenGem: myVote.wasHiddenGem,
+        };
+
         // Update local view optimistically so it feels instant
         agg[sumKey] += sumDelta;
         agg[countKey] += countDelta;
@@ -3172,8 +3213,24 @@ function attachStarHandlers(loc){
         // Function, which reacts to this vote write — the client only writes the vote. The
         // on-screen average was already updated optimistically above.
         const okVote = await saveMyVote(loc.id, myVote);
+        if(!okVote){
+          // Undo the optimistic update. Leaving it would show an average and a star row that no
+          // server ever accepted, and wasHiddenGem would persist into the achievement stats.
+          agg[sumKey] = rollback.sum;
+          agg[countKey] = rollback.count;
+          myVote[type] = rollback.vote;
+          if(rollback.hiddenGem === undefined) delete myVote.wasHiddenGem;
+          else myVote.wasHiddenGem = rollback.hiddenGem;
+          ratingsCache[loc.id] = agg;
+          myVoteCache[loc.id] = myVote;
+          starGroup.querySelectorAll('span').forEach((s,i) => {
+            s.classList.toggle('filled', (i+1) <= (rollback.vote || 0));
+          });
+          const qEl = document.getElementById('quip-' + type + '-' + loc.id);
+          if(qEl) qEl.textContent = quipFor(type, rollback.vote);
+        }
         if(okVote) logActivity('rating', { sourceId: loc.id + '_' + getEffectiveId(), locId: loc.id });
-        if(note) note.textContent = okVote ? 'Saved ✓ — visible to everyone' : 'Save failed';
+        if(note) note.textContent = okVote ? 'Saved ✓ — visible to everyone' : 'Save failed — nothing was recorded';
         if(okVote) maybeShowSupportPrompt();
 
         // refresh the label text with new average

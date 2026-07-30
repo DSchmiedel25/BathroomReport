@@ -1,59 +1,99 @@
-v2.9.7 — DATA-06
-=================
-Flat zip. Small one.
+v2.9.9 — the two MUST-FIX items
+================================
+One is code and it is in this zip. The other is a command only you can run.
 
-WHERE EACH FILE GOES — all repo root
-  holiday-locations.js  ·  nyc-starbucks-locations.js
-  quickchek-locations.js  ·  racetrac-locations.js
-  index.html            version stamp only. BUMP sw.js.
+WHERE EACH FILE GOES
+  app.js                       repo root      BUMP sw.js
+  index.html                   repo root      version stamp
+  export-votes.js              repo root
+  bake-hours.js                repo root
+  fetch-and-bake-hours.js      repo root
+  tools/audit-ui.js            tools/
+  tools/rebuild-aggregates.js  tools/
+  firestore.rules              PUBLISH in the console
+  functions-index.js           rename to index.js -> functions/, THEN deploy
 
-  No rules change. No app.js change. No functions change.
+ORDER
+  1. commit the files
+  2. publish the rules
+  3. firebase deploy --only functions
 
-
-WHAT CHANGED
-  Seven records carried a bare ZIP code where a street address goes — "14740", "10005",
-  " 76063". That is worse than an empty field: it looks like data, tells a driver nothing, and it
-  earned five of them a thin /guide/ page.
-
-  The ZIP is now kept where ZIPs belong (meta.zip), the record is flagged meta.addr_status =
-  "zip_only" so the backlog is findable, and the address is genuinely empty. One address with a
-  leading space was trimmed.
-
-    holiday        2      nyc-starbucks  1
-    quickchek      1      racetrac       3  (one of which had the stray space)
-
-  Verified afterwards: 0 zip-only addresses and 0 whitespace issues remain across all 28,087
-  records, and all 7 keep their ZIP.
-
-DOWNSTREAM
-  Static generation: 21,991 -> 21,986 eligible pages. FIVE thin pages removed, not seven — two of
-  the seven were already held back, because the generator never counted a bare ZIP as a street.
-  I assumed seven and checked; held-back went 6,096 -> 6,101, which matches the five.
+  Publishing before deploying matters here more than usual: the new rule closes `votes` to
+  owner-only reads, and the function is what keeps the activity log honest once the client can no
+  longer audit it. Deploy the function in the same sitting.
 
 
-WHAT I ALSO CHECKED AND DID NOT CHANGE
-  APP-04 "travel mode wording and behaviour contradict each other" — from Audit #1, and it looks
-  already resolved. "On foot" now requests walking directions AND shows the city-jump row, which
-  is what the label implies. That changed in v2.5.5 when travel mode became directions-only with
-  no autoswitch. Not carrying it forward as open.
+═══ MUST-FIX 1 — H-01, public vote reads exposed location histories ═══
+`votes` was `allow read: if true`, and every document carries:
+
+    clientId (the raw uid) · locId · ratedAt · username
+
+So anyone could query the collection and reconstruct WHERE A NAMED PERSON HAD BEEN AND WHEN. No
+sign-in required. Phase 2a closed users/{uid} for precisely this reason and left the collection it
+mirrors — I shut the front door and left the side one open.
+
+It also sits three lines from the FAQ claim that analytics "doesn't identify you personally".
+
+  Now: allow read: if signedIn() && (resource.data.clientId == request.auth.uid || isAdmin())
+
+WHAT THAT BROKE, AND HOW IT IS HANDLED
+  The weekly recap verified every activity entry by reading the vote behind it — which required
+  permission to read OTHER people's votes. Closing the collection would have silently reduced the
+  recap to counting only your own activity.
+
+  The cleanup moved to where it belongs. recomputeBathroomAggregate now deletes an activity entry
+  when its vote is deleted, so the log stays honest without every client being able to audit it.
+  Best-effort and non-fatal: a stale entry is cosmetic, failing an aggregate write over one is not.
+
+EVERY REMAINING votes READ, CHECKED AGAINST THE NEW RULE
+  own vote by id                    PASSES  clientId is the caller
+  query where clientId == my uid    PASSES  provably owner-scoped, the documented list pattern
+  cross-user read in the recap      REMOVED replaced by the server-side cleanup
+  the anon-migration query          DENIED  and that is correct. It filters by a DEVICE id, so it
+                                            is not owner-scoped. Anonymous votes cannot exist
+                                            anyway — the create rule requires signedIn() and pins
+                                            the doc id to request.auth.uid. Now logged as
+                                            "expected" rather than as a failure on every signup.
+
+WHAT IS STILL PUBLICLY READABLE, DELIBERATELY
+  aggregates    anonymous totals, no author attached
+  activity      carries a chosen handle, not a uid, and public credit is the point of the feature
+                you asked for. Weaker than the votes exposure and consented by design.
+  outOfOrder    carries reporterId, but the app must read it for any location while signed out.
+                Smaller surface: only people who report outages. Worth revisiting.
 
 
-STILL OPEN — the honest list
-  Needs the Mac:
-    firebase deploy --only functions   ← still the biggest blocker. The transaction, the admin
-                                         fix, amenity tallies, the hours regex and lastRatedBy
-                                         are all dormant until this runs.
-    git rm the six stray files  ·  curl the two Leaflet plugins (PWA-02)
-  Needs you:
-    the 7 pairs in duplicate-review.txt  ·  a real device regression pass
-  Real work, not started:
-    A2-04  ~15 MB of markers retained at startup. Measured now, but I want a device memory
-           timeline before touching the cluster plugin — the last attempt caused the Android races.
-    APP-02 the users ratings map grows unbounded toward the 1 MiB document ceiling
-    no emulator suite — audit-ui.js is static analysis and has never exercised a live rule
-    FUNC-02 / FUNC-04 hours eligibility counting and the N+1 recomputation
-  Decision:
-    SEC-01/02 report spam needs App Check, not rules
-  Cannot resolve from here:
-    RB-05 — I argue it is inert because anonymous votes cannot exist under current rules. That
-            holds only if no legacy device-id votes exist, which needs a Firestore query.
+═══ MUST-FIX 2 — deploy the function. Only you can do this. ═══
+    cd ~/code/bathroomreport && git pull
+    mv <functions-index.js> functions/index.js
+    firebase deploy --only functions
+
+  Dormant until it runs:
+    the exact-recompute aggregate     CR-02 duplicate delivery, CR-03 out-of-order edits
+    the hours transaction             CR-04 stale invocation overwriting a newer result
+    the admin check                   A2-01, still grants admin on a missing `enabled` field
+    aggregates.amen tallies           live amenity confirmation has NEVER worked
+    the hours regex                   24:01-24:59 accepted as valid times
+    lastRatedBy                       the "by name" credit
+    the activity cleanup              NEW, and H-01 above depends on it
+
+
+WHAT I VERIFIED
+  every votes read traced against the new rule, one by one
+  the cross-user read is gone: 0 occurrences
+  9 JS files parse · 15 audit checks pass · rules balanced · both html well-formed
+
+WHAT I COULD NOT VERIFY
+  Firestore's query-scoping behaviour under the new rule. `where('clientId','==',uid)` under an
+  owner rule is the documented pattern and should be allowed, but I cannot exercise it without an
+  emulator. If loadAllRatings starts returning nothing after you publish, that is the thing to
+  look at — and the fallback path still works, so ratings would load slower rather than vanish.
+
+
+AFTER THIS, WHAT IS LEFT
+  SHOULD:  H-06 client-only proximity · H-07 App Check · APP-02 the 1 MiB ratings map ·
+           A2-04 markers (~15 MB, wants a device profile first) · no emulator suite
+  CAN:     the six stray files · PWA-02 vendoring · 17,043 string coordinates ·
+           85 near-overlap pairs · 5,005 missing addresses · FUNC-02 / FUNC-04
+  NO FIX:  H-09 delta zip · A2-05 open-now tz · RB-05 · A2-06 anonymous reports ·
+           A2-03 partial bake · SEC-09 fail-open block check

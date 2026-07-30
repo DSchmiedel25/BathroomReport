@@ -98,13 +98,18 @@ service cloud.firestore {
         || request.resource.data[k] in ['yes','no','unknown','single','multiple',''];
     }
 
-    function knownAmenityMap(k) {
+    /* The two vote maps take DISJOINT key sets.
+     *
+     * Both used to accept all eleven keys, so a vote carrying accessible:'yes' in amenities AND
+     * in storeFeatures contributed two confirmations from one person — enough to reach
+     * CONFIRM_THRESHOLD on its own. The app writes bathroom answers to `amenities` and store
+     * answers to `storeFeatures`; nothing legitimate puts a key in both.
+     *
+     * Mirrors AMENITY_KEYS_BY_FIELD in functions/index.js and the two arrays in app.js. */
+    function knownAmenityMap(k, allowed) {
       return !(k in request.resource.data)
         || (request.resource.data[k] is map
-            && request.resource.data[k].keys().hasOnly([
-                 'restroomType','accessible','changing','hasRestroom',
-                 'evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'
-               ])
+            && request.resource.data[k].keys().hasOnly(allowed)
             && request.resource.data[k].values().hasOnly(['yes','no','unknown','single','multiple','']));
     }
 
@@ -174,8 +179,10 @@ service cloud.firestore {
       return strOrAbsent('locId')
         && ratingOrAbsent('store')
         && ratingOrAbsent('bathroom')
-        && knownAmenityMap('amenities')
-        && knownAmenityMap('storeFeatures')
+        && knownAmenityMap('amenities',
+             ['restroomType','accessible','changing','hasRestroom'])
+        && knownAmenityMap('storeFeatures',
+             ['evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'])
         // amenityMeta holds per-key not-sure counters, shaped { key: { notSure: n } }, so its
         // VALUES are maps rather than the enum above. Keys are still restricted the same way.
         && boundedMapOrAbsent('amenityMeta', 24)
@@ -192,7 +199,19 @@ service cloud.firestore {
         && boolOrAbsent('wasHiddenGem');
     }
     match /votes/{id} {
-      allow read: if true;
+      /* Was `if true`. Every vote carries clientId (the raw uid), locId, ratedAt and username, so
+       * a public read let anyone query the collection and reconstruct WHERE A NAMED PERSON HAD
+       * BEEN AND WHEN. Phase 2a closed users/{uid} for exactly this and left the collection it
+       * mirrors — the weaker door on the same room.
+       *
+       * Owner-scoped reads still work: a query constrained by where('clientId','==',uid) is
+       * provably within this rule, which is what loadAllRatings uses. Aggregates stay public,
+       * because they are anonymous totals with no author attached.
+       *
+       * The recap used to verify each activity entry by reading the vote behind it, which needed
+       * cross-user reads. That check now lives in recomputeBathroomAggregate, which deletes an
+       * activity entry when its vote is deleted. */
+      allow read: if signedIn() && (resource.data.clientId == request.auth.uid || isAdmin());
       allow create: if ownedByCaller()
         && id == request.resource.data.locId + '_' + request.auth.uid
         && request.resource.data.keys().hasOnly([

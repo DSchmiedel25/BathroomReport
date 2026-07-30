@@ -16,7 +16,21 @@ async function main(){
   console.log('Reading hourStatus from Firestore (read-only)\u2026');
   const snap = await db.collection('hourStatus').get();
   const status = {};
-  snap.forEach(d => { status[d.id.split('__').join('/')] = d.data(); });  // reverse slash-slug
+  /* Key by the document id AS STORED. Do not reverse it.
+   *
+   * This used to do d.id.split('__').join('/'), and that was correct BEFORE Phase 1: location
+   * records carried a slash ('node/123') while hourReports/hourStatus were written through
+   * fsId(), so the doc id was 'node__123' and had to be turned back to match a record.
+   *
+   * Phase 1 renamed the records to the canonical form. Both sides are now 'node__123', so the
+   * reversal produces a key that matches NOTHING — and bake-hours is authoritative: any record
+   * flagged community_verified whose id is absent from this map gets REVERTED to its
+   * pre-community hours. Eight records were one bake away from silently losing their verified
+   * hours.
+   *
+   * The srcId fallback below covers the reverse case: a status document written before Phase 1
+   * whose key never went through fsId at all. */
+  snap.forEach(d => { status[d.id] = d.data(); });
   console.log('Fetched ' + Object.keys(status).length + ' hourStatus doc(s).');
   // REFUSE to bake an empty fetch. bake-hours.js is authoritative and idempotent: any record
   // flagged community_verified whose id is absent from the status file gets REVERTED to its

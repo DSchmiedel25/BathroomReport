@@ -23,10 +23,20 @@ const fs = require('fs');
 admin.initializeApp({ credential: admin.credential.cert(require('./serviceAccountKey.json')) });
 const db = admin.firestore();
 
-// Feature keys the app tracks. Bathroom amenities live under vote.amenities, store features
-// under vote.storeFeatures — we keep them separate so baking maps them to the right badge group.
-const AMENITY_KEYS = ['accessible', 'changing', 'handDrying'];          // restroom-type is multi-state; skip
-const STORE_KEYS   = ['evCharging', 'airPump', 'shower', 'indoorSeating', 'wifi'];
+/* Feature keys the app tracks. Bathroom answers live under vote.amenities, store answers under
+ * vote.storeFeatures, and the two sets are DISJOINT — the same key in both would let one person
+ * confirm something twice.
+ *
+ * These lists had gone stale and it mattered. They still named `handDrying`, an amenity that no
+ * longer exists, and OMITTED hasRestroom, grabAndGo and hotFood. So the nightly bake never baked
+ * a single hasRestroom confirmation — the one question that can prune a pin from the map. That
+ * feature has had no working path at all: the aggregate never carried it either.
+ *
+ * restroomType is deliberately absent: it is multi-state (single / multiple), not yes/no, so it
+ * does not reduce to a confirmation count. tools/audit-ui.js check 15 holds these in step with
+ * app.js, the rules and functions/index.js. */
+const AMENITY_KEYS = ['accessible', 'changing', 'hasRestroom'];
+const STORE_KEYS   = ['evCharging', 'airPump', 'shower', 'indoorSeating', 'wifi', 'grabAndGo', 'hotFood'];
 
 (async () => {
   const summary = {};   // locId -> { amenities:{key:{yes,no}}, storeFeatures:{key:{yes,no}} }

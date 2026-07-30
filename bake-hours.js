@@ -63,7 +63,10 @@ for (const file of locPaths){
   let fileApplied = 0, fileReverted = 0;
   for (const rec of records){
     processed++;
-    const st = verified[rec.id];
+    /* Canonical id first. Fall back to meta.srcId so a hourStatus document written BEFORE the
+     * Phase 1 rename — keyed by the record's old slashed id — still matches its record instead
+     * of looking absent and triggering a revert. */
+    const st = verified[rec.id] || (rec.meta && rec.meta.srcId ? verified[rec.meta.srcId] : undefined);
     const meta = rec.meta || {};
     const isCommunity = meta.hrsSrc === 'community_verified' || meta.hrsSrc === 'admin_override';
 
