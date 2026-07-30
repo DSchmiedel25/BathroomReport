@@ -260,5 +260,42 @@ console.log('\nvote field allowlist');
   }
 }
 
+// ---- 10: the hours canonicalisers must agree ----
+console.log('\nhours canonicaliser');
+{
+  const pull = (file, name) => {
+    if (!fs.existsSync(file)) return null;
+    const lines = fs.readFileSync(file, 'utf8').split('\n');
+    const start = lines.findIndex(l => l.includes('function ' + name + '('));
+    if (start < 0) return null;
+    let end = start;
+    for (let i = start + 1; i < lines.length; i++) if (lines[i] === '}') { end = i; break; }
+    try {
+      const ex = {};
+      new Function('exports', lines.slice(start, end + 1).join('\n') + '; exports.f=' + name + ';')(ex);
+      return ex.f;
+    } catch (e) { return null; }
+  };
+  const A = pull('app.js', 'canonHrsOne');
+  const F = pull('functions/index.js', 'canonOne');
+  if (!A || !F) {
+    fail('could not extract one of the hours canonicalisers');
+  } else {
+    /* Both accepted 2401-2459, which are not clock times. isLocationOpenNow reads the first two
+     * digits as the hour, so "24:30" would have parsed as 2430 and made a store look closed from
+     * 23:59 until the next midnight. Two copies of the same logic in two files is exactly the
+     * duplicated-constant shape that has bitten repeatedly, so this pins them together. */
+    const cases = [['0500-2300','0500-2300'],['24','24'],['0000-2400','24'],['2430-2300',null],
+                   ['2401-0500',null],['0500-2430',null],['2400-0500','2400-0500'],
+                   ['1260-1300',null],['2359-0100','2359-0100']];
+    let bad = 0;
+    for (const [inp, want] of cases) {
+      if (A(inp) !== want) { fail(`app.js canonHrsOne(${JSON.stringify(inp)}) = ${JSON.stringify(A(inp))}, expected ${JSON.stringify(want)}`); bad++; }
+      if (F(inp) !== want) { fail(`functions canonOne(${JSON.stringify(inp)}) = ${JSON.stringify(F(inp))}, expected ${JSON.stringify(want)}`); bad++; }
+    }
+    if (!bad) pass(`both canonicalisers agree on ${cases.length} cases, including rejecting 24:01-24:59`);
+  }
+}
+
 console.log('\n' + (failures ? failures + ' FAILURE(S)' : 'all UI checks passed') + '\n');
 process.exit(failures ? 1 : 0);
