@@ -293,10 +293,11 @@ service cloud.firestore {
     match /amenityOverrides/{storeId} {
       allow read: if true;
       allow create: if isAdmin()
-        && request.resource.data.keys().hasOnly(['restroomType','accessible','changing','evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'])
+        && request.resource.data.keys().hasOnly(['restroomType','accessible','changing','hasRestroom','evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'])
         && boundedStrOrAbsent('restroomType', 24)
         && boundedStrOrAbsent('accessible', 24)
         && boundedStrOrAbsent('changing', 24)
+        && boundedStrOrAbsent('hasRestroom', 24)
         && boundedStrOrAbsent('evCharging', 24)
         && boundedStrOrAbsent('airPump', 24)
         && boundedStrOrAbsent('shower', 24)
@@ -307,10 +308,11 @@ service cloud.firestore {
       // Merge updates: validate only what this write changes, so a legacy field
       // riding along untouched can never block an admin edit.
       allow update: if isAdmin()
-        && touchedKeys().hasOnly(['restroomType','accessible','changing','evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'])
+        && touchedKeys().hasOnly(['restroomType','accessible','changing','hasRestroom','evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'])
         && touchedIsBoundedStr('restroomType', 24)
         && touchedIsBoundedStr('accessible', 24)
         && touchedIsBoundedStr('changing', 24)
+        && touchedIsBoundedStr('hasRestroom', 24)
         && touchedIsBoundedStr('evCharging', 24)
         && touchedIsBoundedStr('airPump', 24)
         && touchedIsBoundedStr('shower', 24)
@@ -384,8 +386,10 @@ service cloud.firestore {
     // ============================================================
     //  Leaderboard + user stats (server-derived, read-only to clients)
     // ============================================================
-    // Both are written ONLY by the leaderboard Cloud Function (admin privileges bypass rules),
-    // derived from vote docs. Anyone may read them; no client may write them.
+    // Reserved for a server-derived leaderboard. NOTE: no Cloud Function currently writes these —
+    // only recomputeBathroomAggregate and recomputeHourStatus are deployed. The rules stay closed
+    // (write:false) so that when a writer is added it must be server-side with admin privileges,
+    // and no client can populate them in the meantime.
     match /leaderboard/{id} {
       allow read: if true;
       allow write: if false;

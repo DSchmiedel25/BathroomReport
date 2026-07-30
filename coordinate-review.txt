@@ -1,0 +1,32 @@
+COORDINATE CONFLICTS — two real stores sharing one set of coordinates
+=====================================================================
+Found 2026-07-30 by the cross-chain overlap audit.
+
+These are NOT duplicates. Each pair is two genuinely different street addresses recorded at
+IDENTICAL coordinates, which means one pin of each pair is in the wrong place on the map.
+
+Fixing them requires an authoritative coordinate for the misplaced store. That can't be derived
+from the data we hold — it needs the chain's store locator or Street View. Left in place rather
+than guessed at, because a wrong coordinate that looks confident is worse than one flagged.
+
+--- CIRCLE K, FRANKLIN, TN ---
+  circlek-franklin-murfreesborord    1501 MURFREESBORO RD, FRANKLIN, TN
+  circlek-franklin-newhwy96w         1501 NEW HWY 96 W, FRANKLIN, TN
+  Both at the same lat/lng. Murfreesboro Rd and New Hwy 96 W are different roads.
+
+--- CUMBERLAND FARMS, BRIDGEWATER, MA ---
+  bridgewater-pleasantst             1001 Pleasant St, Bridgewater, MA 02324
+  bridgewater-mainst                 33 Main St, Bridgewater, MA 02324
+  Both at the same lat/lng. Different streets.
+
+--- CIRCLE K, JACKSONVILLE, FL (ambiguous, likely NOT an error) ---
+  circlek-jacksonville-blandingblvd        3631 BLANDING BLVD
+  circlek-jacksonville-blandingblvdbldg2   3631 BLANDING BLVD BLDG 2
+  Same address with a building suffix, 0.0m apart. Circle K's own store locator lists these
+  as separate stores, so this may be two units in one plaza rather than a duplicate.
+  Check before removing either.
+
+HOW TO FIX
+  Look each up in the chain's store locator, get the correct coordinate for the misplaced one,
+  and enter it in FlushPanel as an override (lat/lng are both in the bake FIELD_MAP). The
+  nightly bake will apply it — which now actually works, see finding 1.

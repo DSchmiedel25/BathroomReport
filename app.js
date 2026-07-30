@@ -2440,6 +2440,12 @@ async function saveStoredAchievements(achievements){
 // ---- Leaderboard ("Top Reviewers") — 2 reads total: the top-10 doc + your own userStats doc.
 // Both maintained server-side by the Cloud Function, so cost is constant regardless of user count.
 let _leaderboardLoaded = false;
+/* NOTE (audit 2026-07-30): #leaderboardList does not exist in index.html, so this returns
+ * immediately and the leaderboard never renders. The whole path is inert by design for now —
+ * no Cloud Function writes the `leaderboard` collection either (see firestore.rules). Kept
+ * rather than deleted because Community/leaderboard is a planned feature and this is the
+ * working reader; the missing piece is the UI. The same applies to updateMyProgressBadge()
+ * and the support-prompt overlay below. */
 async function loadLeaderboard(){
   const listEl = document.getElementById('leaderboardList');
   const youEl = document.getElementById('leaderboardYou');

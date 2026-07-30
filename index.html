@@ -87,7 +87,7 @@
 <div class="icon">📲</div>
 <div class="msg" id="installMsg">Add this to your home screen for one-tap access.</div>
 <button id="installNow" hidden>Install</button>
-<button class="closeBtn" id="installClose">✕</button>
+<button class="closeBtn" id="installClose" aria-label="Dismiss install prompt">✕</button>
 </div>
 <div id="header">
 <div id="headerTopRow">
@@ -186,7 +186,7 @@
 <div id="listViewPanel">
 <div id="listViewHeader">
 <span>All Locations</span>
-<button id="listViewClose">✕</button>
+<button id="listViewClose" aria-label="Close list">✕</button>
 </div>
 <div id="listViewItems"></div>
 </div>
@@ -194,7 +194,7 @@
 <div id="accountPanel">
 <div id="accountHeader">
 <span>👤 Account</span>
-<button id="accountClose">✕</button>
+<button id="accountClose" aria-label="Close account panel">✕</button>
 </div>
 <div style="padding:16px;overflow-y:auto;flex:1;">
 <div id="loggedOutView">
@@ -278,14 +278,14 @@ This is tracked on this device only — log in to sync it across devices.
 </select>
 </div>
 </div>
-<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version">v2.6.2 · 2026-07-29</span></div>
+<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version">v2.6.3 · 2026-07-30</span></div>
 </nav>
 <!-- Community banner (logged-out) -->
 <div id="communityBanner">
 <span>✨</span>
 <div class="cb-txt"><b>Ratings &amp; hours are community powered.</b><small>Sign in to help the next person.</small></div>
 <a href="#" id="learnMoreLink">Learn More</a>
-<button class="cb-close" id="cbClose" aria-label="Dismiss">×</button>
+<button class="cb-close" id="cbClose" aria-label="Dismiss">✕</button>
 </div>
 <!-- How Bathroom Report works (= About = Learn More) -->
 <div id="howItWorks" class="hiw-overlay">

@@ -50,8 +50,17 @@ function confirmedNoSet(group) {
 }
 
 let totalConf = 0, totalLocsTouched = 0;
+// A file matching *-locations.js is not necessarily DATA — compact-locations.js is a maintenance
+// script. Slicing between the first [ and last ] of a script yields garbage that either throws or,
+// worse, parses into nonsense. Verify shape first, and skip anything that isn't a data file.
+function looksLikeDataFile(src) {
+  if (/^\s*#!/.test(src)) return false;
+  return /^\s*window\.[A-Za-z_$][\w$]*\s*=\s*\[/m.test(src);
+}
+
 for (const locPath of locPaths) {
   const src = fs.readFileSync(locPath, 'utf8');
+  if (!looksLikeDataFile(src)) { console.log(`  skipped ${locPath} (not a data file)`); continue; }
   const s = src.indexOf('['), e = src.lastIndexOf(']');
   const header = src.slice(0, s);
   const arr = JSON.parse(src.slice(s, e + 1));

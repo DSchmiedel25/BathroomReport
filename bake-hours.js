@@ -29,8 +29,18 @@ for (const [id, st] of Object.entries(status)){
   if (st && st.verified && st.value != null) verified[id] = st;
 }
 
+
+// A file matching *-locations.js is not necessarily DATA. compact-locations.js is a maintenance
+// script, and every loader here evaluates the file — a shebang line is a SyntaxError that killed
+// the whole run (silently, because bake.yml swallowed it). Verify shape before evaluating.
+function looksLikeDataFile(src){
+  if(/^\s*#!/.test(src)) return false;                 // shebang -> executable script
+  return /^\s*window\.[A-Za-z_$][\w$]*\s*=\s*\[/m.test(src);
+}
+
 function loadFile(file){
   const src = fs.readFileSync(file, 'utf8');
+  if(!looksLikeDataFile(src)) return null;
   const sandbox = { window:{} };
   new Function('window', src)(sandbox.window);
   const varName = Object.keys(sandbox.window)[0];
@@ -47,7 +57,9 @@ function serialize(varName, records){
 const t0 = Date.now();
 let applied = 0, reverted = 0, filesTouched = 0, processed = 0;
 for (const file of locPaths){
-  const { varName, records } = loadFile(file);
+  const parsed = loadFile(file);
+  if(!parsed){ console.log('  skipped ' + file + ' (not a data file)'); continue; }
+  const { varName, records } = parsed;
   let fileApplied = 0, fileReverted = 0;
   for (const rec of records){
     processed++;

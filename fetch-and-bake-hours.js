@@ -18,6 +18,17 @@ async function main(){
   const status = {};
   snap.forEach(d => { status[d.id.split('__').join('/')] = d.data(); });  // reverse slash-slug
   console.log('Fetched ' + Object.keys(status).length + ' hourStatus doc(s).');
+  // REFUSE to bake an empty fetch. bake-hours.js is authoritative and idempotent: any record
+  // flagged community_verified whose id is absent from the status file gets REVERTED to its
+  // pre-community hours. An empty result is indistinguishable from a transient Firestore error,
+  // a permissions change, or a renamed collection — and the consequence is silently wiping every
+  // community-verified hour on the map. fetch-and-bake.js already guards this way; this didn't.
+  if (Object.keys(status).length === 0){
+    console.log('No hourStatus docs returned — refusing to bake, because an empty fetch would');
+    console.log('revert every community-verified hour. If hourStatus is genuinely empty, run');
+    console.log('bake-hours.js directly with an explicit empty file to confirm that is intended.');
+    process.exit(0);
+  }
   fs.writeFileSync(STATUS_JSON, JSON.stringify(status, null, 2));
   // bake into the location files in place (idempotent; reverts downgrades)
   const locFiles = fs.readdirSync(__dirname).filter(f => /-locations\.js$/.test(f));

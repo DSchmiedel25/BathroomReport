@@ -1,0 +1,190 @@
+AUDIT FIXES — v2.6.3
+====================
+
+13 findings from the 2026-07-30 audit. 14 files changed, 5 files to DELETE, 4 things not fixed
+and why. Read the deletions and the "not fixed" section before deploying.
+
+
+UPLOAD (14 files, all to the repo root except the workflow)
+
+  app.js  index.html  styles.css  flushpanel.html      <- BUMP sw.js
+  firestore.rules                                      <- also: firebase deploy --only firestore:rules
+  bake-overrides.js  bake-hours.js  bake-confirmed.js  fetch-and-bake-hours.js
+  circle-k-locations.js  nyc-dunkin-locations.js  jacksons-locations.js
+  .github/workflows/bake.yml
+
+  coordinate-review.txt and this file are for you, NOT the repo.
+
+
+DELETE FROM THE REPO (5 items — audit findings 9 and 12)
+
+  git rm index.js quiktrip-locations.json bathroomreport-nyc-public.zip robots.pdf sw.pdf tools/tools
+  git commit -m "Remove redundant and stray files"
+
+  index.js                       byte-identical to functions/index.js; only the latter deploys
+  quiktrip-locations.json        640K, redundant with quiktrip-locations.js
+  bathroomreport-nyc-public.zip  a delivery zip, served publicly
+  robots.pdf / sw.pdf            actual PDFs — print-to-PDF exports of robots.txt and sw.js
+  tools/tools                    near-empty stray file
+
+  NOTE: deleting these does NOT touch robots.txt or sw.js, which are the real files.
+
+
+=========================================================================
+FIXED
+=========================================================================
+
+1. [CRITICAL] The nightly bake was silently broken.
+
+   compact-locations.js is a maintenance script, not data, but it matches the *-locations.js
+   glob that all three bake steps use to find files. Every loader evaluates the file, and its
+   `#!/usr/bin/env node` shebang is a SyntaxError. Reproduced:
+
+       Loaded 0 override(s).
+       SyntaxError: Invalid or unexpected token
+         at loadLocationsFile (bake-overrides.js:53)
+
+   bake.yml swallowed it with `|| echo "...continuing"`, so runs reported success. Net effect:
+   every FlushPanel override baked into nothing. bake-confirmed wrote per-file inside its loop,
+   so chains alphabetically before "compact-" baked and the rest never did.
+
+   FIX: a looksLikeDataFile() content check in all three loaders — shebang or no
+   `window.X = [` means skip, with the skip logged. Fixing the glob alone would leave the same
+   trap for the next non-data file.
+
+   Fixing that exposed a SECOND crash in bake-overrides.js: the chain-map loop iterated every
+   globbed filename and dereferenced loaded[f].varName, which is undefined for a skipped file.
+   Now iterates Object.keys(loaded).
+
+   PROVEN END TO END, not just parsed. Against a sandbox copy of the real repo:
+       Skipped non-data file(s): compact-locations.js
+       Indexed 28123 locations across 41 file(s).
+       albany-newkarner  ->  hrs, addr
+       Done. 1 updated, 0 created, 0 removed, across 1 file(s).
+   Before the fix, that run died on the first file and applied nothing.
+
+1b. bake.yml hid the failure. All four `|| echo "...continuing"` lines now emit
+    ::warning:: annotations, which surface on the run summary. Steps still continue.
+
+1c. [FOUND WHILE VERIFYING 1 — this one is on me] Fixing the crash made a data-loss path live.
+
+    bake-hours.js is authoritative: any record flagged community_verified whose id is ABSENT
+    from the status file gets REVERTED to its pre-community hours. fetch-and-bake-hours.js
+    wrote whatever Firestore returned with no check — so zero docs (transient error, permissions
+    change, renamed collection) would silently wipe every community-verified hour. Confirmed by
+    running it with an empty status file: 10 records reverted.
+
+    fetch-and-bake.js already guarded this way ("Nothing to bake"); the hours fetcher didn't.
+    FIX: refuse to bake an empty fetch, with an explanatory message.
+
+    That guard protects 10 records today: speedway 8, circleK 1, stewarts 1.
+
+2. Two true duplicates removed.
+     circlek-tampa-ntelecommpkwy   0.0m from circlek-tampa-ntelecompkwy — "TELECOMM" vs
+                                   "TELECOM" at the same address. Kept the correct spelling.
+     node/11761691198              0.1m from node/2549926579 (100 1st Avenue) with no address
+                                   of its own. Kept the one with the address.
+   28,125 -> 28,123 records.
+
+4. hasRestroom is now admin-correctable. The amenityOverrides rules allowed exactly ten keys and
+   the new amenity wasn't one, so a wrong community vote on any of the 672 flagged rest areas or
+   354 flagged Circle Ks could not be overridden from FlushPanel. Added to both the create and
+   update allowlists with the same <=24-char string validation as its siblings.
+
+6. 85 dead CSS declarations removed from styles.css.
+   styles.css and shell.css shared 35 selectors with 117 conflicting declarations; shell.css
+   loads second and won every one, often via !important. Those declarations shipped to every
+   user and did nothing — and worse, editing them silently had no effect.
+   Removed only where shell.css sets the SAME property for EVERY selector in the rule.
+   31 conflicts remain and are correct: they live in multi-selector rules where the other
+   selectors still need the declaration. Zero single-selector conflicts left.
+   Includes the stale `--accent: #38b8bb`, which never applied — #2ea1aa is the live value.
+
+8. firestore.rules no longer claims a Cloud Function that doesn't exist. The comment on
+   /leaderboard and /userStats said they are "written ONLY by the leaderboard Cloud Function";
+   only recomputeBathroomAggregate and recomputeHourStatus are deployed. Reworded to state that
+   no writer exists and the rules stay closed so any future writer must be server-side.
+
+11. Accessibility and consistency on close buttons.
+    aria-label added to installClose, listViewClose, accountClose — the other three already had
+    one. cbClose used U+00D7 (×) while the other five used U+2715 (✕); normalised.
+
+13. flushpanel.html "Handicap accessible" -> "Wheelchair accessible", matching the product
+    direction. Admin-only string.
+
+BONUS (not in the original 13, found during re-verification)
+    jacksons-way-615371860 had sat:"" and sun:"" in its per-day hours map. An empty string is
+    neither open nor closed — the app has a real 'closed' token — so it was a conversion
+    artifact that would render as an unparseable window. Removed those two keys, so those days
+    now read as UNKNOWN, which is what is actually known. This was the last malformed per-day
+    value in the dataset.
+
+
+=========================================================================
+NOT FIXED — deliberately
+=========================================================================
+
+3. Two stores share one set of coordinates. NOT duplicates — two real, different street
+   addresses at identical lat/lng, meaning one pin of each pair is in the wrong place:
+
+     Circle K, Franklin TN       1501 MURFREESBORO RD  /  1501 NEW HWY 96 W
+     Cumberland Farms, Bridgewater MA   1001 Pleasant St  /  33 Main St
+
+   Plus one ambiguous case (Circle K Jacksonville 3631 BLANDING BLVD vs "BLDG 2") which may
+   genuinely be two units in one plaza.
+
+   Fixing these needs an authoritative coordinate for the misplaced store. That cannot be
+   derived from the data on hand — it needs the chain's store locator or Street View. A
+   confident wrong coordinate is worse than a flagged one, so all of them are left in place and
+   documented in coordinate-review.txt, with instructions for entering the fix as a FlushPanel
+   override (lat/lng are both in the bake FIELD_MAP, and the bake now works).
+
+5. amenityOverrides has no writer. app.js reads it in three places; FlushPanel has zero
+   references. The whole admin-authoritative amenity path is a read with nothing writing it.
+   This is a missing feature, not a defect — building the FlushPanel UI for it is a product
+   decision, not a fix.
+
+7. Four features have working JS and no HTML: loadLeaderboard(), updateMyProgressBadge(), the
+   support-prompt overlay, and the recap pills. All are null-guarded, so nothing crashes; they
+   simply return immediately. Deleting working code for a planned feature (Community/leaderboard)
+   would mean rebuilding it later, so instead the status is now documented in a comment at
+   loadLeaderboard so the next reader knows it is intentional rather than broken.
+
+10. WITHDRAWN — this was a false positive in my own report. I said "Where Am I?" was the only
+    primary control with no icon; it has an inline SVG crosshair plus an aria-label, and my check
+    only looked for emoji. The real observation is milder: three controls use emoji (🚽 📋 📍)
+    and one uses inline SVG. The SVG is arguably the better implementation — crisp, themeable, no
+    cross-platform emoji variance — so it is left alone. Making all four consistent is a design
+    choice in either direction and yours to make, not something to change silently.
+
+
+=========================================================================
+RE-AUDIT AFTER THE FIXES
+=========================================================================
+
+  [ok] all changed JS parses (app, 4 bake scripts, 3 data files)
+  [ok] 28,123 records load across 40 globals; ZERO duplicate ids
+  [ok] exactly 2 ids removed, both intended; 1 other field change (the jacksons cleanup)
+  [ok] 40 registry dataVars <-> 40 script tags <-> 40 data files, no orphans either direction
+  [ok] compact-locations.js still has no script tag (the browser never loaded it)
+  [ok] index.html and flushpanel.html: static ids unique, divs balanced
+  [ok] styles.css, shell.css, firestore.rules: braces balanced
+  [ok] no icon-only button missing an aria-label; zero U+00D7 remaining
+  [ok] firestore.rules: hasRestroom present in 4 places (2 allowlists, 2 validators)
+  [ok] bake-overrides, bake-hours, bake-confirmed all skip compact-locations.js and log it
+  [ok] bake-overrides applies a real override end to end and preserves record count
+  [ok] 9 malformed hrs values remain — all pre-existing (5 Casey's, 2 RaceTrac, 1 Maverik,
+       1 Pilot), none introduced. They parse as null, so the app treats them as unknown.
+  [ok] 0 malformed per-day values (was 2)
+
+NOT verified, and cannot be by me: rendered layout and spacing. Every CSS finding above is
+structural — a declaration that provably never applies, a missing label — read from the files.
+I cannot see the screen. Please glance at the header and the drawer after deploying, since
+styles.css changed.
+
+AFTER DEPLOYING
+  - bump sw.js (app.js, index.html, styles.css changed)
+  - firebase deploy --only firestore:rules
+  - run the bake by hand from the Actions tab and watch it: it should log
+    "Skipped non-data file(s): compact-locations.js" and then actually apply your pending
+    overrides — which have been accumulating unbaked.

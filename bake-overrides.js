@@ -45,9 +45,19 @@ const FIELD_MAP = {
   zipCode: 'zipCode', phone: 'phone', lat: 'lat', lng: 'lng', locName: 'n'
 };
 
+
+// A file matching *-locations.js is not necessarily DATA. compact-locations.js is a maintenance
+// script, and every loader here evaluates the file — a shebang line is a SyntaxError that killed
+// the whole run (silently, because bake.yml swallowed it). Verify shape before evaluating.
+function looksLikeDataFile(src){
+  if(/^\s*#!/.test(src)) return false;                 // shebang -> executable script
+  return /^\s*window\.[A-Za-z_$][\w$]*\s*=\s*\[/m.test(src);
+}
+
 function loadLocationsFile(file){
   // Each file is `window.<var> = [ ... ];`. Eval it with a stub window.
   const src = fs.readFileSync(file, 'utf8');
+  if(!looksLikeDataFile(src)) return null;
   const sandbox = { window: {} };
   // eslint-disable-next-line no-new-func
   new Function('window', src)(sandbox.window);
@@ -118,18 +128,23 @@ function main(){
   const files = fs.readdirSync(dir).filter(f => /-locations\.js$/.test(f));
   const byId = {};              // locId -> { file, record }
   const loaded = {};            // file -> { varName, records }
+  const skipped = [];
   for(const f of files){
     const full = path.join(dir, f);
     const parsed = loadLocationsFile(full);
+    if(!parsed){ skipped.push(f); continue; }      // not a data file — see looksLikeDataFile
     loaded[f] = parsed;
     parsed.records.forEach(r => { if(r && r.id) byId[r.id] = { file: f, record: r }; });
   }
+  if(skipped.length) console.log('Skipped non-data file(s): ' + skipped.join(', '));
   console.log('Indexed ' + Object.keys(byId).length + ' locations across ' + files.length + ' file(s).');
 
   // Map a chain key -> its file, accepting both the varName style ("cumberlandFarms")
   // and the filename style ("cumberland-farms") so overrides route regardless of casing.
   const chainToFile = {};
-  for(const f of files){
+  // Iterate the files that actually LOADED, not every filename the glob matched — a skipped
+  // non-data file has no entry in `loaded`.
+  for(const f of Object.keys(loaded)){
     const vkey = (loaded[f].varName || '').replace(/Locations$/, '');   // e.g. cumberlandFarms
     const fkey = f.replace(/-locations\.js$/, '');                      // e.g. cumberland-farms
     [vkey, vkey.toLowerCase(), fkey, fkey.toLowerCase()].forEach(k => { if(k) chainToFile[k] = f; });
