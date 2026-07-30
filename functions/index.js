@@ -112,7 +112,13 @@ function canonOne(s){
   if(!m) return null;
   let o = String(+m[1]).padStart(2,'0') + m[2];
   let c = String(+m[3]).padStart(2,'0') + m[4];
-  if(!/^([01]\d|2[0-4])[0-5]\d$/.test(o) || !/^([01]\d|2[0-4])[0-5]\d$/.test(c)) return null;
+  /* Valid clock times only. The old pattern ([01]\d|2[0-4])[0-5]\d also accepted 2401-2459,
+   * which are not times — 2400 is the single legal "24" value and means midnight. A community
+   * report of "24:30" would have canonicalised cleanly and then been compared against a real
+   * clock by isLocationOpenNow, which reads the first two digits as the hour: 24:30 parses as
+   * 2430, so a store would have looked closed from 23:59 until the following midnight. */
+  const VALID_HHMM = /^(([01]\d|2[0-3])[0-5]\d|2400)$/;
+  if(!VALID_HHMM.test(o) || !VALID_HHMM.test(c)) return null;
   if(c === '0000') c = '2400';
   if(o === '0000' && c === '2400') return '24';   // full midnight-to-midnight span
   return o === c ? '24' : o + '-' + c;   // overnight (c<o) stays a single entry by design
@@ -206,14 +212,25 @@ exports.recomputeHourStatus = onDocumentWritten('hourReports/{storeId}/submissio
     const snap = await tx.get(statusRef);
     const p = snap.exists ? snap.data() : {};
 
-    const nextSource = next.source || (next.verified ? 'community_verified' : (p.source || null));
-    const valueChanged = JSON.stringify(p.value) !== JSON.stringify(next.value) || (p.kind||null) !== (next.kind||null);
+    /* A doc that is no longer verified must not keep claiming it was. This used to carry the old
+     * source forward, so a conflict or pending doc still read source:'community_verified' with a
+     * confirmedAt date and the previously-verified value in `value` — indistinguishable from a
+     * live verified record to anything that forgot to check the `verified` flag. bake-hours.js
+     * does check it, but FlushPanel's conflict rows were rendering the stale value as if it were
+     * the value in dispute. */
+    const nextSource = next.source || (next.verified ? 'community_verified' : null);
+    // Compare against whichever field currently holds the live value: `value` when the previous
+    // state was verified, otherwise nothing was live and any new value is a change.
+    const prevLive = p.verified ? p.value : undefined;
+    const prevLiveKind = p.verified ? (p.kind || null) : null;
+    const valueChanged = JSON.stringify(prevLive) !== JSON.stringify(next.value) || prevLiveKind !== (next.kind||null);
     const anyChanged =
       (!!p.verified) !== next.verified ||
       (p.state||null) !== next.state ||
       (p.agreeCount||0) !== (next.agreeCount||0) ||
       valueChanged ||
-      (p.source||null) !== nextSource;
+      (p.source||null) !== nextSource ||
+      (p.schemaVersion||1) !== 2;
     if (snap.exists && !anyChanged) return;   // nothing to write
 
     const out = {
@@ -221,7 +238,9 @@ exports.recomputeHourStatus = onDocumentWritten('hourReports/{storeId}/submissio
       state: next.state,
       agreeCount: next.agreeCount || 0,
       source: nextSource,
-      schemaVersion: 1,
+      // 2: an unverified doc no longer carries a stale value/source; the previous one moves to
+      // prevValue/prevKind/prevConfirmedAt.
+      schemaVersion: 2,
       bakedRevision: p.bakedRevision || 0,
       revision: (p.revision || 0) + 1,
     };
@@ -231,9 +250,14 @@ exports.recomputeHourStatus = onDocumentWritten('hourReports/{storeId}/submissio
       out.confirmedAt = valueChanged || !p.verified ? Date.now() : (p.confirmedAt || Date.now());
       out.lastConfirmedAt = Date.now();
     } else {
-      out.value = p.value || null; out.kind = p.kind || null;
-      out.confirmedAt = p.confirmedAt || null;
-      out.lastConfirmedAt = p.lastConfirmedAt || null;
+      // Not verified: the previous value is history, not current state. Keep it under prev* so
+      // an admin can still see what it used to say, and leave `value` null so nothing can read
+      // a stale window as though it were confirmed.
+      out.value = null; out.kind = null;
+      out.confirmedAt = null; out.lastConfirmedAt = null;
+      out.prevValue = (p.verified ? p.value : p.prevValue) ?? null;
+      out.prevKind  = (p.verified ? p.kind  : p.prevKind)  ?? null;
+      out.prevConfirmedAt = (p.verified ? p.lastConfirmedAt : p.prevConfirmedAt) ?? null;
     }
     tx.set(statusRef, out, {merge:true});
   });
