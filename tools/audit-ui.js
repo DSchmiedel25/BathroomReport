@@ -199,5 +199,66 @@ console.log('\nchain keys');
   }
 }
 
+// ---- 8: FlushPanel must see every dataset the app does ----
+console.log('\nadmin dataset coverage');
+{
+  const idxFiles = [...html.matchAll(/src="([\w-]+-locations\.js)"/g)].map(m => m[1]);
+  if (!fs.existsSync('flushpanel.html')) {
+    pass('flushpanel.html not present, skipped');
+  } else {
+    const fp = fs.readFileSync('flushpanel.html', 'utf8');
+    const fpFiles = new Set([...fp.matchAll(/src="([\w-]+-locations\.js)"/g)].map(m => m[1]));
+    // 18 of 40 used to load, so 13,915 records could not be moderated at all.
+    const missing = idxFiles.filter(f => !fpFiles.has(f));
+    if (missing.length) fail(`flushpanel is missing ${missing.length} dataset(s) the app loads: ${missing.slice(0, 4).join(', ')}${missing.length > 4 ? '…' : ''}`);
+    else pass(`flushpanel loads all ${idxFiles.length} datasets`);
+
+    // The one table that replaced three drifted hand-kept lists must cover every registry chain.
+    const appSrc = fs.readFileSync('app.js', 'utf8');
+    const seg = appSrc.slice(appSrc.indexOf('const CHAIN_REGISTRY'), appSrc.indexOf('const DEFAULT_CHAIN_KEY'));
+    const regKeys = [...seg.matchAll(/^\s{2}(\w+):\s*\{/gm)].map(m => m[1]);
+    const tableKeys = new Set([...fp.matchAll(/\["[^"]*","(\w+)","[\w-]+-locations\.js"\]/g)].map(m => m[1]));
+    const absent = regKeys.filter(k => !tableKeys.has(k));
+    if (absent.length) fail(`CHAIN_TABLE is missing registry key(s): ${absent.join(', ')}`);
+    else pass(`CHAIN_TABLE covers all ${regKeys.length} registry chains`);
+
+    // And every filename it names must actually exist.
+    const bad = [...fp.matchAll(/\["[^"]*","\w+","([\w-]+-locations\.js)"\]/g)]
+      .map(m => m[1]).filter(f => !fs.existsSync(f));
+    if (bad.length) fail(`CHAIN_TABLE names ${bad.length} file(s) that do not exist: ${bad.join(', ')}`);
+    else pass('every CHAIN_TABLE filename exists');
+  }
+}
+
+// ---- 9: every field the app writes onto a vote must be in the rules allowlist ----
+console.log('\nvote field allowlist');
+{
+  if (!fs.existsSync('firestore.rules')) {
+    pass('firestore.rules not present, skipped');
+  } else {
+    const rules = fs.readFileSync('firestore.rules', 'utf8');
+    const appSrc = fs.readFileSync('app.js', 'utf8');
+    // The create allowlist inside match /votes/
+    const voteBlock = rules.slice(rules.indexOf('match /votes/'), rules.indexOf('match /votes/') + 1400);
+    const m = voteBlock.match(/hasOnly\(\[([\s\S]*?)\]\)/);
+    const allow = m ? [...m[1].matchAll(/'(\w+)'/g)].map(x => x[1]) : [];
+    // Every field assigned onto a vote object in app.js, plus emptyVote's own shape.
+    const assigned = [
+      ...[...appSrc.matchAll(/myVote(?:Cache\[[^\]]+\])?\.(\w+)\s*=/g)].map(x => x[1]),
+      ...[...appSrc.matchAll(/updatedVote\.(\w+)\s*=/g)].map(x => x[1]),
+      ...[...appSrc.matchAll(/payload\.(\w+)\s*=/g)].map(x => x[1]),
+    ];
+    const ev = appSrc.match(/function emptyVote\(\)\s*\{\s*return\s*\{([^}]*)\}/);
+    if (ev) assigned.push(...[...ev[1].matchAll(/(\w+)\s*:/g)].map(x => x[1]));
+    const missing = [...new Set(assigned)].filter(k => !allow.includes(k));
+    /* wasHiddenGem was assigned onto the vote by the Hidden Gem Hunter achievement and was never
+     * in this allowlist, so from the moment it was set EVERY write of that vote was rejected —
+     * the rating and every amenity answer after it. It only fires where bathroomCount < 5, so it
+     * hit precisely the locations nobody had rated yet, and it went unnoticed for weeks. */
+    if (missing.length) fail(`app.js writes vote field(s) the rules reject: ${missing.join(', ')}`);
+    else pass(`all ${new Set(assigned).size} vote fields written by app.js are allowlisted (${allow.length} allowed)`);
+  }
+}
+
 console.log('\n' + (failures ? failures + ' FAILURE(S)' : 'all UI checks passed') + '\n');
 process.exit(failures ? 1 : 0);
