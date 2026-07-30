@@ -1338,7 +1338,13 @@ function canonHrsOne(str){
   if(!m) return null;
   let o = String(+m[1]).padStart(2,'0') + m[2];
   let c = String(+m[3]).padStart(2,'0') + m[4];
-  if(!/^([01]\d|2[0-4])[0-5]\d$/.test(o) || !/^([01]\d|2[0-4])[0-5]\d$/.test(c)) return null;
+  /* Valid clock times only. The old pattern ([01]\d|2[0-4])[0-5]\d also accepted 2401-2459,
+   * which are not times — 2400 is the single legal "24" value and means midnight. A community
+   * report of "24:30" would have canonicalised cleanly and then been compared against a real
+   * clock by isLocationOpenNow, which reads the first two digits as the hour: 24:30 parses as
+   * 2430, so a store would have looked closed from 23:59 until the following midnight. */
+  const VALID_HHMM = /^(([01]\d|2[0-3])[0-5]\d|2400)$/;
+  if(!VALID_HHMM.test(o) || !VALID_HHMM.test(c)) return null;
   if(c === '0000') c = '2400';
   if(o === '0000' && c === '2400') return '24';   // full midnight-to-midnight span
   return o === c ? '24' : o + '-' + c;
