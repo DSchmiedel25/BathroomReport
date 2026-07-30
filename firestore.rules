@@ -244,7 +244,7 @@ service cloud.firestore {
        * nothing. locId and sourceId were also unbounded strings, and ts was any number — a
        * far-future timestamp would pin an entry to the top of the recap forever. */
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['type','ts','locId','text','sourceId'])
+        && request.resource.data.keys().hasOnly(['type','ts','locId','text','sourceId','username'])
         && request.resource.data.type in ['tip','rating']
         && request.resource.data.ts is int
         && request.resource.data.ts <= request.time.toMillis() + 60000
@@ -259,7 +259,12 @@ service cloud.firestore {
         && (request.resource.data.type != 'rating'
             || (request.resource.data.sourceId is string
                 && request.resource.data.sourceId.size() > 0
-                && request.resource.data.sourceId.size() <= 280));
+                && request.resource.data.sourceId.size() <= 280))
+        /* Optional. The header ticker credits the most recent rater, which is only worth doing
+         * because rating requires being within 0.3 miles of the location — the recognition is
+         * earned by actually going somewhere, not by tapping from a sofa. Bounded to 40 to match
+         * the votes rule. */
+        && boundedStrOrAbsent('username', 40);
       allow update, delete: if isAdmin();
     }
 

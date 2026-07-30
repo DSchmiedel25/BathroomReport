@@ -846,6 +846,17 @@ function seasonalNoteHtml(loc){
  * Read from wherever the source put it. metroInfo.access came from the metro imports and
  * osm.restroomUnconfirmed from the chain ones; unifying them in the DATA would mean rewriting
  * thousands of records to say what this function can derive. One reader, no migration. */
+/* Attribution for the most recent rating.
+ *
+ * Free: lastRatedBy is written by the aggregate Cloud Function into a document the popup already
+ * fetches, so no extra read. Absent on every aggregate written before that function ships, and on
+ * ratings from before usernames existed — so this renders nothing rather than "by undefined".
+ * Escaped because it is user-chosen text. */
+function ratedByHtml(agg){
+  const who = agg && typeof agg.lastRatedBy === 'string' ? agg.lastRatedBy.trim() : '';
+  return who ? ` by ${escapeHtml(who.slice(0, 40))}` : '';
+}
+
 function accessState(loc){
   const mi = (loc && loc.metroInfo) || null;
   if(mi && mi.access === 'customer') return 'customer';
@@ -1112,6 +1123,11 @@ function usernameToEmail(username){
 async function signUpAccount(username, password){
   const clean = username.trim();
   if(clean.length < 3) return { ok: false, reason: 'Username needs to be at least 3 characters.' };
+  /* The input carries maxlength=20, but that is client-side and bypassable, and the votes rule
+   * caps username at 40. A longer one would make EVERY rating that account ever writes fail the
+   * rules with nothing shown to the user — the same silent-rejection shape as the wasHiddenGem
+   * bug. Enforce it here, where it can say so. */
+  if(clean.length > 20) return { ok: false, reason: 'Username can be at most 20 characters.' };
   if(!/^[a-zA-Z0-9_]+$/.test(clean)) return { ok: false, reason: 'Letters, numbers, and underscores only.' };
   if(password.length < 6) return { ok: false, reason: 'Password needs to be at least 6 characters.' };
   try{
@@ -1295,8 +1311,10 @@ async function saveMyVote(id, data){
     const payload = { ...data, clientId, locId: id, lastUpdated: Date.now() };
     // Username on the vote lets the leaderboard Cloud Function credit ratings to a display name
     // without a separate lookup. Only logged-in users can rate, so this is always present.
+    // Sliced to 40 to match the votes rule. An account created before the length check above
+    // could otherwise have every rating rejected, silently.
     const uname = (window.__currentUser && window.__currentUser.email)
-      ? window.__currentUser.email.split('@')[0] : '';
+      ? window.__currentUser.email.split('@')[0].slice(0, 40) : '';
     if(uname) payload.username = uname;
     // First bathroom rating gets an immutable ratedAt — drives the time-based achievements.
     if(data.bathroom > 0 && !existing.ratedAt){
@@ -1445,10 +1463,18 @@ function markHoursReported(locId){
 }
 
 // Weekly recap — lightweight activity log, just enough to show "X new this week"
+/* The activity log carries the rater's handle so the header ticker can credit them without a
+ * second read. It is the same chosen handle the vote carries, not an email — sign-up converts a
+ * handle to a synthetic @stewarts-map.local address purely because Firebase Auth wants an email
+ * format. Optional: an entry written without one still validates and simply goes uncredited. */
 async function logActivity(type, extra){
   try{
     const {db, collection, addDoc} = await fb();
-    await addDoc(collection(db, 'activity'), { type, ts: Date.now(), ...(extra || {}) });
+    const uname = (window.__currentUser && window.__currentUser.email)
+      ? window.__currentUser.email.split('@')[0].slice(0, 40) : '';
+    await addDoc(collection(db, 'activity'), {
+      type, ts: Date.now(), ...(extra || {}), ...(uname ? { username: uname } : {})
+    });
   }catch(e){
     // non-critical — recap will just undercount slightly if this fails
   }
@@ -1595,7 +1621,7 @@ function metroPopupHtml(loc, agg, myVote){
     ? `<div class="hours-line">🕐 ${escapeHtml(raw)}</div>`
     : `<div class="hours-line">🕐 Hours not listed yet — know them? Tap 🚩 below to send them in.</div>`;
   const recency = agg ? relativeTimeFromNow(agg.lastRatedAt || agg.lastUpdated) : '';
-  const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}</div>` : '';
+  const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}${ratedByHtml(agg)}</div>` : '';
   const seasonalLine = seasonalNoteHtml(loc);
   // A doubted store shows the caveat until the community settles it either way.
   // The access badge above now carries this — one statement per fact, not two lines saying the
@@ -1673,7 +1699,7 @@ function popupHtml(loc, agg, myVote){
     hoursLine = `<div class="hours-line">🕐 Hours not listed yet — know them? Tap 🕐 Report hours below.</div>`;
   }
   const recency = relativeTimeFromNow(agg.lastRatedAt || agg.lastUpdated);
-  const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}</div>` : '';
+  const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}${ratedByHtml(agg)}</div>` : '';
   hoursLine += seasonalNoteHtml(loc);
   if(restroomDoubted(loc) && !(loc.conf && loc.conf.hasRestroom)
      && !isConfirmedYes((amenityCache[loc.id]||{}).hasRestroom)){
@@ -2125,7 +2151,7 @@ function wireOoo(loc){
     if(confirmMsg && !window.confirm(confirmMsg)) return;
     setNote("Checking you're nearby…");
     const v = await verifyNearby(loc);
-    if(!v.ok){ setNote('📍 You need to be at this stop to do that.', true); return; }
+    if(!v.ok){ setNote(verifyFailMessage(v), true); return; }
     try{ await writeFn(); }catch(e){ setNote('Could not save — try again.', true); return; }
     await loadOoo(loc.id);
     const section = document.getElementById('rating-section-' + loc.id);
@@ -2197,7 +2223,7 @@ async function attachAmenityHandlers(loc){
 
     const verification = await verifyNearby(loc);
     if(!verification.ok){
-      if(note){ note.style.color = '#c62828'; note.textContent = "📍 You need to be at this stop to report its features."; }
+      if(note){ note.style.color = '#c62828'; note.textContent = verifyFailMessage(verification); }
       allBtns.forEach(b => b.disabled = false);
       return;
     }
@@ -2284,7 +2310,7 @@ async function attachStoreFeatureHandlers(loc){
 
     const verification = await verifyNearby(loc);
     if(!verification.ok){
-      if(note){ note.style.color = '#c62828'; note.textContent = "📍 You need to be at this stop to report its features."; }
+      if(note){ note.style.color = '#c62828'; note.textContent = verifyFailMessage(verification); }
       allBtns.forEach(b => b.disabled = false);
       return;
     }
@@ -2350,7 +2376,10 @@ async function loadAllRatings(){
         ratings[locId] = v;
       });
       if(isLoggedIn() && Object.keys(ratings).length){
-        const uname = (window.__currentUser && window.__currentUser.email) ? window.__currentUser.email.split('@')[0] : '';
+        // Capped to 40 like every other username write — the users rule bounds it the same way,
+        // and this one is swallowed by its own catch, so an over-long name would silently drop
+        // the whole one-read backfill and quietly cost a query on every load.
+        const uname = (window.__currentUser && window.__currentUser.email) ? window.__currentUser.email.split('@')[0].slice(0, 40) : '';
         try{ await setDoc(doc(db, 'users', uid), { uid, username: uname, lastUpdated: Date.now(), ratings }, { merge: true }); }catch(e){}
       }
     }
@@ -2834,7 +2863,11 @@ async function updateMostRecentBadge(){
     if(!rec || !rec.locId){ el.textContent = ''; refreshStatTicker(); return; }
     const loc = locationsById[rec.locId];
     const name = (loc && loc.n) || 'a bathroom';
-    el.textContent = `🕐 Most recently rated: ${name} — ${relativeTimeFromNow(rec.ts)}`;
+    /* Credit the rater when the entry carries a handle. Entries written before this shipped have
+     * none and simply read as they always did. textContent, so no escaping question arises. */
+    const who = typeof rec.username === 'string' && rec.username.trim()
+      ? ' by ' + rec.username.trim().slice(0, 40) : '';
+    el.textContent = `🕐 Most recently rated: ${name}${who} — ${relativeTimeFromNow(rec.ts)}`;
     _mostRecentLoaded = true;   // lock only after a real, successful write
     if(loc && markers[loc.id]) el.onclick = () => zoomToMarker(markers[loc.id]);
     refreshStatTicker();
@@ -2848,8 +2881,40 @@ async function updateMostRecentBadge(){
   }
 }
 
-// Verified visit — requires being physically near a location before rating it
-const VERIFY_RADIUS_MILES = 0.3;
+/* Verified visit — you must be at a location to rate it.
+ *
+ * This used to be one flat 0.3 miles with no recorded reason. Measured against the real dataset,
+ * 0.3 leaves 26.6% of locations with at least one OTHER pin inside the radius (37 others at the
+ * worst spot in Manhattan), so a quarter of the map could be rated from across the street. But
+ * tightening it blindly is worse: GPS indoors is bad, and a 100m error standing inside a store
+ * with a metal roof is ordinary, so a tight fixed radius tells someone they are not at a place
+ * they are visibly standing in.
+ *
+ * So scale it to how good the fix actually is. The browser already reports accuracy in metres —
+ * it costs nothing to read, and it is the difference between "we know where you are" and "we
+ * think you are somewhere in this neighbourhood".
+ *
+ *   accuracy <= 107m   ->  0.1 mi (161m), tight enough to tell neighbouring stores apart
+ *   107m to 322m       ->  accuracy x 1.5, scaling with how uncertain the fix is
+ *   worse, or absent   ->  0.3 mi (483m), exactly the previous behaviour
+ *
+ * 107m is where accuracy x 1.5 first exceeds the 0.1 mi floor; 322m is where it hits the 0.3
+ * ceiling. Neither is a chosen number — they fall out of the floor, the ceiling and the
+ * multiplier, which are the three things actually worth arguing about.
+ *
+ * The ceiling stays at 0.3 deliberately: beyond that the geofence stops meaning anything, and
+ * "your GPS is too poor to confirm you are here" is a more honest answer than a rating attached
+ * to the wrong building. */
+const VERIFY_RADIUS_MILES = 0.3;          // ceiling, and the fallback when accuracy is unknown
+const VERIFY_RADIUS_MIN_MILES = 0.1;      // floor for a good fix
+const METRES_PER_MILE = 1609.34;
+
+function verifyRadiusMiles(accuracyMetres){
+  if(typeof accuracyMetres !== 'number' || !isFinite(accuracyMetres) || accuracyMetres <= 0)
+    return VERIFY_RADIUS_MILES;
+  const scaled = (accuracyMetres * 1.5) / METRES_PER_MILE;
+  return Math.min(VERIFY_RADIUS_MILES, Math.max(VERIFY_RADIUS_MIN_MILES, scaled));
+}
 
 // ---------- Out of order — two-phase lifecycle (v2.6) ----------
 // State is DERIVED from the out-of-order report timestamps for a location, so it decays on its own
@@ -2939,7 +3004,11 @@ function getVerifiedPosition(){
     if(!navigator.geolocation){ resolve(null); return; }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        lastKnownPos = { lat: pos.coords.latitude, lng: pos.coords.longitude, ts: Date.now() };
+        // accuracy is metres, 68% confidence, and the browser gives it for free. Keeping it lets
+        // verifyNearby scale the geofence to how good the fix actually is.
+        lastKnownPos = { lat: pos.coords.latitude, lng: pos.coords.longitude,
+                         accuracy: (typeof pos.coords.accuracy === 'number' ? pos.coords.accuracy : null),
+                         ts: Date.now() };
         maybeAutoSetTravelMode(lastKnownPos.lat, lastKnownPos.lng);
         resolve(lastKnownPos);
       },
@@ -2949,11 +3018,30 @@ function getVerifiedPosition(){
   });
 }
 
+/* Why the check failed, in the user's terms.
+ *
+ * "You need to be at this stop" is wrong and infuriating when someone is standing inside the
+ * building — which happens, because GPS indoors is bad. If the fix is too coarse to place them,
+ * say THAT instead: the remedy is stepping outside, not walking closer. Your tester hit this at
+ * a Cumberland Farms and there was no way to tell the two cases apart. */
+function verifyFailMessage(v){
+  if(!v || v.reason === 'no-location')
+    return '📍 Turn on location to confirm you are here.';
+  if(typeof v.accuracy === 'number' && v.accuracy > 150 && v.distance <= 0.5)
+    return '📍 Your location is only accurate to about ' + Math.round(v.accuracy) +
+           'm right now — step outside and try again.';
+  return '📍 You need to be at this stop to do that.';
+}
+
 async function verifyNearby(loc){
   const pos = await getVerifiedPosition();
   if(!pos) return { ok: false, reason: 'no-location' };
   const dist = milesBetween(pos.lat, pos.lng, loc.lat, loc.lng);
-  return { ok: dist <= VERIFY_RADIUS_MILES, distance: dist };
+  const radius = verifyRadiusMiles(pos.accuracy);
+  // `radius` and `accuracy` come back so the caller can say WHICH failure this was: too far, or
+  // a fix too poor to tell. Those need different wording — one is "go closer", the other is
+  // "step outside".
+  return { ok: dist <= radius, distance: dist, radius, accuracy: pos.accuracy };
 }
 
 // Transient rating messages (checking / distance errors) are shown OVER the star row via a
@@ -2998,9 +3086,17 @@ function attachStarHandlers(loc){
 
         const verification = await verifyNearby(loc);
         if(!verification.ok){
+          /* Three outcomes, not two. Telling someone standing inside the building that they are
+           * "0.1 mi away" is both wrong and unhelpful; if the fix is that coarse, the remedy is
+           * stepping outside. Distance is still shown when it IS the reason, because knowing you
+           * are 4 miles off is actionable. */
+          const poorFix = typeof verification.accuracy === 'number'
+            && verification.accuracy > 150 && verification.distance <= 0.5;
           const msg = verification.reason === 'no-location'
             ? '📍 Enable location to verify you\'re at this Bathroom before rating.'
-            : `📍 You need to be at this Bathroom to rate it (you're ${verification.distance.toFixed(1)} mi away).`;
+            : poorFix
+              ? `📍 Your location is only accurate to about ${Math.round(verification.accuracy)}m right now — step outside and try again.`
+              : `📍 You need to be at this Bathroom to rate it (you're ${verification.distance.toFixed(1)} mi away).`;
           showFlash(loc.id, type, msg, 4000, true);
           return;
         }

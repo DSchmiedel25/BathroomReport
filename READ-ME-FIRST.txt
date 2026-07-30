@@ -1,70 +1,109 @@
-v2.9.0 — one access model, three states
-========================================
-(replaces the earlier v2.9.0 zip — badge wording changed)
+v2.9.3 — accuracy-aware geofence, plus everything from v2.9.2
+==============================================================
+Supersedes v2.9.0, v2.9.1 and v2.9.2. One zip, everything in it.
 
 WHAT IS IN THIS BATCH
-  app.js       accessState() + accessBadge(); badge added to the pit-stop popup;
-               the separate "not listed as having a public restroom" line retired
-  index.html   version stamp only. BUMP sw.js.
-  styles.css   comment only — the badge is no longer metro-specific
-
-  No rules, no functions, no data. Minor bump because the UI reads differently.
+  app.js              accuracy-aware geofence (new) · access badges · ratedByHtml ·
+                      activity carries the handle · username capped at all 3 write paths
+  index.html          version stamp only. BUMP sw.js.
+  styles.css          comment only
+  firestore.rules     'username' allowlisted on activity. PUBLISH THIS.
+  tools/audit-ui.js   checks 12 (username caps) and 13 (geofence bounds)
+  functions-index.js  rename to index.js -> functions/, THEN firebase deploy --only functions
 
 WHAT WAS STILL UNSHIPPED FROM EARLIER
-  functions/index.js — sent separately as index.js, needs
-      firebase deploy --only functions
-  Four fixes are not live without it. Nothing else outstanding.
+  functions/index.js, undeployed since v2.7.6. Five fixes ride on it: the fsId path fix,
+  aggregates.amen tallies, the hours regex, stale verified metadata, and lastRatedBy.
+  Everything else is current.
 
 
-HOW IT READS
-  Public is the default and carries NO badge. Only the exceptions do — 88% of the map shows
-  nothing, because a badge everything carries tells you nothing.
+1. WHY 0.3 MILES — nobody knew, so I measured it
+-------------------------------------------------
+There was no recorded reason. Just `const VERIFY_RADIUS_MILES = 0.3;` and a comment saying what
+it does, not why. Measured against your real data:
 
+  radius        locations with ANOTHER pin inside it     worst case
+  0.1 mi          3,166  (11.3%)                          14 others
+  0.3 mi          7,474  (26.6%)                          37 others
+  0.5 mi         10,050  (35.8%)                          70 others
+
+So at 0.3, a quarter of the map could be rated from across the street. But tightening it blindly
+is worse: GPS indoors is bad, and a 100m error while standing inside a store with a metal roof is
+ordinary. A tight fixed radius tells someone they are not at a place they are visibly standing
+in — which is a plausible read on your tester's Cumberland Farms failure.
+
+FIX: scale the radius to how good the fix actually is. The browser already reports accuracy in
+metres; it costs nothing to read.
+
+  accuracy <= 107m   ->  0.1 mi (161m)   tight enough to tell neighbouring stores apart
+  107m to 322m       ->  accuracy x 1.5  scales with the uncertainty
+  worse, or absent   ->  0.3 mi (483m)   exactly the previous behaviour
+
+107 and 322 are not chosen numbers — they fall out of the floor, the ceiling and the multiplier,
+which are the three things actually worth arguing about. I verified them empirically rather than
+asserting them, because my first comment said 65m and was wrong.
+
+AND THE ERROR MESSAGES NOW DISTINGUISH TWO CASES
+  "You need to be at this stop" is wrong and infuriating when someone is inside the building.
+  If the fix is too coarse to place them, it now says so — because the remedy is stepping
+  outside, not walking closer:
+     "Your location is only accurate to about 220m right now — step outside and try again."
+  Distance is still shown when distance IS the reason, since knowing you are 4 miles off is
+  actionable. Applied at all four verifyNearby call sites, which previously shared two wordings
+  between them.
+
+
+2. Rating attribution — costs NOTHING (from v2.9.2)
+----------------------------------------------------
+  Popup:  the name rides in the aggregate doc the popup already fetches. Same single getDoc.
+  Header: one more field on the activity doc the ticker already queries.
+  Looking the rater up from sourceId instead would have been a second read per popup open.
+
+  The competitive angle works BECAUSE of the geofence: the only way into that slot is to
+  physically go somewhere and rate it. It cannot be farmed from a sofa.
+
+  Privacy checked first: the username is a chosen handle, not an email. Sign-up converts it to a
+  synthetic @stewarts-map.local address purely because Firebase Auth wants an email format.
+
+
+3. A latent bug found while building that (from v2.9.2)
+--------------------------------------------------------
+  The votes, users and activity rules all bound username at 40. The input carries maxlength=20,
+  but that is client-side and bypassable, and signUpAccount had no length check. A longer handle
+  would have had EVERY rating rejected — silently, because two of the three write paths swallow
+  their own errors. Same shape as the wasHiddenGem bug that broke your tester.
+
+  I got the guard for it wrong twice. The first version flagged a display-only read. The second
+  only matched single-line assignments, so it reported "all 1 capped" and PASSED a deliberately
+  broken build. A check that passes a broken build is worse than no check. It now spans newlines,
+  finds all three, and I verified it fails at each one individually.
+
+
+4. Access badges (from v2.9.0)
+-------------------------------
     24,739  (no badge)                                  public, assumed
-       983  🔑 Customers only                           operator says so
-     1,333  ❔ Access unknown                            toilet confirmed, who may use it isn't
+       983  🔑 Customers only
+     1,333  ❔ Access unknown                            toilet confirmed, access isn't
        361  🤞 Probably — nobody's confirmed yet         stores
        671  ❔ Unconfirmed — may be a pull-off only      bare rest areas
 
-  A community "no" still hides the pin at CONFIRM_THRESHOLD, unchanged.
-
-WHY THE UNKNOWN SPLITS THREE WAYS
-  Wording them alike would misinform in two directions.
-
-  A metro entry with no access tag has a toilet a human confirmed; what's missing is who may use
-  it. Calling that "unconfirmed" would be wrong about a demonstrably real civic toilet.
-
-  A store the source described without listing a restroom — 353 Circle Ks whose own API lists air
-  and ATM but omits the restroom it lists for the other 5,950 — almost certainly has one. Lead
-  optimistic, let a visitor settle it.
-
-  A bare OSM point, an untagged polygon, or a picnic area is a different bet. "Probably" would be
-  a lie: plenty are a pull-off with a bench and a bin. Someone leaving the interstate on that
-  promise is the exact failure this app exists to prevent.
-
-NO DATA MIGRATION
-  metroInfo.access came from the metro imports, osm.restroomUnconfirmed from the chain ones, and
-  meta.facility from the rest-area tiering. Rewriting thousands of records to unify them would be
-  a migration for something one reader derives.
 
 WHAT I VERIFIED
-  accessState 7/7 across every input shape; accessBadge across all seven rendering cases.
-  Distribution counted on the real data, not estimated.
-  .access-badge CSS exists for all three states, survived the dead-declaration strip I did
-  earlier, and shell.css does not override it.
-  app.js parses; 11 audit checks pass; css and html balanced.
+  verifyRadiusMiles across 13 inputs including null, NaN, negative and a string — always inside
+  [0.1, 0.3]. Check 13 catches an unbounded formula: removing the clamp produces 6 failures.
+  Hinge points measured empirically, not asserted.
+  Failure-message decision exercised across 7 scenarios.
+  ratedByHtml 7/7 · accessState 7/7 · accessBadge all cases · check 12 catches a regression at
+  each of the three username write paths.
+  app.js, functions/index.js, audit-ui.js parse · 13 audit checks pass · rules and css balanced ·
+  index.html well-formed under a strict parse · 40 data files, 28,087 records.
 
 WHAT I COULD NOT VERIFY
-  How the badge looks in the pit-stop popup — it has never rendered there. The CSS was written
-  for the metro card, same position under the address. Worth a look at one of the 353 flagged
-  Circle Ks and at a bare rest area.
-
-A NOTE ON THE DASHES
-  I removed the em dashes from these two badges, then put them back. They belong here: this is a
-  label and its qualifier, the same shape as "♿ Wheelchair accessible — confirmed by visitors"
-  and "⚠️ Seasonal — may be closed in winter" sitting directly beside them. The earlier sweep was
-  of PROSE in index.html, where an em dash mid-sentence reads as affected. 48 label-style dashes
-  remain in app.js and are staying.
+  Real GPS behaviour. Every accuracy figure above is from the spec and the arithmetic, not from a
+  phone in a shop. The one number worth watching is how often the new "step outside" message
+  appears — if it is common, the 150m threshold for calling a fix poor wants revisiting.
+  Also unverified: the deployed function, the badge in the pit-stop popup, and the ticker with a
+  name in it. None has ever rendered.
 
 STILL OPEN
   Mac:      firebase deploy --only functions · git rm the six stray files · curl the Leaflet

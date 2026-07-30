@@ -74,9 +74,16 @@ exports.recomputeBathroomAggregate = onDocumentWritten('votes/{voteId}', async (
     // look wrong.
     schemaVersion: 2,
     lastUpdated:   Date.now(),
-    // Stamp only when the new state includes a real rating (not on rating removal), so the
-    // client's "rated X ago" line reflects the most recent actual rating.
+    /* Stamp only when the new state includes a real rating (not on rating removal), so the
+     * client's "rated X ago" line reflects the most recent actual rating.
+     *
+     * lastRatedBy rides along in a document the popup already fetches, so attribution costs no
+     * extra read. The username is a chosen handle — sign-up converts it to a synthetic
+     * @stewarts-map.local address purely because Firebase Auth wants an email — so this exposes
+     * no personal data. Bounded to 40 to match the votes rule; absent if the vote carried none. */
     ...(a > 0 ? { lastRatedAt: Date.now() } : {}),
+    ...(a > 0 && after && typeof after.username === 'string' && after.username
+        ? { lastRatedBy: after.username.slice(0, 40) } : {}),
   };
   if (sumDelta !== 0)   patch.bathroomSum   = FieldValue.increment(sumDelta);
   if (countDelta !== 0) patch.bathroomCount = FieldValue.increment(countDelta);
