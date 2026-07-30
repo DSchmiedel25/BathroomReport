@@ -474,7 +474,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, collectionGroup, getDocs, getDoc, doc, addDoc, setDoc, updateDoc, deleteDoc, arrayRemove, arrayUnion
+  getFirestore, collection, collectionGroup, getDocs, getDoc, doc, addDoc, setDoc, updateDoc, deleteDoc, arrayRemove, arrayUnion, query, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
@@ -1141,6 +1141,27 @@ $('#tipsList').addEventListener('click', async (e) => {
     try{
       if(entry.legacy) await updateDoc(doc(db, 'tips', fsId(locId)), { tips: arrayRemove(oldText) });
       else await deleteDoc(doc(db, 'tips', fsId(locId), 'entries', entry.id));
+      /* Remove the activity entry this tip produced.
+       *
+       * The weekly recap used to verify every entry by re-reading the tip behind it — one
+       * document read PER ENTRY, which is what got the feature disabled. It now trusts the log,
+       * so the log has to be kept honest at the point of deletion. Same contract as votes, where
+       * recomputeBathroomAggregate does this server-side.
+       *
+       * Best-effort: a stale recap count is cosmetic, and failing the removal over it would
+       * leave a tip on the map that an admin has decided should go. */
+      try{
+        /* Single-field query, then filter in JS. Three equality filters would need a composite
+         * index on type+locId+text, which Firestore only tells you about by failing the first
+         * time someone uses it — and this runs from a moderation action, so the first person to
+         * hit it would be you, mid-task. A location has a handful of activity entries at most. */
+        const stale = await getDocs(query(collection(db, 'activity'), where('locId', '==', locId)));
+        const doomed = stale.docs.filter(d => {
+          const a = d.data() || {};
+          return a.type === 'tip' && a.text === oldText;
+        });
+        await Promise.all(doomed.map(d => deleteDoc(d.ref)));
+      }catch(actErr){ console.warn('activity cleanup for removed tip failed (non-fatal)', actErr); }
       tips.splice(i, 1); if(!tips.length) delete allTips[locId];
       renderTips(); toast('Tip removed.');
     }catch(err){ console.error(err); toast('Could not remove tip.', true); btn.disabled = false; }

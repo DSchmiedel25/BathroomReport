@@ -32,69 +32,124 @@ function fsId(id) {
  * Keys are not enumerated here on purpose: whatever keys appear in a vote's amenities /
  * storeFeatures maps get tallied, so adding an amenity in app.js needs no function redeploy.
  * Values are compared as strings; 'yes' and 'no' are the only ones that move a counter. */
-function amenityDeltas(before, after) {
-  const deltas = {};
-  for (const field of ['amenities', 'storeFeatures']) {
-    const b = (before && before[field]) || {};
-    const a = (after && after[field]) || {};
-    for (const key of new Set([...Object.keys(b), ...Object.keys(a)])) {
-      const bv = String(b[key] == null ? '' : b[key]);
-      const av = String(a[key] == null ? '' : a[key]);
-      if (bv === av) continue;
-      if (bv === 'yes' || bv === 'no') deltas[`amen.${key}.${bv}`] = (deltas[`amen.${key}.${bv}`] || 0) - 1;
-      if (av === 'yes' || av === 'no') deltas[`amen.${key}.${av}`] = (deltas[`amen.${key}.${av}`] || 0) + 1;
+/* The amenity and store-feature keys this function will tally, kept DISJOINT.
+ *
+ * They used to be one flat set checked against both maps, so a vote carrying accessible:'yes' in
+ * BOTH amenities and storeFeatures contributed two confirmations from one person. The app writes
+ * bathroom answers to `amenities` and store answers to `storeFeatures`, and nothing legitimate
+ * puts a key in both — so the split is the contract, not a convenience.
+ *
+ * Mirrors BATHROOM_AMENITIES and STORE_FEATURES in app.js. tools/audit-ui.js check 15 fails the
+ * build if these drift from the rules or the client. */
+const AMENITY_KEYS_BY_FIELD = {
+  amenities:     new Set(['restroomType', 'accessible', 'changing', 'hasRestroom']),
+  storeFeatures: new Set(['evCharging', 'airPump', 'shower', 'indoorSeating', 'wifi', 'grabAndGo', 'hotFood']),
+};
+const AMENITY_KEYS = new Set([
+  ...AMENITY_KEYS_BY_FIELD.amenities,
+  ...AMENITY_KEYS_BY_FIELD.storeFeatures,
+]);
+
+/* Reduce every vote for one location into the exact aggregate.
+ *
+ * NOT a delta. Deltas cannot survive Cloud Functions delivery semantics: an event may arrive
+ * more than once, and two rapid edits may arrive out of order. A delta scheme double-counts on
+ * the first and produces a lasting wrong total on the second — and clamping at zero, which the
+ * previous version did, hides the negative while leaving the count wrong.
+ *
+ * Recomputing from the votes themselves is idempotent by construction: running it once, twice,
+ * or out of order gives the same answer, because the answer is a function of stored state rather
+ * than of the event that woke us up. It costs one query per vote write, which at this app's
+ * volume is the right trade for a total that cannot drift. */
+function reduceVotes(docs) {
+  const out = { bathroomSum: 0, bathroomCount: 0, amen: {}, lastRatedAt: 0, lastRatedBy: null };
+  for (const v of docs) {
+    if (!v) continue;
+    if (typeof v.bathroom === 'number' && v.bathroom > 0 && Number.isInteger(v.bathroom) && v.bathroom <= 5) {
+      out.bathroomSum += v.bathroom;
+      out.bathroomCount += 1;
+      const t = typeof v.ratedAt === 'number' ? v.ratedAt
+              : (typeof v.lastUpdated === 'number' ? v.lastUpdated : 0);
+      if (t > out.lastRatedAt) {
+        out.lastRatedAt = t;
+        out.lastRatedBy = (typeof v.username === 'string' && v.username) ? v.username.slice(0, 40) : null;
+      }
+    }
+    // Each key is read from ITS OWN field only, so one vote can never contribute twice.
+    for (const field of ['amenities', 'storeFeatures']) {
+      const m = v[field];
+      if (!m || typeof m !== 'object') continue;
+      for (const [key, val] of Object.entries(m)) {
+        if (!AMENITY_KEYS_BY_FIELD[field].has(key)) continue;
+        const sv = String(val);
+        if (sv !== 'yes' && sv !== 'no') continue;
+        const cell = (out.amen[key] = out.amen[key] || { yes: 0, no: 0 });
+        cell[sv] += 1;
+      }
     }
   }
-  return deltas;
+  return out;
 }
 
 exports.recomputeBathroomAggregate = onDocumentWritten('votes/{voteId}', async (event) => {
   const before = event.data.before.exists ? event.data.before.data() : null;
   const after  = event.data.after.exists  ? event.data.after.data()  : null;
-
-  // Only bathroom ratings 1–5 count toward the average; 0/undefined means "not rated".
-  const b = (before && typeof before.bathroom === 'number' && before.bathroom > 0) ? before.bathroom : 0;
-  const a = (after  && typeof after.bathroom  === 'number' && after.bathroom  > 0) ? after.bathroom  : 0;
-
-  const sumDelta   = a - b;
-  const countDelta = (a > 0 ? 1 : 0) - (b > 0 ? 1 : 0);
-  const amen       = amenityDeltas(before, after);
-
-  // Nothing changed that any counter tracks (e.g. a lastUpdated-only touch).
-  if (sumDelta === 0 && countDelta === 0 && Object.keys(amen).length === 0) return;
-
-  const locId = (after && after.locId) || (before && before.locId);
+  const locId  = (after && after.locId) || (before && before.locId);
   if (!locId) return;
 
-  const patch = {
-    // Versioned so a future change to this document's shape has a clean migration point.
-    // NOTE: `amen` counts votes from this function's deploy forward. Amenity answers cast
-    // before it existed were never tallied and are not backfilled here — aggregates are
-    // derived from `votes`, so a one-off recompute can correct them if the numbers ever
-    // look wrong.
-    schemaVersion: 2,
-    lastUpdated:   Date.now(),
-    /* Stamp only when the new state includes a real rating (not on rating removal), so the
-     * client's "rated X ago" line reflects the most recent actual rating.
-     *
-     * lastRatedBy rides along in a document the popup already fetches, so attribution costs no
-     * extra read. The username is a chosen handle — sign-up converts it to a synthetic
-     * @stewarts-map.local address purely because Firebase Auth wants an email — so this exposes
-     * no personal data. Bounded to 40 to match the votes rule; absent if the vote carried none. */
-    ...(a > 0 ? { lastRatedAt: Date.now() } : {}),
-    ...(a > 0 && after && typeof after.username === 'string' && after.username
-        ? { lastRatedBy: after.username.slice(0, 40) } : {}),
-  };
-  if (sumDelta !== 0)   patch.bathroomSum   = FieldValue.increment(sumDelta);
-  if (countDelta !== 0) patch.bathroomCount = FieldValue.increment(countDelta);
-
   const ref = db.doc(`aggregates/${fsId(locId)}`);
-  await ref.set(patch, {merge: true});
-  // Nested counters need dot-path updates; set() with merge would replace the nested object.
-  if (Object.keys(amen).length) {
-    const inc = {};
-    for (const [path, n] of Object.entries(amen)) inc[path] = FieldValue.increment(n);
-    await ref.update(inc);
+
+  /* One transaction that READS every vote for this location and writes the exact totals.
+   *
+   * The previous version computed a delta from this single event and incremented. That is atomic
+   * but neither idempotent nor order-safe, and Firestore guarantees neither exactly-once nor
+   * ordered delivery. A retried event double-counted a rating; two fast amenity edits delivered
+   * out of order left a permanently wrong tally that the zero-clamp made look plausible.
+   *
+   * Reading the votes makes the aggregate a pure function of stored state, so any number of
+   * deliveries in any order converge on the same answer. It also removes the need for the clamp:
+   * a computed count cannot go negative. */
+  await db.runTransaction(async (tx) => {
+    const votesSnap = await tx.get(db.collection('votes').where('locId', '==', locId));
+    const totals = reduceVotes(votesSnap.docs.map((d) => d.data()));
+
+    const patch = {
+      schemaVersion:  2,
+      bathroomSum:    totals.bathroomSum,
+      bathroomCount:  totals.bathroomCount,
+      amen:           totals.amen,
+      lastUpdated:    Date.now(),
+    };
+    /* lastRatedAt/By come from the votes too, so they no longer depend on which event fired.
+     * Cleared when no rating remains, rather than left pointing at a rating that is gone. */
+    if (totals.lastRatedAt) patch.lastRatedAt = totals.lastRatedAt;
+    if (totals.lastRatedBy) patch.lastRatedBy = totals.lastRatedBy;
+
+    /* amen is written whole, not merged, so a key whose last vote was withdrawn disappears
+     * instead of lingering at its old count. The rest of the document still merges, preserving
+     * fields this function does not own. */
+    tx.set(ref, patch, { merge: true });
+  });
+
+  /* When a vote is DELETED, remove the activity entries it backed.
+   *
+   * The recap used to verify each activity entry by reading the vote behind it, which meant the
+   * client had to be able to read OTHER people's votes — and a vote document carries the raw uid,
+   * the location and the timestamp, so a public `votes` collection let anyone reconstruct where a
+   * named person had been. Closing that read is only safe if something else keeps the activity
+   * log honest, so the cleanup moves here where it belongs: the server owns derived state.
+   *
+   * Best-effort and deliberately non-fatal. A stale activity entry is cosmetic; failing the
+   * aggregate write over one would not be. */
+  if (!event.data.after.exists) {
+    try {
+      const stale = await db.collection('activity')
+        .where('sourceId', '==', event.params.voteId).get();
+      await Promise.all(stale.docs.map((d) => d.ref.delete()));
+      if (stale.size) console.log(`removed ${stale.size} activity entr(ies) for deleted vote ${event.params.voteId}`);
+    } catch (e) {
+      console.warn('activity cleanup failed (non-fatal)', event.params.voteId, e && e.message);
+    }
   }
 });
 
@@ -152,15 +207,37 @@ async function eligible(uid){
         Date.now() - new Date(u.metadata.creationTime).getTime() >= 7*24*3600*1000) return true;
   } catch(e){ /* ignore */ }
   try {
-    const c = await db.collection('votes').where('clientId','==',uid).count().get();
-    if (c.data().count >= 10) return true;
+    /* Count RATINGS, not vote documents.
+     *
+     * count() counted every vote doc for this uid — but a vote document exists as soon as someone
+     * answers an amenity question, with bathroom still 0. So answering amenity prompts at ten
+     * locations granted hours-consensus eligibility without ever rating a bathroom, which is not
+     * what the comment above promises and not what the threshold is for.
+     *
+     * select('bathroom') fetches one field per doc rather than the whole vote, and avoids the
+     * composite index a where('bathroom','>',0) count would need. A single user's votes are a
+     * small set, and this runs only when the 7-day check has already failed. */
+    const snap = await db.collection('votes').where('clientId','==',uid).select('bathroom').get();
+    let ratings = 0;
+    for (const d of snap.docs) {
+      const b = d.get('bathroom');
+      if (typeof b === 'number' && b > 0) ratings++;
+    }
+    if (ratings >= 10) return true;
   } catch(e){ /* ignore */ }
   return false;
 }
 
-// Is this uid an admin? admins/{uid} with enabled != false. Admin SDK bypasses rules.
+/* Admin is an EXPLICIT opt-in, and this must agree with firestore.rules.
+ *
+ * Phase 2a tightened the rules from `enabled != false` to `enabled == true` and left this server
+ * check untouched. The two then disagreed: a missing, null or mistyped `enabled` field made an
+ * account non-admin to every client path and rules check, while STILL granting it admin authority
+ * inside the hours consensus, which runs with Admin SDK privileges and bypasses rules entirely.
+ * Two sources of truth for who is an administrator is worse than either answer alone. */
+// Is this uid an admin? admins/{uid} with enabled == true. Admin SDK bypasses rules.
 async function isAdminUid(uid){
-  try { const d = await db.doc('admins/' + uid).get(); return d.exists && d.data().enabled !== false; }
+  try { const d = await db.doc('admins/' + uid).get(); return d.exists && d.data().enabled === true; }
   catch(e){ return false; }
 }
 
@@ -174,22 +251,52 @@ exports.recomputeHourStatus = onDocumentWritten('hourReports/{storeId}/submissio
   // is no sticky override state to guard here — an admin editing or deleting their report re-derives
   // the result cleanly.
 
+  /* Everything from here is inside ONE transaction, because the submissions read and the
+   * hourStatus write have to be serialized TOGETHER.
+   *
+   * This query used to run outside the transaction below. The transaction then made the write
+   * atomic, but it never proved the computation was based on the newest submissions — so a slow
+   * invocation could compute "pending" from an old snapshot, and land it AFTER a newer
+   * invocation had written "verified". revision++ cannot reject that: the stale write reads the
+   * newer revision and simply increments past it, so it looks like the most recent answer while
+   * being derived from stale input. Firestore does not guarantee trigger ordering, so the only
+   * fix is to read the inputs under the same transaction that writes the output. */
+  await db.runTransaction(async (tx) => {
   // Load all submissions, keep valid + eligible, group by canonical key.
-  const subs = await db.collection('hourReports/' + storeId + '/submissions').get();
+  const subs = await tx.get(db.collection('hourReports/' + storeId + '/submissions'));
   const groups = {};
   const adminSubs = [];
+  const valid = [];        // parsed submissions, before per-uid resolution
   for (const doc of subs.docs){
     const s = doc.data();
     const canon = canonicalize(s.value, s.kind);
     if (!canon) continue;
+    valid.push({ uid: s.uid, canon, at: (typeof s.submittedAt === 'number' ? s.submittedAt : 0) });
+  }
+
+  /* Resolve each DISTINCT uid once, in parallel.
+   *
+   * This used to call isAdminUid() and eligible() inside the loop, sequentially, for every
+   * submission — so N submissions meant up to 2N round trips awaited one after another, and the
+   * same person submitting at several stores was re-checked every time. eligible() alone reads
+   * Auth plus a votes query.
+   *
+   * The set of distinct uids is small (one per person who has ever reported hours here), so
+   * resolving them once and in parallel turns a serial N+1 into two parallel batches. */
+  const uids = [...new Set(valid.map((v) => v.uid).filter(Boolean))];
+  const [adminFlags, eligibleFlags] = await Promise.all([
+    Promise.all(uids.map((u) => isAdminUid(u).catch(() => false))),
+    Promise.all(uids.map((u) => eligible(u).catch(() => false))),
+  ]);
+  const isAdminBy = new Map(uids.map((u, i) => [u, adminFlags[i]]));
+  const isEligibleBy = new Map(uids.map((u, i) => [u, eligibleFlags[i]]));
+
+  for (const v of valid){
     // Admin reports are authoritative — they bypass the community tally entirely.
-    if (await isAdminUid(s.uid)){
-      adminSubs.push({ canon, at: (typeof s.submittedAt === 'number' ? s.submittedAt : 0) });
-      continue;
-    }
-    if (!(await eligible(s.uid))) continue;
-    const g = groups[canon.key] || (groups[canon.key] = {uids:new Set(), canon});
-    g.uids.add(s.uid);
+    if (isAdminBy.get(v.uid)){ adminSubs.push({ canon: v.canon, at: v.at }); continue; }
+    if (!isEligibleBy.get(v.uid)) continue;
+    const g = groups[v.canon.key] || (groups[v.canon.key] = {uids:new Set(), canon: v.canon});
+    g.uids.add(v.uid);
   }
   let top = null, second = null;
   for (const k in groups){
@@ -214,8 +321,8 @@ exports.recomputeHourStatus = onDocumentWritten('hourReports/{storeId}/submissio
     next = {verified:false, state:'pending', agreeCount: top ? top.n : 0};
   }
 
-  // Transactional compare-and-set on revision.
-  await db.runTransaction(async (tx) => {
+    // Same transaction — the compare-and-set on revision still applies, but now the `next` it
+    // is comparing was derived from submissions read under this very transaction.
     const snap = await tx.get(statusRef);
     const p = snap.exists ? snap.data() : {};
 

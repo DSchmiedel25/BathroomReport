@@ -1311,6 +1311,35 @@ async function loadMyVote(id){
     return emptyVote();
   }
 }
+/* What the users/{uid} mirror actually needs to store.
+ *
+ * The mirror existed to make loadAllRatings one read instead of a query. It was storing the WHOLE
+ * vote payload, which repeats four fields in every single entry:
+ *   clientId     identical in all of them — it is the document owner
+ *   locId        it IS the map key
+ *   username     identical in all of them
+ *   lastUpdated  no reader ever looks at it
+ *
+ * Dropping them cuts an entry by about 36%, and the document is rewritten WHOLE on every rating,
+ * so this reduces the write cost of every future rating too — not just the eventual ceiling.
+ *
+ * Consumers, checked: loadAllRatings spreads the entry over emptyVote() and so needs store,
+ * bathroom, amenities, storeFeatures and amenityMeta; computeAchievementStats reads ratedAt and
+ * wasHiddenGem. Nothing reads the four dropped fields from here. */
+function mirrorEntry(payload){
+  const { clientId, locId, username, lastUpdated, ...keep } = payload || {};
+  return keep;
+}
+
+/* Past this many rated locations, stop mirroring rather than fail.
+ *
+ * A Firestore document is capped at 1 MiB. At the trimmed size that is roughly 3,900 locations —
+ * far off for one person, but the failure mode matters: the write starts throwing, the catch
+ * swallows it, and the mirror silently stops updating while still being READ, so it would serve
+ * a stale ratings map forever. Stopping deliberately falls back to the per-vote query, which is
+ * slower and correct. */
+const MIRROR_MAX_LOCATIONS = 2500;
+
 async function saveMyVote(id, data){
   try{
     const {db, doc, setDoc} = await fb();
@@ -1338,7 +1367,8 @@ async function saveMyVote(id, data){
     if(isLoggedIn()){
       try{
         await setDoc(doc(db, 'users', clientId),
-          { uid: clientId, username: uname || '', lastUpdated: Date.now(), ratings: { [id]: payload } },
+          { uid: clientId, username: uname || '', lastUpdated: Date.now(),
+            ratings: { [id]: mirrorEntry(payload) } },
           { merge: true });
       }catch(e){ /* non-critical */ }
     }
@@ -1512,14 +1542,18 @@ async function loadWeeklyRecap(){
          * every client being able to audit it. */
         checks.push(Promise.resolve('rating'));
       } else if(item.type === 'tip' && item.locId && typeof item.text === 'string'){
-        checks.push(
-          getDoc(doc(db, 'tips', fsId(item.locId)))
-            .then(tSnap => {
-              const tips = tSnap.exists() && Array.isArray(tSnap.data().tips) ? tSnap.data().tips : [];
-              return tips.includes(item.text) ? 'tip' : null;
-            })
-            .catch(() => null)
-        );
+        /* Trusted, like the rating branch above.
+         *
+         * This used to re-read tips/{locId} and look for the text in the `tips` array — which
+         * stopped working the moment RB-02 moved tips into a per-entry subcollection: a new tip
+         * is not in the legacy array, so every one of them failed the check and would have
+         * counted as zero. Reading the subcollection instead would be a second read PER ENTRY,
+         * which is what got this feature disabled in the first place.
+         *
+         * Instead the log is kept honest at the point of deletion: FlushPanel removes the
+         * matching activity entry when an admin removes a tip, and the aggregate function does
+         * the same when a vote is deleted. One query for the week, no per-entry reads. */
+        checks.push(Promise.resolve('tip'));
       }
       // Entries missing the fields needed to verify them (e.g. logged before this check
       // existed) are silently skipped rather than counted as either — safer than risking
@@ -2410,7 +2444,13 @@ async function loadAllRatings(){
         // and this one is swallowed by its own catch, so an over-long name would silently drop
         // the whole one-read backfill and quietly cost a query on every load.
         const uname = (window.__currentUser && window.__currentUser.email) ? window.__currentUser.email.split('@')[0].slice(0, 40) : '';
-        try{ await setDoc(doc(db, 'users', uid), { uid, username: uname, lastUpdated: Date.now(), ratings }, { merge: true }); }catch(e){}
+        // Trim every entry, and skip the mirror entirely past the cap — a document that cannot be
+        // written would otherwise keep serving whatever it last held.
+        const trimmed = {};
+        for(const k of Object.keys(ratings)) trimmed[k] = mirrorEntry(ratings[k]);
+        if(Object.keys(trimmed).length <= MIRROR_MAX_LOCATIONS){
+          try{ await setDoc(doc(db, 'users', uid), { uid, username: uname, lastUpdated: Date.now(), ratings: trimmed }, { merge: true }); }catch(e){}
+        }
       }
     }
   }catch(e){ console.error('my ratings load failed', e); }
@@ -3329,7 +3369,10 @@ loadAllRatings();
 //                   *-locations.js files (weekly, via fetch-and-bake.js) instead of read live
 //                   from the overrides collection on every load. Re-enable this call to
 //                   restore instant live overrides.
-// loadWeeklyRecap();  // disabled — its stat pill is hidden in the redesign (was wasting reads/load)
+/* Re-enabled. It was disabled for read cost, and that cost is gone: it used to run one query for
+ * the week and then a document read PER ENTRY to verify each one. Both verifications are now
+ * handled where the deletion happens, so this is a single query. */
+loadWeeklyRecap();
 
 // One-time support prompt — shown after this identity has rated five different locations.
 // The permanent support link remains available in the Account panel.

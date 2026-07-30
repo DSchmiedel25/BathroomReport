@@ -1,99 +1,97 @@
-v2.9.9 — the two MUST-FIX items
-================================
-One is code and it is in this zip. The other is a command only you can run.
+v2.11.0 — should-fix items, plus the weekly recap is back
+==========================================================
+Includes everything from v2.9.8, v2.9.9 and v2.10.0. Ship this instead of any of those.
 
 WHERE EACH FILE GOES
-  app.js                       repo root      BUMP sw.js
-  index.html                   repo root      version stamp
-  export-votes.js              repo root
-  bake-hours.js                repo root
-  fetch-and-bake-hours.js      repo root
-  tools/audit-ui.js            tools/
-  tools/rebuild-aggregates.js  tools/
-  firestore.rules              PUBLISH in the console
-  functions-index.js           rename to index.js -> functions/, THEN deploy
+  app.js · index.html · flushpanel.html · export-votes.js · bake-hours.js ·
+  fetch-and-bake-hours.js                                              repo root
+  tools/audit-ui.js · tools/rebuild-aggregates.js                      tools/
+  firestore.rules          PUBLISH in the console
+  functions-index.js       rename to index.js -> functions/, THEN deploy
 
-ORDER
-  1. commit the files
-  2. publish the rules
-  3. firebase deploy --only functions
-
-  Publishing before deploying matters here more than usual: the new rule closes `votes` to
-  owner-only reads, and the function is what keeps the activity log honest once the client can no
-  longer audit it. Deploy the function in the same sitting.
+  Order: commit · publish rules · deploy function. BUMP sw.js.
 
 
-═══ MUST-FIX 1 — H-01, public vote reads exposed location histories ═══
-`votes` was `allow read: if true`, and every document carries:
+═══ THE RECAP — you were right to ask ═══
+You asked whether the weekly recap is even deployed. I had just used it to justify part of the
+H-01 fix, so I checked. It is deployed — the pill is in index.html, the function is complete —
+but line 3368 was:
 
-    clientId (the raw uid) · locId · ratedAt · username
+    // loadWeeklyRecap();  // disabled — its stat pill is hidden in the redesign
 
-So anyone could query the collection and reconstruct WHERE A NAMED PERSON HAD BEEN AND WHEN. No
-sign-in required. Phase 2a closed users/{uid} for precisely this reason and left the collection it
-mirrors — I shut the front door and left the side one open.
+So I was wrong. I said closing `votes` would "silently reduce the recap to counting only your own
+activity". It would not have: the recap does not run. The H-01 fix is still right, but on its own
+merits — a public collection carrying uid, location and timestamp is the exposure regardless of
+who reads it — and I overstated the breakage to justify it.
 
-It also sits three lines from the FAQ claim that analytics "doesn't identify you personally".
+It is now re-enabled, and TWO bugs had to be fixed first:
 
-  Now: allow read: if signedIn() && (resource.data.clientId == request.auth.uid || isAdmin())
+1. It cost one query PLUS a document read per entry. That is why it was disabled.
+   Both branches now trust the log. One query for the week, regardless of volume:
+      20 entries: 21 reads -> 1
+      60 entries: 61 reads -> 1
 
-WHAT THAT BROKE, AND HOW IT IS HANDLED
-  The weekly recap verified every activity entry by reading the vote behind it — which required
-  permission to read OTHER people's votes. Closing the collection would have silently reduced the
-  recap to counting only your own activity.
+2. The tip branch was already broken by my own RB-02 restructure. It verified a tip by looking
+   for its text in tips/{locId}.tips — the LEGACY array. Tips have lived in a per-entry
+   subcollection since v2.8.0, so every new tip failed that check. Had I re-enabled it without
+   looking, tips would have silently shown zero forever.
 
-  The cleanup moved to where it belongs. recomputeBathroomAggregate now deletes an activity entry
-  when its vote is deleted, so the log stays honest without every client being able to audit it.
-  Best-effort and non-fatal: a stale entry is cosmetic, failing an aggregate write over one is not.
+Trusting the log means keeping it honest at the point of deletion:
+   votes  recomputeBathroomAggregate deletes the activity entry when a vote is deleted (server)
+   tips   FlushPanel deletes it when an admin removes a tip (already an admin action)
 
-EVERY REMAINING votes READ, CHECKED AGAINST THE NEW RULE
-  own vote by id                    PASSES  clientId is the caller
-  query where clientId == my uid    PASSES  provably owner-scoped, the documented list pattern
-  cross-user read in the recap      REMOVED replaced by the server-side cleanup
-  the anon-migration query          DENIED  and that is correct. It filters by a DEVICE id, so it
-                                            is not owner-scoped. Anonymous votes cannot exist
-                                            anyway — the create rule requires signedIn() and pins
-                                            the doc id to request.auth.uid. Now logged as
-                                            "expected" rather than as a failure on every signup.
-
-WHAT IS STILL PUBLICLY READABLE, DELIBERATELY
-  aggregates    anonymous totals, no author attached
-  activity      carries a chosen handle, not a uid, and public credit is the point of the feature
-                you asked for. Weaker than the votes exposure and consented by design.
-  outOfOrder    carries reporterId, but the app must read it for any location while signed out.
-                Smaller surface: only people who report outages. Worth revisiting.
+INDEXES: none needed. Every query here is single-field — ts >= cutoff, locId ==, sourceId ==.
+I deliberately avoided a three-filter query on type+locId+text, because Firestore only tells you
+a composite index is missing by failing the first time it runs, and that first time would have
+been you, mid-moderation.
 
 
-═══ MUST-FIX 2 — deploy the function. Only you can do this. ═══
-    cd ~/code/bathroomreport && git pull
-    mv <functions-index.js> functions/index.js
-    firebase deploy --only functions
+═══ ALSO IN THIS BATCH ═══
 
-  Dormant until it runs:
-    the exact-recompute aggregate     CR-02 duplicate delivery, CR-03 out-of-order edits
-    the hours transaction             CR-04 stale invocation overwriting a newer result
-    the admin check                   A2-01, still grants admin on a missing `enabled` field
-    aggregates.amen tallies           live amenity confirmation has NEVER worked
-    the hours regex                   24:01-24:59 accepted as valid times
-    lastRatedBy                       the "by name" credit
-    the activity cleanup              NEW, and H-01 above depends on it
+FUNC-02  eligibility counted vote DOCUMENTS while promising ">=10 ratings". A vote document
+         exists as soon as someone answers an amenity question, so amenity-only participation
+         granted hours-consensus eligibility. Now counts actual ratings, via select('bathroom')
+         so it fetches one field per doc and needs no composite index.
+
+FUNC-04  the consensus recompute awaited two Firestore round trips PER SUBMISSION, sequentially,
+         re-resolving the same person every time they appeared. Now each distinct uid resolves
+         once, in parallel: 50 submissions from 12 people, 100 serial reads -> 24 parallel.
+
+APP-02   the ratings mirror stored four redundant fields in every entry — clientId (identical),
+         locId (it IS the key), username (identical), lastUpdated (unread). 36% smaller, and the
+         ceiling moves from ~2,668 to ~3,900 rated locations. The bigger win is that this
+         document is rewritten WHOLE on every rating.
+         Also capped at 2,500: past 1 MiB the write throws, the catch swallows it, and the mirror
+         keeps being READ while silently no longer updating — serving a stale map indefinitely.
 
 
-WHAT I VERIFIED
-  every votes read traced against the new rule, one by one
-  the cross-user read is gone: 0 occurrences
+═══ NOT DONE, AND WHY ═══
+H-06  proximity is client-only. A callable function would still be told the coordinates BY the
+      client, so it moves the check without adding trust. A real fix needs attested location.
+      Writing it would look like a fix and be theatre.
+H-07  App Check. Half is console work only you can do — register the app, get a reCAPTCHA v3 key,
+      enable enforcement. Send me the key and I will write the client init against a real one.
+A2-04 ~15 MB of markers. Still not touching the cluster plugin on a modelled number. app.js:162
+      records that culling was tried and removed as the likely cause of the Android races. The
+      device measurement is the prerequisite, not the fix.
+hours expiry  a two-year-old report still votes on today's hours. Adding expiry can drop a
+      location below consensus, and bake-hours then REVERTS its verified hours — the exact CR-01
+      shape. Needs pairing with a bake that tells "expired" from "never verified".
+17,043 string coordinates  the app coerces with +r.lat everywhere. Rewriting a type across 40
+      files carries more risk than the inconsistency, and I have already had one bad day this
+      session from a contract change with a missed consumer.
+
+
+═══ WHAT I VERIFIED ═══
+  the recap: both branches trusted, zero per-entry reads, empty week renders nothing
+  the tip cleanup runs as admin, which the activity rules permit
+  every query is single-field, so no composite index is required
+  query and where are now imported in flushpanel — they were not, which would have thrown on
+  every tip deletion
+  mirrorEntry keeps all seven fields its consumers read and drops exactly four
   9 JS files parse · 15 audit checks pass · rules balanced · both html well-formed
 
-WHAT I COULD NOT VERIFY
-  Firestore's query-scoping behaviour under the new rule. `where('clientId','==',uid)` under an
-  owner rule is the documented pattern and should be allowed, but I cannot exercise it without an
-  emulator. If loadAllRatings starts returning nothing after you publish, that is the thing to
-  look at — and the fallback path still works, so ratings would load slower rather than vanish.
-
-
-AFTER THIS, WHAT IS LEFT
-  SHOULD:  H-06 client-only proximity · H-07 App Check · APP-02 the 1 MiB ratings map ·
-           A2-04 markers (~15 MB, wants a device profile first) · no emulator suite
-  CAN:     the six stray files · PWA-02 vendoring · 17,043 string coordinates ·
-           85 near-overlap pairs · 5,005 missing addresses · FUNC-02 / FUNC-04
-  NO FIX:  H-09 delta zip · A2-05 open-now tz · RB-05 · A2-06 anonymous reports ·
-           A2-03 partial bake · SEC-09 fail-open block check
+═══ WHAT I COULD NOT VERIFY ═══
+  Any of it against live Firestore. The recap in particular has never rendered, so its first run
+  after deploy is worth watching — it should appear in the stat ticker rotation alongside the
+  most-recently-rated pill, and show nothing at all in a week with no activity.
