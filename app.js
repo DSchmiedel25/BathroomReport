@@ -415,6 +415,7 @@ function isConfirmedNo(x){  return !!x && x.no  >= CONFIRM_THRESHOLD && x.no  > 
 // priority. gas is intentionally absent (OSM-known, never asked). Anything not listed defaults
 // to LOW.
 const AMENITY_TIER = {
+  hasRestroom: 4,                                               // CRITICAL — asked first where doubted
   accessible: 3, changing: 3,                                   // HIGH
   indoorSeating: 2, wifi: 2, restroomType: 2, grabAndGo: 2, hotFood: 2, evCharging: 2, // MEDIUM
   airPump: 1, shower: 1                                         // LOW
@@ -472,6 +473,8 @@ function pickVisitQuestions(loc, myVote){
   const allKeys = (isMetro ? BATHROOM_AMENITIES : [...BATHROOM_AMENITIES, ...STORE_FEATURES]).map(a => a.key);
 
   const eligible = allKeys.filter(key => {
+    // "Is there a public restroom?" is targeted, not universal — see restroomDoubted.
+    if(key === 'hasRestroom' && !restroomDoubted(loc)) return false;
     if(amenitySettled(loc, key, summary)) return false;                 // confirmed / gas
     const ans = mine[key];
     if(ans === 'yes' || ans === 'no' || (ans && ans !== 'unknown')) return false; // answered for real
@@ -498,7 +501,12 @@ const BATHROOM_AMENITIES = [
       multiple:"Men's & women's"
     }},
   {key:'accessible', label:'Wheelchair accessible', stateIcons:{yes:'♿️'}},
-  {key:'changing', label:'Changing table', stateIcons:{yes:'🚼'}}
+  {key:'changing', label:'Changing table', stateIcons:{yes:'🚼'}},
+  /* Asked ONLY where the operator's own data doesn't list a public restroom (see
+   * restroomDoubted). This is the one question that can prune the map: every other amenity adds
+   * detail to a pin already assumed valid, while this one lets people tell us a pin shouldn't
+   * exist. Confirmed-no hides it, at the same CONFIRM_THRESHOLD as everything else. */
+  {key:'hasRestroom', label:'Is there a public restroom here?', stateIcons:{yes:'🚻'}}
 ];
 const amenityCache = {};
 
@@ -772,6 +780,44 @@ function accessKnown(loc){
   const mi = loc && loc.metroInfo;
   if(!mi) return true;
   return !!mi.access;
+}
+
+/* Is this a location where "is there even a restroom?" is worth asking?
+ *
+ * Only where the operator's own data describes the store and doesn't list a public restroom.
+ * Asking it everywhere would be noise and would train people to dismiss it. Scoped to
+ * osm.restroomUnconfirmed — 320 Circle K stores at present.
+ *
+ * Note this is a different question from access-unknown: for the OSM statewide sets a human
+ * already confirmed a toilet exists, and what's missing is who may use it. */
+function restroomDoubted(loc){
+  return !!(loc && loc.osm && loc.osm.restroomUnconfirmed);
+}
+
+/* The community has said, at CONFIRM_THRESHOLD strength, that there is no public restroom here.
+ * Hidden from the map and from Bathroom Now — but the record stays, so nothing is destroyed and
+ * a future re-import can't resurrect it. Same shape as a confirmed-closed location. */
+function isConfirmedNoRestroom(loc){
+  const s = loc && amenityCache[loc.id];
+  return !!(s && isConfirmedNo(s.hasRestroom));
+}
+
+/* Does the operator actually say there's a public restroom here?
+ *
+ * Circle K's API lists a services array per store, and NA_PUBLIC_RESTROOMS appears on 4,583 of
+ * them and not on 320 others that DO list other services. That variation is what makes it
+ * trustworthy — a flag present on every record would be a template, not a fact.
+ *
+ * Absence still isn't proof of absence, so `restroomUnconfirmed` never hides a pin or claims
+ * there's no toilet. It only tells Bathroom Now to prefer somewhere the operator vouches for. */
+function restroomUnconfirmed(loc){
+  return !!(loc && loc.osm && loc.osm.restroomUnconfirmed);
+}
+
+// A location is a confident Bathroom Now recommendation when we know who may use it AND
+// nobody has told us the restroom might not be there.
+function goodRecommendation(loc){
+  return accessKnown(loc) && !restroomUnconfirmed(loc);
 }
 
 // True when the only accessibility signal is OSM's "limited" — partial step-free access.
@@ -1363,6 +1409,9 @@ function metroPopupHtml(loc, agg, myVote){
   const recency = agg ? relativeTimeFromNow(agg.lastRatedAt || agg.lastUpdated) : '';
   const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}</div>` : '';
   const seasonalLine = seasonalNoteHtml(loc);
+  // A doubted store shows the caveat until the community settles it either way.
+  const restroomDoubtLine = (restroomDoubted(loc) && !isConfirmedYes((amenityCache[loc.id]||{}).hasRestroom))
+    ? '<div class="hours-line restroom-doubt">❔ Not listed as having a public restroom — can you confirm?</div>' : '';
   return `<div class="popup-inner" data-locid="${loc.id}">
     <div class="popup-head-row">
       <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${escapeHtml(chain.name)}</div>
@@ -1373,6 +1422,7 @@ function metroPopupHtml(loc, agg, myVote){
     ${(loc.metroInfo && loc.metroInfo.disposal) ? `<div class="hours-line">🚻 Basic facilities (portable / chemical unit)</div>` : ''}
     ${hoursLine}
     ${seasonalLine}
+    ${restroomDoubtLine}
     ${recencyLine}
     <div id="accessible-badge-${loc.id}">${accessibleBadgeHtml(loc.id)}</div>
     <div class="popup-actions">
@@ -1436,6 +1486,9 @@ function popupHtml(loc, agg, myVote){
   const recency = relativeTimeFromNow(agg.lastRatedAt || agg.lastUpdated);
   const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}</div>` : '';
   hoursLine += seasonalNoteHtml(loc);
+  if(restroomDoubted(loc) && !isConfirmedYes((amenityCache[loc.id]||{}).hasRestroom)){
+    hoursLine += '<div class="hours-line restroom-doubt">❔ Not listed as having a public restroom — can you confirm?</div>';
+  }
   const chain = chainFor(loc);
   // Report hours is offered ONLY where hours are unknown — it fills blanks. Correcting wrong
   // hours stays in the 🚩 Report-a-problem flow ("Wrong hours").
@@ -3180,7 +3233,19 @@ function applyFilters(){
   // saved chain filters at once; doing thousands of MarkerCluster add/remove operations in one
   // synchronous burst can trigger iOS Safari's page-reload/crash behavior.
   const runToken = ++_filterRunToken;
-  const batchSize = 350;
+  /* Time-budgeted batching instead of a fixed count.
+   *
+   * A fixed 350 meant 27,307 markers took 78 animation frames — roughly 1.25s of pure frame
+   * scheduling before counting any actual work, and the number went stale as the dataset grew.
+   * Working to a time budget adapts: a fast phone does thousands per frame, a slow one does
+   * fewer and stays responsive, and it never needs retuning when more locations land.
+   *
+   * BATCH_CAP still bounds each frame. The original 350 existed because thousands of
+   * synchronous MarkerCluster add/remove calls could trigger iOS Safari's reload behaviour;
+   * the cap keeps that protection while letting capable devices go faster. */
+  const FRAME_BUDGET_MS = 8;     // leaves room in a 16ms frame for rendering
+  const BATCH_CAP = 2000;        // hard ceiling per frame, iOS safety
+  const BATCH_MIN = 200;         // always make progress even on a slow frame
 
   // Viewport-first ordering: at ~23,000 locations a full pass takes 65+ animation frames
   // (2+ seconds), and in file order the user's own area could be processed LAST. Partition
@@ -3188,6 +3253,7 @@ function applyFilters(){
   // the first batches — nearby pins appear near-instantly and the rest fill in behind.
   // Raw lat/lng compares, no allocations per marker. If the map isn't ready, natural order.
   let order = null;
+  let nearCount = null;              // how many markers are in or near the viewport
   try{
     const b = map.getBounds();
     const latPad = (b.getNorth() - b.getSouth()) * 0.5;
@@ -3201,19 +3267,28 @@ function applyFilters(){
       else far.push(i);
     }
     order = near.concat(far);
+    nearCount = near.length;
   }catch(e){ /* map not ready — natural order is still correct, just not prioritized */ }
 
   let index = 0;
 
   function processBatch(){
     if(runToken !== _filterRunToken) return; // a newer filter pass superseded this one
-    const stop = Math.min(index + batchSize, allLocationMarkers.length);
-    for(; index < stop; index++){
+    const started = (performance && performance.now) ? performance.now() : Date.now();
+    const hardStop = Math.min(index + BATCH_CAP, allLocationMarkers.length);
+    const softStop = Math.min(index + BATCH_MIN, allLocationMarkers.length);
+    for(; index < hardStop; index++){
+      // Yield once the frame budget is spent, but never before BATCH_MIN so a slow frame
+      // can't stall progress entirely.
+      if(index >= softStop && ((performance && performance.now) ? performance.now() : Date.now()) - started > FRAME_BUDGET_MS) break;
       const m = allLocationMarkers[order ? order[index] : index];
       if(!m) continue; // marker added after this pass's order snapshot — next pass covers it
       const loc = m.locationData;
       if(!loc) continue;
       const openOk = showAllLocations || isLocationOpenNow(loc) !== false;
+      // Community said at full threshold there's no public restroom here. Hidden like a
+      // confirmed-closed location: the record survives, the pin doesn't.
+      const restroomOk = showAllLocations || !isConfirmedNoRestroom(loc);
       const accessOk = !hideInaccessible || !isConfirmedNotAccessible(loc);
       const chainOk = activeChains.has(m.chainKey || DEFAULT_CHAIN_KEY);
       const isMetroLoc = groupOf(m.chainKey || DEFAULT_CHAIN_KEY) === 'metro';
@@ -3221,19 +3296,31 @@ function applyFilters(){
       const zoomOk = (!isMetroLoc || map.getZoom() >= METRO_MIN_ZOOM)
                   && (!isRestLoc || map.getZoom() >= REST_MIN_ZOOM);
       const popupOpen = m.isPopupOpen && m.isPopupOpen();
-      if((openOk && accessOk && chainOk && zoomOk) || popupOpen){
+      if((openOk && restroomOk && accessOk && chainOk && zoomOk) || popupOpen){
         if(!markerCluster.hasLayer(m)) markerCluster.addLayer(m);
       } else if(markerCluster.hasLayer(m)){
         markerCluster.removeLayer(m);
       }
     }
+    // Report interactivity when the pins the user can actually SEE are placed, not when the
+    // whole country has been processed. Viewport-first ordering puts those in the first frames;
+    // the old mark fired ~1.9s later while filling in states nobody is looking at, which
+    // measured completion and called it interactivity.
+    if(!_mapInteractiveMarked && nearCount != null && index >= nearCount){
+      _mapInteractiveMarked = true;
+      perfMark('map interactive (' + nearCount + ' pins in view)');
+    }
     if(index < allLocationMarkers.length){ requestAnimationFrame(processBatch); }
-    else if(!_firstFilterPassDone){ _firstFilterPassDone = true; perfMark('first filter pass complete (map interactive)'); }
+    else {
+      if(!_mapInteractiveMarked){ _mapInteractiveMarked = true; perfMark('map interactive'); }
+      if(!_firstFilterPassDone){ _firstFilterPassDone = true; perfMark('all ' + allLocationMarkers.length + ' markers filtered'); }
+    }
   }
 
   requestAnimationFrame(processBatch);
 }
 let _firstFilterPassDone = false;
+let _mapInteractiveMarked = false;
 
 // Clustering now handles which pins render as you pan/zoom (removeOutsideVisibleBounds), so
 // applyFilters no longer needs to run on every map move — it runs only when a FILTER changes
@@ -3843,7 +3930,8 @@ async function buildListView(){
 
   // Distance-only + capped: no ratings, no reads to build. Details load when a pin is opened.
   const nearest = seedLocations
-    .filter(loc => modeAllows(loc) && activeChains.has(loc.chain || DEFAULT_CHAIN_KEY))
+    .filter(loc => modeAllows(loc) && !isConfirmedNoRestroom(loc)
+                && activeChains.has(loc.chain || DEFAULT_CHAIN_KEY))
     .map(loc => ({ loc, dist: milesBetween(currentListPosition.lat, currentListPosition.lng, loc.lat, loc.lng) }))
     .sort((a,b) => a.dist - b.dist)
     .slice(0, NEAREST_COUNT);
@@ -4081,7 +4169,12 @@ function bathroomNowCard(result,fallback=false){
   const hoursMissingNote=open===null?'<br><small>No hours listed for this store — tap "View pin" then 🚩 to send them in.</small>':'';
   // If we had to fall back to a spot whose access isn't recorded, say so up front rather than
   // letting someone discover it at the door.
-  const accessNote=!accessKnown(result.loc)?'<br><small>❔ We can\'t confirm this one is open to the public.</small>':'';
+  // (Bathroom Now never offers a confirmed-no location, so only the doubted state needs saying.)
+  const accessNote = !accessKnown(result.loc)
+    ? '<br><small>❔ We can\'t confirm this one is open to the public.</small>'
+    : (restroomUnconfirmed(result.loc)
+        ? '<br><small>❔ This store doesn\'t list a public restroom.</small>'
+        : '');
   const outsideSelection=!activeChains.has(result.loc.chain || DEFAULT_CHAIN_KEY);
   const chainNote=outsideSelection?`<div class="nearest-alert">Nothing close by in your selected chains, so this ${escapeHtml((CHAIN_REGISTRY[result.loc.chain]||{}).name||'nearby')} location is shown instead.</div>`:'';
   // Filled chain pill so you can see which brand this is at a glance, colored from the registry.
@@ -4188,7 +4281,7 @@ locateBtn.addEventListener('click',()=>{
     const CHAIN_FALLBACK_MILES = 20;
     // Bathroom Now ignores travel mode on purpose: it's the emergency button, so the closest
     // usable bathroom wins even if it's a city/metro spot (e.g. a Dunkin) while in road mode.
-    const notClosed = (loc) => isLocationOpenNow(loc) !== false;
+    const notClosed = (loc) => isLocationOpenNow(loc) !== false && !isConfirmedNoRestroom(loc);
     const inSelection = (loc) => activeChains.has(loc.chain || DEFAULT_CHAIN_KEY);
     const nearestMiles = (list) => list.reduce((min,loc) => {
       const d = milesBetween(user.lat, user.lng, loc.lat, loc.lng);
@@ -4197,12 +4290,12 @@ locateBtn.addEventListener('click',()=>{
     // Relax one constraint at a time, and only when nothing acceptable is within reach.
     // Access-unknown spots come before abandoning the user's chain selection, because an
     // untagged public toilet nearby beats a chain they didn't pick 30 miles away.
-    let eligible = seedLocations.filter(loc => inSelection(loc) && notClosed(loc) && accessKnown(loc));
+    let eligible = seedLocations.filter(loc => inSelection(loc) && notClosed(loc) && goodRecommendation(loc));
     if(nearestMiles(eligible) > CHAIN_FALLBACK_MILES){
       eligible = seedLocations.filter(loc => inSelection(loc) && notClosed(loc));
     }
     if(nearestMiles(eligible) > CHAIN_FALLBACK_MILES){
-      eligible = seedLocations.filter(loc => notClosed(loc) && accessKnown(loc));
+      eligible = seedLocations.filter(loc => notClosed(loc) && goodRecommendation(loc));
     }
     if(nearestMiles(eligible) > CHAIN_FALLBACK_MILES){
       eligible = seedLocations.filter(notClosed);

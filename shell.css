@@ -771,3 +771,6 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 
 /* Seasonal caveat — a warning, not a status. Never styled like open/closed. */
 .hours-line.seasonal-note{ color:var(--shell-muted); font-size:12px; }
+
+/* "Is there a public restroom?" caveat — a question, not a status. Never styled like open/closed. */
+.hours-line.restroom-doubt{ color:var(--shell-muted); font-size:12px; }
