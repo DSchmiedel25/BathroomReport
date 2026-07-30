@@ -323,5 +323,71 @@ console.log('\nrestroom signal consistency');
   else pass(`${doubted} doubted record(s), none of them also claiming a toilet`);
 }
 
+// ---- 12: every username that reaches Firestore must be length-capped ----
+console.log('\nusername caps');
+{
+  const appSrc = fs.readFileSync('app.js', 'utf8');
+  /* The votes, users and activity rules all bound username at 40. An account whose handle is
+   * longer would have EVERY write rejected — silently, because two of the three call sites
+   * swallow their own errors. Same shape as the wasHiddenGem bug: a field the rules cap and the
+   * client does not. */
+  /* Only the WRITE paths matter. All three assign to `uname`; a fourth read assigns to
+   * `username` and is display-only (it uppercases the handle for the account panel and never
+   * touches Firestore), so matching every split('@') flagged it as a false positive. */
+  /* Only the WRITE paths matter. All three assign to `uname`; a fourth read assigns to
+   * `username` and is display-only (it uppercases the handle for the account panel and never
+   * touches Firestore), so matching every split('@') flagged it as a false positive.
+   *
+   * Must span newlines: two of the three assignments wrap, e.g.
+   *     const uname = (window.__currentUser && window.__currentUser.email)
+   *       ? window.__currentUser.email.split('@')[0].slice(0, 40) : '';
+   * A line-bounded pattern saw only the single-line one, reported "all 1 capped", and passed a
+   * deliberately broken build. */
+  const sites = [...appSrc.matchAll(/uname\s*=[\s\S]{0,160}?email\.split\('@'\)\[0\]([\s\S]{0,24})/g)].map(m => m[1]);
+  const uncapped = sites.filter(s => !/\.slice\(0,\s*40\)/.test(s));
+  if (uncapped.length) fail(`${uncapped.length} username write(s) not capped to 40 — the rules will reject them`);
+  else pass(`all ${sites.length} username reads are capped to 40`);
+  // and sign-up must refuse a handle longer than the input's maxlength
+  if (!/clean\.length > 20/.test(appSrc)) fail('signUpAccount has no maximum username length');
+  else pass('sign-up enforces a maximum username length');
+}
+
+// ---- 13: the geofence radius must stay bounded ----
+console.log('\ngeofence');
+{
+  const appSrc = fs.readFileSync('app.js', 'utf8');
+  const lines = appSrc.split('\n');
+  const st = lines.findIndex(l => l.includes('function verifyRadiusMiles('));
+  if (st < 0) { fail('verifyRadiusMiles is gone'); }
+  else {
+    let end = st;
+    for (let i = st + 1; i < lines.length; i++) if (lines[i] === '}') { end = i; break; }
+    const num = (name, dflt) => {
+      const m = appSrc.match(new RegExp('const ' + name + '\\s*=\\s*([\\d.]+)'));
+      return m ? parseFloat(m[1]) : dflt;
+    };
+    const FLOOR = num('VERIFY_RADIUS_MIN_MILES', 0.1);
+    const CEIL  = num('VERIFY_RADIUS_MILES', 0.3);
+    const ex = {};
+    new Function('exports', 'VERIFY_RADIUS_MILES', 'VERIFY_RADIUS_MIN_MILES', 'METRES_PER_MILE',
+      lines.slice(st, end + 1).join('\n') + '; exports.f=verifyRadiusMiles;')(ex, CEIL, FLOOR, 1609.34);
+    /* A rating is only trustworthy if the person was actually there. Too tight and someone
+     * standing inside a store is told they are not; too loose and a quarter of the map can be
+     * rated from across the street. Whatever the multiplier becomes, the result must stay inside
+     * the floor and ceiling — including for junk input, which is where an unguarded formula
+     * quietly returns NaN and lets everything through. */
+    let bad = 0;
+    const inputs = [null, undefined, NaN, -1, 0, 1, 50, 107, 108, 322, 1000, 1e9, 'x'];
+    for (const a of inputs) {
+      const r = ex.f(a);
+      if (!(typeof r === 'number' && isFinite(r) && r >= FLOOR && r <= CEIL)) {
+        fail(`verifyRadiusMiles(${JSON.stringify(a)}) = ${r}, outside [${FLOOR}, ${CEIL}]`);
+        bad++;
+      }
+    }
+    if (!bad) pass(`radius stays within [${FLOOR}, ${CEIL}] mi across ${inputs.length} inputs including junk`);
+  }
+}
+
 console.log('\n' + (failures ? failures + ' FAILURE(S)' : 'all UI checks passed') + '\n');
 process.exit(failures ? 1 : 0);
