@@ -108,5 +108,96 @@ const dates = [...new Set((html.match(/(?:January|February|March|April|May|June|
 if (dates.length > 1) fail('more than one date string in index.html: ' + dates.join(' | '));
 else pass('index.html shows a single date' + (dates[0] ? ' (' + dates[0] + ')' : ''));
 
+// ---- 5: Firestore-safe ids ----
+console.log('\nfirestore-safe ids');
+{
+  const dataFiles = fs.readdirSync('.').filter(f => f.endsWith('-locations.js') && f !== 'compact-locations.js');
+  const g = {};
+  for (const f of dataFiles) {
+    const src = fs.readFileSync(f, 'utf8');
+    if (/^\s*#!/.test(src)) continue;
+    try { new Function('window', src)(g); } catch (e) { fail(`${f} did not evaluate: ${e.message}`); }
+  }
+  let unsafe = 0, missingSrc = 0, total = 0;
+  for (const arr of Object.values(g)) {
+    if (!Array.isArray(arr)) continue;
+    for (const r of arr) {
+      if (!r || !r.id) continue;
+      total++;
+      const id = String(r.id);
+      // '/' is a Firestore path separator: doc(db,'votes','node/1_uid') is a 3-segment path and
+      // doc() throws on an odd count. 6,595 ids used to contain one, so ratings, aggregates,
+      // tips and admin overrides failed silently for 23.5% of the map.
+      if (id.includes('/')) unsafe++;
+      // A renamed id must keep its original, because the transform has no correct inverse:
+      // 39 ids hold two slashes and one holds a genuine '__'.
+      if (id.includes('__') && !(r.meta && r.meta.srcId)) missingSrc++;
+    }
+  }
+  if (unsafe) fail(`${unsafe} location id(s) contain "/" and cannot be Firestore document ids`);
+  else pass(`${total} ids are Firestore-safe`);
+  if (missingSrc) fail(`${missingSrc} id(s) contain "__" without meta.srcId — provenance lost, and the transform has no inverse`);
+  else pass('every "__" id preserves meta.srcId');
+}
+
+// ---- 6: no unnormalised id reaches a Firestore path ----
+console.log('\nfirestore path construction');
+{
+  const LOC_KEYED = ['votes', 'aggregates', 'tips', 'amenityOverrides', 'hourReports', 'overrides'];
+  // Comments must be stripped first: the explanatory comments beside fsId() quote example calls
+  // like doc(db,'votes','node/123_uid') to show what used to break, and scanning raw source
+  // flagged those as real leaks.
+  const stripComments = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  let leaks = 0;
+  for (const file of ['app.js', 'flushpanel.html']) {
+    if (!fs.existsSync(file)) continue;
+    const src = stripComments(fs.readFileSync(file, 'utf8'));
+    for (const coll of LOC_KEYED) {
+      const re = new RegExp("doc\\(db,\\s*'" + coll + "',\\s*([^)]+?)\\)", 'g');
+      let m;
+      while ((m = re.exec(src))) {
+        const arg = m[1];
+        // Accept fsId(...) anywhere in the argument, or a variable already named safeId.
+        if (/fsId\(/.test(arg) || /\bsafeId\b/.test(arg)) continue;
+        leaks++;
+        fail(`${file}: doc(db,'${coll}', ${arg.trim().slice(0, 46)}) is not normalised — wrap the id in fsId()`);
+      }
+    }
+  }
+  if (!leaks) pass('every location-keyed doc() path is normalised');
+}
+
+// ---- 7: chain keys referenced in code must exist in CHAIN_REGISTRY ----
+console.log('\nchain keys');
+{
+  const appSrc = fs.readFileSync('app.js', 'utf8');
+  const seg = appSrc.slice(appSrc.indexOf('const CHAIN_REGISTRY'), appSrc.indexOf('const DEFAULT_CHAIN_KEY'));
+  const registry = new Set([...seg.matchAll(/^\s{2}(\w+):\s*\{/gm)].map(m => m[1]));
+  const pairs = [...seg.matchAll(/(\w+):\s*\{[^}]*?dataVar:\s*'(\w+)'/g)].map(m => [m[2], m[1]]);
+  // Every hand-written key list in app.js
+  let unknown = 0;
+  for (const name of ['TRAVEL_CENTER_KEYS']) {
+    const m = appSrc.match(new RegExp('const ' + name + "\\s*=\\s*new Set\\(\\[([^\\]]*)\\]"));
+    if (!m) continue;
+    for (const k of [...m[1].matchAll(/'(\w+)'/g)].map(x => x[1])) {
+      if (!registry.has(k)) { fail(`${name} references '${k}', which is not a CHAIN_REGISTRY key`); unknown++; }
+    }
+  }
+  if (!unknown) pass(`hand-kept chain key lists all resolve against ${registry.size} registry entries`);
+  // FlushPanel must map any dataVar whose naive suffix-strip differs from the registry key
+  if (fs.existsSync('flushpanel.html')) {
+    const fp = fs.readFileSync('flushpanel.html', 'utf8');
+    let untabled = 0;
+    for (const [dv, key] of pairs) {
+      if (dv.replace(/Locations$/, '') === key) continue;
+      if (!new RegExp(dv + "\\s*:\\s*'" + key + "'").test(fp)) {
+        fail(`flushpanel: ${dv} maps to registry key '${key}', but DATAVAR_TO_CHAIN_KEY does not say so`);
+        untabled++;
+      }
+    }
+    if (!untabled) pass('flushpanel dataVar -> chain key mapping is complete');
+  }
+}
+
 console.log('\n' + (failures ? failures + ' FAILURE(S)' : 'all UI checks passed') + '\n');
 process.exit(failures ? 1 : 0);
