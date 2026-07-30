@@ -1154,9 +1154,20 @@ async function signUpAccount(username, password){
     const cred = await createUserWithEmailAndPassword(auth, usernameToEmail(clean), password);
     /* Preserve the casing the person actually typed. The auth address is lowercased by
      * usernameToEmail because it has to be a stable lookup key; displayName is what gets shown.
-     * Non-fatal: an account without one falls back to the address, which is the old behaviour. */
-    try{ await updateProfile(cred.user, { displayName: clean }); }
-    catch(e){ console.warn('could not set display name (non-fatal)', e && e.code); }
+     *
+     * onAuthStateChanged has already fired by this point and cached the user object with a null
+     * displayName. The SDK mutates that same object, so the cache SHOULD pick it up — but the
+     * first vote or activity entry a new account writes happens seconds later, and if the cache
+     * were stale that entry would be stamped with the lowercase fallback and keep it forever,
+     * because the name is copied at write time. Reassigning explicitly costs one line and
+     * removes the question.
+     *
+     * Non-fatal: an account without a displayName falls back to the address, which is the old
+     * behaviour rather than a broken one. */
+    try{
+      await updateProfile(cred.user, { displayName: clean });
+      window.__currentUser = cred.user;
+    }catch(e){ console.warn('could not set display name (non-fatal)', e && e.code); }
     await migrateAnonymousDataToAccount(oldAnonId, cred.user.uid, clean);
     return { ok: true };
   }catch(e){
@@ -2851,7 +2862,43 @@ function renderBathroomPassport(stats, results){
 
   const listEl = document.getElementById('achievementsList');
   if(listEl){
-    listEl.innerHTML = ACHIEVEMENT_DEFS.map(def => {
+    /* Order: earned first, in the order you earned them, then the ones you are closest to.
+     *
+     * The list was in a fixed thematic order — milestones, chains, geography, dedication,
+     * data-help, hidden. That order tells you how the set was DESIGNED, which is of no use to
+     * someone opening their own passport: what they earned last is buried in the middle, and the
+     * one they are two ratings away from is indistinguishable from the one needing five hundred.
+     *
+     *   1. unlocked, oldest first — reads as a history of what you have done
+     *   2. locked, by how close you are — the next one to chase is at the top of what is left
+     *   3. still-hidden trophies last, since a masked card sorts on nothing meaningful
+     *
+     * Achievements unlocked before unlockedAt was recorded have no date. They sort as oldest,
+     * which is true: they were earned before we started keeping track. */
+    const ordered = ACHIEVEMENT_DEFS.slice().sort((a, b) => {
+      const ra = results[a.key], rb = results[b.key];
+      const tiered = (d, r) => Array.isArray(d.tiers) && r.revealed;
+      const secretA = a.hidden && !ra.unlocked && !tiered(a, ra);
+      const secretB = b.hidden && !rb.unlocked && !tiered(b, rb);
+
+      const rank = (r, secret) => r.unlocked ? 0 : (secret ? 2 : 1);
+      const diff = rank(ra, secretA) - rank(rb, secretB);
+      if(diff !== 0) return diff;
+
+      if(ra.unlocked && rb.unlocked) return (ra.unlockedAt || 0) - (rb.unlockedAt || 0);
+
+      if(!secretA && !secretB){
+        // Fraction complete, descending. total can be 1 for a binary achievement, which lands at
+        // 0 and sorts below anything with real partial progress — correct: you have not started.
+        const frac = (r) => (r.total > 0 ? (r.current || 0) / r.total : 0);
+        const f = frac(rb) - frac(ra);
+        if(f !== 0) return f;
+      }
+      // Stable tail: fall back to the designed order so the list never reshuffles arbitrarily.
+      return ACHIEVEMENT_DEFS.indexOf(a) - ACHIEVEMENT_DEFS.indexOf(b);
+    });
+
+    listEl.innerHTML = ordered.map(def => {
       const r = results[def.key];
       // A tiered achievement (Hours Hero) reveals after its first milestone and then shows a
       // rolling bar, unlike binary hidden trophies which stay masked until fully earned.
