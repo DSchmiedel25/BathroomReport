@@ -76,11 +76,6 @@ button, input, select, textarea{ font-family:inherit; }
 }
 
 /* tagline under the wordmark (repurposed subtitle) */
-#headerSubtitle{
-  text-align:center !important; color:var(--shell-muted) !important;
-  font-size:10.5px !important; font-weight:600 !important; margin:5px 0 0 !important;
-  padding:0 !important;
-}
 
 /* ---------- Map fills the space ---------- */
 #mapWrap{ position:relative; }
@@ -675,6 +670,18 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 #nearestBathroomBadge, #topRatedNearbyBadge, #closingSoonBadge,
 #accessibleNearbyBadge, #myProgressBadge{ display:none !important; }
 #statPillRow .stat-pill:empty{ display:none !important; }
+
+/* One pill at a time.
+ *
+ * refreshStatTicker() has always added and removed .ticker-active every few seconds, and nothing
+ * styled it — so every non-empty pill stacked and the header grew a line per stat. The rotation
+ * was written in JS and the CSS half never existed.
+ *
+ * Gated on .ticking, which the script adds once it takes over. If JS is slow or fails, every pill
+ * stays visible exactly as before rather than the whole row vanishing. */
+#statPillRow.ticking .stat-pill{ display:none; }
+#statPillRow.ticking .stat-pill.ticker-active{ display:inline-flex; }
+#statPillRow.ticking .stat-pill:empty{ display:none !important; }
 #mostRecentBadge{ cursor:pointer; }
 .d-shop-link {
     display: block;

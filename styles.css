@@ -60,8 +60,6 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
 }
   #header h1{margin:0;font-size:19px;font-weight:800;letter-spacing:.2px;line-height:1.2;white-space:nowrap;
 }
-  #headerSubtitle{line-height:1.35;
-}
   #infoBtn{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;vertical-align:middle;padding:0 0 0 4px;
 }
   #themeToggle{

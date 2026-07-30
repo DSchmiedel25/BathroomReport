@@ -2949,6 +2949,10 @@ function refreshStatTicker(){
     .map(id => document.getElementById(id))
     .filter(el => el && el.textContent.trim() !== '');
   pills.forEach(el => el.classList.remove('ticker-active'));
+  const row = document.getElementById('statPillRow');
+  // Tells the CSS to show one at a time. Set here rather than in the markup so a failure to run
+  // this leaves every pill visible instead of hiding the lot.
+  if(row) row.classList.toggle('ticking', pills.length > 0);
   if(pills.length === 0) return;
   if(statTickerIndex >= pills.length) statTickerIndex = 0;
   pills[statTickerIndex].classList.add('ticker-active');
