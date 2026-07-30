@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bathroomreport-v135';
+const CACHE_NAME = 'bathroomreport-v136';
 
 // CORE SHELL ONLY — deliberately does NOT precache the chain data files.
 // Precaching all ~5.6 MB of location data forced a full re-download on every cache
