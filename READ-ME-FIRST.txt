@@ -1,105 +1,51 @@
-BATCH — v2.8.1  (REPLACES the earlier v2.8.1 zip — do not use that one)
-=======================================================================
+v2.8.2 — stop asking a question the data already answers
+=========================================================
 
-17 files. No rules change, no functions change, no app.js change.
+WHAT IS IN THIS BATCH
+  app.js             restroomDoubted() now returns false when the source data already
+                     claims a toilet. Nothing else changed in this file.
+  index.html         version stamp only. BUMP sw.js.
+  tools/audit-ui.js  new check 11: no record may be flagged doubted AND claim a toilet.
 
-UPLOAD
-  12 *-locations.js         -> repo root
-  index.html                -> repo root   (version stamp only — BUMP sw.js)
-  generate-static-pages.js  -> repo root
-  .gitignore                -> repo root
-  tools/audit-ui.js         -> tools/
-  .github/workflows/bake.yml
+  No rules change. No functions change. No data change.
 
-  duplicate-review.txt is for you, not the repo.
+WHAT WAS STILL UNSHIPPED FROM EARLIER
+  Nothing. Checked every staged directory from this session record-by-record against the
+  current tree: the only staged records missing are 26 intended removals, the 45 Canadian
+  Pilots, and 6 that exist solely in a nyc-public merge I rejected for deleting live records.
 
-AFTER UPLOADING
-  28,089 locations · 19,799 with hours (70%) · 5,582 restroom-confirmed
-  zero duplicate ids · zero slashed ids · zero non-US records
+THE CHANGE
+  "Is there a public restroom here?" was scoped to records flagged osm.restroomUnconfirmed.
+  amenitySettled() already stops the question once an admin sets it or the community confirms
+  it — but it knows nothing about the SOURCE data, so a place whose own operator data says
+  "yes" could still have been asked.
 
+  restroomDoubted() now also returns false when:
+     loc.osm.restroomConfirmed      the operator's own locator says yes
+     loc.meta.toilets === 'yes'     an OSM survey says yes
 
-WHAT THE AUDIT OF MY OWN WORK FOUND
-====================================
-The first v2.8.1 zip was incomplete. Auditing it against your live state turned up that an
-ENTIRE earlier batch had never been shipped, and because I built the new work on top of the live
-files, none of it was included:
+  Today this changes nothing: 1,032 records are flagged and NONE of them carries a positive
+  claim, so the behaviour was already correct. It was correct by accident though — a property
+  of the current imports, not a rule — and the next import could set both on one record. This
+  makes it a rule, and check 11 fails the build if the data ever reaches that state.
 
-                    staged earlier      actually live
-  circle-k          5,766 hrs, 5,338 restroom    5,010 hrs, 0 restroom
-  holiday           370 rec, 265 hrs, 244 restroom   336 rec, 32 hrs, 0
-  pilot             781 (Canadians removed)      826
-  restarea          2,335 (Bahamas removed)      2,336
+WHAT I VERIFIED
+  restroomDoubted tested against 6 cases, 6/6:
+     not flagged                          -> do not ask
+     flagged, no claim                    -> ask
+     flagged + operator says yes          -> do not ask
+     flagged + OSM survey says yes        -> do not ask
+     confirmed only                       -> do not ask
+     flagged + meta.toilets 'no'          -> ask
+  app.js parses. All 11 audit-ui checks pass.
+  Still asked: 1,032 locations — circleK 353, restarea 671, holiday 8.
 
-So 5,338 restroom confirmations, ~989 hours, 34 new Holiday locations including 23 in Alaska,
-45 Canadian Pilot records and one Nassau rest area were all still outstanding. This batch folds
-them in.
+WHAT I COULD NOT VERIFY
+  The rendered popup. The scoping logic is unit-tested; whether the question looks right in
+  place is not something I can see.
 
-That is the same failure mode as everything else today: I built sync-live.sh to catch stale
-bases and did not run it against my own deliveries. A "did what I shipped actually land" check
-belongs at the START of every batch, not after you ask me to double-check.
-
-
-1. SEO-01 — one guide page silently overwrote another
-------------------------------------------------------
-Slugs end in id.slice(-4). Four characters is not enough: sheetz-650 and sheetz-atp-650 both end
-"-650" and produced the same URL. Slugs are now assigned once, up front, with collisions resolved
-deterministically — the first record by id keeps the existing URL, later ones widen the id
-fragment (4 -> 6 -> 8 -> 10 -> full) until unique. If two ever remain equal the generator exits
-rather than overwrite a page.
-
-CORRECTION: I first reported 135 collisions. Wrong — that count included the 6,096 records held
-back for having no address, which never get a page. Among publishable records there was one, as
-the audit said.
-
-
-2. 22 duplicate records merged and removed
--------------------------------------------
-The Sheetz collision was two records for one store: same address, both #650, 160m apart. My ATP
-import deduped at 150m and missed it by ten metres.
-
-Sweeping the dataset for same-chain pairs 150-400m apart with an identical normalised address
-found 29. Twenty-two are unambiguous — one id in each carries -atp- or -osm-, marking an import
-that landed on an existing record:
-
-  maverik 9 · bucees 3 · pilot 3 · kwiktrip 2 · alltownFresh 1 · fastrac 1
-  loves 1 · sheetz 1 · travelCenters 1
-
-Survivors absorbed every field the import had that they lacked and record meta.mergedFrom.
-Verified: zero hours lost, zero coordinates or addresses altered on any surviving record.
-
-The other 7 are in duplicate-review.txt, untouched — two Boston Starbucks at Logan Airport, a
-northbound/southbound rest area pair, and TA sites that map truck and car buildings separately.
-
-
-3. RB-07 — the nightly bake reported success while failing
------------------------------------------------------------
-Each step swallows its own failure so the others still run, and whatever succeeded is committed.
-That part is correct. But the RUN reported green regardless, which is how a bake applying ZERO
-overrides went unnoticed for weeks. Failures are recorded now and a final step fails the job
-AFTER the commit, so partial progress still lands and the run goes red.
-
-
-4. New guard checks in tools/audit-ui.js
------------------------------------------
-  - every field app.js writes onto a vote must be in the rules allowlist
-    (the check that would have caught wasHiddenGem)
-  - the hours canonicalisers in app.js and functions/index.js must agree
-    (both accepted 24:01-24:59, which would make a store look closed for a day)
-
-
-STILL OUTSTANDING
-=================
-Needs the Mac:
-  mv ~/Desktop/functions-index.js functions/index.js   THEN
-  firebase deploy --only functions      amenity tallies + the server-side hours fix
-  git rm index.js                       the root duplicate of functions/index.js
-  curl the two Leaflet plugins          PWA-02, unversioned CDN scripts
-
-Needs you:
-  DATA-07   Cumberland Farms Bridgewater, two addresses at one coordinate — Street View
-  the 7 pairs in duplicate-review.txt
-
-Not started:
-  RB-08     all markers constructed at startup (the filter pass is already fixed)
-  CI-01     no automated test suite — audit-ui.js is becoming one
-  SEC-01/02 report spam, needs App Check rather than rules
+A CORRECTION TO MY OWN AUDIT
+  My first pass at the "anything unshipped?" check compared record COUNTS and reported 12 files
+  as unshipped. That was wrong — every one was a file where the current tree has fewer records
+  because of an intentional removal since. Comparing by id rather than count gives the real
+  answer, which is that nothing is missing.

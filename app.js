@@ -854,7 +854,15 @@ function accessKnown(loc){
  * Note this is a different question from access-unknown: for the OSM statewide sets a human
  * already confirmed a toilet exists, and what's missing is who may use it. */
 function restroomDoubted(loc){
-  return !!(loc && loc.osm && loc.osm.restroomUnconfirmed);
+  if(!(loc && loc.osm && loc.osm.restroomUnconfirmed)) return false;
+  /* Never ask a question the data already answers. amenitySettled() covers admin overrides and
+   * community votes, but it knows nothing about the SOURCE data — so a positive claim there has
+   * to be checked here. No record carries both signals today (verified: 1,032 doubted, 0 of them
+   * claiming a toilet), but that is a property of the current imports rather than a rule, and the
+   * next import could set both on one record. */
+  if(loc.osm.restroomConfirmed) return false;                 // the operator's own data says yes
+  if((loc.meta || {}).toilets === 'yes') return false;        // OSM survey says yes
+  return true;
 }
 
 /* The community has said, at CONFIRM_THRESHOLD strength, that there is no public restroom here.
