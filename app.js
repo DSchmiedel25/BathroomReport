@@ -798,8 +798,17 @@ function restroomDoubted(loc){
  * Hidden from the map and from Bathroom Now — but the record stays, so nothing is destroyed and
  * a future re-import can't resurrect it. Same shape as a confirmed-closed location. */
 function isConfirmedNoRestroom(loc){
-  const s = loc && amenityCache[loc.id];
-  return !!(s && isConfirmedNo(s.hasRestroom));
+  if(!loc) return false;
+  const s = amenityCache[loc.id];
+  // A live confirmed YES wins over everything, so a stale baked "no" can be overturned by the
+  // community without waiting for the next bake.
+  if(s && isConfirmedYes(s.hasRestroom)) return false;
+  if(s && isConfirmedNo(s.hasRestroom)) return true;
+  // Otherwise fall back to the BAKED value. bake-confirmed.js writes loc.confNo from the vote
+  // export, so this works on page load for every pin. The live cache is only populated for
+  // locations whose popup has been opened — relying on it alone (the v2.6.0 bug) meant the hide
+  // silently did nothing until you tapped the pin, which is the one moment it doesn't matter.
+  return !!(loc.confNo && loc.confNo.hasRestroom);
 }
 
 /* Does the operator actually say there's a public restroom here?
@@ -1410,7 +1419,8 @@ function metroPopupHtml(loc, agg, myVote){
   const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}</div>` : '';
   const seasonalLine = seasonalNoteHtml(loc);
   // A doubted store shows the caveat until the community settles it either way.
-  const restroomDoubtLine = (restroomDoubted(loc) && !isConfirmedYes((amenityCache[loc.id]||{}).hasRestroom))
+  const restroomDoubtLine = (restroomDoubted(loc) && !(loc.conf && loc.conf.hasRestroom)
+      && !isConfirmedYes((amenityCache[loc.id]||{}).hasRestroom))
     ? '<div class="hours-line restroom-doubt">❔ Not listed as having a public restroom — can you confirm?</div>' : '';
   return `<div class="popup-inner" data-locid="${loc.id}">
     <div class="popup-head-row">
@@ -1486,7 +1496,8 @@ function popupHtml(loc, agg, myVote){
   const recency = relativeTimeFromNow(agg.lastRatedAt || agg.lastUpdated);
   const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}</div>` : '';
   hoursLine += seasonalNoteHtml(loc);
-  if(restroomDoubted(loc) && !isConfirmedYes((amenityCache[loc.id]||{}).hasRestroom)){
+  if(restroomDoubted(loc) && !(loc.conf && loc.conf.hasRestroom)
+     && !isConfirmedYes((amenityCache[loc.id]||{}).hasRestroom)){
     hoursLine += '<div class="hours-line restroom-doubt">❔ Not listed as having a public restroom — can you confirm?</div>';
   }
   const chain = chainFor(loc);

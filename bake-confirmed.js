@@ -17,7 +17,11 @@
 //   node bake-confirmed.js votes-summary.json *-locations.js
 
 const fs = require('fs');
-const MIN_YES = 2;
+// Must match CONFIRM_THRESHOLD in app.js. It was raised to 3 there in v2.6 and this file was
+// not updated, so the bake was promoting features to loc.conf at 2 votes while the app required
+// 3 — a location could show a confirmed badge from the baked data that the live rule disagreed
+// with. Kept as a named constant with this note so the next change to either side is obvious.
+const MIN_YES = 3;   // === CONFIRM_THRESHOLD in app.js ===
 
 const [, , summaryPath, ...locPaths] = process.argv;
 if (!summaryPath || !locPaths.length) {

@@ -1,0 +1,49 @@
+BAKE CONSISTENCY + REST AREAS — v2.6.2
+======================================
+
+Upload all 6 files to the repo root. BUMP sw.js.
+
+  app.js  index.html  shell.css  manifest.webmanifest
+  bake-confirmed.js
+  restarea-locations.js
+
+TWO BUGS FOUND BY CHECKING THE BAKE
+
+1. bake-confirmed.js used MIN_YES = 2 while app.js uses CONFIRM_THRESHOLD = 3.
+
+   The file's own comment claimed it applied "the SAME rule the app uses live". The app was
+   raised to 3 in v2.6 and this was never updated, so every nightly bake has been promoting
+   features to loc.conf at 2 votes while the live app required 3 — a pin could show a
+   confirmed badge from baked data that the live rule disagreed with. Now 3, with a note on
+   both sides.
+
+2. isConfirmedNoRestroom (shipped in v2.6.0 tonight) only read live votes.
+
+   It checked amenityCache, which is populated per-location when a popup opens. So the
+   "community said there is no restroom here" hide did nothing on page load — it only took
+   effect for pins you had already tapped, which is the one moment the hide is pointless.
+
+   isConfirmedNotAccessible already got this right by reading loc.confNo, the value written by
+   bake-confirmed.js. Mine now does the same, in this order:
+
+     live confirmed YES   -> visible   (overturns a stale baked no without waiting for a bake)
+     live confirmed NO    -> hidden
+     baked loc.confNo     -> hidden    (works on page load, for every pin)
+
+   Tested against five vote states; all five correct.
+
+STILL WORTH DOING, NOT DONE HERE
+
+FIELD_MAP in bake-overrides.js allows hrs, hours, addr, city, state, zipCode, phone, lat, lng
+and locName. It does not include `seasonal`, so an admin cannot clear a wrongly-flagged
+seasonal record from FlushPanel. Left alone because adding a field to the bake allowlist
+touches the unattended nightly job, and that deserves its own change rather than riding along
+with this one.
+
+REST AREAS
+
+restarea-locations.js  1,518 -> 2,336 (+818). See the earlier notes for the evidence tiers;
+672 of the additions carry osm.restroomUnconfirmed and are deprioritised by Bathroom Now.
+
+That interacts directly with bug 2 above: those 672 are exactly the records the community will
+vote "no restroom" on, and until this fix the resulting hide would not have applied on load.
