@@ -1,0 +1,48 @@
+SAME-CHAIN PAIRS AT ONE ADDRESS — need a human
+==============================================
+Found 2026-07-30. Same chain, identical normalised street address, 150-400m apart.
+
+22 obvious cases were merged automatically: one id in each pair carried -atp- or -osm-, marking
+it as an import that landed on top of an existing record. The survivor absorbed any field the
+import had and now records meta.mergedFrom.
+
+These 7 are NOT obviously duplicates. Both ids are native, and at these addresses two separate
+outlets are plausible. Left in place.
+
+--- LIKELY BOTH REAL ---
+
+  1 Harborside Drive, Boston, MA 02128        bosStarbucks
+     node__3487861640  vs  node__9325753303     248m apart
+     node__5380551122  vs  node__5380559021     177m apart
+     That address is Logan Airport. Two Starbucks in different terminals share one street
+     address and are separately reachable. Almost certainly keep all four.
+
+  4390 I-73/I-74, Seagrove, NC 27341          restarea
+     restarea-734  vs  restarea-735             304m apart
+     Sequential ids on a divided highway: northbound and southbound. A driver cannot reach the
+     other side. Keep both.
+
+--- WORTH CHECKING ---
+
+  16650 W. Russell Road, Zion, IL 60099       travelCentersOfAmerica
+     ta-way-229450893  vs  ta-way-229450895     193m apart
+     Sequential OSM ways. A TA often maps the truck building and the car/restaurant building
+     separately. If both have public restrooms, keep both.
+
+  4050 Depot Road, Erie, PA 16510             travelCentersOfAmerica
+     ta-way-1330222718  vs  ta-node-7887487648  161m apart
+     A way and a node at one site is the classic OSM double-mapping pattern — usually the
+     building and a POI node for the same thing. Probably one location.
+
+  901 Camino del Rio, Durango, CO 81301       speedway
+     node__8986905572  vs  way__777794298       362m apart
+     Same pattern: node plus way. 362m is far for double-mapping though, so check the map.
+
+  12880 East 51st Street South, Tulsa, OK     quiktrip
+     qt-0135  vs  qt-0374                      356m apart
+     Two different QuikTrip store numbers at one street address. Either a large site with two
+     stores, or one of the two has the wrong address. QuikTrip's own store locator would settle it.
+
+HOW TO RESOLVE
+  Street View each pair. If one building, remove the weaker record in FlushPanel (Remove pin) or
+  correct its coordinates via an override. If two buildings, leave both.

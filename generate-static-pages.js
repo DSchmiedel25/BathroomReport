@@ -226,7 +226,44 @@ const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
 // Accepts a location record (preferred: uses the pinned filename slug) or a bare
 // chain-name string (fallback for grouping keys with no record in hand).
 const chainSlug = (c) => (c && typeof c === "object" ? (c.chainSlug || slugify(c.chain)) : slugify(c));
-const locSlug = (l) => slugify(l.street || l.city, l.city, l.id.slice(-4));
+/* Precomputed by assignLocationSlugs(). The raw form below is only the STARTING point — it
+ * ends in id.slice(-4), and four characters is not enough: 135 locations collided across the
+ * dataset because OSM ids routinely share their last four digits, and each collision meant one
+ * page silently overwrote another. Those locations had no page at all. */
+const rawLocSlug = (l) => slugify(l.street || l.city, l.city, l.id.slice(-4));
+const locSlug = (l) => l.__slug || rawLocSlug(l);
+
+/* Resolve collisions ONCE, deterministically, before anything is written.
+ *
+ * The first record for a given slug keeps it, so every URL already published and indexed stays
+ * exactly where it is. Later records get progressively more of their id appended until unique.
+ * Ordering is by id so the same record wins on every run — otherwise a rebuild could swap two
+ * pages' URLs and break inbound links. */
+function assignLocationSlugs(locations) {
+  const taken = new Map();          // "chain/slug" -> id that owns it
+  let resolved = 0;
+  for (const l of [...locations].sort((a, b) => String(a.id).localeCompare(String(b.id)))) {
+    const chain = chainSlug(l);
+    const base = rawLocSlug(l);
+    let slug = base;
+    // Widen the id fragment until unique: 4 chars, then 6, 8, 10, then the whole id.
+    for (const n of [4, 6, 8, 10, 999]) {
+      slug = n === 4 ? base : slugify(l.street || l.city, l.city, String(l.id).slice(-n));
+      if (!taken.has(chain + "/" + slug)) break;
+    }
+    if (taken.has(chain + "/" + slug)) {
+      // Two records with the same address AND the same full id can't happen (ids are unique),
+      // so reaching here means something upstream is wrong. Fail rather than overwrite a page.
+      console.error(`FATAL: unresolvable slug collision ${chain}/${slug} (${taken.get(chain + "/" + slug)} vs ${l.id})`);
+      process.exit(1);
+    }
+    if (slug !== base) resolved++;
+    taken.set(chain + "/" + slug, l.id);
+    l.__slug = slug;
+  }
+  if (resolved) console.log(`Resolved ${resolved} slug collision(s) by widening the id fragment.`);
+  return locations;
+}
 const fullAddress = (l) => [l.street, l.city, [l.state, l.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 const ratingLabel = (r) => (r == null ? "Not yet rated" : r >= 4 ? "Clean" : r >= 3 ? "Okay" : "Rough");
 const groupBy = (arr, fn) => arr.reduce((m, x) => ((m[fn(x)] ??= []).push(x), m), {});
@@ -439,7 +476,7 @@ function main() {
     .filter((l) => l.id && l.lat != null && l.lng != null);
 
   // Hold back coords-only records so we don't publish thin pages.
-  const locations = geoOk.filter(hasLocationContext);
+  const locations = assignLocationSlugs(geoOk.filter(hasLocationContext));
   const held = geoOk.filter((l) => !hasLocationContext(l));
   console.log(`\nUsable (has address/city): ${locations.length}`);
   if (held.length) {
