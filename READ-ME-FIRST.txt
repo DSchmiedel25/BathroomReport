@@ -1,94 +1,59 @@
-v2.9.6 — A2-02 and SEC-08
-==========================
-Flat zip, no subfolders.
+v2.9.7 — DATA-06
+=================
+Flat zip. Small one.
 
-WHERE EACH FILE GOES
-  app.js            repo root      BUMP sw.js
-  index.html        repo root      version stamp only
-  firestore.rules   publish in the Firebase console
+WHERE EACH FILE GOES — all repo root
+  holiday-locations.js  ·  nyc-starbucks-locations.js
+  quickchek-locations.js  ·  racetrac-locations.js
+  index.html            version stamp only. BUMP sw.js.
 
-STILL NOT DEPLOYED FROM THE LAST BATCH
-  functions/index.js — needs `firebase deploy --only functions` from the Mac. The transaction,
-  the admin fix, amenity tallies, the hours regex and lastRatedBy are all still dormant.
+  No rules change. No app.js change. No functions change.
 
 
-1. A2-02 — one account could suppress everyone's outage reports
----------------------------------------------------------------
-`reports.filter(t => t > clearedAfter)` meant ANY single clear cancelled EVERY report at a
-location. Three people report a broken bathroom, one account taps "it's working now", all three
-vanish — and nothing stopped that account doing it again the moment they were re-filed.
+WHAT CHANGED
+  Seven records carried a bare ZIP code where a street address goes — "14740", "10005",
+  " 76063". That is worse than an empty field: it looks like data, tells a driver nothing, and it
+  earned five of them a thin /guide/ page.
 
-The rules cannot fix this. They cannot tell whether someone is present, whether the restroom is
-genuinely restored, or whose report is whose. So the authority model is now in the client and it
-is deliberately asymmetric:
+  The ZIP is now kept where ZIPs belong (meta.zip), the record is flagged meta.addr_status =
+  "zip_only" so the backlog is findable, and the address is genuinely empty. One address with a
+  leading space was trimmed.
 
-  YOUR OWN report        one clear from you cancels it. You are withdrawing your own statement,
-                         which needs nobody else's agreement.
-  SOMEONE ELSE'S report  cancelling it takes as many DISTINCT clearers as there are outstanding
-                         reporters. One account cannot overrule three people.
+    holiday        2      nyc-starbucks  1
+    quickchek      1      racetrac       3  (one of which had the stray space)
 
-Server-derived consensus is still the better long-term answer, and the audit is right about that.
-This is the part that works without one, and it removes the single-account suppression case.
+  Verified afterwards: 0 zip-only addresses and 0 whitespace issues remain across all 28,087
+  records, and all 7 keep their ZIP.
 
-Tested 8/8:
-  1 report, no clear                     1 live
-  author withdraws their own             0 live
-  a stranger clears a lone report        0 live
-  3 reports, ONE stranger clears         3 live   <- this is the fix
-  3 reports, THREE strangers clear       0 live
-  clear predating the report             1 live   (stale clears do not count)
-  2 reports, 1 withdrawn + 1 stranger    0 live
-  future-dated clear                     ignored
-
-FOUND WHILE FIXING IT: the same logic existed TWICE
-  Bathroom Now's filter had its own simpler copy. Fixing only the popup would have left a single
-  account still able to suppress reports there. Both now call one resolveOooReports(), so they
-  cannot drift apart again. Three dead locals were removed from loadOoo; I listed exactly which
-  lines of executable code were deleted before deleting them, because the surrounding block was
-  all comment.
+DOWNSTREAM
+  Static generation: 21,991 -> 21,986 eligible pages. FIVE thin pages removed, not seven — two of
+  the seven were already held back, because the generator never counted a bare ZIP as a street.
+  I assumed seven and checked; held-back went 6,096 -> 6,101, which matches the five.
 
 
-2. SEC-08 — admin amenity overrides accepted any 24-character string
----------------------------------------------------------------------
-Override values were `boundedStrOrAbsent(..., 24)`. I tightened community VOTES to an enum in the
-Audit #2 pass and left overrides, so the admin path was the looser of the two — which is
-backwards.
-
-Now an enum: yes, no, unknown, single, multiple, or empty (the panel's clear value).
-
-Checked against what actually writes them before changing anything: the admin panel emits exactly
-yes / no / unknown, all three accepted. Now rejected: "YES", "yes " with a trailing space,
-"maybe", markup, and any long string. The app compares these literally, so anything outside the
-enum silently read as "not set" anyway — it was accepted at the door and then ignored.
-
-22 validators changed, 11 on create and 11 on update.
+WHAT I ALSO CHECKED AND DID NOT CHANGE
+  APP-04 "travel mode wording and behaviour contradict each other" — from Audit #1, and it looks
+  already resolved. "On foot" now requests walking directions AND shows the city-jump row, which
+  is what the label implies. That changed in v2.5.5 when travel mode became directions-only with
+  no autoswitch. Not carrying it forward as open.
 
 
-WHAT I VERIFIED
-  the clearing rule across 8 scenarios, including stale and future-dated clears
-  both call sites now share one implementation
-  every value the admin panel emits is still accepted
-  6 JS files parse · 15 audit checks pass · rules balanced · both html well-formed
-
-WHAT I COULD NOT VERIFY
-  Real multi-user behaviour. The clearing rule is tested as a pure function against constructed
-  document sets, not against several accounts reporting and clearing the same bathroom. The
-  logic is deterministic, but the interaction is not something I can exercise.
-
-
-WHAT IS STILL OPEN AFTER THIS
+STILL OPEN — the honest list
   Needs the Mac:
-    firebase deploy --only functions   ·  git rm the six stray files  ·  curl the Leaflet plugins
+    firebase deploy --only functions   ← still the biggest blocker. The transaction, the admin
+                                         fix, amenity tallies, the hours regex and lastRatedBy
+                                         are all dormant until this runs.
+    git rm the six stray files  ·  curl the two Leaflet plugins (PWA-02)
   Needs you:
     the 7 pairs in duplicate-review.txt  ·  a real device regression pass
   Real work, not started:
-    A2-04 markers — ~15 MB retained at startup, measured; needs a device memory timeline before
-                    I touch the cluster plugin again
-    APP-02 — the users ratings map grows unbounded toward the 1 MiB document ceiling
-    no emulator test suite — audit-ui.js is static analysis and has never exercised a live rule
+    A2-04  ~15 MB of markers retained at startup. Measured now, but I want a device memory
+           timeline before touching the cluster plugin — the last attempt caused the Android races.
+    APP-02 the users ratings map grows unbounded toward the 1 MiB document ceiling
+    no emulator suite — audit-ui.js is static analysis and has never exercised a live rule
+    FUNC-02 / FUNC-04 hours eligibility counting and the N+1 recomputation
   Decision:
-    SEC-01/02 report spam needs App Check
-  Unresolvable from here:
+    SEC-01/02 report spam needs App Check, not rules
+  Cannot resolve from here:
     RB-05 — I argue it is inert because anonymous votes cannot exist under current rules. That
-            depends on there being no legacy device-id votes, which needs a Firestore query to
-            confirm rather than an argument.
+            holds only if no legacy device-id votes exist, which needs a Firestore query.
