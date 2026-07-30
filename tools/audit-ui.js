@@ -343,8 +343,16 @@ console.log('\nusername caps');
    *       ? window.__currentUser.email.split('@')[0].slice(0, 40) : '';
    * A line-bounded pattern saw only the single-line one, reported "all 1 capped", and passed a
    * deliberately broken build. */
-  const sites = [...appSrc.matchAll(/uname\s*=[\s\S]{0,160}?email\.split\('@'\)\[0\]([\s\S]{0,24})/g)].map(m => m[1]);
-  const uncapped = sites.filter(s => !/\.slice\(0,\s*40\)/.test(s));
+  /* The name now comes from ONE helper. Checking for the old email.split('@')[0] pattern would
+   * pass vacuously — there are zero such sites left — so check the helper itself instead. It has
+   * to cap at 40 on BOTH branches: the displayName and the email fallback. The votes, users and
+   * activity rules all bound username at 40, and a longer one makes every write from that
+   * account fail silently. */
+  const helper = appSrc.match(/function displayNameFor\(user\)\s*\{[\s\S]*?\n\}/);
+  const sites = helper ? [helper[0]] : [];
+  if (!helper) fail('displayNameFor() is gone — the username cap is no longer enforced anywhere');
+  const caps = helper ? (helper[0].match(/\.slice\(0,\s*40\)/g) || []).length : 0;
+  const uncapped = (helper && caps < 2) ? ['displayNameFor caps ' + caps + ' of 2 branches'] : [];
   if (uncapped.length) fail(`${uncapped.length} username write(s) not capped to 40 — the rules will reject them`);
   else pass(`all ${sites.length} username reads are capped to 40`);
   // and sign-up must refuse a handle longer than the input's maxlength
