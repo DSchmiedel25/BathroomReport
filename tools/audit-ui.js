@@ -389,5 +389,70 @@ console.log('\ngeofence');
   }
 }
 
+// ---- 14: script blocks must be well-formed and self-contained ----
+console.log('\nscript block integrity');
+{
+  for (const file of ['index.html', 'flushpanel.html']) {
+    if (!fs.existsSync(file)) continue;
+    const src = fs.readFileSync(file, 'utf8');
+    const blocks = [];
+    const re = /<script[^>]*>/g;
+    let m;
+    while ((m = re.exec(src))) {
+      const end = src.indexOf('</script>', m.index + m[0].length);
+      blocks.push({ start: m.index + m[0].length, end: end < 0 ? src.length : end });
+    }
+    /* A function defined outside every block is dead: the browser renders its comment as visible
+     * page text and the identifier is undefined wherever it is called. That is exactly what
+     * happened to fsId in flushpanel.html — every override save threw ReferenceError, the catch
+     * swallowed it, and the UI blamed the Firestore rule. */
+    const inABlock = (i) => blocks.some(b => i > b.start && i < b.end);
+    let orphan = 0;
+    for (const fn of [...src.matchAll(/^\s*function\s+(\w+)\s*\(/gm)]) {
+      if (!inABlock(fn.index)) { fail(`${file}: function ${fn[1]}() is declared outside every script block`); orphan++; }
+    }
+    // And a literal closing-script sequence inside a block ends it, even in a comment or string.
+    let stray = 0;
+    for (const b of blocks) if (src.slice(b.start, b.end).includes('</script')) stray++;
+    if (stray) fail(`${file}: ${stray} script block(s) contain a literal closing-script sequence`);
+    if (!orphan && !stray) pass(`${file}: ${blocks.length} script blocks, no orphaned functions`);
+  }
+}
+
+// ---- 15: the amenity key list must agree in all three places ----
+console.log('\namenity key agreement');
+{
+  const appSrc = fs.readFileSync('app.js', 'utf8');
+  const block = (name) => {
+    const i = appSrc.indexOf('const ' + name);
+    const j = appSrc.indexOf('];', i);
+    return i < 0 ? '' : appSrc.slice(i, j > i ? j : i + 2000);
+  };
+  const appKeys = [...new Set([
+    ...[...block('BATHROOM_AMENITIES').matchAll(/key:'(\w+)'/g)].map(m => m[1]),
+    ...[...block('STORE_FEATURES').matchAll(/key:'(\w+)'/g)].map(m => m[1]),
+  ])].sort();
+
+  const grab = (file, re) => {
+    if (!fs.existsSync(file)) return null;
+    const m = fs.readFileSync(file, 'utf8').match(re);
+    return m ? [...new Set([...m[0].matchAll(/'(\w+)'/g)].map(x => x[1]))].sort() : null;
+  };
+  const fnKeys = grab('functions/index.js', /const AMENITY_KEYS = new Set\(\[[\s\S]*?\]\)/);
+  const ruKeys = grab('firestore.rules', /keys\(\)\.hasOnly\(\[\s*'restroomType'[\s\S]*?\]\)/);
+
+  /* Three copies of one list, because a client must not be able to name a server field path.
+   * The Cloud Function turns amenity keys into Firestore dot paths, so an unlisted key produced
+   * `amen.a.b.c.yes` or `amen..yes` — the latter has an empty segment, which Firestore rejects,
+   * throwing and taking the rating update with it. Adding an amenity means touching all three. */
+  if (!fnKeys) fail('AMENITY_KEYS not found in functions/index.js');
+  else if (!ruKeys) fail('the amenity key allowlist was not found in firestore.rules');
+  else if (JSON.stringify(appKeys) !== JSON.stringify(fnKeys) || JSON.stringify(appKeys) !== JSON.stringify(ruKeys)) {
+    fail(`amenity key lists disagree — app.js ${appKeys.length}, functions ${fnKeys.length}, rules ${ruKeys.length}`);
+    const miss = appKeys.filter(k => !fnKeys.includes(k) || !ruKeys.includes(k));
+    if (miss.length) fail(`  missing downstream: ${miss.join(', ')}`);
+  } else pass(`all three amenity key lists agree (${appKeys.length} keys)`);
+}
+
 console.log('\n' + (failures ? failures + ' FAILURE(S)' : 'all UI checks passed') + '\n');
 process.exit(failures ? 1 : 0);
