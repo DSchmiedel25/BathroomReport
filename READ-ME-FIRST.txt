@@ -1,83 +1,111 @@
-v2.6.4 — audit fixes, drawer alignment, and one date to rule them all
-=====================================================================
+v2.6.5 — audit fixes, drawer alignment, and a script so this can't recur
+========================================================================
 
-Supersedes every earlier zip. 15 files to upload, 6 to delete.
+Supersedes every earlier zip. 16 files to upload, 6 to delete.
 
-UPLOAD (repo root, except the workflow)
+UPLOAD (repo root, except the two in folders)
   app.js  index.html  styles.css  shell.css  flushpanel.html    <- BUMP sw.js
   firestore.rules                            <- firebase deploy --only firestore:rules
   bake-overrides.js  bake-hours.js  bake-confirmed.js  fetch-and-bake-hours.js
   circle-k-locations.js  nyc-dunkin-locations.js  jacksons-locations.js
   .github/workflows/bake.yml
+  tools/audit-ui.js                          <- chmod +x tools/audit-ui.js
 
 DELETE
   git rm index.js quiktrip-locations.json bathroomreport-nyc-public.zip robots.pdf sw.pdf tools/tools
-  (index.js is byte-identical to functions/index.js. robots.pdf and sw.pdf are print-to-PDF
-   exports — NOT the real robots.txt / sw.js.)
 
 coordinate-review.txt and this file are for you, not the repo.
 
 
-=====================================================================
-THE DATE PROBLEM — fixed at the root, not the symptom
-=====================================================================
+========================================================================
+THE POINT OF THIS RELEASE: tools/audit-ui.js
+========================================================================
 
-You spotted the FAQ saying July 21 after the data was updated. There were actually THREE
-hand-typed dates, and they had already drifted apart:
+You said the alignment and date problems should have been caught in the last audit. You were
+right, and the reason they weren't is that my checks only find what I thought to query. So the
+three missing checks are now a script instead of a note.
 
-    drawer version stamp       2026-07-30
-    onboarding panel           July 14, 2026
-    FAQ / how it works         July 21, 2026
+    node tools/audit-ui.js        # exits non-zero on failure, so it can gate a commit
 
-Patching the two strings would have guaranteed the same bug next release, so instead there is
-now ONE value:
+Run against the repo you sent me, it reports 18 FAILURES — every bug you found by eye:
 
-    const BUILD_DATE = '2026-07-30';          // app.js, near CONFIRM_THRESHOLD
+    icon slot        FAIL  emoji outside .d-ico: "❓ FAQ: How it works"
+                     FAIL  emoji outside .d-ico: "🛍️ Gift shop"
+                     ... 9 rows total
+    stale selectors  FAIL  #passportToggle is a drawer row but still has
+                           position:absolute + justify-content:center
+                     FAIL  #openNowToggle   same
+    constants        FAIL  more than one date string: July 14, 2026 | July 21, 2026
 
-buildDateLong() turns it into "July 30, 2026" for prose, and stampBuildDate() fills every
-element that shows a date — .onboardingUpdated, .hiw-updated, and the drawer stamp (which now
-carries data-version="v2.6.4" so the version and date compose from one place).
+Against this release: all checks pass.
 
-ON EACH RELEASE: change BUILD_DATE and data-version. Nothing else displays a date.
+WHAT IT CHECKS, AND WHICH BUG EACH ONE CAME FROM
 
-The markup keeps July 30, 2026 as a no-JS fallback, so all three now agree even before
-stampBuildDate runs. Formatter parses the string as parts rather than new Date(), so it can't
-shift a day backwards for users west of GMT. Tested against 2026-01-01, 2026-07-30, 2026-12-25.
+  1. SIBLING GEOMETRY — all four drawer row types must be flex, gap 10px, same left padding.
+     Came from: Gift shop is an <a>, so `.d-items button` never reached it. 16px vs 20px.
 
+  2. ICON SLOT CONTEXT — no emoji may sit outside a .d-ico span.
+     Came from: every icon was inline text, and emoji advance widths differ, so each label
+     started at a different x.
 
-=====================================================================
-DRAWER ALIGNMENT — three causes from your screenshot
-=====================================================================
+  3. STALE SELECTORS — no drawer id may carry position:absolute or justify-content:center.
+     Came from: #passportToggle left in the old floating map-control stack. Invisible to a
+     conflict check because nothing competed with it.
 
-A. Passport was CENTRED. styles.css still listed #passportToggle in the old floating
-   map-control stack (position:absolute, justify-content:center). shell.css overrides display,
-   width and text-align for drawer buttons but never justify-content, so that one declaration
-   survived the redesign.
+  4. DUPLICATED CONSTANTS — CONFIRM_THRESHOLD vs MIN_YES, and more than one date string.
+     Came from: three hand-typed dates that had drifted to July 14 / 21 / 30, and the earlier
+     MIN_YES=2 vs CONFIRM_THRESHOLD=3 mismatch.
 
-   My dead-CSS pass in v2.6.3 could NOT have caught this: it only removed declarations where
-   shell.css sets the same property. This was an orphan with nothing competing against it.
-   FIX: #passportToggle removed from that selector list, and its top:90px rule deleted.
-
-B. Gift shop sat 4px left. It is an <a class="d-shop-link">, so `#appDrawer .d-items button`
-   never applied — padding 14px 16px against everyone else's 20px, weight 600 against 700,
-   display:block instead of flex. FIX: a matching #appDrawer .d-shop-link rule.
-
-C. Nothing lined up vertically, because every icon was inline text. 🎫 ❓ 🛍️ ⚙️ have different
-   advance widths, so the label began at a different x on each row — which is why the menu read
-   as ragged even where padding matched.
-
-   FIX: a fixed-width icon column.
-       #appDrawer .d-ico{ flex:0 0 1.6em; display:inline-flex; justify-content:center; }
-
-   Ten static rows use it, plus the four group toggles. Those needed a data change as well:
-   CK_GROUPS stored the emoji inside the label string ('⛽ Gas & convenience') so it could not be
-   placed in the slot. Split into { icon, label }; both renderers updated and labels now run
-   through escapeHtml. Sized in em so the column tracks font size, not a magic pixel value.
+Check 3 found a bug I had missed even while writing the fix: #openNowToggle moved into the
+drawer as "Hide confirmed closed" but kept position:absolute and justify-content:center. It
+LOOKS fine today only because margin-left:auto on the switch masks it — one rule change from
+mattering, and the identical rule that centred Passport. Removed, along with its dead
+#openNowToggle.active green-pill rule (the JS uses .on now, verified).
 
 
-=====================================================================
+========================================================================
+DRAWER ALIGNMENT — four causes
+========================================================================
+
+A. Passport was CENTRED. styles.css still listed #passportToggle in the old map-control stack
+   (position:absolute, justify-content:center). shell.css overrides display, width and
+   text-align for drawer buttons but never justify-content.
+   My v2.6.3 dead-CSS pass could NOT have caught it — that pass only removed declarations where
+   shell.css sets the same property, and nothing competed with this one.
+
+B. Gift shop sat 4px left. An <a class="d-shop-link">, so the button rule never applied:
+   padding 14px 16px vs 20px, weight 600 vs 700, display:block vs flex.
+
+C. Every label started at a different x, because icons were inline text. Fixed with a
+   fixed-width column: #appDrawer .d-ico{ flex:0 0 1.6em; display:inline-flex; justify-content:center; }
+   Ten static rows plus the four group toggles. CK_GROUPS had the emoji baked into the label
+   string, so it was split into { icon, label }; both renderers updated, labels now escaped.
+
+D. [from your second screenshot] "Getting around" and "Directions app" still butted against
+   their icons. They are .d-section-label divs, not buttons — never given display:flex or gap,
+   so .d-ico had no flex context: flex-basis ignored, gap inert. Now flex with gap 10px like
+   every other row.
+
+
+========================================================================
+THE DATE PROBLEM — fixed at the root
+========================================================================
+
+Three hand-typed dates, already drifted: drawer stamp 2026-07-30, onboarding July 14, FAQ
+July 21. Now one value:
+
+    const BUILD_DATE = '2026-07-30';      // app.js, beside CONFIRM_THRESHOLD
+
+buildDateLong() formats it for prose; stampBuildDate() fills .onboardingUpdated, .hiw-updated
+and the drawer stamp (which carries data-version="v2.6.5" so version and date compose from one
+place). ON EACH RELEASE change BUILD_DATE and data-version; nothing else shows a date. The
+markup keeps July 30 as a no-JS fallback. Parsed as parts, not new Date(), so it can't shift a
+day backwards west of GMT — tested at 2026-01-01, 2026-07-30, 2026-12-25.
+
+
+========================================================================
 THE 13 AUDIT FINDINGS
-=====================================================================
+========================================================================
 
 FIXED
 
@@ -89,100 +117,76 @@ FIXED
    Fixing it exposed a SECOND crash: the chain-map loop dereferenced loaded[f].varName for the
    skipped file. Now iterates Object.keys(loaded).
    PROVEN end to end against a copy of the real repo — 28,123 indexed, override applied, record
-   count preserved. Before the fix that run died on the first file.
+   count preserved. Before the fix, that run died on the first file.
 
-1b bake.yml now emits ::warning:: annotations instead of a bare echo, so the next failure shows
-   on the run summary instead of hiding.
+1b bake.yml now emits ::warning:: annotations, so the next failure shows on the run summary.
 
 1c [found while verifying 1] Fixing the crash made a data-loss path live. bake-hours.js is
    authoritative: a record flagged community_verified whose id is ABSENT from the status file is
    REVERTED. fetch-and-bake-hours.js wrote whatever Firestore returned with no emptiness check,
-   so one transient error would wipe every community-verified hour. Confirmed by running with an
-   empty status file: 10 records reverted. fetch-and-bake.js already guarded this way; the hours
-   fetcher did not. FIX: refuse to bake an empty fetch. Protects 10 records today
-   (speedway 8, circleK 1, stewarts 1).
+   so one transient error would wipe every community-verified hour. Confirmed with an empty
+   status file: 10 records reverted. fetch-and-bake.js already guarded this; the hours fetcher
+   did not. FIX: refuse to bake an empty fetch. Protects 10 records today (speedway 8,
+   circleK 1, stewarts 1).
 
 2  Two true duplicates removed. 28,125 -> 28,123.
      circlek-tampa-ntelecommpkwy   "TELECOMM" vs "TELECOM", same address, 0.0m
      node/11761691198              0.1m from 100 1st Avenue, no address of its own
 
-4  hasRestroom is now admin-correctable. The amenityOverrides allowlist had ten keys and the new
-   amenity was not one, so a wrong community vote on any of the 672 flagged rest areas or 354
-   flagged Circle Ks could not be overridden from FlushPanel.
+4  hasRestroom is now admin-correctable — it was missing from the amenityOverrides allowlist, so
+   a wrong community vote on any of the 672 flagged rest areas or 354 flagged Circle Ks could not
+   be overridden from FlushPanel.
 
-6  85 dead CSS declarations removed from styles.css — only where shell.css sets the same property
-   for every selector in the rule. 31 remain and are correct (multi-selector rules whose other
-   selectors still need them). Includes the stale --accent:#38b8bb, which never applied.
+6  85 dead CSS declarations removed from styles.css. 31 remain and are correct (multi-selector
+   rules whose other selectors still need them). Includes the stale --accent:#38b8bb.
 
 8  firestore.rules no longer claims a leaderboard Cloud Function that isn't deployed.
 
 11 aria-label added to installClose, listViewClose, accountClose. cbClose used U+00D7 (×) among
-   five U+2715 (✕) close buttons; normalised.
+   five U+2715 (✕); normalised.
 
 13 flushpanel.html "Handicap accessible" -> "Wheelchair accessible".
 
-BONUS jacksons-way-615371860 had sat:"" and sun:"" in per-day hours. An empty string is neither
-   open nor closed, so those days now read as unknown. Last malformed per-day value in the set.
+BONUS jacksons-way-615371860 had sat:"" and sun:"" in per-day hours — neither open nor closed.
+   Those days now read as unknown. Last malformed per-day value in the dataset.
 
 NOT FIXED, DELIBERATELY
 
-3  Two stores share one coordinate — NOT duplicates. Two real, different addresses at identical
-   lat/lng, so one pin of each pair is misplaced: Circle K Franklin TN (Murfreesboro Rd / New
-   Hwy 96 W) and Cumberland Farms Bridgewater MA (Pleasant St / Main St). Plus an ambiguous
-   Jacksonville "BLDG 2" case that may be two units in one plaza. Fixing needs an authoritative
-   coordinate I cannot derive from the data. See coordinate-review.txt; enter the correction as a
-   FlushPanel override (lat/lng are in the bake FIELD_MAP, and the bake works now).
+3  Two stores share one coordinate — NOT duplicates. Two real addresses at identical lat/lng, so
+   one pin of each pair is misplaced: Circle K Franklin TN (Murfreesboro Rd / New Hwy 96 W) and
+   Cumberland Farms Bridgewater MA (Pleasant St / Main St), plus an ambiguous Jacksonville
+   "BLDG 2". Needs an authoritative coordinate I cannot derive. See coordinate-review.txt.
 
-5  amenityOverrides has no writer — app.js reads it in three places, FlushPanel has zero. A
-   missing feature, not a defect.
+5  amenityOverrides has no writer — read in three places, written by nothing. A missing feature.
 
-7  Four features have working JS and no HTML (loadLeaderboard, updateMyProgressBadge, the support
-   prompt, the recap pills). All null-guarded; nothing crashes. Documented in a comment rather
-   than deleted, since Community/leaderboard is planned.
+7  Four features have working JS and no HTML (loadLeaderboard, updateMyProgressBadge, support
+   prompt, recap pills). All null-guarded. Documented rather than deleted, since
+   Community/leaderboard is planned.
 
-10 WITHDRAWN — my own false positive. "Where Am I?" does have an icon: an inline SVG plus an
-   aria-label. My check only looked for emoji. The real observation is that three primary
-   controls use emoji and one uses SVG; the SVG is the better implementation, so it stands.
-   Unifying them is a design call and yours.
+10 WITHDRAWN — my false positive. "Where Am I?" has an inline SVG icon plus an aria-label; my
+   check only looked for emoji. The real point is that three primary controls use emoji and one
+   uses SVG. The SVG is the better implementation, so it stands; unifying is your design call.
 
 
-=====================================================================
-WHAT THE AUDIT SHOULD HAVE CAUGHT AND DIDN'T
-=====================================================================
-
-The alignment problems and the stale dates were all visible in the files I had. They were missed
-because my checks only find what I thought to query. Three checks worth running next time:
-
-  - STALE SELECTORS: any rule whose properties contradict the element's current layout context
-    (position:absolute on a flex-column child, justify-content on a row that must be
-    left-aligned). This is what hid the Passport bug.
-  - SIBLING GEOMETRY: rows in one container that disagree on padding, font-weight or display.
-    This is what hid the Gift shop bug.
-  - DUPLICATED CONSTANTS: the same value typed in more than one file — dates, thresholds,
-    colours. Three dates in three places is why they drifted. (bake-confirmed's MIN_YES vs the
-    app's CONFIRM_THRESHOLD was the same class of bug, caught earlier.)
-
-
-=====================================================================
+========================================================================
 RE-AUDIT
-=====================================================================
+========================================================================
+  [ok] node tools/audit-ui.js — all checks pass (18 failures against the pre-fix repo)
   [ok] app.js and all four bake scripts parse
   [ok] 28,123 records across 40 globals, ZERO duplicate ids
   [ok] 40 registry dataVars <-> 40 script tags <-> 40 files
-  [ok] index.html: static ids unique, div/span/button balanced
-  [ok] styles.css, shell.css, firestore.rules braces balanced
-  [ok] .d-ico defined once (shell.css), no competing rule in styles.css
-  [ok] all 10 drawer emoji inside the slot; labels contain no stray glyph
-  [ok] #passportToggle fully absent from styles.css
-  [ok] only ONE date string in the markup: July 30, 2026
-  [ok] buildDateLong tested at 2026-01-01 / 2026-07-30 / 2026-12-25
+  [ok] index.html ids unique; div/span/button balanced; css + rules braces balanced
+  [ok] all four drawer row types: flex, gap 10px, 20px left padding
+  [ok] 10 drawer rows, every emoji inside a .d-ico slot
+  [ok] 19 drawer ids carry no leftover positioning rules
+  [ok] one date string in the markup; buildDateLong tested across three dates
   [ok] no icon-only button missing aria-label; zero U+00D7
   [ok] 9 malformed hrs values remain, all pre-existing; 0 malformed per-day
-  [ok] bake skips compact-locations.js, logs it, applies a real override
+  [ok] bake skips compact-locations.js, logs it, and applies a real override
 
-CANNOT BE VERIFIED BY ME: the rendered result. Please reopen the drawer after deploying and
-confirm Passport, FAQ, Gift shop, All places and Preferences share one left edge, that the four
-group toggles line up with them, and that the FAQ now reads July 30.
+STILL NOT VERIFIABLE BY ME: the rendered result. The script checks structure, not pixels. Please
+reopen the drawer and confirm all seven rows — Passport, FAQ, Gift shop, Getting around, All
+places, Preferences, Directions app — share one left edge, and that the FAQ reads July 30.
 
 AFTER DEPLOYING
   1. bump sw.js

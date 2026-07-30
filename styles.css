@@ -234,7 +234,6 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
   .chain-filter-row input{margin:0;cursor:pointer;
 }
   /* Right-side map controls: one aligned stack with matching dimensions. */
-  #openNowToggle,
   #listViewToggle,
   #whereAmIBtn{
     position:absolute;right:10px;z-index:500;
@@ -244,10 +243,6 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
     border-radius:8px;padding:6px 10px;
     font-size:12px;font-weight:700;line-height:1.2;
     box-shadow:0 3px 10px rgba(0,0,0,.3);cursor:pointer;
-}
-  #openNowToggle{top:10px;
-}
-  #openNowToggle.active{background:#2e7d32;border-color:#2e7d32;color:#fff;
 }
   .map-control-icon{
     width:17px;height:17px;flex:0 0 17px;margin-right:7px;

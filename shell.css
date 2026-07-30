@@ -641,6 +641,10 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 #appDrawer .d-section-label{
   padding:14px 20px 8px !important; margin:0 !important;
   font-size:15px; font-weight:700; color:var(--shell-ink);
+  /* Must be flex with the same gap as the button rows, otherwise .d-ico has no flex context:
+     flex-basis is ignored and gap does nothing, so the label loses its 10px and starts ~38px
+     left of every other row. */
+  display:flex !important; align-items:center; gap:10px;
 }
 /* Toggles grouped inside a section (Preferences) don't add their own divider. */
 #appDrawer .d-section .d-toggle{ border-top:none !important; }
