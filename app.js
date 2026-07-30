@@ -1115,6 +1115,24 @@ function isLoggedIn(){
 // Turns a plain username into the fake email Firebase's login system needs internally —
 // nobody ever sees this, it's just how we get "username + password" out of a system built
 // around email addresses.
+/* The name to show for the signed-in user.
+ *
+ * usernameToEmail() LOWERCASES what you typed to build the synthetic auth address, and every
+ * reader recovered the name from that address — so "Dave" was stored as dave@stewarts-map.local
+ * and came back as "dave", with the account panel then shouting it as "DAVE". Three
+ * presentations, none of them what anyone chose.
+ *
+ * Firebase Auth has displayName for exactly this. It is set at sign-up with the original casing
+ * and preferred everywhere. The email local part remains the fallback for accounts created before
+ * this existed — including the first one. */
+function displayNameFor(user){
+  const u = user || window.__currentUser;
+  if(!u) return '';
+  const dn = typeof u.displayName === 'string' ? u.displayName.trim() : '';
+  if(dn) return dn.slice(0, 40);
+  return u.email ? String(u.email).split('@')[0].slice(0, 40) : '';
+}
+
 function usernameToEmail(username){
   const clean = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
   return clean + '@stewarts-map.local';
@@ -1131,9 +1149,14 @@ async function signUpAccount(username, password){
   if(!/^[a-zA-Z0-9_]+$/.test(clean)) return { ok: false, reason: 'Letters, numbers, and underscores only.' };
   if(password.length < 6) return { ok: false, reason: 'Password needs to be at least 6 characters.' };
   try{
-    const {auth, createUserWithEmailAndPassword, db, doc, setDoc} = await fb();
+    const {auth, createUserWithEmailAndPassword, updateProfile, db, doc, setDoc} = await fb();
     const oldAnonId = getClientId(); // capture before login changes what getEffectiveId() returns
     const cred = await createUserWithEmailAndPassword(auth, usernameToEmail(clean), password);
+    /* Preserve the casing the person actually typed. The auth address is lowercased by
+     * usernameToEmail because it has to be a stable lookup key; displayName is what gets shown.
+     * Non-fatal: an account without one falls back to the address, which is the old behaviour. */
+    try{ await updateProfile(cred.user, { displayName: clean }); }
+    catch(e){ console.warn('could not set display name (non-fatal)', e && e.code); }
     await migrateAnonymousDataToAccount(oldAnonId, cred.user.uid, clean);
     return { ok: true };
   }catch(e){
@@ -1350,8 +1373,7 @@ async function saveMyVote(id, data){
     // without a separate lookup. Only logged-in users can rate, so this is always present.
     // Sliced to 40 to match the votes rule. An account created before the length check above
     // could otherwise have every rating rejected, silently.
-    const uname = (window.__currentUser && window.__currentUser.email)
-      ? window.__currentUser.email.split('@')[0].slice(0, 40) : '';
+    const uname = displayNameFor();
     if(uname) payload.username = uname;
     // First bathroom rating gets an immutable ratedAt — drives the time-based achievements.
     if(data.bathroom > 0 && !existing.ratedAt){
@@ -1508,8 +1530,7 @@ function markHoursReported(locId){
 async function logActivity(type, extra){
   try{
     const {db, collection, addDoc} = await fb();
-    const uname = (window.__currentUser && window.__currentUser.email)
-      ? window.__currentUser.email.split('@')[0].slice(0, 40) : '';
+    const uname = displayNameFor();
     await addDoc(collection(db, 'activity'), {
       type, ts: Date.now(), ...(extra || {}), ...(uname ? { username: uname } : {})
     });
@@ -2443,7 +2464,7 @@ async function loadAllRatings(){
         // Capped to 40 like every other username write — the users rule bounds it the same way,
         // and this one is swallowed by its own catch, so an over-long name would silently drop
         // the whole one-read backfill and quietly cost a query on every load.
-        const uname = (window.__currentUser && window.__currentUser.email) ? window.__currentUser.email.split('@')[0].slice(0, 40) : '';
+        const uname = displayNameFor();
         // Trim every entry, and skip the mirror entirely past the cap — a document that cannot be
         // written would otherwise keep serving whatever it last held.
         const trimmed = {};
@@ -4490,7 +4511,9 @@ function updateAccountUI(passportMode){
   const accountBtn = document.getElementById('accountToggle');
   if(loggedIn){
     const email = window.__currentUser.email || '';
-    const username = (email.split('@')[0] || '').toUpperCase(); // ALL CAPS display; never show raw email/UID
+    // Show the name as chosen. This used to uppercase it, which turned "Dave" into "DAVE" —
+    // a third rendering of the same name. Never shows the raw address or uid.
+    const username = displayNameFor();
     document.getElementById('loggedInUsername').textContent = username;
     if(accountBtn) accountBtn.textContent = '👤 ' + username;
   } else if(accountBtn){
