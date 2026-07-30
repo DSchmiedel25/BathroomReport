@@ -2806,8 +2806,17 @@ async function loadOoo(locId){
     const snap = await getDocs(query(collection(db, 'outOfOrder'), where('locId', '==', locId)));
     const reports = [];
     let clearedAfter = 0;
+    /* Ignore anything stamped in the future. The whole lifecycle is derived from timestamps, and
+     * the rules used to accept any number for ts, so a single document could break it in either
+     * direction and never expire:
+     *   cleared:true dated years ahead  -> every real report is filtered out, permanently
+     *   cleared:false dated years ahead -> `age` goes negative, so the hard phase never ends
+     * The rules now clamp ts on write, but existing documents predate that, and a client should
+     * not trust a timestamp it can check. 60s of slack absorbs ordinary clock skew. */
+    const notFuture = (t) => typeof t === 'number' && t <= Date.now() + 60000;
     snap.forEach(d => {
       const r = d.data();
+      if(!notFuture(r.ts)) return;
       if(r.cleared){ if(r.ts > clearedAfter) clearedAfter = r.ts; }
       else reports.push(r.ts);
     });

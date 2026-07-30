@@ -15,10 +15,13 @@ service cloud.firestore {
     // ============================================================
     function signedIn() { return request.auth != null; }
 
+    /* Admin is an explicit opt-in. This used to read `enabled != false`, which meant a missing
+     * field, a null, or a typo like "no" all evaluated to admin — merely EXISTING in the admins
+     * collection was enough. `enabled` only worked as an off-switch, never as the grant. */
     function isAdmin() {
       return signedIn()
         && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled != false;
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled == true;
     }
 
     // A community write must belong to the signed-in caller: the doc's clientId field
@@ -62,9 +65,24 @@ service cloud.firestore {
       return !(k in request.resource.data) || request.resource.data[k] is map;
     }
     // Star rating: absent, or an integer-ish number 0–5 (0 = not rated yet).
+    /* A star rating is a whole number 0-5. `is number` accepted 3.7, which would have skewed the
+     * average and can't be produced by the UI. `is int` rejects doubles outright. */
+    /* A vote's amenity maps were validated only as `is map` — any number of keys, any values.
+     * Bound both so one write can't carry a large arbitrary payload. 24 keys is well clear of the
+     * ~11 amenities and store features the app actually sends. */
+    function boundedMapOrAbsent(k, maxKeys) {
+      return !(k in request.resource.data)
+        || (request.resource.data[k] is map
+            && request.resource.data[k].keys().size() <= maxKeys);
+    }
+
+    function boolOrAbsent(k) {
+      return !(k in request.resource.data) || request.resource.data[k] is bool;
+    }
+
     function ratingOrAbsent(k) {
       return !(k in request.resource.data)
-        || (request.resource.data[k] is number
+        || (request.resource.data[k] is int
             && request.resource.data[k] >= 0
             && request.resource.data[k] <= 5);
     }
@@ -118,12 +136,20 @@ service cloud.firestore {
       return strOrAbsent('locId')
         && ratingOrAbsent('store')
         && ratingOrAbsent('bathroom')
-        && mapOrAbsent('amenities')
-        && mapOrAbsent('storeFeatures')
-        && mapOrAbsent('amenityMeta')
+        && boundedMapOrAbsent('amenities', 24)
+        && boundedMapOrAbsent('storeFeatures', 24)
+        && boundedMapOrAbsent('amenityMeta', 24)
         && numOrAbsent('lastUpdated')
         && numOrAbsent('ratedAt')
-        && boundedStrOrAbsent('username', 40);
+        && boundedStrOrAbsent('username', 40)
+        /* Set by the Hidden Gem Hunter achievement when someone is the first few to rate a
+         * location — captured at that moment because it can't be reconstructed later. It was
+         * never in the allowlist above, so from the instant the flag was set EVERY subsequent
+         * write of that vote was rejected: the rating itself, and every amenity answer after it.
+         * It fires only where bathroomCount < 5, i.e. almost every location nobody had rated
+         * yet, so first-ever ratings at fresh locations have been failing since the achievement
+         * shipped. */
+        && boolOrAbsent('wasHiddenGem');
     }
     match /votes/{id} {
       allow read: if true;
@@ -131,7 +157,7 @@ service cloud.firestore {
         && id == request.resource.data.locId + '_' + request.auth.uid
         && request.resource.data.keys().hasOnly([
              'store','bathroom','amenities','storeFeatures','amenityMeta',
-             'clientId','locId','lastUpdated','username','ratedAt'
+             'clientId','locId','lastUpdated','username','ratedAt','wasHiddenGem'
            ])
         && validVoteShape();
       allow update: if ownedByCaller()
@@ -140,7 +166,7 @@ service cloud.firestore {
         // before these rules — possibly carrying retired fields — stay updatable.
         && touchedKeys().hasOnly([
              'store','bathroom','amenities','storeFeatures','amenityMeta',
-             'clientId','locId','lastUpdated','username','ratedAt'
+             'clientId','locId','lastUpdated','username','ratedAt','wasHiddenGem'
            ])
         && validVoteShape();
       allow delete: if signedIn() && resource.data.clientId == request.auth.uid;
@@ -196,13 +222,27 @@ service cloud.firestore {
     // closes the hole where any account could vandalize or wipe the shared log.
     match /activity/{id} {
       allow read: if true;
+      /* Type-specific requirements. Previously a 'tip' could omit text and a 'rating' could omit
+       * sourceId, so the feed could be filled with entries that render as blanks or point at
+       * nothing. locId and sourceId were also unbounded strings, and ts was any number — a
+       * far-future timestamp would pin an entry to the top of the recap forever. */
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['type','ts','locId','text','sourceId'])
         && request.resource.data.type in ['tip','rating']
-        && request.resource.data.ts is number
-        && strOrAbsent('locId')
-        && boundedStrOrAbsent('text', 120)
-        && strOrAbsent('sourceId');
+        && request.resource.data.ts is int
+        && request.resource.data.ts <= request.time.toMillis() + 60000
+        && request.resource.data.ts > 1700000000000
+        && request.resource.data.locId is string
+        && request.resource.data.locId.size() > 0
+        && request.resource.data.locId.size() <= 200
+        && (request.resource.data.type != 'tip'
+            || (request.resource.data.text is string
+                && request.resource.data.text.size() > 0
+                && request.resource.data.text.size() <= 120))
+        && (request.resource.data.type != 'rating'
+            || (request.resource.data.sourceId is string
+                && request.resource.data.sourceId.size() > 0
+                && request.resource.data.sourceId.size() <= 280));
       allow update, delete: if isAdmin();
     }
 
@@ -268,7 +308,14 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
              'locId','locName','lat','lng','reporterId','ts','cleared'
            ])
-        && request.resource.data.ts is number
+        /* ts drives the entire out-of-order lifecycle and was accepted as any number. A document
+         * dated years ahead either suppressed every real report at that location forever
+         * (cleared:true) or pinned it broken forever (cleared:false), because the client derives
+         * phase from `now - ts` and never expected a negative age. Clamped like activity and
+         * hourReports; 60s of slack absorbs clock skew. */
+        && request.resource.data.ts is int
+        && request.resource.data.ts <= request.time.toMillis() + 60000
+        && request.resource.data.ts > 1700000000000
         && request.resource.data.cleared is bool
         && boundedStrOrAbsent('locName', 120)
         && numOrAbsent('lat')
@@ -408,7 +455,12 @@ service cloud.firestore {
     // Phase 1: exactly the fields saveMyVote()/loadAllRatings() write —
     // { uid, username, lastUpdated, ratings } — and uid must match the doc/caller.
     match /users/{uid} {
-      allow read: if true;
+      /* Was `if true`. This document mirrors every one of a user's ratings under `ratings`, keyed
+       * by location — so a public read exposed a complete, UID-linked history of where somebody
+       * has been. Nothing needs that: app.js only ever reads the caller's OWN doc (the one-read
+       * loadAllRatings path), and the leaderboard that would need cross-user reads is inert and
+       * has no writer. Admins retain read for moderation. */
+      allow read: if signedIn() && (uid == request.auth.uid || isAdmin());
       allow create: if signedIn() && uid == request.auth.uid
         && request.resource.data.keys().hasOnly(['uid','username','lastUpdated','ratings'])
         && request.resource.data.uid == uid
@@ -439,13 +491,30 @@ service cloud.firestore {
     // the only writer of verified state (in hourStatus). No client can forge "verified".
     match /hourReports/{storeId}/submissions/{uid} {
       allow read: if signedIn();
+      /* `value` was accepted as ANY type and submittedAt as any number. A single-window report is
+       * a short string ("0500-2300" or "24"); a per-day report is a small map. submittedAt is
+       * clamped to a sane window so a far-future stamp can't outrank real submissions in the
+       * consensus the Cloud Function derives. */
       allow create, update: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.uid == uid
         && request.resource.data.keys().hasOnly(['uid','value','kind','submittedAt','schemaVersion'])
         && request.resource.data.kind in ['single','perday']
         && request.resource.data.schemaVersion == 1
-        && request.resource.data.submittedAt is number;
+        && request.resource.data.submittedAt is int
+        && request.resource.data.submittedAt <= request.time.toMillis() + 60000
+        && request.resource.data.submittedAt > 1700000000000
+        && (
+             (request.resource.data.kind == 'single'
+               && request.resource.data.value is string
+               && request.resource.data.value.size() > 0
+               && request.resource.data.value.size() <= 24)
+             ||
+             (request.resource.data.kind == 'perday'
+               && request.resource.data.value is map
+               && request.resource.data.value.keys().size() > 0
+               && request.resource.data.value.keys().size() <= 7)
+           );
       allow delete: if signedIn() && request.auth.uid == uid;
     }
 
