@@ -1,113 +1,75 @@
-v2.9.3 — accuracy-aware geofence, plus everything from v2.9.2
-==============================================================
-Supersedes v2.9.0, v2.9.1 and v2.9.2. One zip, everything in it.
+v2.9.4 — URGENT: FlushPanel override saves are broken, and it is my fault
+==========================================================================
 
-WHAT IS IN THIS BATCH
-  app.js              accuracy-aware geofence (new) · access badges · ratedByHtml ·
-                      activity carries the handle · username capped at all 3 write paths
-  index.html          version stamp only. BUMP sw.js.
-  styles.css          comment only
-  firestore.rules     'username' allowlisted on activity. PUBLISH THIS.
-  tools/audit-ui.js   checks 12 (username caps) and 13 (geofence bounds)
-  functions-index.js  rename to index.js -> functions/, THEN firebase deploy --only functions
+UPLOAD FIRST
+  flushpanel.html    the fix
+  index.html         version stamp only. BUMP sw.js.
+  tools/audit-ui.js  check 14, so this cannot happen again
 
-WHAT WAS STILL UNSHIPPED FROM EARLIER
-  functions/index.js, undeployed since v2.7.6. Five fixes ride on it: the fsId path fix,
-  aggregates.amen tallies, the hours regex, stale verified metadata, and lastRatedBy.
-  Everything else is current.
+  No rules change. No data change. No app.js change.
+  The rules are FINE — the error message blaming them was wrong.
 
 
-1. WHY 0.3 MILES — nobody knew, so I measured it
--------------------------------------------------
-There was no recorded reason. Just `const VERIFY_RADIUS_MILES = 0.3;` and a comment saying what
-it does, not why. Measured against your real data:
+WHAT BROKE
+  Your screenshot said "Could not save — check the overrides write rule." The rule was never the
+  problem. Look at the bottom of that screenshot: raw JavaScript comment text was rendering as
+  visible page content —
 
-  radius        locations with ANOTHER pin inside it     worst case
-  0.1 mi          3,166  (11.3%)                          14 others
-  0.3 mi          7,474  (26.6%)                          37 others
-  0.5 mi         10,050  (35.8%)                          70 others
+      "...and THROWS: 6,595 location ids were OSM-derived and contained..."
 
-So at 0.3, a quarter of the map could be rated from across the street. But tightening it blindly
-is worse: GPS indoors is bad, and a 100m error while standing inside a store with a metal roof is
-ordinary. A tight fixed radius tells someone they are not at a place they are visibly standing
-in — which is a plausible read on your tester's Cumberland Farms failure.
+  That is my comment. If it is visible on the page, the code around it is not in a script block.
 
-FIX: scale the radius to how good the fix actually is. The browser already reports accuracy in
-metres; it costs nothing to read.
+  In Phase 1 I inserted the fsId() helper into flushpanel.html by searching for the first
+  occurrence of a comment banner. That anchor matched a position AFTER the final closing script
+  tag. So:
+     - the browser rendered the comment as page text
+     - fsId was undefined inside the module where all 10 call sites live
+     - every doc(db,'overrides', fsId(locId)) threw ReferenceError
+     - the catch swallowed it and blamed the Firestore rule
 
-  accuracy <= 107m   ->  0.1 mi (161m)   tight enough to tell neighbouring stores apart
-  107m to 322m       ->  accuracy x 1.5  scales with the uncertainty
-  worse, or absent   ->  0.3 mi (483m)   exactly the previous behaviour
+  Reports still listed, because that path does not use fsId. Only overrides and tips did — which
+  is exactly the symptom you hit.
 
-107 and 322 are not chosen numbers — they fall out of the floor, the ceiling and the multiplier,
-which are the three things actually worth arguing about. I verified them empirically rather than
-asserting them, because my first comment said 65m and was wrong.
+  This has been live since Phase 1 shipped. Every override you saved since then failed.
 
-AND THE ERROR MESSAGES NOW DISTINGUISH TWO CASES
-  "You need to be at this stop" is wrong and infuriating when someone is inside the building.
-  If the fix is too coarse to place them, it now says so — because the remedy is stepping
-  outside, not walking closer:
-     "Your location is only accurate to about 220m right now — step outside and try again."
-  Distance is still shown when distance IS the reason, since knowing you are 4 miles off is
-  actionable. Applied at all four verifyNearby call sites, which previously shared two wordings
-  between them.
+FIXED
+  fsId now lives inside the module block (bytes 26895-64904), before all 10 uses. Verified by
+  locating the enclosing block, not by eyeballing indentation.
 
 
-2. Rating attribution — costs NOTHING (from v2.9.2)
-----------------------------------------------------
-  Popup:  the name rides in the aggregate doc the popup already fetches. Same single getDoc.
-  Header: one more field on the activity doc the ticker already queries.
-  Looking the rater up from sourceId instead would have been a second read per popup open.
+AND A SECOND BUG I CREATED WHILE FIXING THE FIRST
+  My replacement comment explained the mistake by writing the closing script sequence literally.
+  The HTML parser ends a script block at that sequence REGARDLESS of JavaScript context — inside
+  a comment, inside a string, anywhere. That would have truncated the module and broken the panel
+  far worse than the bug I was fixing.
 
-  The competitive angle works BECAUSE of the geofence: the only way into that slot is to
-  physically go somewhere and rate it. It cannot be farmed from a sofa.
-
-  Privacy checked first: the username is a chosen handle, not an email. Sign-up converts it to a
-  synthetic @stewarts-map.local address purely because Firebase Auth wants an email format.
+  Caught because I re-derived the block boundaries after editing instead of trusting the edit.
+  The comment now says "closing script tag" in words, and warns the next person.
 
 
-3. A latent bug found while building that (from v2.9.2)
---------------------------------------------------------
-  The votes, users and activity rules all bound username at 40. The input carries maxlength=20,
-  but that is client-side and bypassable, and signUpAccount had no length check. A longer handle
-  would have had EVERY rating rejected — silently, because two of the three write paths swallow
-  their own errors. Same shape as the wasHiddenGem bug that broke your tester.
-
-  I got the guard for it wrong twice. The first version flagged a display-only read. The second
-  only matched single-line assignments, so it reported "all 1 capped" and PASSED a deliberately
-  broken build. A check that passes a broken build is worse than no check. It now spans newlines,
-  finds all three, and I verified it fails at each one individually.
-
-
-4. Access badges (from v2.9.0)
--------------------------------
-    24,739  (no badge)                                  public, assumed
-       983  🔑 Customers only
-     1,333  ❔ Access unknown                            toilet confirmed, access isn't
-       361  🤞 Probably — nobody's confirmed yet         stores
-       671  ❔ Unconfirmed — may be a pull-off only      bare rest areas
+GUARD — check 14
+  Two rules, both from mistakes made today:
+    every top-level function must be inside a script block
+    no script block may contain a literal closing-script sequence
+  Verified: it FAILS on the file as it shipped ("function fsId() is declared outside every script
+  block") and passes on the fix. index.html: 49 blocks clean. flushpanel.html: 42 blocks clean.
 
 
 WHAT I VERIFIED
-  verifyRadiusMiles across 13 inputs including null, NaN, negative and a string — always inside
-  [0.1, 0.3]. Check 13 catches an unbounded formula: removing the clamp produces 6 failures.
-  Hinge points measured empirically, not asserted.
-  Failure-message decision exercised across 7 scenarios.
-  ratedByHtml 7/7 · accessState 7/7 · accessBadge all cases · check 12 catches a regression at
-  each of the three username write paths.
-  app.js, functions/index.js, audit-ui.js parse · 13 audit checks pass · rules and css balanced ·
-  index.html well-formed under a strict parse · 40 data files, 28,087 records.
+  fsId inside the module block, before all 10 uses, defined exactly once
+  no stray closing-script sequence in any block of either file
+  flushpanel ids unique, divs balanced, script tags balanced
+  CHAIN_TABLE still 40 rows, still 40 dataset script tags
+  14 audit checks pass
 
 WHAT I COULD NOT VERIFY
-  Real GPS behaviour. Every accuracy figure above is from the spec and the arithmetic, not from a
-  phone in a shop. The one number worth watching is how often the new "step outside" message
-  appears — if it is common, the 150m threshold for calling a fix poor wants revisiting.
-  Also unverified: the deployed function, the badge in the pit-stop popup, and the ticker with a
-  name in it. None has ever rendered.
+  The panel in a browser. Please open FlushPanel and save an override on any location — that is
+  the exact path that has been failing. If the comment text at the bottom of your screenshot is
+  gone, the script block is intact.
 
-STILL OPEN
-  Mac:      firebase deploy --only functions · git rm the six stray files · curl the Leaflet
-            plugins (PWA-02)
-  You:      the 7 pairs in duplicate-review.txt
-  Decision: SEC-01/02 report spam needs App Check
-  Won't-fix, measured: RB-08 marker construction · SEC-09 block check fails open by design
+
+WHAT THIS SAYS ABOUT MY EARLIER CHECKING
+  I verified that file repeatedly today — ids unique, divs balanced, script tags balanced, all
+  Firestore paths normalised. Every one of those passed while the panel was broken, because none
+  of them asked whether the code was in a position to RUN. Balanced tags do not mean working
+  code. That is the gap check 14 closes.

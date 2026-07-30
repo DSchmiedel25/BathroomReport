@@ -494,6 +494,24 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
+/* Firestore treats '/' as a path separator, so doc(db,'overrides','node/123') resolves to a
+ * three-segment path and THROWS. 6,595 location ids were OSM-derived and contained a slash, so
+ * every override and tip edit made from this panel silently failed for a quarter of the map.
+ * The data files now carry the safe form (original in meta.srcId), but reads still normalise so
+ * an override created earlier under a raw id keeps resolving.
+ *
+ * MUST live inside this module block. It was first added after the final closing script tag,
+ * where the browser rendered the comment as visible page text and left fsId undefined. Every
+ * override save then threw ReferenceError, was swallowed by its catch, and surfaced as
+ * "Could not save, check the overrides write rule". The rule was fine.
+ *
+ * (And do not write the closing script sequence literally in here, even in a comment: the HTML
+ * parser ends the block at it regardless of JS context, which is a faster way to break this
+ * panel than the bug it documents.) */
+function fsId(id){
+  return String(id == null ? '' : id).replace(/\//g, '__');
+}
+
 // ---- Editable override fields (must match the public app's applyOverrideToLocation
 //      and bake-overrides.js FIELD_MAP). locName maps to the seed's `n`. ----
 const OVERRIDE_TEXT_FIELDS = ['locName','addr','city','state','zipCode','phone','hrs'];
@@ -1432,13 +1450,3 @@ $('#addSave').addEventListener('click', saveAddStore);
 </script>
 </body>
 </html>
-    /* Firestore treats '/' as a path separator, so doc(db,'overrides','node/123') resolves to a
-     * three-segment path and THROWS. 6,595 location ids were OSM-derived and contained a slash —
-     * Speedway entirely, plus every metro and public chain — so every override and tip edit made
-     * from this panel silently failed for a quarter of the map. This panel had NO sanitising at
-     * all. The data files now carry the safe form (original preserved in meta.srcId), but reads
-     * still normalise so any override created earlier under a raw id keeps resolving. */
-    function fsId(id){
-      return String(id == null ? '' : id).replace(/\//g, '__');
-    }
-
