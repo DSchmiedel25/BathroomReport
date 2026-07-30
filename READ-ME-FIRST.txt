@@ -1,66 +1,73 @@
-v2.8.4 — CI-01, the checks now run on push
-===========================================
+v2.8.5 — coordinate corrections + CI
+=====================================
 
 WHAT IS IN THIS BATCH
-  .github/workflows/checks.yml   NEW. Runs on push and PR touching the app.
-  index.html                     version stamp only. BUMP sw.js.
+  cumberland-farms-locations.js   1 coordinate corrected
+  circle-k-locations.js           1 coordinate corrected, 2 duplicate records merged away
+  index.html                      version stamp only. BUMP sw.js.
+  .github/workflows/checks.yml    NEW (this is the v2.8.4 file — include it if you have not
+                                  already shipped v2.8.4)
 
-  No app.js, no rules, no functions, no data.
+  No app.js, no rules, no functions.
 
 WHAT WAS STILL UNSHIPPED FROM EARLIER
-  functions/index.js — the v2.8.3 copy. Still needs:
-     mv <the v2.8.3 functions-index.js> functions/index.js
-     firebase deploy --only functions
-  It carries four fixes that are not live: the fsId path fix, aggregates.amen tallies, the
-  24:01-24:59 hours regex, and the stale-verified-metadata fix. Nothing else is outstanding.
+  functions/index.js — I gave you this as index.js separately. Still needs:
+      firebase deploy --only functions
+  Four fixes are not live without it: the fsId path fix, aggregates.amen tallies, the
+  24:01-24:59 hours regex, and the stale-verified-metadata fix.
+  If v2.8.4 has not shipped, checks.yml is in this zip too. Nothing else outstanding.
 
-WHAT THE WORKFLOW DOES
-  1. node --check on every JS file we ship (9 of them)
-     Worth a separate step: audit-ui.js reads app.js as TEXT for several checks, so a syntax
-     error there could pass the audit while the app is broken in the browser.
-  2. every *-locations.js must evaluate and define exactly one array global
-     This is the check that would have caught compact-locations.js. Verified: run against a repo
-     containing it, this step fails with "Invalid or unexpected token" — the same error that
-     silently killed the nightly bake for weeks.
-  3. node tools/audit-ui.js — all 11 checks
-  4. SEO generator dry run
-     The generator now exits on an unresolvable slug collision, so running it is a real check:
-     two locations that would overwrite each other's page fail the build instead of one page
-     quietly disappearing.
 
-  Concurrency guard cancels superseded runs. Deliberately not scheduled — a red run here should
-  always point at a commit.
+THE CORRECTIONS — all three from your verification
+--------------------------------------------------
+1. Cumberland Farms, Bridgewater MA
+   bridgewater-pleasantst sat on the Main St store's exact coordinate. Moved 3.46 km to
+   41.971890, -71.008410 (1001 Pleasant St). I padded your 5 decimals to 6 so the stored
+   precision matches what you supplied rather than implying more.
+
+2. Circle K, Franklin TN
+   1501 Murfreesboro Rd and 1501 New Hwy 96 W were one store under two road names. Kept
+   Murfreesboro Rd per your call, moved it 75m to 35.914000, -86.820580, dropped the alias.
+
+3. Circle K, Jacksonville FL
+   3631 Blanding Blvd and the same address "Bldg 2" were one store. Merged; the survivor
+   absorbed anything the dropped record had.
+
+Every correction records provenance — coord_prev, coord_corrected, coord_source, and for the
+merges, mergedFrom plus altAddress. altAddress matters: the Circle K API returns these stores
+under BOTH names, so a future import that does not recognise the alias would re-add them.
+
+  28,089 -> 28,087 records
+
 
 WHAT I VERIFIED
-  All four steps run locally against the current tree, exactly as written: 9 files parse, 40 data
-  files load with 28,089 records and one global each, 11 audit checks pass, generator exits 0.
-  YAML parses.
-  Against the repo you sent for the audit, the workflow reports 28 failures — every one a bug
-  that had shipped and was invisible.
+  Each supplied coordinate sanity-checked before applying: inside a plausible town box, lat/lng
+  not transposed, and the move distance sensible (3.46 km for a genuine relocation, 75m for a
+  refinement).
+  ZERO exact-coordinate groups with different addresses now exist, across all 28,087 records.
+  DATA-01 and DATA-07 are both fully closed — DATA-01 had been open since the first audit.
+  app.js parses · all 11 audit checks pass · 40 data files load, one global each · SEO generator
+  exits 0 with no collisions.
 
 WHAT I COULD NOT VERIFY
-  The workflow running on GitHub. I can execute every step locally but not the Actions runner
-  itself, so the trigger paths and checkout behaviour are reasoned, not observed. Watch the first
-  run.
+  That the coordinates are right. They are yours; I checked they are plausible and consistent,
+  not that they are correct. And whether a second Circle K really does exist at Blanding Blvd —
+  I took your word and merged.
 
-RB-08 — CLOSED AS WON'T-FIX, with numbers
-  "All markers are constructed at startup, and chainsInViewport scans the full dataset on every
-  map move." Both true. Measured:
-      viewport scan, empty view (no early exit)   0.97ms
-      viewport scan, dense view                   0.50ms
-  and renderChainKey has a signature guard, so a pan that changes nothing returns before touching
-  the DOM. Marker construction was ~100-200ms at startup, with the map interactive at 1,521ms on
-  LTE; the expensive part, the filter pass, was already fixed in v2.6.1.
-
-  Against that, app.js line 162 records that viewport add/remove culling was tried and REMOVED
-  because it fought the cluster plugin for marker ownership — the likely cause of the Android
-  races. Reintroducing lazy construction means re-fighting that. Not worth it for a millisecond.
 
 REMAINING WORK
   Needs the Mac:
-    deploy functions (above) · git rm index.js · curl the two Leaflet plugins (PWA-02)
-  Needs you:
-    DATA-07 Bridgewater coordinate — Street View
-    the 7 pairs in duplicate-review.txt
+    firebase deploy --only functions      (the index.js I sent separately)
+    git rm index.js quiktrip-locations.json bathroomreport-nyc-public.zip robots.pdf sw.pdf tools/tools
+    curl the two Leaflet plugins          PWA-02
+  Worth doing, not started:
+    SEO-03  og:image points at /og.png, which does not exist — every one of ~22,000 pages and
+            every link you share has a blank preview card. Most visible remaining issue.
+    SEO-02  5,750 pages are typed ConvenienceStore when they are rest areas, public restrooms
+            or cafes.
   Product decision:
-    SEC-01/02 report spam — needs App Check, not rules
+    SEC-01/02  report spam needs App Check, not rules
+  Closed won't-fix, with measurements:
+    RB-08   marker construction and the viewport scan, both measured and cheap; the previous
+            attempt at culling caused the Android races
+    SEC-09  the block check fails open deliberately, and the comment says so
