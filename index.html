@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Bathroom Report — Find. Rate. Share. Improve.</title>
-<meta name="description" content="Find. Rate. Share. Improve. Clean, open public bathrooms at convenience stores and travel stops nationwide — rated by the community.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bathroom Report | Find. Rate. Share. Improve.</title>
+<meta name="description" content="Find. Rate. Share. Improve. Clean, open public bathrooms at convenience stores and travel stops nationwide, rated by the community.">
 <link rel="canonical" href="https://bathroomreport.app/">
-<meta property="og:title" content="Bathroom Report — Find. Rate. Share. Improve.">
+<meta property="og:title" content="Bathroom Report | Find. Rate. Share. Improve.">
 <meta property="og:description" content="Find. Rate. Share. Improve. The community-powered bathroom finder.">
 <meta property="og:image" content="https://bathroomreport.app/icon-512.png">
 <meta property="og:type" content="website">
@@ -143,7 +143,7 @@
 <div id="onboardingCard" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
 <div id="onboardingScroll">
 <h2 id="onboardingTitle">🚽 Welcome to Bathroom Report</h2>
-<p class="onboardingTagline">Find a clean, open bathroom — and help the next person.</p>
+<p class="onboardingTagline">Find a clean, open bathroom, and help the next person.</p>
 <div class="onboardingGrid" aria-label="Quick tour">
 <div class="onboardingTip">
 <span aria-hidden="true">📍</span>
@@ -161,8 +161,8 @@
 <details id="onboardingMore">
 <summary>More tips &amp; important info</summary>
 <div class="onboardingMoreBody">
-<p>Use List to see the bathrooms closest to you. Directions open in your device's default maps app — sign in to choose Apple Maps, Google Maps, or Waze.</p>
-<p>Hours are shown when we have them. A spot with unknown hours still appears — it's never marked closed on a guess.</p>
+<p>Use List to see the bathrooms closest to you. Directions open in your device's default maps app. Sign in to choose Apple Maps, Google Maps, or Waze.</p>
+<p>Hours are shown when we have them. A spot with unknown hours still appears. It's never marked closed on a guess.</p>
 <p>Share a pin, or report wrong info from its popup.</p>
 <p>An account is optional. Sign in to rate and add tips, filter which places show on the map, set your preferred directions app, switch appearance, and sync your Passport and achievements across devices.</p>
 <p class="onboardingDisclaimer">Bathroom Report is an independent, community-created project and isn't affiliated with or endorsed by any business listed.</p>
@@ -200,14 +200,14 @@
 <div id="loggedOutView">
 <p style="color:var(--cream);font-size:13px;margin:0 0 12px;">
 You can <b>FIND</b> without an account. Sign in to <b>RATE</b>, <b>SHARE</b>, and
-<b>IMPROVE</b> — your name and history follow you across devices.
+<b>IMPROVE</b>, so your name and history follow you across devices.
 </p>
 <div class="rating-label" style="color:var(--cream);">Username</div>
 <input type="text" id="authUsername" maxlength="20" placeholder="letters, numbers, underscore" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
 <div class="rating-label" style="color:var(--cream);">Password</div>
 <input type="password" id="authPassword" placeholder="at least 6 characters" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
 <p style="background:#3a2226;border:1px solid #e53935;border-radius:6px;padding:8px 10px;color:#ffab91;font-size:12px;margin:0 0 12px;">
-⚠️ There's no email attached to this account, so there's no way to reset a forgotten password — not by you, not by us. Once it's set, write it down somewhere safe. If it's lost, that username is gone for good.
+⚠️ There's no email attached to this account, so there's no way to reset a forgotten password: <b>not by you, not by us</b>. Once it's set, write it down somewhere safe. If it's lost, that username is gone for good.
 </p>
 <button class="btn btn-amber" id="authSignUpBtn" style="width:100%;margin-bottom:8px;">Sign Up (new account)</button>
 <button class="btn btn-secondary" id="authLogInBtn" style="width:100%;">Log In (existing account)</button>
@@ -223,7 +223,7 @@ Logged in as <b id="loggedInUsername" style="color:var(--amber);"></b>
 <div id="passportSection">
 <div class="account-section-title">🎫 Bathroom Passport</div>
 <p id="passportSyncNote" style="color:var(--muted);font-size:11.5px;margin:0 0 8px;display:none;">
-This is tracked on this device only — log in to sync it across devices.
+This is tracked on this device only. Log in to sync it across devices.
 </p>
 <div id="bathroomPassportBody"></div>
 <div id="achievementsSection">
@@ -278,7 +278,7 @@ This is tracked on this device only — log in to sync it across devices.
 </select>
 </div>
 </div>
-<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.7.2">v2.7.2 · 2026-07-30</span></div>
+<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.7.5">v2.7.5 · 2026-07-30</span></div>
 </nav>
 <!-- Community banner (logged-out) -->
 <div id="communityBanner">
@@ -292,18 +292,18 @@ This is tracked on this device only — log in to sync it across devices.
 <div class="hiw-card">
 <div class="hiw-head"><h2>How Bathroom Report works</h2><button id="howItWorksClose" aria-label="Close">✕</button></div>
 <div class="hiw-body">
-<section><h3>What this is</h3><p>Bathroom Report helps you find a clean, open public bathroom fast — at convenience stores, travel stops, and other reliable spots. It’s community-powered and growing nationwide. The whole idea in four words: <b class="tag-verb">FIND. RATE. SHARE. IMPROVE.</b></p></section>
-<section><h3><span class="tag-verb">FIND</span></h3><p>Open the map, tap 🚽 Bathroom Now for the closest option, or use the key to see which places are around you. Hours show when we have them — a spot with unknown hours still appears, and we never mark a place closed on a guess. No account needed for any of this.</p></section>
-<section><h3><span class="tag-verb">RATE</span></h3><p>Ratings come from people who’ve actually been there — you can only rate when you’re on-site. They cover the bathroom itself, so you know what to expect before you go. Something broken? Flag it right from the pin.</p></section>
-<section><h3><span class="tag-verb">SHARE</span></h3><p>Get directions, share a spot with a friend, leave a tip (“need a key,” “buzzer required”), or report wrong info — all from a pin. Signed out, directions open in your device’s default maps app. Spotted a place we don’t have? Send it in with 📍 We Missed One?</p></section>
-<section><h3><span class="tag-verb">IMPROVE</span></h3><p>Confirm a store’s hours, answer quick amenity questions, and build your Passport as you go. Every location is reviewed and added by hand, so the map stays accurate instead of auto-importing bad data — your reports are how it gets better.</p></section>
-<section><h3>Accounts &amp; privacy</h3><p>Signing in is optional — the whole map works without an account. Sign in to rate, add tips, build your Passport, filter places, choose your default directions app, and switch appearance, all synced across your devices. Like most sites, Bathroom Report also uses basic analytics to understand overall usage; it doesn’t identify you personally.</p></section>
+<section><h3>What this is</h3><p>Bathroom Report helps you find a clean, open public bathroom fast, at convenience stores, travel stops, and other reliable spots. It’s community-powered and growing nationwide. The whole idea in four words: <b class="tag-verb">FIND. RATE. SHARE. IMPROVE.</b></p></section>
+<section><h3><span class="tag-verb">FIND</span></h3><p>Open the map, tap 🚽 Bathroom Now for the closest option, or use the key to see which places are around you. Hours show when we have them. A spot with unknown hours still appears, and we never mark a place closed on a guess. <b>No account needed</b> for any of this.</p></section>
+<section><h3><span class="tag-verb">RATE</span></h3><p>Ratings come from people who’ve actually been there, because you can only rate <b>when you’re on-site</b>. They cover the bathroom itself, so you know what to expect before you go. Something broken? Flag it right from the pin.</p></section>
+<section><h3><span class="tag-verb">SHARE</span></h3><p>Get directions, share a spot with a friend, leave a tip (“need a key,” “buzzer required”), or report wrong info, all from a pin. Signed out, directions open in your device’s default maps app. Spotted a place we don’t have? Send it in with 📍 We Missed One?</p></section>
+<section><h3><span class="tag-verb">IMPROVE</span></h3><p>Confirm a store’s hours, answer quick amenity questions, and build your Passport as you go. Every location is reviewed before it goes on the map, and whole data sources get rejected. One national chain claimed restrooms at 16,000 sites with no evidence behind it, so none of them are here. Nothing is <b>bulk-imported unchecked</b>, and your reports are how it keeps getting better.</p></section>
+<section><h3>Accounts &amp; privacy</h3><p>Signing in is optional. The whole map works without an account. Sign in to rate, add tips, build your Passport, filter places, choose your default directions app, and switch appearance, all synced across your devices. Like most sites, Bathroom Report also uses basic analytics to understand overall usage; it doesn’t identify you personally.</p></section>
 <section><h3>Not affiliated</h3><p>Bathroom Report is an independent, community-created project. It isn’t affiliated with or endorsed by any business listed. &copy; 2025&ndash;2026 Bathroom Report. All rights reserved. Map data &copy; OpenStreetMap contributors.</p></section>
 <section class="hiw-support">
   <h3>Keep Bathroom Report free</h3>
 
   <p>
-    Bathroom Report is independent — no ads, no investors — just me keeping
+    Bathroom Report is independent (no ads, no investors), just me keeping
     the map accurate and the servers running.
   </p>
 
@@ -337,15 +337,15 @@ This is tracked on this device only — log in to sync it across devices.
   </div>
 
   <p class="hiw-store-caption">
-    No ads, ever — store sales and tips keep this app running. Shop the Signature Collection and numbered Collector Series.
+    <b>No ads, ever.</b> Store sales and tips keep this app running. Shop the Signature Collection and numbered Collector Series.
   </p>
 </section><section><h3>Contact</h3><p>Questions, corrections, or ideas? Email <a href="mailto:dave@bathroomreport.app">dave@bathroomreport.app</a>.</p></section>
 <section><h3>Follow us</h3><div class="hiw-social-row"><a href="https://x.com/Bathroom_Report" target="_blank" rel="noopener" aria-label="Follow Bathroom Report on X"><img src="icon-x.png" alt="Follow on X"></a></div></section>
 <section class="hiw-faq"><h3>FAQ</h3>
-<p><b>Do I need an account?</b> No — the map, directions, and Bathroom Now all work signed out. An account adds rating, tips, and Passport, plus place filtering and a saved directions-app preference.</p>
+<p><b>Do I need an account?</b> No. The map, directions, and Bathroom Now all work signed out. An account adds rating, tips, and Passport, plus place filtering and a saved directions-app preference.</p>
 <p><b>Why can’t I rate this bathroom?</b> You need to be on-site (within about a third of a mile), so ratings come from real visits.</p>
 <p><b>The hours are wrong, or it’s closed.</b> Report it from the pin and we’ll review it.</p>
-<p><b>I don’t see a store I know is there.</b> We add locations by hand — send it in and we’ll add it.</p>
+<p><b>I don’t see a store I know is there.</b> We add locations by hand, so send it in and we’ll add it.</p>
 <p><b>Is this affiliated with these businesses?</b> No. It’s an independent, community-created project.</p></section>
 <p class="hiw-updated">Location data last updated: July 30, 2026</p>
 </div>

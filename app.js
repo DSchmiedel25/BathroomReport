@@ -568,7 +568,8 @@ const BATHROOM_AMENITIES = [
    * restroomDoubted). This is the one question that can prune the map: every other amenity adds
    * detail to a pin already assumed valid, while this one lets people tell us a pin shouldn't
    * exist. Confirmed-no hides it, at the same CONFIRM_THRESHOLD as everything else. */
-  {key:'hasRestroom', label:'Is there a public restroom here?', stateIcons:{yes:'🚻'}}
+  {key:'hasRestroom', label:'Public restroom', question:'Is there a public restroom here?',
+    stateIcons:{yes:'🚻'}}
 ];
 const amenityCache = {};
 
@@ -646,7 +647,7 @@ function adminAmenityPanelHtml(loc){
   const rows = feats.map(a => {
     const cur = ov[a.key] || '';
     const btn = (val, label) => `<button type="button" class="admin-am-btn" data-key="${a.key}" data-val="${val}" style="padding:3px 9px;margin-left:4px;border-radius:6px;border:1px solid ${cur===val?'#2ea1aa':'#2a2e35'};background:${cur===val?'#0e2f33':'#1b1e23'};color:#f6f8fa;font-size:12px;cursor:pointer;">${label}</button>`;
-    return `<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 0;font-size:13px;color:#f6f8fa;"><span>${a.label}</span><span>${btn('yes','Yes')}${btn('no','No')}${btn('unknown','—')}</span></div>`;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 0;font-size:13px;color:#f6f8fa;"><span>${a.question || a.label}</span><span>${btn('yes','Yes')}${btn('no','No')}${btn('unknown','—')}</span></div>`;
   }).join('');
   // Collapsible so a long popup isn't dominated by admin controls. Open by default, and the
   // choice is remembered — mid-audit it stays open, otherwise it tucks away.
@@ -721,7 +722,7 @@ function renderAmenityStepHtml(myVote, locId){
     `<button type="button" class="amenity-answer-btn" data-key="${a.key}" data-value="${s}">${amenityAnswerIcon(a, s)} ${amenityStateLabel(a, s)}</button>`
   ).join('');
   return `<div class="amenity-progress">Question ${cursor + 1} of ${list.length}</div>
-    <div class="amenity-question-label">${a.label}</div>
+    <div class="amenity-question-label">${a.question || a.label}</div>
     <div class="amenity-answer-row">${buttons}</div>`;
 }
 
@@ -975,7 +976,7 @@ function renderStoreFeatureStepHtml(myVote){
     `<button type="button" class="store-feature-answer-btn" data-key="${a.key}" data-value="${s}">${amenityAnswerIcon(a, s)} ${amenityStateLabel(a, s)}</button>`
   ).join('');
   return `<div class="amenity-progress">Feature ${idx + 1} of ${STORE_FEATURES.length}</div>
-    <div class="amenity-question-label">${a.label}</div>
+    <div class="amenity-question-label">${a.question || a.label}</div>
     <div class="amenity-answer-row">${buttons}</div>`;
 }
 
@@ -1257,6 +1258,7 @@ async function loadMyVote(id){
     if(!snap.exists()) return emptyVote();
     return { ...emptyVote(), ...snap.data() };
   }catch(e){
+    console.error('loadMyVote failed', id, e && (e.code || e.message));
     return emptyVote();
   }
 }
@@ -1291,6 +1293,11 @@ async function saveMyVote(id, data){
     }
     return true;
   }catch(e){
+    /* Log it. This catch used to discard the error, which is why a rules rejection was invisible:
+     * the UI said "Save failed" and the console said nothing. wasHiddenGem was missing from the
+     * votes allowlist for weeks and every first-ever rating at a fresh location was being denied
+     * with a permission-denied nobody could see. A rejected write is not routine. */
+    console.error('saveMyVote failed', id, e && (e.code || e.message), e);
     return false;
   }
 }
@@ -1304,6 +1311,7 @@ async function loadTips(id){
     if(!snap.exists()) return [];
     return (snap.data().tips || []).slice(-8); // show up to the 8 most recent
   }catch(e){
+    console.error('loadTips failed', id, e && (e.code || e.message));
     return [];
   }
 }
@@ -1610,7 +1618,7 @@ function popupHtml(loc, agg, myVote){
       <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${chain.name}</div>
       <span class="store-icons" id="store-icons-${loc.id}">${storeFeatureIconsHtml(loc, storeFeatureCache[loc.id])}</span>
     </div>
-    <div class="addr addr-title">${loc.addr}${loc.num ? ' &middot; Shop #' + loc.num : ''}</div>
+    <div class="addr addr-title">${escapeHtml(loc.addr)}${loc.num ? ' &middot; Shop #' + escapeHtml(loc.num) : ''}</div>
     ${hoursLine}
     <div id="accessible-badge-${loc.id}">${accessibleBadgeHtml(loc.id)}</div>
     ${recencyLine}
@@ -2966,10 +2974,23 @@ function renderTipsList(loc, tips){
   listEl.innerHTML = tips.map(t => `<li>💡 ${escapeHtml(t)}</li>`).join('');
 }
 
+/* Escape for BOTH text content and attribute values.
+ *
+ * The old implementation set textContent and read innerHTML back, which escapes < > and & but
+ * leaves quotes alone, because quotes are not special in text content. That made it unsafe the
+ * moment anyone used it inside an attribute — and two records in the current data carry a double
+ * quote ("John \"Chuck\" Erreca Northbound Rest Area"), so it was one refactor away from
+ * mattering. Explicit replacement covers every context.
+ *
+ * Names and addresses come from OSM and ATP, where they are user-editable, so this is escaping
+ * untrusted input even though today's data happens to contain no markup. */
 function escapeHtml(str){
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 async function attachTipHandlers(loc){
@@ -4076,7 +4097,7 @@ async function buildListView(){
     const status = open===true ? '🟢 Open'
       : open===false ? '🔴 Closed'
       : (todayHrsString(loc) ? '🕐 ' + formatHrsDisplay(loc) : '⚪ Hours unavailable');
-    return `<div class="list-item" data-locid="${loc.id}"><div class="list-item-name">${loc.n}</div><div class="list-item-addr">${loc.addr}</div><div class="list-item-meta"><span>📍 ${dist.toFixed(1)} mi</span><span>${status}</span></div></div>`;
+    return `<div class="list-item" data-locid="${loc.id}"><div class="list-item-name">${escapeHtml(loc.n)}</div><div class="list-item-addr">${escapeHtml(loc.addr)}</div><div class="list-item-meta"><span>📍 ${dist.toFixed(1)} mi</span><span>${status}</span></div></div>`;
   }).join('');
 }
 document.getElementById('listViewToggle').addEventListener('click',()=>{buildListView();document.getElementById('listViewPanel').classList.add('show');document.body.classList.add('list-open');});
@@ -4316,7 +4337,7 @@ function bathroomNowCard(result,fallback=false){
   // Filled chain pill so you can see which brand this is at a glance, colored from the registry.
   const chain=CHAIN_REGISTRY[result.loc.chain]||{};
   const chainBadge=chain.name?`<div class="now-chain-badge" style="background:${chain.color};color:${chain.textColor};">${escapeHtml(chain.name)}</div>`:'';
-  return `<div class="bathroom-now-card"><button class="bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':'Closest bathroom by driving distance'}</div>${chainNote}${chainBadge}<b>${result.loc.n}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${lastRatedNote}${hoursMissingNote}${accessNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">Details</button></div></div>`;
+  return `<div class="bathroom-now-card"><button class="bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':'Closest bathroom by driving distance'}</div>${chainNote}${chainBadge}<b>${escapeHtml(result.loc.n)}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${lastRatedNote}${hoursMissingNote}${accessNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">Details</button></div></div>`;
 }
 // For Bathroom Now: drop any of the top-4 nearest candidates that are in the HARD out-of-order
 // phase, in a SINGLE batched query (Firestore `in` takes up to 10 ids, so 4 = one read cost).
