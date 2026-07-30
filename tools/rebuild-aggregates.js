@@ -25,13 +25,13 @@ const path  = require('path');
 
 const WRITE = process.argv.includes('--write');
 
-// Must match AMENITY_KEYS in functions/index.js and the rules allowlist. tools/audit-ui.js
-// check 15 fails the build if those two drift; this is a third copy and deliberately narrow —
-// an unknown key here would recreate the field-path problem the allowlist exists to prevent.
-const AMENITY_KEYS = new Set([
-  'restroomType', 'accessible', 'changing', 'hasRestroom',
-  'evCharging', 'airPump', 'shower', 'indoorSeating', 'wifi', 'grabAndGo', 'hotFood',
-]);
+/* Must match AMENITY_KEYS_BY_FIELD in functions/index.js and the rules. The two sets are
+ * DISJOINT: reading a key from the wrong field would let one vote be counted twice, which is
+ * exactly the double-count the split exists to prevent. */
+const AMENITY_KEYS_BY_FIELD = {
+  amenities:     new Set(['restroomType', 'accessible', 'changing', 'hasRestroom']),
+  storeFeatures: new Set(['evCharging', 'airPump', 'shower', 'indoorSeating', 'wifi', 'grabAndGo', 'hotFood']),
+};
 
 // Same normalisation the app and functions use: '/' is a Firestore path separator.
 const fsId = (id) => String(id == null ? '' : id).replace(/\//g, '__');
@@ -68,7 +68,7 @@ const db = admin.firestore();
       const m = v[field];
       if (!m || typeof m !== 'object') continue;
       for (const [key, val] of Object.entries(m)) {
-        if (!AMENITY_KEYS.has(key)) continue;
+        if (!AMENITY_KEYS_BY_FIELD[field].has(key)) continue;   // key must come from ITS OWN field
         const s = String(val);
         if (s !== 'yes' && s !== 'no') continue;
         const cell = (a.amen[key] = a.amen[key] || { yes: 0, no: 0 });

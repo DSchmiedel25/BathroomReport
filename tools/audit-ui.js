@@ -438,8 +438,33 @@ console.log('\namenity key agreement');
     const m = fs.readFileSync(file, 'utf8').match(re);
     return m ? [...new Set([...m[0].matchAll(/'(\w+)'/g)].map(x => x[1]))].sort() : null;
   };
-  const fnKeys = grab('functions/index.js', /const AMENITY_KEYS = new Set\(\[[\s\S]*?\]\)/);
-  const ruKeys = grab('firestore.rules', /keys\(\)\.hasOnly\(\[\s*'restroomType'[\s\S]*?\]\)/);
+  /* The two sets must be DISJOINT and must match per FIELD, not merely as a union. Both maps
+   * used to accept all eleven keys, so accessible:'yes' in amenities AND storeFeatures let one
+   * person contribute two confirmations — enough to reach CONFIRM_THRESHOLD alone. */
+  const pair = (file, reA, reB) => {
+    if (!fs.existsSync(file)) return null;
+    const src = fs.readFileSync(file, 'utf8');
+    const a = src.match(reA), b = src.match(reB);
+    if (!a || !b) return null;
+    return {
+      amenities:     [...new Set([...a[0].matchAll(/'(\w+)'/g)].map(x => x[1]))].filter(k => k !== 'amenities').sort(),
+      storeFeatures: [...new Set([...b[0].matchAll(/'(\w+)'/g)].map(x => x[1]))].filter(k => k !== 'storeFeatures').sort(),
+    };
+  };
+  const fnPair = pair('functions/index.js',
+    /amenities:\s*new Set\(\[[^\]]*\]/, /storeFeatures:\s*new Set\(\[[^\]]*\]/);
+  const ruPair = pair('firestore.rules',
+    /knownAmenityMap\('amenities',\s*\n?\s*\[[^\]]*\]/, /knownAmenityMap\('storeFeatures',\s*\n?\s*\[[^\]]*\]/);
+  const fnKeys = fnPair ? [...new Set([...fnPair.amenities, ...fnPair.storeFeatures])].sort() : null;
+  const ruKeys = ruPair ? [...new Set([...ruPair.amenities, ...ruPair.storeFeatures])].sort() : null;
+  if (fnPair && ruPair) {
+    const overlap = fnPair.amenities.filter(k => fnPair.storeFeatures.includes(k));
+    if (overlap.length) fail(`amenity and storeFeature key sets overlap: ${overlap.join(', ')} — one vote could count twice`);
+    if (JSON.stringify(fnPair.amenities) !== JSON.stringify(ruPair.amenities)
+     || JSON.stringify(fnPair.storeFeatures) !== JSON.stringify(ruPair.storeFeatures)) {
+      fail('functions and rules disagree on WHICH field each amenity key belongs to');
+    }
+  }
 
   /* Three copies of one list, because a client must not be able to name a server field path.
    * The Cloud Function turns amenity keys into Firestore dot paths, so an unlisted key produced
