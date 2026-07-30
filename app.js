@@ -3183,13 +3183,34 @@ function todayHrsString(loc){
   return (loc && loc.hrs != null) ? loc.hrs : null;
 }
 
+/* How far away a location can be before we stop claiming to know whether it's open.
+ *
+ * A store's hours are in ITS local time, but the comparison below uses the DEVICE clock. Looking
+ * at a New York store from California, "Closed now" was computed three hours early — silently,
+ * and on the app's primary question. No record carries a timezone, so the honest fix is to stop
+ * asserting a verdict once the device clock stops being a reasonable proxy.
+ *
+ * 150 miles keeps every normal use intact — Bathroom Now, the nearest list, and browsing your own
+ * area are all well inside it — while removing the coast-to-coast error. A zone boundary can sit
+ * inside 150 miles, so this isn't a guarantee; it caps a possible error at roughly an hour instead
+ * of three, and only where the app was already guessing. */
+const OPEN_NOW_CONFIDENT_MILES = 150;
+
+// True when the device clock is a fair stand-in for the location's local time. With no position
+// fix we have nothing better to go on, so the device clock stays the best available guess rather
+// than blanking the verdict for every first-time visitor.
+function openNowConfident(loc){
+  if(!lastKnownPos) return true;
+  return milesBetween(lastKnownPos.lat, lastKnownPos.lng, Number(loc.lat), Number(loc.lng))
+         <= OPEN_NOW_CONFIDENT_MILES;
+}
+
 // Open-now calculation — effective hours string is "24", "HHMM-HHMM", "closed", or unknown.
 // Locations with no known hours are "unknown" and are never hidden by the open-now filter.
-// Computed in the visitor's local time; stores show their own local hours, which is fine
-// for a regionally-focused map.
 function isLocationOpenNow(loc){
   const hrs = todayHrsString(loc);
   if(!hrs) return null; // unknown — we don't have hours data for this one yet
+  // 'closed' and '24' hold in every timezone, so they stay definite at any distance.
   if(hrs === 'closed') return false;
   if(hrs === '24') return true;
   const parts = hrs.split('-');
@@ -3197,6 +3218,8 @@ function isLocationOpenNow(loc){
   const open = parseInt(parts[0], 10);
   const close = parseInt(parts[1], 10);
   if(isNaN(open) || isNaN(close)) return null;
+  // Only a timed window depends on which clock we read, so only it needs the distance guard.
+  if(!openNowConfident(loc)) return null;
   const now = new Date();
   const nowVal = now.getHours() * 100 + now.getMinutes();
   if(close > open){
@@ -4046,7 +4069,13 @@ async function buildListView(){
   document.getElementById('listViewHeader').querySelector('span').textContent = 'Closest bathrooms';
   container.innerHTML = nearest.map(({loc,dist}) => {
     const open = isLocationOpenNow(loc);
-    const status = open===true ? '🟢 Open' : open===false ? '🔴 Closed' : '⚪ Hours unavailable';
+    /* null covers two different things and they must not read the same. Either we have no hours
+     * at all, or we have hours but the location is too far away for the device clock to judge
+     * them (see OPEN_NOW_CONFIDENT_MILES). Saying "Hours unavailable" when the hours are right
+     * there would be a worse answer than the one this change removes. */
+    const status = open===true ? '🟢 Open'
+      : open===false ? '🔴 Closed'
+      : (todayHrsString(loc) ? '🕐 ' + formatHrsDisplay(loc) : '⚪ Hours unavailable');
     return `<div class="list-item" data-locid="${loc.id}"><div class="list-item-name">${loc.n}</div><div class="list-item-addr">${loc.addr}</div><div class="list-item-meta"><span>📍 ${dist.toFixed(1)} mi</span><span>${status}</span></div></div>`;
   }).join('');
 }
