@@ -236,7 +236,6 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
   /* Right-side map controls: one aligned stack with matching dimensions. */
   #openNowToggle,
   #listViewToggle,
-  #passportToggle,
   #whereAmIBtn{
     position:absolute;right:10px;z-index:500;
     width:148px;min-height:34px;box-sizing:border-box;
@@ -247,8 +246,6 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
     box-shadow:0 3px 10px rgba(0,0,0,.3);cursor:pointer;
 }
   #openNowToggle{top:10px;
-}
-  #passportToggle{top:90px;
 }
   #openNowToggle.active{background:#2e7d32;border-color:#2e7d32;color:#fff;
 }

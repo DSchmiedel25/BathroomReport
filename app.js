@@ -406,6 +406,36 @@ function ratingConfidenceHtml(count){
 // AND yes outnumber no. The same bar applies symmetrically to "confirmed no". One constant so the
 // threshold is tuned in a single place (badges, filters, priority engine, and the bake tool all
 // use it). Raised to 3 in v2.6 for stronger trust.
+/* Single source of truth for "when was the data last updated".
+ *
+ * This used to be typed by hand in three places — the version stamp in the drawer, the
+ * onboarding panel, and the FAQ — which is exactly why they drifted apart (July 14 / July 21 /
+ * actually July 30). Set this ONE value on each release; everything that shows a date reads it.
+ * Format is YYYY-MM-DD so it sorts and can't be misread. */
+const BUILD_DATE = '2026-07-30';
+
+// "2026-07-30" -> "July 30, 2026" for prose. Parsed as UTC parts rather than new Date(str) so it
+// can't shift a day backwards for users west of GMT.
+function buildDateLong(){
+  const [y, m, d] = BUILD_DATE.split('-').map(Number);
+  const MONTHS = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+  return MONTHS[m - 1] + ' ' + d + ', ' + y;
+}
+
+// Fill every element that displays the data date, so none can go stale independently.
+function stampBuildDate(){
+  const long = buildDateLong();
+  document.querySelectorAll('.onboardingUpdated').forEach(el => {
+    el.textContent = 'Location data updated: ' + long;
+  });
+  document.querySelectorAll('.hiw-updated').forEach(el => {
+    el.textContent = 'Location data last updated: ' + long;
+  });
+  const v = document.querySelector('.d-version');
+  if(v && v.dataset.version) v.textContent = v.dataset.version + ' \u00b7 ' + BUILD_DATE;
+}
+
 const CONFIRM_THRESHOLD = 3;
 function isConfirmedYes(x){ return !!x && x.yes >= CONFIRM_THRESHOLD && x.yes > x.no; }
 function isConfirmedNo(x){  return !!x && x.no  >= CONFIRM_THRESHOLD && x.no  > x.yes; }
@@ -2928,6 +2958,7 @@ async function attachTipHandlers(loc){
 // Load all seed locations — this is now instant since no storage calls happen until a pin is tapped
 seedLocations.forEach(loc => addMarker(loc));
 perfMark('markers created (' + allLocationMarkers.length + ')');
+stampBuildDate();   // keeps the drawer stamp, onboarding, and FAQ dates identical
 // This direct call is a RACE SAFETY NET, not redundancy: firebase.js (a module, early in
 // index.html) can finish auth init and fire 'authStateReady' during the ~half second the
 // browser spends parsing the location data files BEFORE app.js runs and registers its
@@ -3652,11 +3683,14 @@ function chainBucket(key){
   if(TRAVEL_CENTER_KEYS.has(key)) return 'travel';
   return 'gas';
 }
+/* icon and text are separate so the drawer can render the icon inside the same fixed-width
+   .d-ico slot the static rows use — emoji advance widths differ, so an inline "emoji label"
+   would start its text at a different x than Passport / FAQ / Preferences above it. */
 const CK_GROUPS = [
-  { id: 'gas',    label: '⛽ Gas & convenience' },
-  { id: 'travel', label: '🚛 Travel centers' },
-  { id: 'public', label: '🚻 Public restrooms' },
-  { id: 'city',   label: '🏙️ City & metro' }
+  { id: 'gas',    icon: '⛽',  label: 'Gas & convenience' },
+  { id: 'travel', icon: '🚛',  label: 'Travel centers' },
+  { id: 'public', icon: '🚻',  label: 'Public restrooms' },
+  { id: 'city',   icon: '🏙️', label: 'City & metro' }
 ];
 
 // Rebuilds are cheap but not free — skip the DOM write when nothing changed (same chains,
@@ -3698,15 +3732,16 @@ function renderChainKey(){
     const keys = allKeys.filter(k => chainBucket(k) === g.id);
     if(!keys.length) return '';
     const on = !keys.every(k => disabledChains.has(k));
+    const ico = `<span class="d-ico" aria-hidden="true">${g.icon}</span>`;
     if(readOnly){
-      return `<div class="d-toggle ck-grouprow d-gated"><span>${g.label}</span>` +
+      return `<div class="d-toggle ck-grouprow d-gated"><span>${ico}${escapeHtml(g.label)}</span>` +
              `<span class="d-switch"><b></b></span></div>`;
     }
     // Reuses the drawer's own switch (same markup as Hide-closed and Appearance) rather than
     // the map key's checkmark. A checkmark reads as "selected"; the question here is
     // shown/hidden, and the drawer already has a control that says exactly that.
     return `<button type="button" class="d-toggle ck-grouprow${on ? ' on' : ''}" data-groupkeys="${keys.join(',')}"` +
-      ` role="switch" aria-checked="${on}"><span>${g.label}</span>` +
+      ` role="switch" aria-checked="${on}"><span>${ico}${escapeHtml(g.label)}</span>` +
       `<span class="d-switch"><b></b></span></button>`;
   }).join('');
 

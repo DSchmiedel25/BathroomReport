@@ -223,6 +223,24 @@ button, input, select, textarea{ font-family:inherit; }
 /* Signed-out hiding for drawer entries (Passport). Needs !important to beat the
    `display:flex !important` above — an inline style.display can't. */
 #appDrawer .d-items button.is-hidden{ display:none !important; }
+/* Fixed-width icon slot. Emoji have different advance widths — 🎫 is wider than ❓, which is
+   wider than ⚙️ — so an inline "emoji label" starts its text at a different x on every row.
+   Reserving one column makes every label line up no matter which glyph is used. Sized in ch so
+   it tracks the font rather than a magic pixel value. */
+#appDrawer .d-ico{
+  flex:0 0 1.6em; display:inline-flex; align-items:center; justify-content:center;
+  font-size:1.05em; line-height:1;
+}
+
+/* The Gift shop row is an <a>, so the `.d-items button` rule never reached it: it had 16px
+   side padding against everyone else's 20px, and weight 600 against 700. Match it exactly. */
+#appDrawer .d-shop-link{
+  display:flex !important; align-items:center; gap:10px;
+  padding:14px 20px !important; font-weight:700 !important; border-radius:0 !important;
+  color:var(--shell-ink) !important; box-sizing:border-box;
+}
+#appDrawer .d-shop-link:active{ background:var(--shell-chrome2); }
+
 /* Toggle rows (Show all locations, Appearance): switch pinned to the right */
 #appDrawer .d-toggle .d-switch{
   margin-left:auto; width:42px; height:25px; border-radius:999px; background:var(--shell-chrome2);

@@ -166,7 +166,7 @@
 <p>Share a pin, or report wrong info from its popup.</p>
 <p>An account is optional. Sign in to rate and add tips, filter which places show on the map, set your preferred directions app, switch appearance, and sync your Passport and achievements across devices.</p>
 <p class="onboardingDisclaimer">Bathroom Report is an independent, community-created project and isn't affiliated with or endorsed by any business listed.</p>
-<p class="onboardingUpdated">Location data updated: July 14, 2026</p>
+<p class="onboardingUpdated">Location data updated: July 30, 2026</p>
 </div>
 </details>
 </div>
@@ -239,17 +239,17 @@ This is tracked on this device only — log in to sync it across devices.
 <nav id="appDrawer" aria-label="Menu">
 <div class="d-brand"><img src="logo.png" alt=""><span class="d-brand-text"><b>BATHROOM <span class="wm-accent">REPORT</span></b><span class="d-tagline">FIND<i>.</i> RATE<i>.</i> SHARE<i>.</i> IMPROVE<i>.</i></span></span><button id="drawerClose" class="d-close" aria-label="Close menu" title="Close">✕</button></div>
 <div class="d-items">
-<button id="passportToggle">🎫 Passport</button>
-<button id="infoBtn" title="FAQ and how it works">❓ FAQ: How it works</button>
+<button id="passportToggle"><span class="d-ico" aria-hidden="true">🎫</span>Passport</button>
+<button id="infoBtn" title="FAQ and how it works"><span class="d-ico" aria-hidden="true">❓</span>FAQ: How it works</button>
 <a
     href="https://bathroomreport-shop.fourthwall.com/?utm_source=bathroomreport.app&utm_medium=website&utm_campaign=main_menu"
     target="_blank"
     rel="noopener noreferrer"
     class="d-shop-link">
-    🛍️ Gift shop
+    <span class="d-ico" aria-hidden="true">🛍️</span>Gift shop
 </a>
 <div id="travelModePref" class="d-section" style="display:none">
-<div class="d-section-label">🧭 Getting around</div>
+<div class="d-section-label"><span class="d-ico" aria-hidden="true">🧭</span>Getting around</div>
 <select id="travelModeSelect" class="nav-pref-select" aria-label="Getting around">
 <option value="road">🛣️ On the road</option>
 <option value="foot">🚶 On foot</option>
@@ -257,20 +257,20 @@ This is tracked on this device only — log in to sync it across devices.
 <div id="travelModeCoverage" class="d-coverage-note" style="display:none"></div>
 </div>
 <div id="allChains" class="d-section">
-<div id="allChainsToggle" class="d-collapse-head">📍 All places <span id="allChainsArrow" class="d-collapse-arrow">▾</span></div>
+<div id="allChainsToggle" class="d-collapse-head"><span class="d-ico" aria-hidden="true">📍</span>All places <span id="allChainsArrow" class="d-collapse-arrow">▾</span></div>
 <div id="chainKeyAllList" class="collapsed"></div>
 </div>
 <div class="d-section">
-<div id="prefsToggle" class="d-collapse-head">⚙️ Preferences <span id="prefsArrow" class="d-collapse-arrow">▾</span></div>
+<div id="prefsToggle" class="d-collapse-head"><span class="d-ico" aria-hidden="true">⚙️</span>Preferences <span id="prefsArrow" class="d-collapse-arrow">▾</span></div>
 <div id="prefsBody" class="collapsed">
-<button id="openNowToggle" class="d-toggle" aria-pressed="true"><span>🚫 Hide confirmed closed</span><span class="d-switch"><b></b></span></button>
-<button id="accessibleToggle" class="d-toggle"><span>♿ Hide confirmed step-only</span><span class="d-switch"><b></b></span></button>
-<button id="themeToggle" class="d-toggle"><span><span class="theme-ico">🌙</span> Appearance</span><span class="d-switch"><b></b></span></button>
+<button id="openNowToggle" class="d-toggle" aria-pressed="true"><span><span class="d-ico" aria-hidden="true">🚫</span>Hide confirmed closed</span><span class="d-switch"><b></b></span></button>
+<button id="accessibleToggle" class="d-toggle"><span><span class="d-ico" aria-hidden="true">♿</span>Hide confirmed step-only</span><span class="d-switch"><b></b></span></button>
+<button id="themeToggle" class="d-toggle"><span><span class="d-ico theme-ico" aria-hidden="true">🌙</span>Appearance</span><span class="d-switch"><b></b></span></button>
 <div class="d-gate-note" id="prefsGateNote" hidden>Sign in to change these</div>
 </div>
 </div>
 <div id="navAppPref" class="d-section">
-<div class="d-section-label">🧭 Directions app</div>
+<div class="d-section-label"><span class="d-ico" aria-hidden="true">🧭</span>Directions app</div>
 <select id="navAppSelect" class="nav-pref-select" aria-label="Preferred directions app">
 <option value="apple">Apple Maps</option>
 <option value="google">Google Maps</option>
@@ -278,7 +278,7 @@ This is tracked on this device only — log in to sync it across devices.
 </select>
 </div>
 </div>
-<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version">v2.6.3 · 2026-07-30</span></div>
+<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.6.4">v2.6.4 · 2026-07-30</span></div>
 </nav>
 <!-- Community banner (logged-out) -->
 <div id="communityBanner">
@@ -347,7 +347,7 @@ This is tracked on this device only — log in to sync it across devices.
 <p><b>The hours are wrong, or it’s closed.</b> Report it from the pin and we’ll review it.</p>
 <p><b>I don’t see a store I know is there.</b> We add locations by hand — send it in and we’ll add it.</p>
 <p><b>Is this affiliated with these businesses?</b> No. It’s an independent, community-created project.</p></section>
-<p class="hiw-updated">Location data last updated: July 21, 2026</p>
+<p class="hiw-updated">Location data last updated: July 30, 2026</p>
 </div>
 </div>
 </div>
