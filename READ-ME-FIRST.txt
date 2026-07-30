@@ -1,58 +1,66 @@
-v2.8.3 — FUNC-03, stale "verified" hour metadata
-=================================================
+v2.8.4 — CI-01, the checks now run on push
+===========================================
 
 WHAT IS IN THIS BATCH
-  functions-index.js   rename to index.js -> functions/   THEN firebase deploy --only functions
-                       REPLACES the copy already on your Desktop. That one was never deployed,
-                       so deploy this instead.
-  flushpanel.html      conflict rows label a previous value as history, not as current
-  index.html           version stamp only. BUMP sw.js.
+  .github/workflows/checks.yml   NEW. Runs on push and PR touching the app.
+  index.html                     version stamp only. BUMP sw.js.
 
-  No app.js change. No rules change. No data change.
+  No app.js, no rules, no functions, no data.
 
 WHAT WAS STILL UNSHIPPED FROM EARLIER
-  functions/index.js. It has been sitting on your Desktop undeployed since v2.7.6 and carries
-  three fixes that are not live yet:
-     the fsId path fix                aggregates/{locId} threw for 6,595 slashed ids
-     aggregates.amen tallies          live amenity confirmation has never worked
-     the hours regex                  24:01-24:59 were accepted as valid times
-  This batch adds a fourth. Nothing else is outstanding — every data file matches what you
-  shipped.
+  functions/index.js — the v2.8.3 copy. Still needs:
+     mv <the v2.8.3 functions-index.js> functions/index.js
+     firebase deploy --only functions
+  It carries four fixes that are not live: the fsId path fix, aggregates.amen tallies, the
+  24:01-24:59 hours regex, and the stale-verified-metadata fix. Nothing else is outstanding.
 
-THE CHANGE
-  When hour status dropped from verified to pending or conflict, the document kept the previously
-  verified value, kind, confirmedAt AND source:'community_verified'. A conflicted record was
-  indistinguishable from a live verified one to anything that did not check the `verified` flag.
+WHAT THE WORKFLOW DOES
+  1. node --check on every JS file we ship (9 of them)
+     Worth a separate step: audit-ui.js reads app.js as TEXT for several checks, so a syntax
+     error there could pass the audit while the app is broken in the browser.
+  2. every *-locations.js must evaluate and define exactly one array global
+     This is the check that would have caught compact-locations.js. Verified: run against a repo
+     containing it, this step fails with "Invalid or unexpected token" — the same error that
+     silently killed the nightly bake for weeks.
+  3. node tools/audit-ui.js — all 11 checks
+  4. SEO generator dry run
+     The generator now exits on an unresolvable slug collision, so running it is a real check:
+     two locations that would overwrite each other's page fail the build instead of one page
+     quietly disappearing.
 
-  bake-hours.js DOES check it (line 29), so no wrong hours were ever baked — the impact was
-  smaller than the audit implied. But FlushPanel's conflict rows rendered that stale value as
-  though it were the value in dispute, so an admin reviewing conflicts saw hours that were not
-  actually in conflict.
-
-  Now, when a doc is not verified:
-     value, kind, confirmedAt, lastConfirmedAt   -> null
-     source                                      -> null, not 'community_verified'
-     prevValue, prevKind, prevConfirmedAt        -> the history, clearly named
-  schemaVersion bumped 1 -> 2.
-
-  FlushPanel shows "was 0500-2300" for a conflict, plus the date it was last confirmed.
+  Concurrency guard cancels superseded runs. Deliberately not scheduled — a red run here should
+  always point at a commit.
 
 WHAT I VERIFIED
-  Simulated a verified -> conflict -> pending -> verified cycle: the live value clears on the way
-  down, the history survives two unverified passes, and a new verification replaces it cleanly.
-  fmtVal tested 4/4: verified single, verified per-day, conflict with history, pending with none.
-  bake-hours.js is unaffected — it already required verified && value != null, and an unverified
-  doc now has value null, so it is skipped either way.
-  functions/index.js and app.js parse. All 11 audit-ui checks pass. FlushPanel ids unique, divs
-  balanced.
+  All four steps run locally against the current tree, exactly as written: 9 files parse, 40 data
+  files load with 28,089 records and one global each, 11 audit checks pass, generator exits 0.
+  YAML parses.
+  Against the repo you sent for the audit, the workflow reports 28 failures — every one a bug
+  that had shipped and was invisible.
 
 WHAT I COULD NOT VERIFY
-  The deployed function. I cannot run it against Firestore, so the transaction body is reasoned
-  through and simulated, not executed. Worth watching the first bake review after deploying.
+  The workflow running on GitHub. I can execute every step locally but not the Actions runner
+  itself, so the trigger paths and checkout behaviour are reasoned, not observed. Watch the first
+  run.
 
-A CORRECTION TO MY OWN AUDIT
-  My "anything unshipped?" check misfired twice today. It first compared record COUNTS, which
-  flagged 12 files that had simply had records intentionally removed. Fixed to compare by id, it
-  then fell back to the pre-Phase-1 snapshot for files not in the previous batch and flagged the
-  13 renamed files as unshipped. Both were false alarms. The check has to compare against what
-  was ACTUALLY last delivered, per file, not against a fixed baseline.
+RB-08 — CLOSED AS WON'T-FIX, with numbers
+  "All markers are constructed at startup, and chainsInViewport scans the full dataset on every
+  map move." Both true. Measured:
+      viewport scan, empty view (no early exit)   0.97ms
+      viewport scan, dense view                   0.50ms
+  and renderChainKey has a signature guard, so a pan that changes nothing returns before touching
+  the DOM. Marker construction was ~100-200ms at startup, with the map interactive at 1,521ms on
+  LTE; the expensive part, the filter pass, was already fixed in v2.6.1.
+
+  Against that, app.js line 162 records that viewport add/remove culling was tried and REMOVED
+  because it fought the cluster plugin for marker ownership — the likely cause of the Android
+  races. Reintroducing lazy construction means re-fighting that. Not worth it for a millisecond.
+
+REMAINING WORK
+  Needs the Mac:
+    deploy functions (above) · git rm index.js · curl the two Leaflet plugins (PWA-02)
+  Needs you:
+    DATA-07 Bridgewater coordinate — Street View
+    the 7 pairs in duplicate-review.txt
+  Product decision:
+    SEC-01/02 report spam — needs App Check, not rules
