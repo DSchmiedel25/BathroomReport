@@ -1019,10 +1019,17 @@ async function loadBakeReview(){
     const pending   = rows.filter(r => r.verified && r.revision !== r.bakedRevision);
     const conflicts = rows.filter(r => r.state === 'conflict');
     const overrides = rows.filter(r => r.state === 'admin_override');
+    /* Only a verified doc has a live `value`. An unverified one keeps its history in prevValue,
+     * so show that explicitly as "was" rather than printing it where a current value goes —
+     * conflict rows used to render the previously-verified hours as though they were the hours
+     * in dispute. */
+    const fmtOne = (v) => (v == null) ? null
+      : (typeof v === 'object' ? Object.entries(v).map(([d,x]) => d + ' ' + x).join(', ') : String(v));
     const fmtVal = (r) => {
-      if(r.value == null) return '—';
-      if(typeof r.value === 'object') return Object.entries(r.value).map(([d,v]) => d + ' ' + v).join(', ');
-      return String(r.value);
+      const live = fmtOne(r.value);
+      if(live) return live;
+      const prev = fmtOne(r.prevValue);
+      return prev ? 'was ' + prev : '—';
     };
     const fmtWhen = (t) => t ? new Date(t).toLocaleDateString() : '';
     const block = (title, list, meta) => {
@@ -1037,7 +1044,8 @@ async function loadBakeReview(){
     };
     const html =
       block('✅ Pending confirmed — will bake', pending, r => 'agree ' + (r.agreeCount || 0) + ' · confirmed ' + fmtWhen(r.lastConfirmedAt)) +
-      block('⚠️ Conflicts — need a human', conflicts, r => 'tie at agree ' + (r.agreeCount || 0)) +
+      block('⚠️ Conflicts — need a human', conflicts, r => 'tie at agree ' + (r.agreeCount || 0)
+             + (r.prevConfirmedAt ? ' · last confirmed ' + fmtWhen(r.prevConfirmedAt) : '')) +
       block('🔒 Admin overrides — active', overrides, r => 'override in effect');
     el.innerHTML = (pending.length || conflicts.length || overrides.length)
       ? html

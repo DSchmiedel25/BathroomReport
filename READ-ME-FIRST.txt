@@ -1,51 +1,58 @@
-v2.8.2 — stop asking a question the data already answers
-=========================================================
+v2.8.3 — FUNC-03, stale "verified" hour metadata
+=================================================
 
 WHAT IS IN THIS BATCH
-  app.js             restroomDoubted() now returns false when the source data already
-                     claims a toilet. Nothing else changed in this file.
-  index.html         version stamp only. BUMP sw.js.
-  tools/audit-ui.js  new check 11: no record may be flagged doubted AND claim a toilet.
+  functions-index.js   rename to index.js -> functions/   THEN firebase deploy --only functions
+                       REPLACES the copy already on your Desktop. That one was never deployed,
+                       so deploy this instead.
+  flushpanel.html      conflict rows label a previous value as history, not as current
+  index.html           version stamp only. BUMP sw.js.
 
-  No rules change. No functions change. No data change.
+  No app.js change. No rules change. No data change.
 
 WHAT WAS STILL UNSHIPPED FROM EARLIER
-  Nothing. Checked every staged directory from this session record-by-record against the
-  current tree: the only staged records missing are 26 intended removals, the 45 Canadian
-  Pilots, and 6 that exist solely in a nyc-public merge I rejected for deleting live records.
+  functions/index.js. It has been sitting on your Desktop undeployed since v2.7.6 and carries
+  three fixes that are not live yet:
+     the fsId path fix                aggregates/{locId} threw for 6,595 slashed ids
+     aggregates.amen tallies          live amenity confirmation has never worked
+     the hours regex                  24:01-24:59 were accepted as valid times
+  This batch adds a fourth. Nothing else is outstanding — every data file matches what you
+  shipped.
 
 THE CHANGE
-  "Is there a public restroom here?" was scoped to records flagged osm.restroomUnconfirmed.
-  amenitySettled() already stops the question once an admin sets it or the community confirms
-  it — but it knows nothing about the SOURCE data, so a place whose own operator data says
-  "yes" could still have been asked.
+  When hour status dropped from verified to pending or conflict, the document kept the previously
+  verified value, kind, confirmedAt AND source:'community_verified'. A conflicted record was
+  indistinguishable from a live verified one to anything that did not check the `verified` flag.
 
-  restroomDoubted() now also returns false when:
-     loc.osm.restroomConfirmed      the operator's own locator says yes
-     loc.meta.toilets === 'yes'     an OSM survey says yes
+  bake-hours.js DOES check it (line 29), so no wrong hours were ever baked — the impact was
+  smaller than the audit implied. But FlushPanel's conflict rows rendered that stale value as
+  though it were the value in dispute, so an admin reviewing conflicts saw hours that were not
+  actually in conflict.
 
-  Today this changes nothing: 1,032 records are flagged and NONE of them carries a positive
-  claim, so the behaviour was already correct. It was correct by accident though — a property
-  of the current imports, not a rule — and the next import could set both on one record. This
-  makes it a rule, and check 11 fails the build if the data ever reaches that state.
+  Now, when a doc is not verified:
+     value, kind, confirmedAt, lastConfirmedAt   -> null
+     source                                      -> null, not 'community_verified'
+     prevValue, prevKind, prevConfirmedAt        -> the history, clearly named
+  schemaVersion bumped 1 -> 2.
+
+  FlushPanel shows "was 0500-2300" for a conflict, plus the date it was last confirmed.
 
 WHAT I VERIFIED
-  restroomDoubted tested against 6 cases, 6/6:
-     not flagged                          -> do not ask
-     flagged, no claim                    -> ask
-     flagged + operator says yes          -> do not ask
-     flagged + OSM survey says yes        -> do not ask
-     confirmed only                       -> do not ask
-     flagged + meta.toilets 'no'          -> ask
-  app.js parses. All 11 audit-ui checks pass.
-  Still asked: 1,032 locations — circleK 353, restarea 671, holiday 8.
+  Simulated a verified -> conflict -> pending -> verified cycle: the live value clears on the way
+  down, the history survives two unverified passes, and a new verification replaces it cleanly.
+  fmtVal tested 4/4: verified single, verified per-day, conflict with history, pending with none.
+  bake-hours.js is unaffected — it already required verified && value != null, and an unverified
+  doc now has value null, so it is skipped either way.
+  functions/index.js and app.js parse. All 11 audit-ui checks pass. FlushPanel ids unique, divs
+  balanced.
 
 WHAT I COULD NOT VERIFY
-  The rendered popup. The scoping logic is unit-tested; whether the question looks right in
-  place is not something I can see.
+  The deployed function. I cannot run it against Firestore, so the transaction body is reasoned
+  through and simulated, not executed. Worth watching the first bake review after deploying.
 
 A CORRECTION TO MY OWN AUDIT
-  My first pass at the "anything unshipped?" check compared record COUNTS and reported 12 files
-  as unshipped. That was wrong — every one was a file where the current tree has fewer records
-  because of an intentional removal since. Comparing by id rather than count gives the real
-  answer, which is that nothing is missing.
+  My "anything unshipped?" check misfired twice today. It first compared record COUNTS, which
+  flagged 12 files that had simply had records intentionally removed. Fixed to compare by id, it
+  then fell back to the pre-Phase-1 snapshot for files not in the previous batch and flagged the
+  13 renamed files as unshipped. Both were false alarms. The check has to compare against what
+  was ACTUALLY last delivered, per file, not against a fixed baseline.
