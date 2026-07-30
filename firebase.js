@@ -5,7 +5,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import {
     getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-    signOut, onAuthStateChanged
+    signOut, onAuthStateChanged, updateProfile
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   const firebaseConfig = {
@@ -25,7 +25,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
   // Expose just what the rest of the (non-module) page script needs
   window.__fb = {
     db, doc, getDoc, setDoc, increment, arrayUnion, collection, addDoc, query, where, getDocs, deleteDoc,
-    auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut
+    auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile
   };
 
   // Track login state globally — the rest of the page (non-module script) reads window.__currentUser
