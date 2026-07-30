@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bathroomreport-v142';
+const CACHE_NAME = 'bathroomreport-v137';
 
 // CORE SHELL ONLY — deliberately does NOT precache the chain data files.
 // Precaching all ~5.6 MB of location data forced a full re-download on every cache
@@ -64,7 +64,16 @@ self.addEventListener('fetch', event => {
             if(response && response.status === 200) cache.put(event.request, response.clone());
             return response;
           })
-          .catch(() => cache.match(event.request).then(c => c || cache.match('./index.html')))
+          .catch(() => cache.match(event.request).then(c => {
+            if(c) return c;
+            // Only a NAVIGATION may fall back to the shell. Serving index.html in answer to a
+            // failed app.js or shell.css request produced an HTTP 200 full of HTML, so the
+            // browser reported success and then failed to parse it — a blank or half-built page
+            // with no useful error. A real network error is the honest answer, and the caller
+            // (or the user's reload) can act on it.
+            if(event.request.mode === 'navigate') return cache.match('./index.html');
+            return Response.error();
+          }))
       )
     );
     return;
@@ -81,7 +90,14 @@ self.addEventListener('fetch', event => {
             if(response && response.status === 200) cache.put(event.request, response.clone());
             return response;
           })
-          .catch(() => cached || caches.match('./index.html'));
+          /* Do NOT fall back to the app shell here. This branch serves data files, images and the
+           * manifest — handing any of them index.html produces an HTTP 200 full of HTML that the
+           * browser reports as a success and then fails to parse, and cache poisoning behaviour
+           * on top. A real network error is the honest answer.
+           *
+           * I fixed the code-shell branch above for exactly this and reported PWA-01 done while
+           * leaving this one, which is the branch that actually serves the 40 location datasets. */
+          .catch(() => cached || Response.error());
         return cached || networkFetch;
       })
     )
