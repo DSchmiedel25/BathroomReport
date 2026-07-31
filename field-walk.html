@@ -21,7 +21,7 @@
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0;height:100%;overflow:hidden;background:var(--ink);color:var(--bone);
-    font-family:var(--mono);font-size:16px;}
+    font-family:var(--mono);font-size:16px;overscroll-behavior:none;touch-action:manipulation;}
   canvas{display:block;}
   #scene{position:fixed;inset:0;touch-action:none;}
 
@@ -32,7 +32,7 @@
   /* ---------- register (menu) ---------- */
   #register{position:fixed;inset:0;z-index:40;background:
       radial-gradient(120% 80% at 50% -10%, #1B262C 0%, #0E1418 60%);
-    overflow-y:auto;-webkit-overflow-scrolling:touch;padding:28px 20px 40px;}
+    overflow-y:auto;-webkit-overflow-scrolling:touch;padding:28px 20px 40px;touch-action:pan-y;}
   .wrap{max-width:640px;margin:0 auto;}
   .mast{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
   h1{font-family:var(--mono);font-weight:600;font-size:clamp(30px,9vw,44px);
@@ -106,6 +106,9 @@
     background:rgba(10,16,19,.72);backdrop-filter:blur(2px);}
   #dot{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;
     border-radius:50%;background:rgba(245,239,227,.6);box-shadow:0 0 4px rgba(0,0,0,.8);}
+  #moment{position:absolute;left:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 92px);
+    font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:rgba(216,177,74,.85);
+    line-height:1.9;text-shadow:0 1px 5px rgba(0,0,0,.95);}
   #keys{position:absolute;left:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);
     font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(245,239,227,.42);line-height:1.8;
     text-shadow:0 1px 5px rgba(0,0,0,.9);}
@@ -131,8 +134,48 @@
   #done.on{display:flex;}
   #done .big{font-size:clamp(34px,12vw,54px);font-weight:300;color:var(--brass);letter-spacing:.04em;}
 
+  #lift{position:absolute;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 130px);
+    width:76px;height:76px;border-radius:50%;display:none;pointer-events:auto;
+    border:1px solid rgba(216,177,74,.5);background:rgba(216,177,74,.14);
+    color:var(--brass);font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+    text-transform:uppercase;backdrop-filter:blur(3px);}
+  #lift.on{display:block;}
+  #lift.live{background:rgba(216,177,74,.42);color:#12100A;}
+
+  /* ---------- thumbstick ---------- */
+  #pad{position:absolute;width:116px;height:116px;margin:-58px 0 0 -58px;border-radius:50%;
+    border:1px dashed rgba(245,239,227,.30);display:none;opacity:.34;transition:opacity .18s ease;}
+  #pad.on{display:block;}
+  #pad.live{opacity:1;border-style:solid;border-color:rgba(216,177,74,.55);}
+  #padKnob{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;
+    background:rgba(245,239,227,.16);border:1px solid rgba(245,239,227,.45);
+    box-shadow:0 2px 12px rgba(0,0,0,.5);}
+  #pad.live #padKnob{background:rgba(216,177,74,.28);border-color:var(--brass);}
+
+  /* ---------- quality toggle ---------- */
+  .seg{display:flex;border:1px solid var(--hair);border-radius:2px;overflow:hidden;margin-top:6px;}
+  .seg button{flex:1;background:transparent;border:0;color:var(--steel);font-family:var(--mono);
+    font-size:11px;letter-spacing:.14em;text-transform:uppercase;padding:12px 6px;cursor:pointer;}
+  .seg button[aria-pressed="true"]{background:rgba(95,184,196,.14);color:var(--bone);}
+  .seg button + button{border-left:1px solid var(--hair);}
+
   @media (prefers-reduced-motion: reduce){ .lbar i{animation:none;width:100%} #toast{transition:none} }
-  @media (max-width:420px){ #keys{display:none} }
+  @media (max-width:520px){
+    #keys{display:none}
+    #mini{width:90px;height:90px}
+    .dist{font-size:19px} .stat{font-size:16px}
+    .tgt{font-size:13.5px}
+    #panel-l{max-width:46vw;top:calc(env(safe-area-inset-top,0px) + 44px)}
+    #panel-r{top:calc(env(safe-area-inset-top,0px) + 44px)}
+    #exit{top:calc(env(safe-area-inset-top,0px) + 8px)}
+    .row{padding:15px 4px}
+  }
+  @media (max-height:520px){
+    #panel-l,#panel-r{top:calc(env(safe-area-inset-top,0px) + 40px)}
+    #mini{width:80px;height:80px}
+    #tape{width:min(520px,72vw)}
+    #toast{top:38%}
+  }
 </style>
 </head>
 <body>
@@ -155,20 +198,53 @@
 
     <div class="sec">
       <div class="sec-head"><span class="eyebrow">Or enter your own coordinates</span></div>
-      <div class="field">
-        <label class="f"><span>Latitude</span><input type="text" id="clat" inputmode="decimal" placeholder="41.3925"></label>
-        <label class="f"><span>Longitude</span><input type="text" id="clon" inputmode="decimal" placeholder="2.1650"></label>
+      <label class="f"><span>Coordinates</span>
+        <input type="text" id="coords" placeholder="40&deg;44'38&quot;N 73&deg;59'44&quot;W  &mdash;  or  40.7439, -73.9956"></label>
+      <div class="field" style="margin-top:10px">
+        <label class="f"><span>Date &mdash; M/D/Y</span><input type="text" id="cdate" inputmode="numeric" placeholder="5/4/25"></label>
+        <label class="f"><span>Time</span><input type="text" id="ctime" placeholder="5:28pm"></label>
       </div>
       <label class="f" style="margin-top:14px">
         <span>Survey radius — <b id="radlbl" style="color:var(--brass);font-weight:500">350 m</b></span>
-        <input type="range" id="rad" min="180" max="600" step="10" value="350">
+        <input type="range" id="rad" min="150" max="600" step="10" value="350">
       </label>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><span class="eyebrow">Conditions</span><span class="eyebrow" id="sunread">&mdash;</span></div>
+      <div class="seg" id="wseg">
+        <button type="button" data-w="clear" aria-pressed="true">Clear</button>
+        <button type="button" data-w="overcast" aria-pressed="false">Overcast</button>
+        <button type="button" data-w="rain" aria-pressed="false">Rain</button>
+        <button type="button" data-w="snow" aria-pressed="false">Snow</button>
+      </div>
+      <p class="foot" style="margin-top:9px">Sun position is computed from the date, time and coordinates you enter. Time is read as local clock time; the offset comes from your longitude, so it is right to the hour almost everywhere.</p>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><span class="eyebrow">Real imagery</span><span class="eyebrow" id="aerialNote"></span></div>
+      <div class="seg" id="layers">
+        <button type="button" data-l="aerial" aria-pressed="true">Aerial ground</button>
+        <button type="button" data-l="photos" aria-pressed="true">Street photos</button>
+      </div>
+      <p class="foot" style="margin-top:9px" id="layerNote"></p>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><span class="eyebrow">Detail</span><span class="eyebrow" id="qauto"></span></div>
+      <div class="seg" id="qseg">
+        <button type="button" data-q="low" aria-pressed="false">Smooth</button>
+        <button type="button" data-q="high" aria-pressed="false">Detailed</button>
+      </div>
+      <p class="foot" style="margin-top:9px" id="qnote"></p>
     </div>
 
     <button id="go">Begin survey</button>
 
     <p class="foot">
-      Map data © OpenStreetMap contributors, ODbL 1.0. Geometry served by the public Overpass API.
+      Map data © OpenStreetMap contributors, ODbL 1.0, via the public Overpass API.
+      Aerial ground: USGS The National Map orthoimagery, public domain, United States only.
+      Street photographs © Mapillary contributors, provided by Meta Platforms Ireland Ltd.
       Rendering by three.js (MIT). Building heights come from <code>height</code> and <code>building:levels</code>
       tags where surveyed, and are estimated where they aren't.
     </p>
@@ -197,10 +273,15 @@
     <div class="stat" id="score">0 / 0</div>
     <div class="eyebrow" style="margin-top:10px">Elapsed</div>
     <div class="stat" id="time">0:00</div>
+    <div class="eyebrow" style="margin-top:10px">Altitude</div>
+    <div class="stat" id="alt">0 m</div>
   </div>
   <canvas id="mini" width="224" height="224"></canvas>
   <div id="dot"></div>
+  <div id="moment"></div>
   <div id="keys">W A S D — walk<br>Shift — run<br>Mouse — look<br>Esc — pause</div>
+  <div id="pad"><div id="padKnob"></div></div>
+  <button id="lift">Lift</button>
   <div id="toast"><div class="eyebrow" id="toastK">Logged</div><div class="t" id="toastT"></div></div>
   <button id="exit">Leave</button>
 </div>
@@ -230,16 +311,16 @@
    ============================================================ */
 
 const LOCATIONS = [
-  { n:"French Quarter",   c:"New Orleans, US",  lat:29.9584, lon:-90.0644 },
+  { n:"French Quarter",   c:"New Orleans, US",  lat:29.9584, lon:-90.0644, us:true },
+  { n:"Lower Manhattan",  c:"New York, US",     lat:40.7075, lon:-74.0100, us:true },
+  { n:"North Beach",      c:"San Francisco, US",lat:37.7999, lon:-122.4083, us:true },
+  { n:"Downtown",         c:"Savannah, US",     lat:32.0780, lon:-81.0912, us:true },
+  { n:"The Strip",        c:"Las Vegas, US",    lat:36.1147, lon:-115.1728, us:true },
+  { n:"Stockade district",c:"Schenectady, US",  lat:42.8180, lon:-73.9520, us:true },
   { n:"Rialto & San Polo",c:"Venice, IT",       lat:45.4380, lon: 12.3358 },
   { n:"Le Marais",        c:"Paris, FR",        lat:48.8590, lon:  2.3610 },
   { n:"Gion",             c:"Kyoto, JP",        lat:35.0037, lon:135.7788 },
-  { n:"North Beach",      c:"San Francisco, US",lat:37.7999, lon:-122.4083 },
   { n:"Jordaan",          c:"Amsterdam, NL",    lat:52.3750, lon:  4.8830 },
-  { n:"Eixample blocks",  c:"Barcelona, ES",    lat:41.3925, lon:  2.1650 },
-  { n:"Covent Garden",    c:"London, UK",       lat:51.5124, lon: -0.1225 },
-  { n:"Kabukichō",        c:"Tokyo, JP",        lat:35.6950, lon:139.7020 },
-  { n:"Lower Manhattan",  c:"New York, US",     lat:40.7075, lon:-74.0100 },
 ];
 
 const OVERPASS = [
@@ -248,23 +329,68 @@ const OVERPASS = [
   "https://overpass.private.coffee/api/interpreter"
 ];
 
+/* ---------- real imagery sources ---------- */
+const MLY_TOKEN = "MLY|27349781664703494|177bdf9d6eac575b5b3b74e7d9efcfc4";
+const MLY_GRAPH = "https://graph.mapillary.com";
+
+/* USGS orthoimagery is public domain but only covers the United States.
+   There is no free, openly-licensed, high-resolution aerial layer for the
+   whole planet — so districts outside the US fall back to painted ground. */
+const AERIAL_URL = (z,x,y) =>
+  "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/"+z+"/"+y+"/"+x;
+const AERIAL_MAXZ = 19;
+
+/* ---------- web mercator ---------- */
+const t2n = z => Math.pow(2, z);
+function lon2t(lon, z){ return (lon+180)/360 * t2n(z); }
+function lat2t(lat, z){
+  const r = lat*Math.PI/180;
+  return (1 - Math.log(Math.tan(r) + 1/Math.cos(r))/Math.PI)/2 * t2n(z);
+}
+function t2lon(x, z){ return x/t2n(z)*360 - 180; }
+function t2lat(y, z){
+  const n = Math.PI - 2*Math.PI*y/t2n(z);
+  return 180/Math.PI * Math.atan(0.5*(Math.exp(n) - Math.exp(-n)));
+}
+
 const EYE = 1.68, WALK = 3.3, RUN = 6.8, REACH = 9;
 const R_EARTH = 6378137;
+
+/* Mobile GPUs choke on a full city block at retina resolution, so the geometry
+   budget, view distance and render scale all move together. */
+const COARSE = matchMedia("(pointer: coarse)").matches;
+const SMALL  = Math.min(innerWidth, innerHeight) < 560;
+const QSET = {
+  low:  { dpr:1.4, aa:false, far:520,  fog:0.0100, buildings:1200, trees:160, apron:false, label:26 },
+  high: { dpr:2.0, aa:true,  far:1200, fog:0.0058, buildings:2600, trees:420, apron:true,  label:34 }
+};
+let quality = (COARSE || SMALL) ? "low" : "high";
+const Q = () => QSET[quality];
+let renderScale = 1;
+function applyScale(){
+  if(!renderer) return;
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, Q().dpr) * renderScale);
+  renderer.setSize(innerWidth, innerHeight);
+}
 
 let scene, camera, renderer, clock, raf = 0;
 let originLat = 0, originLon = 0, cosLat = 1, worldRadius = 350;
 let running = false, paused = false, finished = false;
 
-const player = { x:0, z:0, yaw:0, pitch:0 };
+const player = { x:0, z:0, y:0, vy:0, yaw:0, pitch:0, airborne:false };
 const keys = Object.create(null);
 let objectives = [], foundCount = 0, startTime = 0, elapsed = 0;
 let districtName = "";
 
+/* flight */
+const GRAVITY = 15.5, THRUST = 30, VY_MAX = 15, FALL_MAX = -34, AIR_CTRL = 0.72;
+let thrusting = false, peakAlt = 0;
+
 /* ---------- collision index ---------- */
 const CELL = 28;
 const grid = new Map();
-function cellKey(x,z){ return ((x/CELL)|0) + ":" + ((z/CELL)|0); }
-function indexPolygon(poly){
+function indexPolygon(poly, h){
+  poly.h = h;
   let minx=1e9,maxx=-1e9,minz=1e9,maxz=-1e9;
   for(const p of poly){ if(p.x<minx)minx=p.x; if(p.x>maxx)maxx=p.x; if(p.z<minz)minz=p.z; if(p.z>maxz)maxz=p.z; }
   for(let cx=(minx/CELL|0); cx<=(maxx/CELL|0); cx++)
@@ -282,13 +408,25 @@ function pointInPoly(px,pz,poly){
   }
   return inside;
 }
-function blocked(x,z){
+/* walls only stop you if they rise above your feet */
+function blockedAt(x, z, y){
   for(let cx=-1;cx<=1;cx++) for(let cz=-1;cz<=1;cz++){
     const a = grid.get(((x/CELL|0)+cx)+":"+((z/CELL|0)+cz));
     if(!a) continue;
-    for(const poly of a) if(pointInPoly(x,z,poly)) return true;
+    for(const poly of a) if(poly.h > y + 0.35 && pointInPoly(x,z,poly)) return true;
   }
   return false;
+}
+function blocked(x,z){ return blockedAt(x,z,0); }
+/* the surface underfoot — a rooftop if you're over one, otherwise street level */
+function groundAt(x, z){
+  let top = 0;
+  for(let cx=-1;cx<=1;cx++) for(let cz=-1;cz<=1;cz++){
+    const a = grid.get(((x/CELL|0)+cx)+":"+((z/CELL|0)+cz));
+    if(!a) continue;
+    for(const poly of a) if(poly.h > top && pointInPoly(x,z,poly)) top = poly.h;
+  }
+  return top;
 }
 
 /* ---------- projection ---------- */
@@ -320,7 +458,8 @@ let selected = 0;
     const pick = ()=>{
       selected = i;
       [...rows.children].forEach((c,j)=>c.setAttribute("aria-selected", j===i?"true":"false"));
-      $("clat").value=""; $("clon").value="";
+      $("coords").value="";
+      updateAerialNote(); refreshSun();
     };
     el.addEventListener("click", pick);
     el.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); pick(); }});
@@ -328,7 +467,88 @@ let selected = 0;
   });
 })();
 
+let weather = "clear";
+let sceneWhen = null, sceneSun = null;
+
+function readWhen(){
+  const c = parseCoords($("coords").value) ||
+            { lat:LOCATIONS[selected].lat, lon:LOCATIONS[selected].lon };
+  const d = parseDate($("cdate").value);
+  const t = parseTime($("ctime").value);
+  if(!d || !t) return { coords:c, sun:null, when:null };
+  const off = guessOffset(c.lat, c.lon, d.y, d.mo, d.d);
+  const utc = new Date(Date.UTC(d.y, d.mo-1, d.d, t.h - off, t.m));
+  return { coords:c, when:{ d, t, off, utc }, sun: sunAt(utc, c.lat, c.lon) };
+}
+function refreshSun(){
+  const r = readWhen();
+  if(!r.sun){ $("sunread").textContent = "Add date and time"; return; }
+  const e = r.sun.elev;
+  const state = e > 12 ? "full sun" : e > 0 ? "low sun" : e > -6 ? "twilight" : "night";
+  $("sunread").textContent = e.toFixed(0) + "° " + Math.round(r.sun.az) + "° · " + state;
+}
+["coords","cdate","ctime"].forEach(id =>
+  $(id).addEventListener("input", ()=>{ refreshSun(); updateAerialNote(); }));
+
+(function setupWeather(){
+  const seg = $("wseg");
+  [...seg.children].forEach(b => b.addEventListener("click", ()=>{
+    weather = b.dataset.w;
+    [...seg.children].forEach(o => o.setAttribute("aria-pressed", o.dataset.w===weather ? "true":"false"));
+  }));
+})();
+
+let wantAerial = true, wantPhotos = true, aerialActive = false, districtIsUS = false;
+
+(function setupLayers(){
+  const seg = $("layers");
+  const paint = ()=>{
+    [...seg.children].forEach(b=>{
+      const on = b.dataset.l === "aerial" ? wantAerial : wantPhotos;
+      b.setAttribute("aria-pressed", on ? "true":"false");
+    });
+    const bits = [];
+    if(wantAerial) bits.push("Ground becomes USGS orthoimagery — public domain, US only, down to 6 inches per pixel. The painted road and park layers switch off underneath it.");
+    if(wantPhotos) bits.push("Mapillary photographs stand in the streets where they were taken, facing the way the camera faced. They load as you approach.");
+    $("layerNote").textContent = bits.join(" ") || "Stylised ground, no photographs. Fastest option.";
+  };
+  [...seg.children].forEach(b=>b.addEventListener("click", ()=>{
+    if(b.dataset.l === "aerial") wantAerial = !wantAerial; else wantPhotos = !wantPhotos;
+    paint();
+  }));
+  paint();
+  updateAerialNote();
+  refreshSun();
+})();
+
+function currentIsUS(){
+  const c = parseCoords($("coords").value);
+  if(c) return c.lat > 24 && c.lat < 50 && c.lon > -125 && c.lon < -66;
+  return !!LOCATIONS[selected].us;
+}
+function updateAerialNote(){
+  $("aerialNote").textContent = currentIsUS() ? "Aerial available here" : "No aerial outside the US";
+}
+
 $("rad").addEventListener("input", e=>{ $("radlbl").textContent = e.target.value + " m"; });
+
+(function setupQuality(){
+  if(COARSE || SMALL){
+    $("rad").max = "420";
+    $("rad").value = "240";
+    $("radlbl").textContent = "240 m";
+  }
+  $("qauto").textContent = (COARSE || SMALL) ? "Phone detected" : "Desktop detected";
+  const seg = $("qseg");
+  const paint = ()=>{
+    [...seg.children].forEach(b => b.setAttribute("aria-pressed", b.dataset.q === quality ? "true":"false"));
+    $("qnote").textContent = quality === "low"
+      ? "Fewer buildings, closer horizon, lower render scale. Steadier framerate on a phone."
+      : "Full geometry and a long view. Best on a laptop or desktop.";
+  };
+  [...seg.children].forEach(b => b.addEventListener("click", ()=>{ quality = b.dataset.q; paint(); }));
+  paint();
+})();
 $("go").addEventListener("click", start);
 $("lback").addEventListener("click", toRegister);
 $("again").addEventListener("click", toRegister);
@@ -354,13 +574,19 @@ function toRegister(){
    ============================================================ */
 async function start(){
   let lat, lon;
-  const cl = parseFloat($("clat").value), cn = parseFloat($("clon").value);
-  if(!isNaN(cl) && !isNaN(cn) && Math.abs(cl)<=90 && Math.abs(cn)<=180){
-    lat = cl; lon = cn; districtName = cl.toFixed(4)+", "+cn.toFixed(4);
+  const typed = parseCoords($("coords").value);
+  if(typed){
+    lat = typed.lat; lon = typed.lon;
+    districtName = lat.toFixed(4)+", "+lon.toFixed(4);
   } else {
     const L = LOCATIONS[selected]; lat = L.lat; lon = L.lon; districtName = L.n+" — "+L.c;
   }
+  const w = readWhen();
+  sceneWhen = w.when;
+  sceneSun  = w.sun || { elev: 34, az: 215 };
   worldRadius = parseInt($("rad").value,10);
+  districtIsUS = currentIsUS();
+  aerialActive = false;
 
   $("register").style.display = "none";
   $("loading").classList.add("on");
@@ -381,6 +607,7 @@ async function start(){
 
   originLat = lat; originLon = lon; cosLat = Math.cos(lat*Math.PI/180);
   buildWorld(data);
+  if(wantPhotos) await buildPhotos(lat, lon, setMsg);
   $("loading").classList.remove("on");
   enterGame();
 }
@@ -431,6 +658,340 @@ async function fetchOSM(lat,lon,r,onMsg){
 }
 
 /* ============================================================
+   INPUT PARSING — accept coordinates the way people actually paste them
+   ============================================================ */
+function parseCoords(str){
+  if(!str) return null;
+  const s = String(str).trim();
+  let m = s.match(/^\s*(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)\s*$/);
+  if(m){
+    const la = parseFloat(m[1]), lo = parseFloat(m[2]);
+    if(Math.abs(la)<=90 && Math.abs(lo)<=180) return { lat:la, lon:lo };
+  }
+  const re = /(\d+(?:\.\d+)?)\s*[°d]\s*(?:(\d+(?:\.\d+)?)\s*['′]\s*)?(?:(\d+(?:\.\d+)?)\s*(?:"|″|'')\s*)?\s*([NSEW])/gi;
+  const parts = []; let x;
+  while((x = re.exec(s)) !== null){
+    let v = parseFloat(x[1]) + (parseFloat(x[2])||0)/60 + (parseFloat(x[3])||0)/3600;
+    const h = x[4].toUpperCase();
+    if(h === "S" || h === "W") v = -v;
+    parts.push({ v, h });
+  }
+  const la = parts.find(p=>p.h==="N"||p.h==="S");
+  const lo = parts.find(p=>p.h==="E"||p.h==="W");
+  if(la && lo) return { lat:la.v, lon:lo.v };
+  return null;
+}
+function parseDate(str){
+  const s = String(str||"").trim();
+  let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if(m) return { y:+m[1], mo:+m[2], d:+m[3] };
+  m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);   // month first
+  if(m){ let y=+m[3]; if(y<100) y+=2000; return { y, mo:+m[1], d:+m[2] }; }
+  return null;
+}
+function parseTime(str){
+  const m = String(str||"").trim().match(/^(\d{1,2})[:.h](\d{2})\s*(am|pm)?$/i);
+  if(!m) return null;
+  let h = +m[1]; const mi = +m[2];
+  const ap = m[3] && m[3].toLowerCase();
+  if(ap === "pm" && h < 12) h += 12;
+  if(ap === "am" && h === 12) h = 0;
+  if(h > 23 || mi > 59) return null;
+  return { h, m:mi };
+}
+/* No timezone database here — standard meridian from longitude, plus a
+   rough northern-hemisphere summer-time bump. Right for most populated places. */
+function guessOffset(lat, lon, y, mo, d){
+  let off = Math.round(lon/15);
+  const t = Date.UTC(y, mo-1, d);
+  if(lat > 0 && t >= Date.UTC(y,2,8) && t < Date.UTC(y,10,1)) off += 1;
+  else if(lat < -20 && (t >= Date.UTC(y,9,1) || t < Date.UTC(y,3,1))) off += 1;
+  return off;
+}
+
+/* ============================================================
+   SOLAR POSITION — low-precision NOAA formulation, ~0.01° accurate
+   ============================================================ */
+function sunAt(utcDate, lat, lon){
+  const rad = Math.PI/180;
+  const n = utcDate.getTime()/86400000 + 2440587.5 - 2451545.0;
+  const L = (280.460 + 0.9856474*n) % 360;
+  const g = ((357.528 + 0.9856003*n) % 360) * rad;
+  const lambda = (L + 1.915*Math.sin(g) + 0.020*Math.sin(2*g)) * rad;
+  const eps = (23.439 - 0.0000004*n) * rad;
+  const alpha = Math.atan2(Math.cos(eps)*Math.sin(lambda), Math.cos(lambda));
+  const delta = Math.asin(Math.sin(eps)*Math.sin(lambda));
+  const gmst = (18.697374558 + 24.06570982441908*n) % 24;
+  const H = ((gmst*15 + lon)*rad) - alpha;
+  const phi = lat*rad;
+  const elev = Math.asin(Math.sin(phi)*Math.sin(delta) + Math.cos(phi)*Math.cos(delta)*Math.cos(H));
+  const az = Math.atan2(-Math.sin(H), Math.tan(delta)*Math.cos(phi) - Math.sin(phi)*Math.cos(H));
+  return { elev: elev/rad, az: ((az/rad)%360+360)%360 };
+}
+
+/* ============================================================
+   ATMOSPHERE — sky, sun and fog derived from elevation + weather
+   ============================================================ */
+const WEATHER = ["clear","overcast","rain","snow"];
+function mixHex(a, b, t){
+  const ca = new THREE.Color(a), cb = new THREE.Color(b);
+  return ca.lerp(cb, t).getHex();
+}
+function atmosphere(elev, weather){
+  // daylight ramp: night below -6°, full day above 12°
+  const day  = Math.max(0, Math.min(1, (elev + 6) / 18));
+  const gold = Math.max(0, 1 - Math.abs(elev - 4) / 14);   // peaks near the horizon
+
+  let sky = mixHex(0x0B1220, 0x9FB3BC, day);
+  sky = mixHex(sky, 0xE3B183, gold * 0.72);
+  let sunCol = mixHex(0xFFD9A8, 0xFFF3E0, day);
+  sunCol = mixHex(sunCol, 0xFF9A52, gold * 0.8);
+
+  let sunI  = 0.22 + 0.85 * day;
+  let hemiI = 0.30 + 0.72 * day;
+  let ambI  = 0.20 + 0.24 * day;
+  let fog   = Q().fog;
+  let ground = 1;
+
+  if(weather === "overcast"){
+    sky = mixHex(sky, 0x8C969C, 0.72); sunI *= 0.34; hemiI *= 1.12; fog *= 1.5; ground = 0.86;
+  } else if(weather === "rain"){
+    sky = mixHex(sky, 0x5F6A72, 0.82); sunCol = mixHex(sunCol, 0xC8D2D8, 0.6);
+    sunI *= 0.24; hemiI *= 1.05; ambI *= 1.15; fog *= 2.3; ground = 0.62;
+  } else if(weather === "snow"){
+    sky = mixHex(sky, 0xB9C2C6, 0.78); sunI *= 0.4; hemiI *= 1.25; fog *= 2.0; ground = 1.18;
+  }
+  return { sky, sunCol, sunI, hemiI, ambI, fog, ground, day };
+}
+/* ============================================================
+   PRECIPITATION — a slab of drops that travels with the player
+   ============================================================ */
+let precip = null, baseFog = 0.006, groundTint = 1;
+const P_BOX = 70, P_TOP = 46;
+
+function buildPrecip(){
+  if(weather !== "rain" && weather !== "snow") return;
+  const snow = weather === "snow";
+  const N = (COARSE || SMALL) ? (snow ? 1400 : 2600) : (snow ? 3200 : 6000);
+  const pos = new Float32Array(N * 2 * 3);   // two vertices per streak
+  const seeds = new Float32Array(N);
+  const len = snow ? 0.16 : 1.5;
+  for(let i=0;i<N;i++){
+    const x = (Math.random()-0.5)*P_BOX, y = Math.random()*P_TOP, z = (Math.random()-0.5)*P_BOX;
+    pos[i*6]   = x;       pos[i*6+1] = y;       pos[i*6+2] = z;
+    pos[i*6+3] = x;       pos[i*6+4] = y + len; pos[i*6+5] = z;
+    seeds[i] = Math.random();
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  const m = new THREE.LineBasicMaterial({
+    color: snow ? 0xF2F6F8 : 0xB9C9D4,
+    transparent: true,
+    opacity: snow ? 0.85 : 0.42,
+    depthWrite: false
+  });
+  const mesh = new THREE.LineSegments(g, m);
+  mesh.frustumCulled = false;
+  scene.add(track(mesh));
+  precip = { mesh, pos, seeds, N, snow, len,
+             fall: snow ? 1.5 : 26, drift: snow ? 1.1 : 2.4, t: 0 };
+}
+
+function stepPrecip(dt){
+  if(!precip) return;
+  const p = precip;
+  p.t += dt;
+  const pos = p.pos;
+  const fallDist = p.fall * dt;
+  const halfBox = P_BOX/2;
+  for(let i=0;i<p.N;i++){
+    const b = i*6;
+    let y = pos[b+1] - fallDist;
+    let x = pos[b];
+    let z = pos[b+2];
+    if(p.snow){
+      x += Math.sin(p.t*0.8 + p.seeds[i]*9) * p.drift * dt;
+      z += Math.cos(p.t*0.6 + p.seeds[i]*7) * p.drift * dt;
+    } else {
+      x += p.drift * dt;
+    }
+    if(y < -2){
+      y = P_TOP;
+      x = (Math.random()-0.5)*P_BOX;
+      z = (Math.random()-0.5)*P_BOX;
+    }
+    // keep the slab wrapped around the player
+    const rx = x - player.x, rz = z - player.z;
+    if(rx >  halfBox) x -= P_BOX; else if(rx < -halfBox) x += P_BOX;
+    if(rz >  halfBox) z -= P_BOX; else if(rz < -halfBox) z += P_BOX;
+    pos[b]   = x; pos[b+1] = y;       pos[b+2] = z;
+    pos[b+3] = x; pos[b+4] = y + p.len; pos[b+5] = z;
+  }
+  p.mesh.geometry.attributes.position.needsUpdate = true;
+}
+
+/* ============================================================
+   AERIAL GROUND — USGS orthoimagery tiles laid flat
+   ============================================================ */
+const texLoader = new THREE.TextureLoader();
+texLoader.setCrossOrigin("anonymous");
+function loadTex(url){
+  return new Promise((res, rej)=> texLoader.load(url, res, undefined, rej));
+}
+
+let aerialTried = 0, aerialFailed = 0;
+function buildAerial(){
+  const halfLat = worldRadius*1.08/111320;
+  const halfLon = worldRadius*1.08/(111320*cosLat);
+  let z = AERIAL_MAXZ;
+  let x0, x1, y0, y1;
+  // step down zoom until the tile count is sane
+  for(; z >= 14; z--){
+    x0 = Math.floor(lon2t(originLon-halfLon, z)); x1 = Math.floor(lon2t(originLon+halfLon, z));
+    y0 = Math.floor(lat2t(originLat+halfLat, z)); y1 = Math.floor(lat2t(originLat-halfLat, z));
+    if((x1-x0+1)*(y1-y0+1) <= 90) break;
+  }
+
+  const mat0 = new THREE.MeshBasicMaterial({ color:0x2B2F2C });
+  for(let x=x0; x<=x1; x++) for(let y=y0; y<=y1; y++){
+    const nw = toXZ(t2lat(y, z),   t2lon(x, z));
+    const se = toXZ(t2lat(y+1, z), t2lon(x+1, z));
+    const w = Math.abs(se.x - nw.x), d = Math.abs(se.z - nw.z);
+    if(w < 1 || d < 1) continue;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat0.clone());
+    m.rotation.x = -Math.PI/2;
+    m.position.set((nw.x+se.x)/2, 0.02, (nw.z+se.z)/2);
+    scene.add(track(m));
+    aerialTried++;
+    loadTex(AERIAL_URL(z,x,y)).then(t=>{
+      t.encoding = THREE.sRGBEncoding;
+      t.minFilter = THREE.LinearFilter;
+      t.generateMipmaps = false;
+      t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+      m.material.map = t;
+      m.material.color.setScalar(groundTint);
+      m.material.needsUpdate = true;
+    }).catch(()=>{ aerialFailed++; });
+  }
+  aerialActive = true;
+}
+
+/* ============================================================
+   STREET PHOTOGRAPHS — Mapillary frames standing where they were shot
+   ============================================================ */
+let shots = [], shotTimer = 0, shotGeoFlat = null, shotGeoPano = null, shotMarks = null;
+
+async function buildPhotos(lat, lon, onMsg){
+  const dLat = worldRadius/111320, dLon = worldRadius/(111320*cosLat);
+  const bbox = [lon-dLon, lat-dLat, lon+dLon, lat+dLat].map(v=>v.toFixed(6)).join(",");
+  let data = [];
+  try{
+    onMsg("Locating street photographs");
+    const r = await fetch(MLY_GRAPH+"/images?access_token="+encodeURIComponent(MLY_TOKEN)
+      + "&fields=id,computed_geometry,geometry,compass_angle,computed_compass_angle,is_pano"
+      + "&bbox="+bbox+"&limit=1500");
+    const j = await r.json();
+    if(j && j.data) data = j.data;
+  }catch(e){ console.warn("Mapillary lookup failed", e); return; }
+  if(!data.length) return;
+
+  // thin them out so the streets aren't wallpapered — one frame per 22 m cell
+  const seen = new Set(), picked = [];
+  for(const im of data){
+    const g = im.computed_geometry || im.geometry;
+    if(!g || !g.coordinates) continue;
+    const p = toXZ(g.coordinates[1], g.coordinates[0]);
+    if(Math.hypot(p.x, p.z) > worldRadius*0.95) continue;
+    const key = Math.round(p.x/22)+":"+Math.round(p.z/22);
+    if(seen.has(key)) continue;
+    seen.add(key);
+    const ang = im.computed_compass_angle != null ? im.computed_compass_angle : (im.compass_angle||0);
+    picked.push({ id:im.id, x:p.x, z:p.z, b:ang, pano:!!im.is_pano });
+    if(picked.length >= (COARSE||SMALL ? 70 : 150)) break;
+  }
+  if(!picked.length) return;
+
+  shotGeoFlat = new THREE.PlaneGeometry(4.6, 2.6);
+  shotGeoPano = new THREE.PlaneGeometry(7.4, 3.7);
+
+  for(const s of picked){
+    const rad = s.b * Math.PI/180;
+    // sit the frame a few metres along the camera's heading, turned back to face you
+    const fx = Math.sin(rad), fz = -Math.cos(rad);
+    const m = new THREE.Mesh(
+      s.pano ? shotGeoPano : shotGeoFlat,
+      new THREE.MeshBasicMaterial({ color:0xD8B14A, transparent:true, opacity:0.20, side:THREE.DoubleSide })
+    );
+    m.position.set(s.x + fx*3.2, s.pano ? 2.6 : 2.2, s.z + fz*3.2);
+    m.rotation.y = -rad;
+    scene.add(track(m));
+    s.mesh = m;
+    shots.push(s);
+  }
+
+  // a dot on the ground under each, so the frames are findable from the air
+  const ring = new THREE.RingGeometry(0.9, 1.5, 14);
+  const rmat = new THREE.MeshBasicMaterial({ color:0xD8B14A, transparent:true, opacity:0.4, side:THREE.DoubleSide, depthWrite:false });
+  shotMarks = new THREE.InstancedMesh(ring, rmat, shots.length);
+  const mtx = new THREE.Matrix4(), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2,0,0)), sc = new THREE.Vector3(1,1,1);
+  shots.forEach((s,i)=>{ mtx.compose(new THREE.Vector3(s.x, 0.18, s.z), q, sc); shotMarks.setMatrixAt(i, mtx); });
+  scene.add(track(shotMarks));
+}
+
+/* Only a handful of photographs are ever resident in memory. */
+function streamPhotos(){
+  if(!shots.length) return;
+  const NEAR = 95, FAR = 150, BUDGET = (COARSE||SMALL) ? 5 : 9;
+  let live = 0;
+  for(const s of shots) if(s.tex) live++;
+
+  for(const s of shots){
+    const d = Math.hypot(s.x - player.x, s.z - player.z);
+    if(s.tex && d > FAR){
+      s.mesh.material.map = null;
+      s.mesh.material.color.setHex(0xD8B14A);
+      s.mesh.material.opacity = 0.20;
+      s.mesh.material.needsUpdate = true;
+      s.tex.dispose(); s.tex = null; live--;
+    }
+  }
+  if(live >= BUDGET) return;
+
+  const queue = shots
+    .filter(s => !s.tex && !s.loading && !s.dead)
+    .map(s => ({ s, d: Math.hypot(s.x - player.x, s.z - player.z) }))
+    .filter(e => e.d < NEAR)
+    .sort((a,b)=>a.d-b.d)
+    .slice(0, BUDGET - live);
+
+  for(const e of queue) hydrate(e.s);
+}
+
+async function hydrate(s){
+  s.loading = true;
+  try{
+    if(!s.url){
+      const r = await fetch(MLY_GRAPH+"/"+s.id+"?access_token="+encodeURIComponent(MLY_TOKEN)+"&fields=thumb_1024_url");
+      const j = await r.json();
+      s.url = j.thumb_1024_url;
+    }
+    if(!s.url) throw new Error("no thumbnail");
+    const t = await loadTex(s.url);
+    t.encoding = THREE.sRGBEncoding;
+    t.minFilter = THREE.LinearFilter;
+    t.generateMipmaps = false;
+    s.tex = t;
+    s.mesh.material.map = t;
+    s.mesh.material.color.setHex(0xffffff);
+    s.mesh.material.opacity = 1;
+    s.mesh.material.needsUpdate = true;
+  }catch(err){
+    s.dead = true;             // expired URL or blocked host — stop retrying this one
+  }
+  s.loading = false;
+}
+
+/* ============================================================
    WORLD CONSTRUCTION
    ============================================================ */
 const disposables = [];
@@ -443,6 +1004,9 @@ function disposeWorld(){
     if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ if(m.map) m.map.dispose(); m.dispose(); }); }
     if(o.parent) o.parent.remove(o);
   }
+  for(const s2 of shots){ if(s2.tex) s2.tex.dispose(); }
+  shots = []; shotMarks = null; precip = null;
+  aerialTried = aerialFailed = 0;
   disposables.length = 0;
   grid.clear();
   objectives = [];
@@ -488,28 +1052,38 @@ function signedArea(pts){
 }
 
 function buildWorld(data){
-  // ---- scene shell ----
-  const SKY = 0xA8B7BC;
+  // ---- scene shell, lit for the requested moment ----
+  const A = atmosphere(sceneSun.elev, weather);
+  const SKY = A.sky;
   scene = new THREE.Scene();
   scene.background = new THREE.Color(SKY);
-  scene.fog = new THREE.FogExp2(SKY, 0.0058);
+  scene.fog = new THREE.FogExp2(SKY, A.fog);
+  baseFog = A.fog;
 
-  camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 1200);
+  camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, Q().far);
 
   if(!renderer){
-    renderer = new THREE.WebGLRenderer({ canvas: $("scene"), antialias: true, powerPreference:"high-performance" });
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+    renderer = new THREE.WebGLRenderer({ canvas: $("scene"), antialias: Q().aa, powerPreference:"high-performance" });
     renderer.outputEncoding = THREE.sRGBEncoding;
   }
-  renderer.setSize(innerWidth, innerHeight);
+  applyScale();
 
-  scene.add(new THREE.HemisphereLight(0xC9D6DB, 0x4A4438, 0.95));
-  const sun = new THREE.DirectionalLight(0xFFF0D8, 0.85); sun.position.set(-0.55,1,0.4); scene.add(sun);
-  scene.add(new THREE.AmbientLight(0x6E7A80, 0.35));
+  scene.add(new THREE.HemisphereLight(0xC9D6DB, 0x4A4438, A.hemiI));
+  const sun = new THREE.DirectionalLight(A.sunCol, A.sunI);
+  // azimuth is clockwise from north; north is -Z, east is +X
+  const ar = sceneSun.az*Math.PI/180, er = Math.max(sceneSun.elev, -4)*Math.PI/180;
+  sun.position.set(
+    Math.cos(er)*Math.sin(ar),
+    Math.max(0.06, Math.sin(er)),
+    -Math.cos(er)*Math.cos(ar)
+  ).multiplyScalar(100);
+  scene.add(sun);
+  scene.add(new THREE.AmbientLight(0x6E7A80, A.ambI));
+  groundTint = A.ground;
 
   // ---- ground ----
   const gGeo = new THREE.PlaneGeometry(3000,3000);
-  const gMat = new THREE.MeshLambertMaterial({ color: 0x3A4038 });
+  const gMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(0x3A4038).multiplyScalar(groundTint) });
   const ground = new THREE.Mesh(gGeo, gMat); ground.rotation.x = -Math.PI/2; ground.position.y = -0.05;
   scene.add(track(ground));
 
@@ -530,8 +1104,11 @@ function buildWorld(data){
     else if(t.leisure || t.landuse) areas.push({el, kind:"green"});
   }
 
-  // ---- flat areas (water, green) ----
-  {
+  // ---- ground imagery ----
+  if(wantAerial && districtIsUS) buildAerial();
+
+  // ---- flat areas (water, green) — redundant once real aerial is down ----
+  if(!aerialActive){
     const pos = [], col = [];
     const c = new THREE.Color();
     for(const a of areas){
@@ -556,11 +1133,11 @@ function buildWorld(data){
   }
 
   // ---- roads ----
-  {
+  if(!aerialActive){
     const pos = [], col = [];
     const c = new THREE.Color();
     // pavement apron first (slightly lower), then carriageway
-    for(let pass=0; pass<2; pass++){
+    for(let pass = Q().apron ? 0 : 1; pass<2; pass++){
       for(const w of roads){
         const type = w.tags.highway;
         let width = ROAD_W[type] || 6;
@@ -596,9 +1173,9 @@ function buildWorld(data){
 
       walls(pts, h, c, wPos, wCol, wUV);
       roof(pts, h, rc, rPos, rCol);
-      indexPolygon(pts);
+      indexPolygon(pts, h);
       count++;
-      if(count > 2600) break;
+      if(count > Q().buildings) break;
     }
     if(wPos.length){
       const g = new THREE.BufferGeometry();
@@ -620,7 +1197,7 @@ function buildWorld(data){
 
   // ---- trees ----
   if(trees.length){
-    const n = Math.min(trees.length, 420);
+    const n = Math.min(trees.length, Q().trees);
     const trunkG = new THREE.CylinderGeometry(0.16,0.22,2.4,5);
     const leafG  = new THREE.IcosahedronGeometry(1.9, 0);
     const trunkM = new THREE.MeshLambertMaterial({ color:0x4A3B2E });
@@ -636,6 +1213,9 @@ function buildWorld(data){
     }
     scene.add(track(tI)); scene.add(track(lI));
   }
+
+  // ---- weather ----
+  buildPrecip();
 
   // ---- objectives ----
   pickObjectives(pois, roads);
@@ -1016,6 +1596,39 @@ function look(dx, dy, sens){
 
 /* touch + drag-look fallback */
 const cv = $("scene");
+
+/* thumbstick + thrust visuals */
+const PAD_HOME_X = 86, PAD_HOME_Y = 96;
+function padHome(){
+  const p = $("pad");
+  p.style.left = PAD_HOME_X + "px";
+  p.style.top = (innerHeight - PAD_HOME_Y) + "px";
+  p.classList.remove("live");
+  $("padKnob").style.transform = "";
+}
+function padTo(x,y){
+  const p = $("pad");
+  p.style.left = x + "px"; p.style.top = y + "px";
+  p.classList.add("live");
+}
+function padKnob(dx,dy){
+  const len = Math.hypot(dx,dy) || 1;
+  const m = Math.min(len, 40);
+  $("padKnob").style.transform = "translate("+(dx/len*m)+"px,"+(dy/len*m)+"px)";
+}
+function setThrust(on){
+  thrusting = on;
+  $("lift").classList.toggle("live", on);
+}
+(function bindLift(){
+  const b = $("lift");
+  b.addEventListener("pointerdown", e=>{ e.preventDefault(); b.setPointerCapture(e.pointerId); setThrust(true); });
+  const off = ()=> setThrust(false);
+  b.addEventListener("pointerup", off);
+  b.addEventListener("pointercancel", off);
+  b.addEventListener("pointerleave", off);
+})();
+
 cv.addEventListener("pointerdown", e=>{
   if(!running) return;
   if(paused){ return; }
@@ -1023,6 +1636,7 @@ cv.addEventListener("pointerdown", e=>{
   cv.setPointerCapture(e.pointerId);
   if(e.pointerType !== "mouse" && e.clientX < innerWidth*0.45 && e.clientY > innerHeight*0.35){
     stick = { id:e.pointerId, ox:e.clientX, oy:e.clientY, dx:0, dy:0 };
+    padTo(e.clientX, e.clientY);
   } else {
     dragLook = { id:e.pointerId, x:e.clientX, y:e.clientY };
   }
@@ -1032,13 +1646,14 @@ cv.addEventListener("pointermove", e=>{
   if(stick && e.pointerId === stick.id){
     stick.dx = e.clientX - stick.ox;
     stick.dy = e.clientY - stick.oy;
+    padKnob(stick.dx, stick.dy);
   } else if(dragLook && e.pointerId === dragLook.id){
     if(!pointerLocked) look(e.clientX - dragLook.x, e.clientY - dragLook.y, 0.0038);
     dragLook.x = e.clientX; dragLook.y = e.clientY;
   }
 });
 function endPointer(e){
-  if(stick && e.pointerId === stick.id) stick = null;
+  if(stick && e.pointerId === stick.id){ stick = null; padHome(); }
   if(dragLook && e.pointerId === dragLook.id) dragLook = null;
 }
 cv.addEventListener("pointerup", endPointer);
@@ -1048,7 +1663,7 @@ addEventListener("resize", ()=>{
   if(!renderer || !camera) return;
   camera.aspect = innerWidth/innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
+  applyScale();
 });
 
 /* ============================================================
@@ -1057,19 +1672,34 @@ addEventListener("resize", ()=>{
 function enterGame(){
   running = true; paused = false; finished = false;
   foundCount = 0;
+  player.y = groundAt(player.x, player.z);
+  player.vy = 0; player.airborne = false; peakAlt = 0;
+  setThrust(false);
   startTime = performance.now();
   clock = new THREE.Clock();
   $("hud").classList.add("on");
   $("exit").style.display = "";
   $("score").textContent = "0 / " + objectives.length;
+  const wl = { clear:"Clear", overcast:"Overcast", rain:"Rain", snow:"Snow" }[weather];
+  $("moment").innerHTML = (sceneWhen
+      ? sceneWhen.d.mo+"/"+sceneWhen.d.d+"/"+String(sceneWhen.d.y).slice(2)+" &middot; "
+        + String(sceneWhen.t.h%12||12)+":"+String(sceneWhen.t.m).padStart(2,"0")
+        + (sceneWhen.t.h<12?"am":"pm")+"<br>"
+      : "")
+    + wl + " &middot; sun " + Math.round(sceneSun.elev) + "&deg; at " + Math.round(sceneSun.az) + "&deg;";
   const touch = matchMedia("(pointer: coarse)").matches;
+  if(touch){ $("pad").classList.add("on"); $("lift").classList.add("on"); padHome(); }
   $("keys").innerHTML = touch
-    ? "Left thumb — walk<br>Right side — look"
-    : "W A S D — walk<br>Shift — run<br>Mouse — look<br>Esc — pause";
+    ? "Left thumb — walk<br>Lift — fly<br>Right side — look"
+    : "W A S D — walk<br>Shift — run<br>Space — fly<br>Mouse — look<br>Esc — pause";
+  if(aerialActive) setTimeout(()=>{
+    if(aerialTried && aerialFailed > aerialTried*0.6)
+      toast("Aerial refused", "The tile host blocked the images — switch Aerial ground off");
+  }, 6000);
   $("veil").classList.add("on");
   $("veilT").textContent = touch
-    ? "Drag the lower-left of the screen to walk. Drag anywhere else to look around. Reach every brass beacon."
-    : "Click to look around. Walk with W A S D, hold Shift to run. Reach every brass beacon.";
+    ? "Drag the lower-left to walk, drag anywhere else to look. Hold Lift to rise off the street — let go and you'll fall back down. Reach every brass beacon."
+    : "Click to look around. Walk with W A S D, hold Shift to run. Hold Space to fly — release and gravity takes over. You can land on rooftops. Reach every brass beacon.";
   loop();
 }
 
@@ -1092,7 +1722,7 @@ function loop(){
     elapsed = (performance.now() - startTime)/1000;
   }
 
-  camera.position.set(player.x, EYE, player.z);
+  camera.position.set(player.x, player.y + EYE, player.z);
   camera.rotation.set(0,0,0,"YXZ");
   camera.rotation.order = "YXZ";
   camera.rotation.y = player.yaw;
@@ -1100,15 +1730,35 @@ function loop(){
 
   // beacon idle motion
   const t = performance.now()/1000;
+
+  // the higher you climb the further you can see
+  if(scene.fog){
+    const k = Math.min(1, player.y / 160);
+    scene.fog.density = baseFog * (1 - k * 0.86);
+  }
   for(const o of objectives){
     o.ring.rotation.z = t*0.5;
     o.ring.scale.setScalar(o.found ? 1 : 1 + Math.sin(t*1.8)*0.06);
     o.label.material.opacity = o.found ? 0.35 : 1;
   }
 
+  stepPrecip(dt);
+
+  shotTimer += dt;
+  if(shotTimer > 0.45){ shotTimer = 0; streamPhotos(); }
+
   renderer.render(scene, camera);
   updateHUD();
+
+  // if the device can't hold a playable rate, quietly drop render scale
+  fpsAcc += dt; fpsN++;
+  if(fpsN >= 50){
+    const fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0;
+    if(fps < 26 && renderScale > 0.62){ renderScale = Math.max(0.62, renderScale - 0.14); applyScale(); }
+    else if(fps > 56 && renderScale < 1){ renderScale = Math.min(1, renderScale + 0.08); applyScale(); }
+  }
 }
+let fpsAcc = 0, fpsN = 0;
 
 function step(dt){
   let fx = 0, fz = 0, run = false;
@@ -1129,29 +1779,55 @@ function step(dt){
     }
   }
 
+  /* ---- vertical: hold to climb, release and gravity takes over ---- */
+  const lift = thrusting || keys.Space;
+  if(lift) player.vy = Math.min(VY_MAX, player.vy + THRUST * dt);
+  player.vy = Math.max(FALL_MAX, player.vy - GRAVITY * dt);
+  player.y += player.vy * dt;
+
+  const floor = groundAt(player.x, player.z);
+  if(player.y <= floor){
+    player.y = floor;
+    player.vy = 0;
+    player.airborne = false;
+  } else {
+    player.airborne = true;
+    if(player.y > peakAlt) peakAlt = player.y;
+  }
+  // ceiling on how high you can go, so you don't leave the fog behind entirely
+  if(player.y > 400){ player.y = 400; player.vy = Math.min(player.vy, 0); }
+
+  /* ---- horizontal ---- */
   const mag = Math.hypot(fx, fz);
-  if(mag < 0.001) return;
-  const nx = fx/mag * Math.min(mag,1), nz = fz/mag * Math.min(mag,1);
+  if(mag > 0.001){
+    const nx = fx/mag * Math.min(mag,1), nz = fz/mag * Math.min(mag,1);
+    const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
+    // airborne you get a speed boost but slightly loose control
+    const s = speed * (player.airborne ? 1.9 : 1) * (player.airborne ? AIR_CTRL + 0.28 : 1);
+    const dx = ( nx*cos - nz*sin) * s * dt;
+    const dz = (-nx*sin - nz*cos) * s * dt;
 
-  const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
-  const dx = ( nx*cos - nz*sin) * speed * dt;
-  const dz = (-nx*sin - nz*cos) * speed * dt;
+    const probe = 0.55;
+    const px = player.x + dx, pz = player.z + dz;
+    const lead = Math.hypot(dx,dz) || 1;
+    const y = player.y;
+    if(!blockedAt(px + dx/lead*probe, pz + dz/lead*probe, y)){ player.x = px; player.z = pz; }
+    else {
+      if(!blockedAt(player.x + dx + Math.sign(dx)*probe, player.z, y)) player.x += dx;
+      else if(!blockedAt(player.x, player.z + dz + Math.sign(dz)*probe, y)) player.z += dz;
+    }
 
-  const probe = 0.55;
-  const px = player.x + dx, pz = player.z + dz;
-  const lead = Math.hypot(dx,dz) || 1;
-  if(!blocked(px + dx/lead*probe, pz + dz/lead*probe)){ player.x = px; player.z = pz; }
-  else {
-    if(!blocked(player.x + dx + Math.sign(dx)*probe, player.z)) player.x += dx;
-    else if(!blocked(player.x, player.z + dz + Math.sign(dz)*probe)) player.z += dz;
+    const d = Math.hypot(player.x, player.z);
+    const lim = worldRadius * 0.96;
+    if(d > lim){ player.x *= lim/d; player.z *= lim/d; }
   }
 
-  // soft boundary
-  const d = Math.hypot(player.x, player.z);
-  const lim = worldRadius * 0.96;
-  if(d > lim){ player.x *= lim/d; player.z *= lim/d; }
+  // stepping off a roof edge should drop you, not leave you hovering
+  const nowFloor = groundAt(player.x, player.z);
+  if(player.y > nowFloor + 0.05) player.airborne = true;
+  else if(player.y < nowFloor){ player.y = nowFloor; player.vy = 0; player.airborne = false; }
 
-  // objective checks
+  // objective checks — beacons are tall columns, so reaching one from the air counts
   for(const o of objectives){
     if(o.found) continue;
     if(Math.hypot(o.x - player.x, o.z - player.z) < REACH){
@@ -1198,6 +1874,7 @@ function updateHUD(){
     $("tgtDist").textContent = "—";
   }
   $("time").textContent = fmt(elapsed);
+  $("alt").textContent = Math.round(player.y) + " m";
   drawTape(bearing, tb);
   drawMinimap();
 }
