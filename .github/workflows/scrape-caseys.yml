@@ -1,0 +1,73 @@
+name: Scrape Casey's Locations
+
+# Run it from the Actions tab: "Run workflow" button. Works from the phone.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "start with introspect; then discover, probe, smoke, full"
+        required: true
+        default: introspect
+        type: choice
+        options: [introspect, discover, probe, smoke, full]
+      commit:
+        description: "Commit the result back to the repo"
+        required: true
+        default: "false"
+        type: choice
+        options: ["true", "false"]
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Introspect schema
+        if: inputs.mode == 'introspect'
+        working-directory: data
+        run: node scrape-caseys.js --introspect
+
+      - name: Discover query from site JS
+        if: inputs.mode == 'discover'
+        working-directory: data
+        run: node scrape-caseys.js --discover
+
+      - name: Probe endpoint
+        if: inputs.mode == 'probe'
+        working-directory: data
+        run: node scrape-caseys.js --probe
+
+      - name: Smoke test (50 queries)
+        if: inputs.mode == 'smoke'
+        working-directory: data
+        run: node scrape-caseys.js --limit 50
+
+      - name: Full crawl
+        if: inputs.mode == 'full'
+        working-directory: data
+        run: node scrape-caseys.js
+
+      - name: Upload result
+        if: inputs.mode == 'smoke' || inputs.mode == 'full'
+        uses: actions/upload-artifact@v4
+        with:
+          name: caseys-${{ inputs.mode }}-${{ github.run_number }}
+          path: data/caseys_full.json
+          if-no-files-found: warn
+
+      - name: Commit
+        if: inputs.mode == 'full' && inputs.commit == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/caseys_full.json
+          git diff --staged --quiet && echo "no changes" && exit 0
+          git commit -m "Casey's location refresh $(date -u +%Y-%m-%d)"
+          git push
