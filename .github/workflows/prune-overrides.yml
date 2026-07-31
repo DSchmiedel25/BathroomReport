@@ -1,0 +1,72 @@
+name: Prune overrides
+
+# Retires overrides that are already baked into the static *-locations.js files.
+# Deliberately NOT part of the nightly bake: an override should only be retired once its
+# values have been baked, committed, pushed and live for a while. Running it inside the bake
+# would delete a correction minutes after writing it, before the commit step has proven it
+# shipped — and if that push then failed, the fix would be gone from both places.
+#
+# `remove: true` overrides are never retired. Everything retired is copied to
+# `overridesArchive` first, so a from-scratch chain rebuild can replay it.
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'       # Mondays 09:00 UTC, an hour after the nightly bake
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry-run reports only; apply archives + deletes"
+        required: true
+        default: dry-run
+        type: choice
+        options: [dry-run, apply]
+      days:
+        description: "only retire overrides untouched for at least this many days"
+        required: true
+        default: "14"
+        type: string
+      include_orphans:
+        description: "also retire overrides with no matching record"
+        required: true
+        default: "false"
+        type: choice
+        options: ["true", "false"]
+
+concurrency:
+  group: prune-overrides
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Restore service account key
+        run: |
+          printf '%s' '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > serviceAccountKey.json
+          node -e "require('./serviceAccountKey.json')" || { echo "Invalid FIREBASE_SERVICE_ACCOUNT secret"; exit 1; }
+
+      - name: Install firebase-admin
+        run: npm install firebase-admin --no-save
+
+      # The scheduled run is always a dry run. Retiring on a timer with nobody reading the
+      # output is how a bad rule quietly eats a year of corrections; the weekly report is the
+      # prompt to go press the button.
+      - name: Prune
+        run: |
+          FLAGS="--days ${{ inputs.days || '14' }}"
+          if [ "${{ inputs.mode }}" = "apply" ]; then FLAGS="$FLAGS --apply"; fi
+          if [ "${{ inputs.include_orphans }}" = "true" ]; then FLAGS="$FLAGS --include-orphans"; fi
+          echo "running: node prune-overrides.js $FLAGS"
+          node prune-overrides.js $FLAGS
+
+      - name: Clean up key
+        if: always()
+        run: rm -f serviceAccountKey.json
