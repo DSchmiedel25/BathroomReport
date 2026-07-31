@@ -14,6 +14,8 @@
  * a new store next to a known one is found automatically.
  *
  * Usage:
+ *   node scrape-caseys.js --sitemap          # list every store from the sitemap
+ *   node scrape-caseys.js --pages            # fetch each store page for coords
  *   node scrape-caseys.js --introspect       # ask the API to describe itself
  *   node scrape-caseys.js --discover         # dig the query out of the site's JS
  *   node scrape-caseys.js --probe            # one request, dump raw JSON, exit
@@ -49,6 +51,8 @@ const args = process.argv.slice(2);
 const PROBE = args.includes("--probe");
 const INTROSPECT = args.includes("--introspect");
 const DISCOVER = args.includes("--discover");
+const SITEMAP = args.includes("--sitemap");
+const PAGES = args.includes("--pages");
 const LIMIT = args.includes("--limit")
   ? parseInt(args[args.indexOf("--limit") + 1], 10)
   : Infinity;
@@ -180,12 +184,7 @@ async function queryCaseys(lat, lng) {
     try {
       const res = await fetch(ENDPOINT, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "User-Agent":
-            "BathroomReport/1.0 (+https://bathroomreport.app) location-sync",
-        },
+        headers: { ...BROWSER_HEADERS, "Content-Type": "application/json" },
         body: JSON.stringify({
           query: QUERY,
           variables: buildVariables(lat, lng),
@@ -214,6 +213,49 @@ async function queryCaseys(lat, lng) {
 }
 
 // ---------------------------------------------------------------------------
+// HTTP helpers
+// ---------------------------------------------------------------------------
+
+const BROWSER_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
+    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+  "Accept-Language": "en-US,en;q=0.9",
+  Accept: "application/json, text/plain, */*",
+  Origin: "https://www.caseys.com",
+  Referer: "https://www.caseys.com/store-locator",
+};
+
+/** POST JSON and never blow up on an HTML error page — report it instead. */
+async function postJSON(url, body) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { ...BROWSER_HEADERS, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  const ctype = res.headers.get("content-type") ?? "";
+
+  if (!ctype.includes("json")) {
+    const err = new Error(`Non-JSON response (HTTP ${res.status})`);
+    err.diagnostic =
+      `  status       : ${res.status} ${res.statusText}\n` +
+      `  content-type : ${ctype}\n` +
+      `  server       : ${res.headers.get("server") ?? "-"}\n` +
+      `  cf-ray       : ${res.headers.get("cf-ray") ?? "-"}\n` +
+      `  body (600ch) :\n${text.slice(0, 600)}`;
+    throw err;
+  }
+  return JSON.parse(text);
+}
+
+async function getText(url) {
+  const res = await fetch(url, { headers: BROWSER_HEADERS });
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+  return res.text();
+}
+
+// ---------------------------------------------------------------------------
 // Discovery: figure out the schema without a browser
 // ---------------------------------------------------------------------------
 
@@ -237,12 +279,17 @@ function typeName(t) {
 
 async function introspect() {
   console.log("Asking the endpoint to describe itself...\n");
-  const res = await fetch(ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ query: INTROSPECTION }),
-  });
-  const json = await res.json();
+  let json;
+  try {
+    json = await postJSON(ENDPOINT, { query: INTROSPECTION });
+  } catch (e) {
+    console.log(`${e.message}\n${e.diagnostic ?? ""}`);
+    console.log(
+      "\n--> The API is behind a bot filter or the path is wrong.\n" +
+      "    Next: node scrape-caseys.js --sitemap"
+    );
+    return;
+  }
 
   if (json.errors || !json.data?.__schema) {
     console.log("Introspection is disabled or blocked. Raw response:\n");
@@ -269,9 +316,7 @@ async function discover() {
   const page = "https://www.caseys.com/store-locator";
   console.log(`Fetching ${page} and scanning its JS for the query...\n`);
 
-  const html = await (await fetch(page, {
-    headers: { "User-Agent": "Mozilla/5.0 BathroomReport/1.0" },
-  })).text();
+  const html = await getText(page);
 
   const bundles = [...new Set(
     [...html.matchAll(/src="([^"]+\.js[^"]*)"/g)].map((m) =>
@@ -298,6 +343,183 @@ async function discover() {
     }
   }
   if (!found) console.log("Nothing matched. Paste me the page URL you searched and I'll adapt.");
+}
+
+// ---------------------------------------------------------------------------
+// Sitemap route — no API needed. Casey's publishes every store page, and the
+// URL itself encodes state, city, street and store number:
+//   /general-store/ky-paducah/5425-cairo-road/4464
+// ---------------------------------------------------------------------------
+
+const SITEMAP_ROOT = "https://www.caseys.com/sitemap.xml";
+const SITEMAP_FILE = path.join(__dirname, "caseys_sitemap.json");
+const STORE_URL_RE =
+  /https:\/\/www\.caseys\.com\/general-store\/([a-z]{2})-([^/]+)\/([^/]+)\/(\d+)/gi;
+
+const titleCase = (s) =>
+  s.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+async function collectSitemapUrls() {
+  const seen = new Map();
+  const queue = [SITEMAP_ROOT];
+  const visited = new Set();
+
+  while (queue.length) {
+    const url = queue.shift();
+    if (visited.has(url)) continue;
+    visited.add(url);
+
+    let xml;
+    try {
+      xml = await getText(url);
+    } catch (e) {
+      console.warn(`  ! ${e.message}`);
+      continue;
+    }
+
+    for (const m of xml.matchAll(STORE_URL_RE)) {
+      const [full, st, city, street, num] = m;
+      if (!seen.has(num)) {
+        seen.set(num, {
+          store_number: num.padStart(4, "0"),
+          state: st.toUpperCase(),
+          city: titleCase(city),
+          address: titleCase(street),
+          url: full,
+        });
+      }
+    }
+
+    // follow nested sitemaps
+    for (const m of xml.matchAll(/<loc>\s*([^<]+\.xml[^<]*)\s*<\/loc>/gi)) {
+      const child = m[1].trim();
+      if (!visited.has(child)) queue.push(child);
+    }
+    console.log(`  scanned ${url.split("/").pop()} — ${seen.size} stores so far`);
+  }
+  return [...seen.values()];
+}
+
+async function sitemap() {
+  console.log(`Crawling ${SITEMAP_ROOT}...\n`);
+  const stores = await collectSitemapUrls();
+
+  if (!stores.length) {
+    console.log("No store URLs found. The sitemap may be split differently.");
+    return;
+  }
+
+  fs.writeFileSync(SITEMAP_FILE, JSON.stringify(stores, null, 1));
+
+  const byState = {};
+  stores.forEach((s) => (byState[s.state] = (byState[s.state] ?? 0) + 1));
+
+  console.log(`\n${"=".repeat(52)}`);
+  console.log(`  stores in sitemap : ${stores.length}`);
+  console.log(`  vs reported 2,944 : ${(stores.length / 2944 * 100).toFixed(1)}%`);
+  console.log(`  states            : ${Object.keys(byState).length}`);
+  console.log(`${"=".repeat(52)}`);
+  Object.entries(byState)
+    .sort((a, b) => b[1] - a[1])
+    .forEach(([st, n]) => console.log(`    ${st}  ${n}`));
+
+  if (fs.existsSync(SEEDS_FILE)) {
+    const known = new Set(
+      JSON.parse(fs.readFileSync(SEEDS_FILE, "utf8"))
+        .map((k) => k.store_number)
+        .filter(Boolean)
+    );
+    const fresh = stores.filter((s) => !known.has(s.store_number));
+    console.log(`\n  not in caseys_merged.json: ${fresh.length}`);
+  }
+  console.log(`\nWrote ${path.basename(SITEMAP_FILE)}. Next: --pages`);
+}
+
+/** Pull coordinates + hours from a store page's JSON-LD block. */
+function parseStorePage(html, base) {
+  const rec = { ...base };
+  for (const m of html.matchAll(
+    /<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi
+  )) {
+    let ld;
+    try { ld = JSON.parse(m[1].trim()); } catch { continue; }
+    for (const node of [].concat(ld["@graph"] ?? ld)) {
+      if (!node?.geo && !node?.address) continue;
+      if (node.geo) {
+        rec.lat = round6(Number(node.geo.latitude));
+        rec.lng = round6(Number(node.geo.longitude));
+      }
+      if (node.address) {
+        rec.address = node.address.streetAddress ?? rec.address;
+        rec.city = node.address.addressLocality ?? rec.city;
+        rec.state = (node.address.addressRegion ?? rec.state).toUpperCase();
+        rec.zip = String(node.address.postalCode ?? "").split("-")[0] || null;
+      }
+      rec.phone = node.telephone ?? rec.phone ?? null;
+      if (node.openingHours) {
+        rec.hours = [].concat(node.openingHours).join("; ");
+      }
+    }
+  }
+  if (!rec.lat) {
+    const m = html.match(/"latitude"\s*:\s*"?(-?\d+\.\d+)"?[\s\S]{0,120}?"longitude"\s*:\s*"?(-?\d+\.\d+)"?/i);
+    if (m) { rec.lat = round6(+m[1]); rec.lng = round6(+m[2]); }
+  }
+  return rec;
+}
+
+async function pages() {
+  if (!fs.existsSync(SITEMAP_FILE)) {
+    console.log("Run --sitemap first."); return;
+  }
+  const list = JSON.parse(fs.readFileSync(SITEMAP_FILE, "utf8"));
+  const out = fs.existsSync(CHECKPOINT)
+    ? JSON.parse(fs.readFileSync(CHECKPOINT, "utf8"))
+    : {};
+  const todo = list.filter((s) => !out[s.store_number]).slice(0, LIMIT);
+  console.log(`${list.length} stores, ${todo.length} to fetch.\n`);
+
+  let done = 0;
+  const queue = [...todo];
+
+  async function worker() {
+    while (queue.length) {
+      const s = queue.shift();
+      try {
+        out[s.store_number] = parseStorePage(await getText(s.url), s);
+      } catch (e) {
+        console.warn(`  ! ${s.store_number}: ${e.message}`);
+      }
+      if (++done % 50 === 0) {
+        console.log(`  ${done}/${todo.length}`);
+        fs.writeFileSync(CHECKPOINT, JSON.stringify(out));
+      }
+      await sleep(DELAY_MS);
+    }
+  }
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+
+  const all = Object.values(out).map((s) => ({
+    id: `caseys-${s.store_number}`,
+    chain: "caseys",
+    store_number: s.store_number,
+    name: "Casey's",
+    lat: s.lat ?? null,
+    lng: s.lng ?? null,
+    address: s.address ?? null,
+    city: s.city ?? null,
+    state: s.state ?? null,
+    zip: s.zip ?? null,
+    phone: s.phone ?? null,
+    hours: s.hours ?? null,
+    website: s.url,
+    source: `caseys-sitemap:${new Date().toISOString().slice(0, 10)}`,
+    needs_enrichment: !s.lat,
+  })).sort((a, b) => a.store_number.localeCompare(b.store_number));
+
+  fs.writeFileSync(OUT_FILE, JSON.stringify(all, null, 1));
+  if (fs.existsSync(CHECKPOINT)) fs.unlinkSync(CHECKPOINT);
+  report(all, done);
 }
 
 // ---------------------------------------------------------------------------
@@ -345,6 +567,8 @@ function loadSeeds() {
 
 async function main() {
   if (INTROSPECT) return introspect();
+  if (SITEMAP) return sitemap();
+  if (PAGES) return pages();
   if (DISCOVER) return discover();
   if (PROBE) return probe();
 
