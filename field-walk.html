@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>FIELDWALK — first-person survey of real places</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0E1418;
+    --ink-2:#141C21;
+    --bone:#F5EFE3;
+    --steel:#8A98A0;
+    --cyan:#5FB8C4;
+    --brass:#D8B14A;
+    --hair:rgba(245,239,227,.14);
+    --mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans:"IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--ink);color:var(--bone);
+    font-family:var(--mono);font-size:16px;}
+  canvas{display:block;}
+  #scene{position:fixed;inset:0;touch-action:none;}
+
+  /* ---------- shared micro-type ---------- */
+  .eyebrow{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--steel);font-weight:500;}
+  .rule{height:1px;background:var(--hair);border:0;margin:0;}
+
+  /* ---------- register (menu) ---------- */
+  #register{position:fixed;inset:0;z-index:40;background:
+      radial-gradient(120% 80% at 50% -10%, #1B262C 0%, #0E1418 60%);
+    overflow-y:auto;-webkit-overflow-scrolling:touch;padding:28px 20px 40px;}
+  .wrap{max-width:640px;margin:0 auto;}
+  .mast{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+  h1{font-family:var(--mono);font-weight:600;font-size:clamp(30px,9vw,44px);
+     letter-spacing:.30em;margin:6px 0 0;line-height:1;text-indent:.30em;}
+  .sub{font-family:var(--sans);font-weight:300;font-size:14px;color:var(--steel);
+     line-height:1.55;margin:16px 0 0;max-width:44ch;}
+  .sub b{color:var(--bone);font-weight:400;}
+  .sec{margin-top:30px;}
+  .sec-head{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:8px;}
+
+  .rows{border-top:1px solid var(--hair);}
+  .row{display:grid;grid-template-columns:26px 1fr auto;gap:12px;align-items:center;
+    padding:13px 4px;border-bottom:1px solid var(--hair);cursor:pointer;position:relative;
+    background:transparent;transition:background .18s ease,padding-left .18s ease;}
+  .row:hover,.row:focus-visible{background:rgba(95,184,196,.07);padding-left:10px;outline:none;}
+  .row[aria-selected="true"]{background:rgba(216,177,74,.10);}
+  .row[aria-selected="true"]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--brass);}
+  .idx{font-size:11px;color:var(--cyan);letter-spacing:.1em;}
+  .row[aria-selected="true"] .idx{color:var(--brass);}
+  .nm{font-family:var(--sans);font-size:15px;font-weight:400;line-height:1.25;}
+  .nm small{display:block;font-family:var(--mono);font-size:10.5px;color:var(--steel);
+    letter-spacing:.06em;margin-top:3px;text-transform:uppercase;}
+  .coord{font-size:11px;color:var(--steel);letter-spacing:.02em;text-align:right;white-space:nowrap;}
+
+  .field{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+  label.f{display:block;}
+  label.f span{display:block;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--steel);margin-bottom:6px;}
+  input[type=text]{width:100%;background:#0A1013;border:1px solid var(--hair);color:var(--bone);
+    font-family:var(--mono);font-size:14px;padding:10px 11px;border-radius:2px;}
+  input[type=text]:focus{outline:none;border-color:var(--cyan);}
+  input[type=range]{width:100%;accent-color:var(--brass);}
+
+  #go{margin-top:26px;width:100%;padding:16px;background:var(--brass);color:#12100A;border:0;
+    font-family:var(--mono);font-weight:600;font-size:13px;letter-spacing:.24em;text-transform:uppercase;
+    cursor:pointer;border-radius:2px;transition:transform .12s ease, filter .12s ease;}
+  #go:hover{filter:brightness(1.08);}
+  #go:active{transform:translateY(1px);}
+  #go:disabled{background:#2A3238;color:var(--steel);cursor:default;}
+  .foot{margin-top:22px;font-size:10.5px;line-height:1.7;color:#5E6D75;letter-spacing:.04em;}
+  .foot a{color:var(--steel);}
+
+  /* ---------- loading ---------- */
+  #loading{position:fixed;inset:0;z-index:45;background:#0E1418;display:none;
+    flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center;}
+  #loading.on{display:flex;}
+  .lbar{width:min(260px,70vw);height:2px;background:rgba(245,239,227,.12);overflow:hidden;}
+  .lbar i{display:block;height:100%;width:34%;background:var(--cyan);animation:sweep 1.25s ease-in-out infinite;}
+  @keyframes sweep{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
+  #lmsg{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--steel);min-height:1.4em;}
+  #lerr{font-family:var(--sans);font-size:13px;color:var(--bone);max-width:36ch;line-height:1.6;display:none;}
+  .btn-ghost{background:transparent;border:1px solid var(--hair);color:var(--bone);font-family:var(--mono);
+    font-size:11px;letter-spacing:.18em;text-transform:uppercase;padding:11px 18px;cursor:pointer;border-radius:2px;}
+  .btn-ghost:hover{border-color:var(--cyan);}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;z-index:20;pointer-events:none;display:none;
+    padding:calc(env(safe-area-inset-top,0px) + 12px) 14px calc(env(safe-area-inset-bottom,0px) + 14px);}
+  #hud.on{display:block;}
+  #tape{position:absolute;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);
+    width:min(620px,90vw);height:auto;}
+  #panel-l{position:absolute;top:calc(env(safe-area-inset-top,0px) + 52px);left:14px;max-width:52vw;}
+  #panel-r{position:absolute;top:calc(env(safe-area-inset-top,0px) + 52px);right:14px;text-align:right;}
+  .tgt{font-family:var(--sans);font-size:15px;font-weight:400;line-height:1.25;margin-top:5px;
+    text-shadow:0 1px 6px rgba(0,0,0,.9);}
+  .dist{font-size:22px;font-weight:300;letter-spacing:.02em;color:var(--brass);margin-top:4px;
+    text-shadow:0 1px 6px rgba(0,0,0,.9);}
+  .stat{font-size:19px;font-weight:300;margin-top:3px;text-shadow:0 1px 6px rgba(0,0,0,.9);}
+  #panel-l .eyebrow,#panel-r .eyebrow{text-shadow:0 1px 5px rgba(0,0,0,.9);}
+  #mini{position:absolute;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);
+    width:112px;height:112px;border-radius:50%;border:1px solid rgba(245,239,227,.22);
+    background:rgba(10,16,19,.72);backdrop-filter:blur(2px);}
+  #dot{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;
+    border-radius:50%;background:rgba(245,239,227,.6);box-shadow:0 0 4px rgba(0,0,0,.8);}
+  #keys{position:absolute;left:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);
+    font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(245,239,227,.42);line-height:1.8;
+    text-shadow:0 1px 5px rgba(0,0,0,.9);}
+  #toast{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);text-align:center;
+    opacity:0;transition:opacity .3s ease;}
+  #toast .eyebrow{color:var(--brass);}
+  #toast .t{font-family:var(--sans);font-size:19px;margin-top:6px;text-shadow:0 2px 10px rgba(0,0,0,.9);}
+  #toast.on{opacity:1;}
+  #exit{position:absolute;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;pointer-events:auto;
+    background:transparent;border:0;color:rgba(245,239,227,.5);font-family:var(--mono);font-size:10px;
+    letter-spacing:.18em;padding:6px;cursor:pointer;display:none;}
+
+  /* ---------- pause / lock prompt ---------- */
+  #veil{position:fixed;inset:0;z-index:30;background:rgba(14,20,24,.86);display:none;
+    align-items:center;justify-content:center;flex-direction:column;gap:16px;text-align:center;padding:24px;
+    pointer-events:auto;}
+  #veil.on{display:flex;}
+  #veil .t{font-family:var(--sans);font-size:16px;color:var(--bone);max-width:34ch;line-height:1.6;}
+
+  /* ---------- finish card ---------- */
+  #done{position:fixed;inset:0;z-index:35;background:rgba(14,20,24,.93);display:none;
+    align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:28px;text-align:center;}
+  #done.on{display:flex;}
+  #done .big{font-size:clamp(34px,12vw,54px);font-weight:300;color:var(--brass);letter-spacing:.04em;}
+
+  @media (prefers-reduced-motion: reduce){ .lbar i{animation:none;width:100%} #toast{transition:none} }
+  @media (max-width:420px){ #keys{display:none} }
+</style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+
+<!-- ============ REGISTER ============ -->
+<div id="register">
+  <div class="wrap">
+    <div class="mast">
+      <div class="eyebrow">Survey&nbsp;instrument&nbsp;/&nbsp;walking&nbsp;scale</div>
+    </div>
+    <h1>FIELDWALK</h1>
+    <p class="sub">Every street, building and doorway below is pulled live from <b>OpenStreetMap</b> and rebuilt as ground you can walk. Pick a district, then find every marked address on foot. Nothing is invented — if it's standing in the world, it's standing here.</p>
+
+    <div class="sec">
+      <div class="sec-head"><span class="eyebrow">Districts on file</span><span class="eyebrow">Lat / Lon</span></div>
+      <div class="rows" id="rows"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><span class="eyebrow">Or enter your own coordinates</span></div>
+      <div class="field">
+        <label class="f"><span>Latitude</span><input type="text" id="clat" inputmode="decimal" placeholder="41.3925"></label>
+        <label class="f"><span>Longitude</span><input type="text" id="clon" inputmode="decimal" placeholder="2.1650"></label>
+      </div>
+      <label class="f" style="margin-top:14px">
+        <span>Survey radius — <b id="radlbl" style="color:var(--brass);font-weight:500">350 m</b></span>
+        <input type="range" id="rad" min="180" max="600" step="10" value="350">
+      </label>
+    </div>
+
+    <button id="go">Begin survey</button>
+
+    <p class="foot">
+      Map data © OpenStreetMap contributors, ODbL 1.0. Geometry served by the public Overpass API.
+      Rendering by three.js (MIT). Building heights come from <code>height</code> and <code>building:levels</code>
+      tags where surveyed, and are estimated where they aren't.
+    </p>
+  </div>
+</div>
+
+<!-- ============ LOADING ============ -->
+<div id="loading">
+  <div class="eyebrow">Reading the ground</div>
+  <div class="lbar"><i></i></div>
+  <div id="lmsg">Opening connection…</div>
+  <div id="lerr"></div>
+  <button class="btn-ghost" id="lback" style="display:none">Back to register</button>
+</div>
+
+<!-- ============ HUD ============ -->
+<div id="hud">
+  <canvas id="tape" width="620" height="34"></canvas>
+  <div id="panel-l">
+    <div class="eyebrow">Next address</div>
+    <div class="tgt" id="tgtName">—</div>
+    <div class="dist" id="tgtDist">—</div>
+  </div>
+  <div id="panel-r">
+    <div class="eyebrow">Found</div>
+    <div class="stat" id="score">0 / 0</div>
+    <div class="eyebrow" style="margin-top:10px">Elapsed</div>
+    <div class="stat" id="time">0:00</div>
+  </div>
+  <canvas id="mini" width="224" height="224"></canvas>
+  <div id="dot"></div>
+  <div id="keys">W A S D — walk<br>Shift — run<br>Mouse — look<br>Esc — pause</div>
+  <div id="toast"><div class="eyebrow" id="toastK">Logged</div><div class="t" id="toastT"></div></div>
+  <button id="exit">Leave</button>
+</div>
+
+<!-- ============ VEIL ============ -->
+<div id="veil">
+  <div class="eyebrow">Paused</div>
+  <div class="t" id="veilT">Click to look around. Walk with W A S D, hold Shift to run.</div>
+  <button class="btn-ghost" id="resume">Step outside</button>
+  <button class="btn-ghost" id="quit" style="border-color:transparent;color:var(--steel)">Back to register</button>
+</div>
+
+<!-- ============ DONE ============ -->
+<div id="done">
+  <div class="eyebrow">Survey complete</div>
+  <div class="big" id="doneTime">0:00</div>
+  <div class="t" style="font-family:var(--sans);color:var(--steel);max-width:32ch;line-height:1.6" id="doneT"></div>
+  <button class="btn-ghost" id="again">Back to register</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+
+/* ============================================================
+   FIELDWALK — first-person walking over live OpenStreetMap data
+   ============================================================ */
+
+const LOCATIONS = [
+  { n:"French Quarter",   c:"New Orleans, US",  lat:29.9584, lon:-90.0644 },
+  { n:"Rialto & San Polo",c:"Venice, IT",       lat:45.4380, lon: 12.3358 },
+  { n:"Le Marais",        c:"Paris, FR",        lat:48.8590, lon:  2.3610 },
+  { n:"Gion",             c:"Kyoto, JP",        lat:35.0037, lon:135.7788 },
+  { n:"North Beach",      c:"San Francisco, US",lat:37.7999, lon:-122.4083 },
+  { n:"Jordaan",          c:"Amsterdam, NL",    lat:52.3750, lon:  4.8830 },
+  { n:"Eixample blocks",  c:"Barcelona, ES",    lat:41.3925, lon:  2.1650 },
+  { n:"Covent Garden",    c:"London, UK",       lat:51.5124, lon: -0.1225 },
+  { n:"Kabukichō",        c:"Tokyo, JP",        lat:35.6950, lon:139.7020 },
+  { n:"Lower Manhattan",  c:"New York, US",     lat:40.7075, lon:-74.0100 },
+];
+
+const OVERPASS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter"
+];
+
+const EYE = 1.68, WALK = 3.3, RUN = 6.8, REACH = 9;
+const R_EARTH = 6378137;
+
+let scene, camera, renderer, clock, raf = 0;
+let originLat = 0, originLon = 0, cosLat = 1, worldRadius = 350;
+let running = false, paused = false, finished = false;
+
+const player = { x:0, z:0, yaw:0, pitch:0 };
+const keys = Object.create(null);
+let objectives = [], foundCount = 0, startTime = 0, elapsed = 0;
+let districtName = "";
+
+/* ---------- collision index ---------- */
+const CELL = 28;
+const grid = new Map();
+function cellKey(x,z){ return ((x/CELL)|0) + ":" + ((z/CELL)|0); }
+function indexPolygon(poly){
+  let minx=1e9,maxx=-1e9,minz=1e9,maxz=-1e9;
+  for(const p of poly){ if(p.x<minx)minx=p.x; if(p.x>maxx)maxx=p.x; if(p.z<minz)minz=p.z; if(p.z>maxz)maxz=p.z; }
+  for(let cx=(minx/CELL|0); cx<=(maxx/CELL|0); cx++)
+    for(let cz=(minz/CELL|0); cz<=(maxz/CELL|0); cz++){
+      const k = cx+":"+cz;
+      let a = grid.get(k); if(!a){ a=[]; grid.set(k,a); }
+      a.push(poly);
+    }
+}
+function pointInPoly(px,pz,poly){
+  let inside=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const xi=poly[i].x, zi=poly[i].z, xj=poly[j].x, zj=poly[j].z;
+    if(((zi>pz)!==(zj>pz)) && (px < (xj-xi)*(pz-zi)/(zj-zi)+xi)) inside=!inside;
+  }
+  return inside;
+}
+function blocked(x,z){
+  for(let cx=-1;cx<=1;cx++) for(let cz=-1;cz<=1;cz++){
+    const a = grid.get(((x/CELL|0)+cx)+":"+((z/CELL|0)+cz));
+    if(!a) continue;
+    for(const poly of a) if(pointInPoly(x,z,poly)) return true;
+  }
+  return false;
+}
+
+/* ---------- projection ---------- */
+function toXZ(lat, lon){
+  return {
+    x: (lon - originLon) * Math.PI/180 * R_EARTH * cosLat,
+    z: -(lat - originLat) * Math.PI/180 * R_EARTH
+  };
+}
+
+/* ============================================================
+   REGISTER UI
+   ============================================================ */
+const $ = id => document.getElementById(id);
+let selected = 0;
+
+(function buildRegister(){
+  const rows = $("rows");
+  LOCATIONS.forEach((L,i)=>{
+    const el = document.createElement("div");
+    el.className = "row";
+    el.tabIndex = 0;
+    el.setAttribute("role","option");
+    el.setAttribute("aria-selected", i===0 ? "true":"false");
+    el.innerHTML =
+      '<div class="idx">'+String(i+1).padStart(2,"0")+'</div>'+
+      '<div class="nm">'+L.n+'<small>'+L.c+'</small></div>'+
+      '<div class="coord">'+L.lat.toFixed(4)+'<br>'+L.lon.toFixed(4)+'</div>';
+    const pick = ()=>{
+      selected = i;
+      [...rows.children].forEach((c,j)=>c.setAttribute("aria-selected", j===i?"true":"false"));
+      $("clat").value=""; $("clon").value="";
+    };
+    el.addEventListener("click", pick);
+    el.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); pick(); }});
+    rows.appendChild(el);
+  });
+})();
+
+$("rad").addEventListener("input", e=>{ $("radlbl").textContent = e.target.value + " m"; });
+$("go").addEventListener("click", start);
+$("lback").addEventListener("click", toRegister);
+$("again").addEventListener("click", toRegister);
+$("quit").addEventListener("click", toRegister);
+$("exit").addEventListener("click", ()=>{ paused = true; $("veil").classList.add("on"); $("veilT").textContent = "Survey held. Step back outside, or return to the register."; });
+$("resume").addEventListener("click", ()=>{ $("veil").classList.remove("on"); paused=false; tryLock(); });
+
+function toRegister(){
+  running = false; paused = false; finished = false;
+  cancelAnimationFrame(raf);
+  document.exitPointerLock && document.exitPointerLock();
+  $("hud").classList.remove("on");
+  $("veil").classList.remove("on");
+  $("done").classList.remove("on");
+  $("loading").classList.remove("on");
+  $("exit").style.display = "none";
+  $("register").style.display = "";
+  disposeWorld();
+}
+
+/* ============================================================
+   START / LOAD
+   ============================================================ */
+async function start(){
+  let lat, lon;
+  const cl = parseFloat($("clat").value), cn = parseFloat($("clon").value);
+  if(!isNaN(cl) && !isNaN(cn) && Math.abs(cl)<=90 && Math.abs(cn)<=180){
+    lat = cl; lon = cn; districtName = cl.toFixed(4)+", "+cn.toFixed(4);
+  } else {
+    const L = LOCATIONS[selected]; lat = L.lat; lon = L.lon; districtName = L.n+" — "+L.c;
+  }
+  worldRadius = parseInt($("rad").value,10);
+
+  $("register").style.display = "none";
+  $("loading").classList.add("on");
+  $("lerr").style.display = "none";
+  $("lback").style.display = "none";
+  setMsg("Requesting geometry within " + worldRadius + " m");
+
+  const data = await fetchOSM(lat, lon, worldRadius, setMsg);
+  if(!data){
+    $("lmsg").textContent = "";
+    $("lerr").style.display = "block";
+    $("lerr").innerHTML = "The Overpass servers didn't answer. They rate-limit heavily at busy hours — wait a minute and try again, or pick a smaller radius.";
+    $("lback").style.display = "";
+    return;
+  }
+  setMsg("Raising " + data.elements.length.toLocaleString() + " features");
+  await new Promise(r=>setTimeout(r,40));
+
+  originLat = lat; originLon = lon; cosLat = Math.cos(lat*Math.PI/180);
+  buildWorld(data);
+  $("loading").classList.remove("on");
+  enterGame();
+}
+function setMsg(m){ $("lmsg").textContent = m; }
+
+function buildQuery(lat,lon,r){
+  const a = "(around:"+r+","+lat+","+lon+")";
+  return "[out:json][timeout:40];("
+    + 'way'+a+'["building"];'
+    + 'way'+a+'["building:part"];'
+    + 'way'+a+'["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|service|living_street|pedestrian|footway|path|steps|track)$"];'
+    + 'way'+a+'["natural"="water"];'
+    + 'way'+a+'["waterway"="riverbank"];'
+    + 'way'+a+'["leisure"~"^(park|garden|pitch|playground)$"];'
+    + 'way'+a+'["landuse"~"^(grass|forest|meadow|village_green|cemetery|recreation_ground)$"];'
+    + 'node'+a+'["amenity"~"^(cafe|restaurant|bar|pub|fast_food|bank|pharmacy|library|theatre|cinema|fountain|post_office|marketplace|place_of_worship)$"]["name"];'
+    + 'node'+a+'["shop"]["name"];'
+    + 'node'+a+'["tourism"~"^(museum|attraction|artwork|hotel|gallery|viewpoint)$"]["name"];'
+    + 'node'+a+'["natural"="tree"];'
+    + ");out geom;";
+}
+
+async function fetchOSM(lat,lon,r,onMsg){
+  const q = buildQuery(lat,lon,r);
+  for(let i=0;i<OVERPASS.length;i++){
+    const ep = OVERPASS[i];
+    try{
+      onMsg("Querying " + ep.split("/")[2]);
+      const ctrl = new AbortController();
+      const timer = setTimeout(()=>ctrl.abort(), 45000);
+      const res = await fetch(ep, {
+        method:"POST",
+        headers:{"Content-Type":"application/x-www-form-urlencoded"},
+        body:"data="+encodeURIComponent(q),
+        signal: ctrl.signal
+      });
+      clearTimeout(timer);
+      if(!res.ok) throw new Error("HTTP "+res.status);
+      const json = await res.json();
+      if(json && json.elements && json.elements.length) return json;
+      throw new Error("empty");
+    }catch(err){
+      console.warn("Overpass failed:", ep, err);
+      onMsg("Mirror busy — trying another");
+    }
+  }
+  return null;
+}
+
+/* ============================================================
+   WORLD CONSTRUCTION
+   ============================================================ */
+const disposables = [];
+function track(o){ disposables.push(o); return o; }
+
+function disposeWorld(){
+  if(!scene) return;
+  for(const o of disposables){
+    if(o.geometry) o.geometry.dispose();
+    if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ if(m.map) m.map.dispose(); m.dispose(); }); }
+    if(o.parent) o.parent.remove(o);
+  }
+  disposables.length = 0;
+  grid.clear();
+  objectives = [];
+}
+
+const ROAD_W = { motorway:17, trunk:15, primary:13, secondary:11, tertiary:9.5,
+  residential:7.5, unclassified:6.5, living_street:6.5, service:4.5, pedestrian:6,
+  footway:2.4, path:1.9, steps:2.2, track:3.2 };
+const PAVED = { motorway:1, trunk:1, primary:1, secondary:1, tertiary:1, residential:1, unclassified:1, service:1, living_street:1 };
+
+const WALL_COLORS = [0x9C8F79,0x8A6F60,0x7E8286,0xA1937F,0x6E6A66,0xB0A188,0x7A6C5E,0x8E9491];
+
+function hash(n){ n = (n ^ 61) ^ (n >>> 16); n = n + (n << 3); n = n ^ (n >>> 4); n = Math.imul(n, 0x27d4eb2d); n = n ^ (n >>> 15); return (n >>> 0) / 4294967295; }
+
+function makeFacadeTexture(){
+  const c = document.createElement("canvas"); c.width = c.height = 256;
+  const g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0,0,256,256);
+  for(let i=0;i<2600;i++){
+    g.fillStyle = "rgba(0,0,0,"+(Math.random()*0.055)+")";
+    g.fillRect(Math.random()*256, Math.random()*256, 2, 2);
+  }
+  const cell = 64;
+  for(let y=0;y<4;y++) for(let x=0;x<4;x++){
+    const lit = Math.random() < 0.16;
+    g.fillStyle = lit ? "#F2CE96" : "#39414A";
+    g.fillRect(x*cell+15, y*cell+13, cell-30, cell-32);
+    g.fillStyle = "rgba(0,0,0,0.22)";
+    g.fillRect(x*cell+15, y*cell+13, cell-30, 3);
+    g.fillStyle = "rgba(255,255,255,0.55)";
+    g.fillRect(x*cell+13, y*cell+cell-19, cell-26, 3);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  return t;
+}
+
+function signedArea(pts){
+  let a = 0;
+  for(let i=0,j=pts.length-1;i<pts.length;j=i++) a += (pts[j].x*pts[i].z - pts[i].x*pts[j].z);
+  return a/2;
+}
+
+function buildWorld(data){
+  // ---- scene shell ----
+  const SKY = 0xA8B7BC;
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(SKY);
+  scene.fog = new THREE.FogExp2(SKY, 0.0058);
+
+  camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 1200);
+
+  if(!renderer){
+    renderer = new THREE.WebGLRenderer({ canvas: $("scene"), antialias: true, powerPreference:"high-performance" });
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+    renderer.outputEncoding = THREE.sRGBEncoding;
+  }
+  renderer.setSize(innerWidth, innerHeight);
+
+  scene.add(new THREE.HemisphereLight(0xC9D6DB, 0x4A4438, 0.95));
+  const sun = new THREE.DirectionalLight(0xFFF0D8, 0.85); sun.position.set(-0.55,1,0.4); scene.add(sun);
+  scene.add(new THREE.AmbientLight(0x6E7A80, 0.35));
+
+  // ---- ground ----
+  const gGeo = new THREE.PlaneGeometry(3000,3000);
+  const gMat = new THREE.MeshLambertMaterial({ color: 0x3A4038 });
+  const ground = new THREE.Mesh(gGeo, gMat); ground.rotation.x = -Math.PI/2; ground.position.y = -0.05;
+  scene.add(track(ground));
+
+  // ---- sort elements ----
+  const buildings = [], roads = [], areas = [], pois = [], trees = [];
+  for(const el of data.elements){
+    const t = el.tags || {};
+    if(el.type === "node"){
+      if(t.natural === "tree") trees.push(el);
+      else if(t.name) pois.push(el);
+      continue;
+    }
+    if(el.type !== "way" || !el.geometry || el.geometry.length < 2) continue;
+    if(t.highway){ roads.push(el); continue; }
+    if(el.geometry.length < 3) continue;
+    if(t.building || t["building:part"]) buildings.push(el);
+    else if(t.natural === "water" || t.waterway === "riverbank") areas.push({el, kind:"water"});
+    else if(t.leisure || t.landuse) areas.push({el, kind:"green"});
+  }
+
+  // ---- flat areas (water, green) ----
+  {
+    const pos = [], col = [];
+    const c = new THREE.Color();
+    for(const a of areas){
+      let pts = a.el.geometry.map(p => toXZ(p.lat, p.lon));
+      if(pts.length > 2 && pts[0].x === pts[pts.length-1].x && pts[0].z === pts[pts.length-1].z) pts.pop();
+      if(pts.length < 3) continue;
+      if(signedArea(pts) < 0) pts.reverse();
+      const contour = pts.map(p => new THREE.Vector2(p.x, p.z));
+      let tris;
+      try { tris = THREE.ShapeUtils.triangulateShape(contour, []); } catch(e){ continue; }
+      const y = a.kind === "water" ? 0.04 : 0.03;
+      c.set(a.kind === "water" ? 0x2D5567 : 0x445A3C);
+      for(const f of tris){
+        for(const idx of f){
+          const v = contour[idx];
+          pos.push(v.x, y, v.y);
+          col.push(c.r, c.g, c.b);
+        }
+      }
+    }
+    if(pos.length) scene.add(track(flatMesh(pos, col)));
+  }
+
+  // ---- roads ----
+  {
+    const pos = [], col = [];
+    const c = new THREE.Color();
+    // pavement apron first (slightly lower), then carriageway
+    for(let pass=0; pass<2; pass++){
+      for(const w of roads){
+        const type = w.tags.highway;
+        let width = ROAD_W[type] || 6;
+        const paved = PAVED[type];
+        if(pass === 0 && !paved) continue;
+        const y = pass === 0 ? 0.05 : 0.09;
+        if(pass === 0){ width += 4.2; c.set(0x6B6A63); }
+        else c.set(paved ? 0x33373A : (type === "steps" ? 0x5C564D : 0x57514A));
+        const pts = w.geometry.map(p => toXZ(p.lat, p.lon));
+        ribbon(pts, width, y, c, pos, col);
+      }
+    }
+    if(pos.length) scene.add(track(flatMesh(pos, col)));
+  }
+
+  // ---- buildings ----
+  {
+    const wPos = [], wCol = [], wUV = [];
+    const rPos = [], rCol = [];
+    const c = new THREE.Color(), rc = new THREE.Color();
+    let count = 0;
+    for(const b of buildings){
+      let pts = b.geometry.map(p => toXZ(p.lat, p.lon));
+      if(pts.length > 2 && Math.abs(pts[0].x - pts[pts.length-1].x) < 1e-6 && Math.abs(pts[0].z - pts[pts.length-1].z) < 1e-6) pts.pop();
+      if(pts.length < 3) continue;
+      if(signedArea(pts) < 0) pts.reverse();
+
+      const h = buildingHeight(b.tags, b.id);
+      const seed = hash(b.id | 0);
+      c.setHex(WALL_COLORS[Math.floor(seed * WALL_COLORS.length) % WALL_COLORS.length]);
+      c.offsetHSL(0, 0, (hash(b.id*7|0) - 0.5) * 0.10);
+      rc.copy(c).multiplyScalar(0.62);
+
+      walls(pts, h, c, wPos, wCol, wUV);
+      roof(pts, h, rc, rPos, rCol);
+      indexPolygon(pts);
+      count++;
+      if(count > 2600) break;
+    }
+    if(wPos.length){
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(wPos,3));
+      g.setAttribute("color", new THREE.Float32BufferAttribute(wCol,3));
+      g.setAttribute("uv", new THREE.Float32BufferAttribute(wUV,2));
+      g.computeVertexNormals();
+      const m = new THREE.MeshLambertMaterial({ vertexColors:true, map: makeFacadeTexture(), side: THREE.DoubleSide });
+      scene.add(track(new THREE.Mesh(g,m)));
+    }
+    if(rPos.length){
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(rPos,3));
+      g.setAttribute("color", new THREE.Float32BufferAttribute(rCol,3));
+      g.computeVertexNormals();
+      scene.add(track(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors:true, side: THREE.DoubleSide }))));
+    }
+  }
+
+  // ---- trees ----
+  if(trees.length){
+    const n = Math.min(trees.length, 420);
+    const trunkG = new THREE.CylinderGeometry(0.16,0.22,2.4,5);
+    const leafG  = new THREE.IcosahedronGeometry(1.9, 0);
+    const trunkM = new THREE.MeshLambertMaterial({ color:0x4A3B2E });
+    const leafM  = new THREE.MeshLambertMaterial({ color:0x4E6B3A, flatShading:true });
+    const tI = new THREE.InstancedMesh(trunkG, trunkM, n);
+    const lI = new THREE.InstancedMesh(leafG, leafM, n);
+    const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+    for(let i=0;i<n;i++){
+      const p = toXZ(trees[i].lat, trees[i].lon);
+      const k = 0.75 + hash(i*13) * 0.7;
+      mtx.compose(new THREE.Vector3(p.x, 1.2*k, p.z), q, s.set(k,k,k)); tI.setMatrixAt(i, mtx);
+      mtx.compose(new THREE.Vector3(p.x, 3.4*k, p.z), q, s.set(k,k*1.15,k)); lI.setMatrixAt(i, mtx);
+    }
+    scene.add(track(tI)); scene.add(track(lI));
+  }
+
+  // ---- objectives ----
+  pickObjectives(pois, roads);
+
+  // ---- spawn ----
+  spawn(roads);
+
+  buildMinimap(buildings, roads, areas);
+}
+
+function buildingHeight(t, id){
+  t = t || {};
+  if(t.height){ const h = parseFloat(t.height); if(!isNaN(h) && h > 1) return Math.min(h, 320); }
+  if(t["building:levels"]){ const l = parseFloat(t["building:levels"]); if(!isNaN(l) && l > 0) return Math.min(l*3.35 + 1.2, 320); }
+  const kind = t.building || "";
+  if(/church|cathedral|temple|tower/.test(kind)) return 22 + hash(id|0)*16;
+  if(/garage|shed|hut|carport|roof/.test(kind)) return 3 + hash(id|0)*1.5;
+  if(/apartments|residential|commercial|retail|office/.test(kind)) return 11 + hash(id|0)*13;
+  return 7.5 + hash(id|0)*7;
+}
+
+function walls(pts, h, color, pos, col, uv){
+  const cuts = h > 9 ? [0, 5.5, h] : [0, h];
+  const n = pts.length;
+  let run = 0;
+  for(let i=0;i<n;i++){
+    const a = pts[i], b = pts[(i+1)%n];
+    const dx = b.x-a.x, dz = b.z-a.z;
+    const len = Math.hypot(dx,dz);
+    if(len < 0.05) continue;
+    const u0 = run/16, u1 = (run+len)/16; run += len;
+    for(let s=0;s<cuts.length-1;s++){
+      const y0 = cuts[s], y1 = cuts[s+1];
+      const v0 = y0/13.6, v1 = y1/13.6;
+      const a0 = ao(y0), a1 = ao(y1);
+      push6(pos, a.x,y0,a.z,  b.x,y0,b.z,  b.x,y1,b.z);
+      push6(pos, a.x,y0,a.z,  b.x,y1,b.z,  a.x,y1,a.z);
+      pushUV(uv, u0,v0, u1,v0, u1,v1);
+      pushUV(uv, u0,v0, u1,v1, u0,v1);
+      pushC(col, color, a0,a0,a1);
+      pushC(col, color, a0,a1,a1);
+    }
+  }
+}
+function ao(y){ return 0.44 + 0.56 * Math.min(1, y/7); }
+
+function roof(pts, h, color, pos, col){
+  const contour = pts.map(p => new THREE.Vector2(p.x, p.z));
+  let tris;
+  try { tris = THREE.ShapeUtils.triangulateShape(contour, []); } catch(e){ return; }
+  for(const f of tris){
+    for(const idx of f){
+      const v = contour[idx];
+      pos.push(v.x, h, v.y);
+      col.push(color.r, color.g, color.b);
+    }
+  }
+}
+
+function ribbon(pts, width, y, color, pos, col){
+  const hw = width/2;
+  for(let i=0;i<pts.length-1;i++){
+    const a = pts[i], b = pts[i+1];
+    let dx = b.x-a.x, dz = b.z-a.z;
+    const len = Math.hypot(dx,dz);
+    if(len < 0.02) continue;
+    dx/=len; dz/=len;
+    const px = -dz*hw, pz = dx*hw;
+    push6(pos, a.x+px,y,a.z+pz,  b.x+px,y,b.z+pz,  b.x-px,y,b.z-pz);
+    push6(pos, a.x+px,y,a.z+pz,  b.x-px,y,b.z-pz,  a.x-px,y,a.z-pz);
+    for(let k=0;k<6;k++) col.push(color.r, color.g, color.b);
+    if(i > 0){ // fill the mitre gap with a small square
+      push6(pos, a.x-hw,y,a.z-hw, a.x+hw,y,a.z-hw, a.x+hw,y,a.z+hw);
+      push6(pos, a.x-hw,y,a.z-hw, a.x+hw,y,a.z+hw, a.x-hw,y,a.z+hw);
+      for(let k=0;k<6;k++) col.push(color.r, color.g, color.b);
+    }
+  }
+}
+
+function push6(arr, ax,ay,az, bx,by,bz, cx,cy,cz){ arr.push(ax,ay,az, bx,by,bz, cx,cy,cz); }
+function pushUV(arr, a,b, c,d, e,f){ arr.push(a,b, c,d, e,f); }
+function pushC(arr, col, s0,s1,s2){
+  arr.push(col.r*s0, col.g*s0, col.b*s0,
+           col.r*s1, col.g*s1, col.b*s1,
+           col.r*s2, col.g*s2, col.b*s2);
+}
+function flatMesh(pos, col){
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col,3));
+  g.computeVertexNormals();
+  return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors:true, side:THREE.DoubleSide }));
+}
+
+/* ---------- objectives ---------- */
+function labelSprite(text){
+  const c = document.createElement("canvas");
+  const ctx = c.getContext("2d");
+  const font = "500 34px 'IBM Plex Mono', monospace";
+  ctx.font = font;
+  const w = Math.min(660, Math.ceil(ctx.measureText(text).width) + 44);
+  c.width = w; c.height = 72;
+  const g = c.getContext("2d");
+  g.font = font; g.textBaseline = "middle";
+  g.fillStyle = "rgba(14,20,24,0.80)"; g.fillRect(0,0,w,72);
+  g.fillStyle = "#D8B14A"; g.fillRect(0,0,3,72);
+  g.fillStyle = "#F5EFE3"; g.fillText(text, 20, 38);
+  const tex = new THREE.CanvasTexture(c);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:true, depthTest:false }));
+  sp.scale.set(w/72 * 3.4, 3.4, 1);
+  return sp;
+}
+
+function pickObjectives(pois, roads){
+  const cands = [];
+  for(const p of pois){
+    const q = toXZ(p.lat, p.lon);
+    const d = Math.hypot(q.x, q.z);
+    if(d > worldRadius*0.88 || d < 35) continue;
+    const t = p.tags;
+    const kind = t.shop ? ("shop — "+t.shop.replace(/_/g," ")) :
+                 t.amenity ? t.amenity.replace(/_/g," ") :
+                 t.tourism ? t.tourism.replace(/_/g," ") : "address";
+    cands.push({ x:q.x, z:q.z, name:t.name, kind, d });
+  }
+  cands.sort(()=>Math.random()-0.5);
+
+  const chosen = [];
+  for(const c of cands){
+    if(chosen.length >= 7) break;
+    if(chosen.every(o => Math.hypot(o.x-c.x, o.z-c.z) > 75)) chosen.push(c);
+  }
+  // fall back to road vertices if the area has few named places
+  if(chosen.length < 4 && roads.length){
+    for(const w of roads){
+      if(chosen.length >= 6) break;
+      const g = w.geometry[Math.floor(w.geometry.length/2)];
+      const q = toXZ(g.lat, g.lon);
+      const d = Math.hypot(q.x,q.z);
+      if(d > worldRadius*0.85 || d < 60) continue;
+      if(chosen.every(o => Math.hypot(o.x-q.x, o.z-q.z) > 90))
+        chosen.push({ x:q.x, z:q.z, name: w.tags.name || "Unnamed way", kind:"waypoint", d });
+    }
+  }
+
+  objectives = chosen.map(o => {
+    const grp = new THREE.Group();
+    const beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.5,1.5,60,10,1,true),
+      new THREE.MeshBasicMaterial({ color:0xD8B14A, transparent:true, opacity:0.14, depthWrite:false, side:THREE.DoubleSide })
+    );
+    beam.position.y = 30;
+    const core = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.22,0.22,60,6),
+      new THREE.MeshBasicMaterial({ color:0xF3DCA1, transparent:true, opacity:0.5, depthWrite:false })
+    );
+    core.position.y = 30;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(3.4, 4.0, 32),
+      new THREE.MeshBasicMaterial({ color:0xD8B14A, transparent:true, opacity:0.55, side:THREE.DoubleSide, depthWrite:false })
+    );
+    ring.rotation.x = -Math.PI/2; ring.position.y = 0.16;
+    const label = labelSprite(o.name.length > 34 ? o.name.slice(0,33)+"…" : o.name);
+    label.position.y = 7.5;
+    grp.add(beam, core, ring, label);
+    grp.position.set(o.x, 0, o.z);
+    scene.add(track(grp));
+    return { x:o.x, z:o.z, name:o.name, kind:o.kind, grp, beam, core, ring, label, found:false };
+  });
+  foundCount = 0;
+}
+
+function spawn(roads){
+  let best = null, bd = 1e9;
+  for(const w of roads){
+    if(!PAVED[w.tags.highway] && w.tags.highway !== "pedestrian" && w.tags.highway !== "footway") continue;
+    for(const g of w.geometry){
+      const q = toXZ(g.lat, g.lon);
+      const d = Math.hypot(q.x,q.z);
+      if(d < bd && !blocked(q.x,q.z)){ bd = d; best = q; }
+    }
+  }
+  if(!best) best = { x:0, z:0 };
+  // if we still landed inside something, spiral outward until we're on open ground
+  if(blocked(best.x, best.z)){
+    outer: for(let r = 4; r <= 120; r += 4){
+      for(let a = 0; a < Math.PI*2; a += Math.PI/8){
+        const tx = best.x + Math.cos(a)*r, tz = best.z + Math.sin(a)*r;
+        if(!blocked(tx,tz)){ best = { x:tx, z:tz }; break outer; }
+      }
+    }
+  }
+  player.x = best.x; player.z = best.z; player.pitch = 0;
+  // face the nearest objective so the first move is obvious
+  if(objectives.length){
+    let n = objectives[0], nd = 1e9;
+    for(const o of objectives){ const d = Math.hypot(o.x-player.x, o.z-player.z); if(d<nd){nd=d;n=o;} }
+    player.yaw = -Math.atan2(n.x-player.x, -(n.z-player.z));
+  } else player.yaw = 0;
+}
+
+/* ============================================================
+   MINIMAP
+   ============================================================ */
+let baseMap = null, baseScale = 1, baseSpan = 1;
+function buildMinimap(buildings, roads, areas){
+  const S = 700;
+  baseSpan = worldRadius * 2.2;
+  baseScale = S / baseSpan;
+  baseMap = document.createElement("canvas");
+  baseMap.width = baseMap.height = S;
+  const g = baseMap.getContext("2d");
+  g.fillStyle = "#0A1013"; g.fillRect(0,0,S,S);
+  const P = (p)=>[ (p.x + baseSpan/2)*baseScale, (p.z + baseSpan/2)*baseScale ];
+
+  g.fillStyle = "#16302E";
+  for(const a of areas){
+    const pts = a.el.geometry.map(p=>toXZ(p.lat,p.lon));
+    if(pts.length<3) continue;
+    g.fillStyle = a.kind === "water" ? "#12303E" : "#17321F";
+    g.beginPath(); pts.forEach((p,i)=>{ const q=P(p); i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]); }); g.closePath(); g.fill();
+  }
+  g.strokeStyle = "#3E4952"; g.lineCap = "round";
+  for(const w of roads){
+    const type = w.tags.highway;
+    g.lineWidth = Math.max(1, (ROAD_W[type]||5) * baseScale * 0.9);
+    g.strokeStyle = PAVED[type] ? "#49555E" : "#3A424A";
+    g.beginPath();
+    w.geometry.forEach((p,i)=>{ const q=P(toXZ(p.lat,p.lon)); i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]); });
+    g.stroke();
+  }
+  g.fillStyle = "#242C31";
+  for(const b of buildings){
+    const pts = b.geometry.map(p=>toXZ(p.lat,p.lon));
+    if(pts.length<3) continue;
+    g.beginPath(); pts.forEach((p,i)=>{ const q=P(p); i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]); }); g.closePath(); g.fill();
+  }
+}
+
+const SPAN = 250;
+function drawMinimap(){
+  const cv = $("mini"), ctx = cv.getContext("2d");
+  const S = cv.width, R = S/2;
+  ctx.clearRect(0,0,S,S);
+  ctx.save();
+  ctx.beginPath(); ctx.arc(R,R,R-2,0,Math.PI*2); ctx.clip();
+  ctx.fillStyle = "#0A1013"; ctx.fillRect(0,0,S,S);
+  if(baseMap){
+    const sw = SPAN * baseScale;
+    const sx = (player.x + baseSpan/2)*baseScale - sw/2;
+    const sy = (player.z + baseSpan/2)*baseScale - sw/2;
+    ctx.drawImage(baseMap, sx, sy, sw, sw, 0, 0, S, S);
+  }
+  const k = S / SPAN;
+  for(const o of objectives){
+    const px = R + (o.x - player.x)*k, py = R + (o.z - player.z)*k;
+    ctx.beginPath(); ctx.arc(px,py,o.found?3.5:5,0,Math.PI*2);
+    ctx.fillStyle = o.found ? "#4C5A5E" : "#D8B14A"; ctx.fill();
+  }
+  // player arrow
+  ctx.translate(R,R); ctx.rotate(-player.yaw);
+  ctx.beginPath(); ctx.moveTo(0,-9); ctx.lineTo(6.5,7); ctx.lineTo(0,3.5); ctx.lineTo(-6.5,7); ctx.closePath();
+  ctx.fillStyle = "#F5EFE3"; ctx.fill();
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(R,R,R-2,0,Math.PI*2);
+  ctx.strokeStyle = "rgba(245,239,227,0.22)"; ctx.lineWidth = 2; ctx.stroke();
+}
+
+/* ============================================================
+   COMPASS TAPE  — the signature instrument
+   ============================================================ */
+function drawTape(bearing, targetBearing){
+  const cv = $("tape"), g = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  g.clearRect(0,0,W,H);
+  const DEG_SPAN = 132, pxPerDeg = W/DEG_SPAN, mid = W/2;
+
+  g.fillStyle = "rgba(14,20,24,0.42)";
+  g.fillRect(0,0,W,H);
+
+  const start = Math.floor((bearing - DEG_SPAN/2)/5)*5;
+  for(let d = start; d <= bearing + DEG_SPAN/2; d += 5){
+    let delta = d - bearing;
+    const x = mid + delta*pxPerDeg;
+    if(x < 0 || x > W) continue;
+    const dd = ((d % 360) + 360) % 360;
+    const card = dd===0?"N":dd===90?"E":dd===180?"S":dd===270?"W":null;
+    const major = dd % 45 === 0;
+    const fade = 1 - Math.min(1, Math.abs(delta)/(DEG_SPAN/2)) * 0.75;
+    g.globalAlpha = fade;
+    if(card){
+      g.fillStyle = "#5FB8C4";
+      g.font = "600 17px 'IBM Plex Mono', monospace";
+      g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText(card, x, H*0.5);
+    } else if(major){
+      g.fillStyle = "rgba(245,239,227,0.72)";
+      g.font = "400 12px 'IBM Plex Mono', monospace";
+      g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText(String(dd), x, H*0.5);
+    } else {
+      g.fillStyle = "rgba(245,239,227,0.34)";
+      g.fillRect(x-0.5, H*0.5-4, 1, 8);
+    }
+    g.globalAlpha = 1;
+  }
+
+  // target pip
+  if(targetBearing !== null){
+    let delta = targetBearing - bearing;
+    while(delta > 180) delta -= 360;
+    while(delta < -180) delta += 360;
+    const clamped = Math.max(-DEG_SPAN/2 + 6, Math.min(DEG_SPAN/2 - 6, delta));
+    const x = mid + clamped*pxPerDeg;
+    const off = Math.abs(delta) > DEG_SPAN/2 - 6;
+    g.fillStyle = "#D8B14A";
+    g.beginPath();
+    if(off){
+      const dir = delta > 0 ? 1 : -1;
+      g.moveTo(x + dir*9, H-4); g.lineTo(x, H-12); g.lineTo(x, H-4);
+    } else {
+      g.moveTo(x-6, H-3); g.lineTo(x+6, H-3); g.lineTo(x, H-12);
+    }
+    g.closePath(); g.fill();
+  }
+
+  // centre index
+  g.fillStyle = "#F5EFE3";
+  g.fillRect(mid-1, 0, 2, 7);
+  g.fillStyle = "rgba(245,239,227,0.30)";
+  g.fillRect(0, H-1, W, 1);
+}
+
+/* ============================================================
+   INPUT
+   ============================================================ */
+let pointerLocked = false, lockUnsupported = false;
+let dragLook = null, stick = null;
+
+function tryLock(){
+  if(lockUnsupported) return;
+  const c = $("scene");
+  if(c.requestPointerLock){
+    const p = c.requestPointerLock();
+    if(p && p.catch) p.catch(()=>{ lockUnsupported = true; });
+  }
+}
+document.addEventListener("pointerlockchange", ()=>{
+  pointerLocked = (document.pointerLockElement === $("scene"));
+  if(running && !pointerLocked && !finished && !lockUnsupported && !paused){
+    paused = true;
+    $("veil").classList.add("on");
+    $("veilT").textContent = "Survey held. Step back outside, or return to the register.";
+  }
+});
+document.addEventListener("pointerlockerror", ()=>{ lockUnsupported = true; });
+
+document.addEventListener("mousemove", e=>{
+  if(!running || paused) return;
+  if(pointerLocked) look(e.movementX, e.movementY, 0.0021);
+});
+
+addEventListener("keydown", e=>{
+  keys[e.code] = true;
+  if(e.code === "Escape" && running && !finished){
+    paused = true; $("veil").classList.add("on");
+    $("veilT").textContent = "Survey held. Step back outside, or return to the register.";
+  }
+  if(running && !paused && ["KeyW","KeyA","KeyS","KeyD","Space","ShiftLeft"].includes(e.code)) e.preventDefault();
+});
+addEventListener("keyup", e=>{ keys[e.code] = false; });
+
+function look(dx, dy, sens){
+  player.yaw -= dx * sens;
+  player.pitch -= dy * sens;
+  player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch));
+}
+
+/* touch + drag-look fallback */
+const cv = $("scene");
+cv.addEventListener("pointerdown", e=>{
+  if(!running) return;
+  if(paused){ return; }
+  if(e.pointerType === "mouse" && !pointerLocked) tryLock();
+  cv.setPointerCapture(e.pointerId);
+  if(e.pointerType !== "mouse" && e.clientX < innerWidth*0.45 && e.clientY > innerHeight*0.35){
+    stick = { id:e.pointerId, ox:e.clientX, oy:e.clientY, dx:0, dy:0 };
+  } else {
+    dragLook = { id:e.pointerId, x:e.clientX, y:e.clientY };
+  }
+});
+cv.addEventListener("pointermove", e=>{
+  if(!running || paused) return;
+  if(stick && e.pointerId === stick.id){
+    stick.dx = e.clientX - stick.ox;
+    stick.dy = e.clientY - stick.oy;
+  } else if(dragLook && e.pointerId === dragLook.id){
+    if(!pointerLocked) look(e.clientX - dragLook.x, e.clientY - dragLook.y, 0.0038);
+    dragLook.x = e.clientX; dragLook.y = e.clientY;
+  }
+});
+function endPointer(e){
+  if(stick && e.pointerId === stick.id) stick = null;
+  if(dragLook && e.pointerId === dragLook.id) dragLook = null;
+}
+cv.addEventListener("pointerup", endPointer);
+cv.addEventListener("pointercancel", endPointer);
+
+addEventListener("resize", ()=>{
+  if(!renderer || !camera) return;
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ============================================================
+   GAME LOOP
+   ============================================================ */
+function enterGame(){
+  running = true; paused = false; finished = false;
+  foundCount = 0;
+  startTime = performance.now();
+  clock = new THREE.Clock();
+  $("hud").classList.add("on");
+  $("exit").style.display = "";
+  $("score").textContent = "0 / " + objectives.length;
+  const touch = matchMedia("(pointer: coarse)").matches;
+  $("keys").innerHTML = touch
+    ? "Left thumb — walk<br>Right side — look"
+    : "W A S D — walk<br>Shift — run<br>Mouse — look<br>Esc — pause";
+  $("veil").classList.add("on");
+  $("veilT").textContent = touch
+    ? "Drag the lower-left of the screen to walk. Drag anywhere else to look around. Reach every brass beacon."
+    : "Click to look around. Walk with W A S D, hold Shift to run. Reach every brass beacon.";
+  loop();
+}
+
+let toastTimer = 0;
+function toast(kicker, text){
+  $("toastK").textContent = kicker;
+  $("toastT").textContent = text;
+  $("toast").classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>$("toast").classList.remove("on"), 2200);
+}
+
+function loop(){
+  raf = requestAnimationFrame(loop);
+  if(!running) return;
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  if(!paused && !finished){
+    step(dt);
+    elapsed = (performance.now() - startTime)/1000;
+  }
+
+  camera.position.set(player.x, EYE, player.z);
+  camera.rotation.set(0,0,0,"YXZ");
+  camera.rotation.order = "YXZ";
+  camera.rotation.y = player.yaw;
+  camera.rotation.x = player.pitch;
+
+  // beacon idle motion
+  const t = performance.now()/1000;
+  for(const o of objectives){
+    o.ring.rotation.z = t*0.5;
+    o.ring.scale.setScalar(o.found ? 1 : 1 + Math.sin(t*1.8)*0.06);
+    o.label.material.opacity = o.found ? 0.35 : 1;
+  }
+
+  renderer.render(scene, camera);
+  updateHUD();
+}
+
+function step(dt){
+  let fx = 0, fz = 0, run = false;
+  if(keys.KeyW || keys.ArrowUp) fz += 1;
+  if(keys.KeyS || keys.ArrowDown) fz -= 1;
+  if(keys.KeyA || keys.ArrowLeft) fx -= 1;
+  if(keys.KeyD || keys.ArrowRight) fx += 1;
+  if(keys.ShiftLeft || keys.ShiftRight) run = true;
+
+  let speed = run ? RUN : WALK;
+  if(stick){
+    const len = Math.hypot(stick.dx, stick.dy);
+    if(len > 6){
+      const k = Math.min(1, len/70);
+      fx += (stick.dx/len) * k;
+      fz += (-stick.dy/len) * k;
+      speed = WALK + (RUN - WALK) * Math.max(0, (k - 0.75)/0.25);
+    }
+  }
+
+  const mag = Math.hypot(fx, fz);
+  if(mag < 0.001) return;
+  const nx = fx/mag * Math.min(mag,1), nz = fz/mag * Math.min(mag,1);
+
+  const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
+  const dx = ( nx*cos - nz*sin) * speed * dt;
+  const dz = (-nx*sin - nz*cos) * speed * dt;
+
+  const probe = 0.55;
+  const px = player.x + dx, pz = player.z + dz;
+  const lead = Math.hypot(dx,dz) || 1;
+  if(!blocked(px + dx/lead*probe, pz + dz/lead*probe)){ player.x = px; player.z = pz; }
+  else {
+    if(!blocked(player.x + dx + Math.sign(dx)*probe, player.z)) player.x += dx;
+    else if(!blocked(player.x, player.z + dz + Math.sign(dz)*probe)) player.z += dz;
+  }
+
+  // soft boundary
+  const d = Math.hypot(player.x, player.z);
+  const lim = worldRadius * 0.96;
+  if(d > lim){ player.x *= lim/d; player.z *= lim/d; }
+
+  // objective checks
+  for(const o of objectives){
+    if(o.found) continue;
+    if(Math.hypot(o.x - player.x, o.z - player.z) < REACH){
+      o.found = true; foundCount++;
+      o.beam.material.color.setHex(0x5FB8C4); o.beam.material.opacity = 0.06;
+      o.core.material.color.setHex(0x5FB8C4); o.core.material.opacity = 0.18;
+      o.ring.material.color.setHex(0x5FB8C4); o.ring.material.opacity = 0.28;
+      $("score").textContent = foundCount + " / " + objectives.length;
+      toast("Logged — " + o.kind, o.name);
+      if(foundCount === objectives.length) finish();
+    }
+  }
+}
+
+function finish(){
+  finished = true;
+  document.exitPointerLock && document.exitPointerLock();
+  $("doneTime").textContent = fmt(elapsed);
+  $("doneT").textContent = "All " + objectives.length + " addresses logged in " + districtName + ".";
+  $("done").classList.add("on");
+}
+
+function fmt(s){
+  const m = Math.floor(s/60), r = Math.floor(s%60);
+  return m + ":" + String(r).padStart(2,"0");
+}
+
+function updateHUD(){
+  // nearest unfound
+  let best = null, bd = 1e9;
+  for(const o of objectives){
+    if(o.found) continue;
+    const d = Math.hypot(o.x - player.x, o.z - player.z);
+    if(d < bd){ bd = d; best = o; }
+  }
+  const bearing = (((-player.yaw * 180/Math.PI) % 360) + 360) % 360;
+  let tb = null;
+  if(best){
+    tb = (((Math.atan2(best.x - player.x, -(best.z - player.z)) * 180/Math.PI) % 360) + 360) % 360;
+    $("tgtName").textContent = best.name;
+    $("tgtDist").textContent = bd < 1000 ? Math.round(bd) + " m" : (bd/1000).toFixed(2) + " km";
+  } else {
+    $("tgtName").textContent = "All logged";
+    $("tgtDist").textContent = "—";
+  }
+  $("time").textContent = fmt(elapsed);
+  drawTape(bearing, tb);
+  drawMinimap();
+}
+</script>
+</body>
+</html>
