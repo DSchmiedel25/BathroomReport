@@ -1,6 +1,7 @@
 'use strict';
-// fetch-and-bake-hours.js — read hourStatus from Firestore (read-only) and bake verified community
+// fetch-and-bake-hours.js — read hourStatus from Firestore and bake verified community
 // hours into the static *-locations.js files via bake-hours.js. Mirrors fetch-and-bake.js.
+// Writes back only one thing: bakedRevision, stamped after a successful bake (see below).
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
@@ -13,7 +14,7 @@ catch(e){ console.error('\n\u2717 firebase-admin not installed. Run: npm install
 async function main(){
   admin.initializeApp({ credential: admin.cert(require(KEY_FILE)) });
   const db = require('firebase-admin/firestore').getFirestore();
-  console.log('Reading hourStatus from Firestore (read-only)\u2026');
+  console.log('Reading hourStatus from Firestore\u2026');
   const snap = await db.collection('hourStatus').get();
   const status = {};
   /* Key by the document id AS STORED. Do not reverse it.
@@ -48,6 +49,46 @@ async function main(){
   const locFiles = fs.readdirSync(__dirname).filter(f => /-locations\.js$/.test(f));
   if (!locFiles.length){ console.log('No *-locations.js files here.'); process.exit(0); }
   execFileSync('node', ['bake-hours.js', STATUS_JSON, ...locFiles], { stdio:'inherit' });
+
+  /* Mark what we just baked.
+   *
+   * This script was read-only, and nothing else in the pipeline writes bakedRevision. FlushPanel's
+   * Bake review lists a row as pending while `verified && revision !== bakedRevision`, so every
+   * verified row stayed pending FOREVER — including hours baked into the static files days
+   * earlier. The page looked like a growing backlog when it was really a log of past work.
+   *
+   * Safe here and only here: bake-hours.js is authoritative and throws on failure (execFileSync
+   * above), so by this line every verified row in `status` is reflected in the location files.
+   * Runs under the service account, which bypasses the `allow write: if false` rule on
+   * hourStatus — no client can forge a baked stamp.
+   *
+   * Only verified rows are stamped. Conflicts and single-report rows are deliberately left alone:
+   * they were never baked, and they must keep surfacing for a human. */
+  const toStamp = Object.entries(status).filter(([, r]) =>
+    r && r.verified && r.revision !== undefined && r.revision !== r.bakedRevision);
+
+  if (!toStamp.length){
+    console.log('\nNo newly baked rows to stamp — bakedRevision already current.');
+  } else {
+    const bakedAt = Date.now();
+    let written = 0;
+    // Firestore caps a batch at 500 writes.
+    for (let i = 0; i < toStamp.length; i += 450){
+      const chunk = toStamp.slice(i, i + 450);
+      const batch = db.batch();
+      for (const [id, r] of chunk){
+        batch.update(db.collection('hourStatus').doc(id), {
+          bakedRevision: r.revision,
+          bakedAt: bakedAt
+        });
+      }
+      await batch.commit();
+      written += chunk.length;
+      console.log('  stamped ' + written + '/' + toStamp.length);
+    }
+    console.log('\nStamped ' + toStamp.length + ' row(s) as baked.');
+  }
+
   console.log('\nReview the changed *-locations.js, then commit/push (bump sw.js).');
   process.exit(0);
 }
