@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>SIGHTLINE — hop the world's street photography</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0E1418; --bone:#F5EFE3; --steel:#8A98A0;
+    --cyan:#5FB8C4; --brass:#D8B14A; --hair:rgba(245,239,227,.14);
+    --mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans:"IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--ink);color:var(--bone);
+    font-family:var(--mono);font-size:16px;overscroll-behavior:none;touch-action:manipulation;}
+  canvas{display:block;}
+  #scene{position:fixed;inset:0;touch-action:none;cursor:grab;}
+  #scene.grabbing{cursor:grabbing;}
+  .eyebrow{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--steel);font-weight:500;}
+
+  /* ---------- register ---------- */
+  #register{position:fixed;inset:0;z-index:40;overflow-y:auto;touch-action:pan-y;
+    background:radial-gradient(120% 80% at 50% -10%, #1B262C 0%, #0E1418 60%);padding:28px 20px 44px;}
+  .wrap{max-width:640px;margin:0 auto;}
+  h1{font-weight:600;font-size:clamp(28px,8.5vw,42px);letter-spacing:.30em;margin:6px 0 0;
+     line-height:1;text-indent:.30em;}
+  .sub{font-family:var(--sans);font-weight:300;font-size:14px;color:var(--steel);
+    line-height:1.55;margin:16px 0 0;max-width:46ch;}
+  .sub b{color:var(--bone);font-weight:400;}
+  .sec{margin-top:28px;}
+  .sec-head{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:8px;}
+  .rows{border-top:1px solid var(--hair);}
+  .row{display:grid;grid-template-columns:26px 1fr auto;gap:12px;align-items:center;
+    padding:15px 4px;border-bottom:1px solid var(--hair);cursor:pointer;position:relative;
+    transition:background .18s ease,padding-left .18s ease;}
+  .row:hover,.row:focus-visible{background:rgba(95,184,196,.07);padding-left:10px;outline:none;}
+  .row[aria-selected="true"]{background:rgba(216,177,74,.10);}
+  .row[aria-selected="true"]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--brass);}
+  .idx{font-size:11px;color:var(--cyan);letter-spacing:.1em;}
+  .row[aria-selected="true"] .idx{color:var(--brass);}
+  .nm{font-family:var(--sans);font-size:15px;line-height:1.25;}
+  .nm small{display:block;font-family:var(--mono);font-size:10.5px;color:var(--steel);
+    letter-spacing:.06em;margin-top:3px;text-transform:uppercase;}
+  .coord{font-size:11px;color:var(--steel);text-align:right;white-space:nowrap;}
+  .field{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+  label.f span{display:block;font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--steel);margin-bottom:6px;}
+  input[type=text]{width:100%;background:#0A1013;border:1px solid var(--hair);color:var(--bone);
+    font-family:var(--mono);font-size:14px;padding:11px;border-radius:2px;}
+  input[type=text]:focus{outline:none;border-color:var(--cyan);}
+  input[type=range]{width:100%;accent-color:var(--brass);}
+  #go{margin-top:26px;width:100%;padding:17px;background:var(--brass);color:#12100A;border:0;
+    font-family:var(--mono);font-weight:600;font-size:13px;letter-spacing:.24em;
+    text-transform:uppercase;cursor:pointer;border-radius:2px;}
+  #go:hover{filter:brightness(1.08);}
+  #go:active{transform:translateY(1px);}
+  .foot{margin-top:20px;font-size:10.5px;line-height:1.75;color:#5E6D75;}
+  .foot code{color:var(--steel);}
+
+  /* ---------- loading / error ---------- */
+  #loading{position:fixed;inset:0;z-index:45;background:#0E1418;display:none;
+    flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:26px;text-align:center;}
+  #loading.on{display:flex;}
+  .lbar{width:min(260px,70vw);height:2px;background:rgba(245,239,227,.12);overflow:hidden;}
+  .lbar i{display:block;height:100%;width:34%;background:var(--cyan);animation:sweep 1.25s ease-in-out infinite;}
+  @keyframes sweep{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
+  #lmsg{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--steel);}
+  #lerr{font-family:var(--sans);font-size:13.5px;max-width:40ch;line-height:1.65;display:none;text-align:left;}
+  #lerr b{color:var(--brass);font-weight:600;display:block;margin-bottom:6px;font-family:var(--mono);
+    font-size:11px;letter-spacing:.16em;text-transform:uppercase;}
+  #lerr code{display:block;margin-top:10px;font-size:10.5px;color:#5E6D75;word-break:break-all;line-height:1.5;}
+  .btn-ghost{background:transparent;border:1px solid var(--hair);color:var(--bone);font-family:var(--mono);
+    font-size:11px;letter-spacing:.18em;text-transform:uppercase;padding:12px 18px;cursor:pointer;border-radius:2px;}
+  .btn-ghost:hover{border-color:var(--cyan);}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;z-index:20;pointer-events:none;display:none;}
+  #hud.on{display:block;}
+  #tape{position:absolute;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;
+    transform:translateX(-50%);width:min(600px,90vw);height:auto;}
+  #panel-l{position:absolute;top:calc(env(safe-area-inset-top,0px) + 50px);left:14px;max-width:52vw;}
+  #panel-r{position:absolute;top:calc(env(safe-area-inset-top,0px) + 50px);right:14px;text-align:right;}
+  .tgt{font-family:var(--sans);font-size:14.5px;line-height:1.25;margin-top:5px;text-shadow:0 1px 6px rgba(0,0,0,.95);}
+  .dist{font-size:21px;font-weight:300;color:var(--brass);margin-top:4px;text-shadow:0 1px 6px rgba(0,0,0,.95);}
+  .stat{font-size:18px;font-weight:300;margin-top:3px;text-shadow:0 1px 6px rgba(0,0,0,.95);}
+  #panel-l .eyebrow,#panel-r .eyebrow{text-shadow:0 1px 5px rgba(0,0,0,.95);}
+
+  /* movement compass rose */
+  #rose{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);
+    transform:translateX(-50%);display:flex;gap:7px;pointer-events:auto;flex-wrap:wrap;
+    justify-content:center;max-width:min(440px,94vw);}
+  .hop{background:rgba(14,20,24,.78);border:1px solid rgba(245,239,227,.26);color:var(--bone);
+    font-family:var(--mono);font-size:11px;letter-spacing:.1em;padding:11px 13px;border-radius:2px;
+    cursor:pointer;backdrop-filter:blur(3px);min-width:58px;line-height:1.35;text-align:center;}
+  .hop:hover{border-color:var(--brass);background:rgba(216,177,74,.16);}
+  .hop b{display:block;font-size:14px;font-weight:600;letter-spacing:.06em;}
+  .hop i{font-style:normal;font-size:9.5px;color:var(--steel);letter-spacing:.06em;}
+  .hop.best{border-color:var(--brass);}
+
+  #mini{position:absolute;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 84px);
+    width:104px;height:104px;border-radius:50%;border:1px solid rgba(245,239,227,.22);
+    background:rgba(10,16,19,.72);}
+  #meta{position:absolute;left:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 88px);
+    font-size:9.5px;letter-spacing:.1em;color:rgba(245,239,227,.4);line-height:1.8;
+    text-shadow:0 1px 5px rgba(0,0,0,.95);pointer-events:auto;}
+  #meta button{background:none;border:0;color:rgba(95,184,196,.85);font-family:var(--mono);
+    font-size:9.5px;letter-spacing:.1em;cursor:pointer;padding:2px 4px;}
+  #fade{position:absolute;inset:0;background:#0A1013;opacity:0;transition:opacity .22s ease;}
+  #toast{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);text-align:center;
+    opacity:0;transition:opacity .3s ease;}
+  #toast .eyebrow{color:var(--brass);}
+  #toast .t{font-family:var(--sans);font-size:18px;margin-top:6px;text-shadow:0 2px 10px rgba(0,0,0,.95);}
+  #toast.on{opacity:1;}
+  #exit{position:absolute;top:calc(env(safe-area-inset-top,0px) + 9px);right:14px;pointer-events:auto;
+    background:none;border:0;color:rgba(245,239,227,.5);font-family:var(--mono);font-size:10px;
+    letter-spacing:.18em;padding:6px;cursor:pointer;}
+  #done{position:fixed;inset:0;z-index:35;background:rgba(14,20,24,.94);display:none;
+    align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:28px;text-align:center;}
+  #done.on{display:flex;}
+  #done .big{font-size:clamp(32px,11vw,50px);font-weight:300;color:var(--brass);}
+  @media (prefers-reduced-motion: reduce){ .lbar i{animation:none;width:100%} #toast,#fade{transition:none} }
+  @media (max-width:520px){
+    #mini{width:84px;height:84px}
+    .dist{font-size:18px} .stat{font-size:15px} .tgt{font-size:13px}
+    #meta{display:none}
+    .hop{padding:10px 11px;min-width:52px}
+  }
+  @media (max-height:520px){ #mini{display:none} #panel-l,#panel-r{top:calc(env(safe-area-inset-top,0px) + 40px)} }
+</style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+
+<div id="register">
+  <div class="wrap">
+    <div class="eyebrow">Street photography / node to node</div>
+    <h1>SIGHTLINE</h1>
+    <p class="sub">Real photographs, taken by real people, standing where you're standing. This pulls live coverage from <b>Mapillary</b> — the open street-level imagery archive — and drops you inside it. You move the way the camera moved: hop to hop, along roads somebody actually drove or walked. Find every marked address.</p>
+
+    <div class="sec">
+      <div class="sec-head"><span class="eyebrow">Districts with dense coverage</span><span class="eyebrow">Lat / Lon</span></div>
+      <div class="rows" id="rows"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><span class="eyebrow">Or enter your own coordinates</span></div>
+      <div class="field">
+        <label class="f"><span>Latitude</span><input type="text" id="clat" inputmode="decimal" placeholder="52.3750"></label>
+        <label class="f"><span>Longitude</span><input type="text" id="clon" inputmode="decimal" placeholder="4.8830"></label>
+      </div>
+      <label class="f" style="margin-top:14px">
+        <span>Search radius — <b id="radlbl" style="color:var(--brass)">300 m</b></span>
+        <input type="range" id="rad" min="120" max="700" step="20" value="300">
+      </label>
+    </div>
+
+    <button id="go">Enter the archive</button>
+
+    <p class="foot">
+      Imagery © Mapillary contributors, provided by Meta Platforms Ireland Ltd. Free for personal and
+      commercial use under the Mapillary terms. Viewer built on three.js (MIT).
+      Access token is stored in this file at <code>const TOKEN</code> — swap it for your own to redistribute.
+    </p>
+  </div>
+</div>
+
+<div id="loading">
+  <div class="eyebrow">Reading coverage</div>
+  <div class="lbar"><i></i></div>
+  <div id="lmsg">Opening connection…</div>
+  <div id="lerr"></div>
+  <button class="btn-ghost" id="lback" style="display:none">Back to register</button>
+</div>
+
+<div id="hud">
+  <div id="fade"></div>
+  <canvas id="tape" width="600" height="34"></canvas>
+  <div id="panel-l">
+    <div class="eyebrow">Next address</div>
+    <div class="tgt" id="tgtName">—</div>
+    <div class="dist" id="tgtDist">—</div>
+  </div>
+  <div id="panel-r">
+    <div class="eyebrow">Found</div>
+    <div class="stat" id="score">0 / 0</div>
+    <div class="eyebrow" style="margin-top:9px">Hops</div>
+    <div class="stat" id="hops">0</div>
+  </div>
+  <canvas id="mini" width="208" height="208"></canvas>
+  <div id="meta">
+    <span id="shotinfo">—</span><br>
+    Align view <button id="nudgeL">&#8592;</button><span id="offv">0&deg;</span><button id="nudgeR">&#8594;</button>
+  </div>
+  <div id="rose"></div>
+  <div id="toast"><div class="eyebrow" id="toastK">Logged</div><div class="t" id="toastT"></div></div>
+  <button id="exit">Leave</button>
+</div>
+
+<div id="done">
+  <div class="eyebrow">Survey complete</div>
+  <div class="big" id="doneHops">0</div>
+  <div class="eyebrow">hops</div>
+  <div style="font-family:var(--sans);color:var(--steel);max-width:32ch;line-height:1.6" id="doneT"></div>
+  <button class="btn-ghost" id="again">Back to register</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+
+/* ============================================================
+   SIGHTLINE — navigate real street photography from Mapillary
+   Swap this for your own token from mapillary.com/dashboard/developers
+   ============================================================ */
+const TOKEN = "MLY|27349781664703494|177bdf9d6eac575b5b3b74e7d9efcfc4";
+
+const GRAPH = "https://graph.mapillary.com";
+const LOCATIONS = [
+  { n:"Jordaan canals",   c:"Amsterdam, NL",     lat:52.3750, lon:  4.8830 },
+  { n:"Gothic Quarter",   c:"Barcelona, ES",     lat:41.3830, lon:  2.1770 },
+  { n:"Shibuya crossing", c:"Tokyo, JP",         lat:35.6595, lon:139.7005 },
+  { n:"Mission District", c:"San Francisco, US", lat:37.7599, lon:-122.4148 },
+  { n:"Kreuzberg",        c:"Berlin, DE",        lat:52.4990, lon: 13.4180 },
+  { n:"Södermalm",        c:"Stockholm, SE",     lat:59.3160, lon: 18.0710 },
+  { n:"Trastevere",       c:"Rome, IT",          lat:41.8890, lon: 12.4690 },
+  { n:"Le Marais",        c:"Paris, FR",         lat:48.8590, lon:  2.3610 },
+];
+
+const HOP_MAX = 34;      // metres — furthest we'll consider a neighbour
+const HOP_MIN = 2.5;     // ignore near-duplicate frames
+const REACH   = 22;      // metres — close enough to log a target
+
+let scene, camera, renderer, sphere, raf = 0;
+let nodes = [], byId = new Map();
+let current = null, targets = [], foundCount = 0, hopCount = 0;
+let originLat = 0, originLon = 0, cosLat = 1, searchRadius = 300;
+let yaw = 0, pitch = 0, panoOffset = 0, districtName = "";
+let running = false, busy = false;
+
+const $ = id => document.getElementById(id);
+const enc = encodeURIComponent;
+
+/* ---------- geo helpers ---------- */
+const R_EARTH = 6378137;
+function toXZ(lat, lon){
+  return { x:(lon-originLon)*Math.PI/180*R_EARTH*cosLat,
+           z:-(lat-originLat)*Math.PI/180*R_EARTH };
+}
+function metres(a, b){
+  const dx = (b.lon-a.lon)*Math.PI/180*R_EARTH*Math.cos(a.lat*Math.PI/180);
+  const dz = (b.lat-a.lat)*Math.PI/180*R_EARTH;
+  return Math.hypot(dx, dz);
+}
+function bearingTo(a, b){
+  const dx = (b.lon-a.lon)*Math.PI/180*R_EARTH*Math.cos(a.lat*Math.PI/180);
+  const dz = (b.lat-a.lat)*Math.PI/180*R_EARTH;
+  return (Math.atan2(dx, dz)*180/Math.PI + 360) % 360;
+}
+const CARD = ["N","NE","E","SE","S","SW","W","NW"];
+const cardinal = b => CARD[Math.round(((b%360)+360)%360 / 45) % 8];
+
+/* ============================================================
+   REGISTER
+   ============================================================ */
+let selected = 0;
+(function(){
+  const rows = $("rows");
+  LOCATIONS.forEach((L,i)=>{
+    const el = document.createElement("div");
+    el.className = "row"; el.tabIndex = 0; el.setAttribute("role","option");
+    el.setAttribute("aria-selected", i===0?"true":"false");
+    el.innerHTML = '<div class="idx">'+String(i+1).padStart(2,"0")+'</div>'+
+      '<div class="nm">'+L.n+'<small>'+L.c+'</small></div>'+
+      '<div class="coord">'+L.lat.toFixed(4)+'<br>'+L.lon.toFixed(4)+'</div>';
+    const pick = ()=>{ selected=i;
+      [...rows.children].forEach((c,j)=>c.setAttribute("aria-selected", j===i?"true":"false"));
+      $("clat").value=""; $("clon").value=""; };
+    el.addEventListener("click", pick);
+    el.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();pick();} });
+    rows.appendChild(el);
+  });
+  if(matchMedia("(pointer: coarse)").matches){ $("rad").value="220"; $("radlbl").textContent="220 m"; }
+})();
+$("rad").addEventListener("input", e=>{ $("radlbl").textContent = e.target.value+" m"; });
+$("go").addEventListener("click", start);
+$("lback").addEventListener("click", toRegister);
+$("again").addEventListener("click", toRegister);
+$("exit").addEventListener("click", toRegister);
+
+function toRegister(){
+  running = false; cancelAnimationFrame(raf);
+  $("hud").classList.remove("on"); $("done").classList.remove("on");
+  $("loading").classList.remove("on"); $("register").style.display = "";
+  if(sphere){ if(sphere.material.map) sphere.material.map.dispose();
+    sphere.geometry.dispose(); sphere.material.dispose();
+    if(scene) scene.remove(sphere); sphere = null; }
+  nodes = []; byId.clear(); targets = []; current = null;
+}
+function setMsg(m){ $("lmsg").textContent = m; }
+function fail(title, body, detail){
+  $("lmsg").textContent = "";
+  $("lerr").style.display = "block";
+  $("lerr").innerHTML = "<b>"+title+"</b>"+body+(detail?"<code>"+detail+"</code>":"");
+  $("lback").style.display = "";
+}
+
+/* ============================================================
+   LOAD COVERAGE
+   ============================================================ */
+async function start(){
+  let lat, lon;
+  const cl = parseFloat($("clat").value), cn = parseFloat($("clon").value);
+  if(!isNaN(cl) && !isNaN(cn) && Math.abs(cl)<=90 && Math.abs(cn)<=180){
+    lat=cl; lon=cn; districtName = cl.toFixed(4)+", "+cn.toFixed(4);
+  } else {
+    const L = LOCATIONS[selected]; lat=L.lat; lon=L.lon; districtName = L.n+" — "+L.c;
+  }
+  searchRadius = parseInt($("rad").value,10);
+  originLat=lat; originLon=lon; cosLat=Math.cos(lat*Math.PI/180);
+
+  $("register").style.display="none";
+  $("loading").classList.add("on");
+  $("lerr").style.display="none"; $("lback").style.display="none";
+  setMsg("Requesting coverage within "+searchRadius+" m");
+
+  const dLat = searchRadius/111320, dLon = searchRadius/(111320*cosLat);
+  const bbox = [lon-dLon, lat-dLat, lon+dLon, lat+dLat].map(v=>v.toFixed(6)).join(",");
+  const url = GRAPH+"/images?access_token="+enc(TOKEN)
+    + "&fields=id,computed_geometry,geometry,compass_angle,computed_compass_angle,is_pano,captured_at"
+    + "&bbox="+bbox+"&limit=2000";
+
+  let json;
+  try{
+    const res = await fetch(url);
+    const text = await res.text();
+    try{ json = JSON.parse(text); }
+    catch(e){ return fail("Unreadable response",
+      "The server answered, but not with JSON. That usually means the token was rejected upstream.",
+      text.slice(0,240)); }
+    if(json.error){
+      const m = json.error.message || "";
+      if(/token|OAuth|session/i.test(m))
+        return fail("Token rejected",
+          "Mapillary refused the access token. Generate a fresh one on the developer dashboard and replace <code style='display:inline'>const TOKEN</code> at the top of this file.", m);
+      return fail("API error", "Mapillary returned an error for this request.", m);
+    }
+    if(!res.ok) return fail("Request failed", "The coverage query came back with HTTP "+res.status+".", text.slice(0,240));
+  }catch(err){
+    return fail("Network blocked",
+      "The request never completed. Either you're offline, or this page can't reach graph.mapillary.com.",
+      String(err));
+  }
+
+  const raw = (json && json.data) || [];
+  if(!raw.length) return fail("No coverage here",
+    "Mapillary has no photographs inside this box. Coverage is crowdsourced and very uneven — try one of the listed districts, or widen the radius.", "bbox "+bbox);
+
+  setMsg("Threading " + raw.length.toLocaleString() + " frames");
+  buildGraph(raw);
+  if(!nodes.length) return fail("Coverage too sparse",
+    "Frames exist here but none are close enough together to walk between.", nodes.length+" usable nodes");
+
+  await new Promise(r=>setTimeout(r,30));
+  initScene();
+  pickTargets();
+  const seed = nodes.reduce((a,b)=> a.dc < b.dc ? a : b);
+  await goTo(seed, true);
+  $("loading").classList.remove("on");
+  enterGame();
+}
+
+function buildGraph(raw){
+  nodes = []; byId.clear();
+  const centre = { lat:originLat, lon:originLon };
+  for(const im of raw){
+    const g = im.computed_geometry || im.geometry;
+    if(!g || !g.coordinates) continue;
+    const lon = g.coordinates[0], lat = g.coordinates[1];
+    const n = {
+      id: im.id, lat, lon,
+      pano: !!im.is_pano,
+      angle: (im.computed_compass_angle != null ? im.computed_compass_angle : im.compass_angle) || 0,
+      at: im.captured_at || 0,
+      dc: metres(centre, {lat,lon}),
+      nb: []
+    };
+    if(n.dc > searchRadius * 1.15) continue;
+    Object.assign(n, toXZ(lat, lon));
+    nodes.push(n); byId.set(n.id, n);
+  }
+  // spatial buckets so neighbour search stays linear
+  const B = HOP_MAX, buckets = new Map();
+  const bk = n => ((n.x/B)|0)+":"+((n.z/B)|0);
+  for(const n of nodes){ const k=bk(n); let a=buckets.get(k); if(!a){a=[];buckets.set(k,a);} a.push(n); }
+  for(const n of nodes){
+    const cx=(n.x/B)|0, cz=(n.z/B)|0;
+    for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++){
+      const a = buckets.get((cx+i)+":"+(cz+j)); if(!a) continue;
+      for(const m of a){
+        if(m===n) continue;
+        const d = Math.hypot(m.x-n.x, m.z-n.z);
+        if(d>=HOP_MIN && d<=HOP_MAX) n.nb.push({ n:m, d, b:bearingTo(n,m) });
+      }
+    }
+    n.nb.sort((p,q)=>p.d-q.d);
+  }
+  nodes = nodes.filter(n => n.nb.length > 0);
+}
+
+/* ============================================================
+   SCENE
+   ============================================================ */
+function initScene(){
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0A1013);
+  camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1200);
+  if(!renderer){
+    renderer = new THREE.WebGLRenderer({ canvas:$("scene"), antialias:false });
+    renderer.setPixelRatio(Math.min(devicePixelRatio||1, 2));
+    renderer.outputEncoding = THREE.sRGBEncoding;
+  }
+  renderer.setSize(innerWidth, innerHeight);
+}
+
+const loader = new THREE.TextureLoader();
+loader.setCrossOrigin("anonymous");
+
+function loadTexture(url){
+  return new Promise((resolve, reject)=>{
+    loader.load(url, resolve, undefined, err => reject(err));
+  });
+}
+
+async function goTo(node, first){
+  if(busy || !node) return;
+  busy = true;
+  $("fade").style.opacity = first ? "1" : "0.85";
+
+  let meta;
+  try{
+    const r = await fetch(GRAPH+"/"+node.id+"?access_token="+enc(TOKEN)
+      + "&fields=thumb_2048_url,thumb_1024_url,is_pano,compass_angle,computed_compass_angle,captured_at");
+    meta = await r.json();
+    if(meta.error) throw new Error(meta.error.message || "entity error");
+  }catch(err){
+    busy = false; $("fade").style.opacity = "0";
+    if(first) fail("Couldn't open the first frame",
+      "The coverage list loaded, but fetching an individual photograph failed.", String(err));
+    return;
+  }
+
+  const url = meta.thumb_2048_url || meta.thumb_1024_url;
+  if(!url){ busy=false; $("fade").style.opacity="0"; return; }
+
+  let tex;
+  try{ tex = await loadTexture(url); }
+  catch(err){
+    busy = false; $("fade").style.opacity = "0";
+    if(first) fail("Image blocked",
+      "The photograph downloaded but the browser refused to hand it to WebGL. That's a cross-origin restriction on the image host — nothing you can fix from this file.", String(err && err.type || err));
+    return;
+  }
+  tex.encoding = THREE.sRGBEncoding;
+  tex.minFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+
+  if(sphere){
+    if(sphere.material.map) sphere.material.map.dispose();
+    sphere.geometry.dispose(); sphere.material.dispose(); scene.remove(sphere);
+  }
+
+  const isPano = meta.is_pano != null ? meta.is_pano : node.pano;
+  let geo;
+  if(isPano){
+    geo = new THREE.SphereGeometry(500, 64, 40);
+  } else {
+    // flat frame: a curved panel roughly matching a phone camera's field of view
+    const hFov = THREE.MathUtils.degToRad(76), vFov = THREE.MathUtils.degToRad(52);
+    geo = new THREE.SphereGeometry(500, 32, 24, Math.PI/2 - hFov/2, hFov, Math.PI/2 - vFov/2, vFov);
+  }
+  geo.scale(-1, 1, 1);
+  sphere = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map:tex }));
+
+  const ang = (meta.computed_compass_angle != null ? meta.computed_compass_angle : meta.compass_angle);
+  node.angle = ang != null ? ang : node.angle;
+  sphere.rotation.y = THREE.MathUtils.degToRad(-node.angle + panoOffset);
+  scene.add(sphere);
+
+  if(!first){ hopCount++; $("hops").textContent = hopCount; }
+  current = node;
+  yaw = 0;
+
+  const d = node.at ? new Date(node.at) : null;
+  $("shotinfo").textContent = (isPano ? "360° frame" : "flat frame")
+    + (d && !isNaN(d) ? " · " + d.toISOString().slice(0,7) : "");
+
+  buildRose();
+  checkTargets();
+  $("fade").style.opacity = "0";
+  busy = false;
+
+  // warm the two nearest neighbours so the next hop feels instant
+  node.nb.slice(0,2).forEach(async e=>{
+    try{
+      const r = await fetch(GRAPH+"/"+e.n.id+"?access_token="+enc(TOKEN)+"&fields=thumb_1024_url");
+      const j = await r.json();
+      if(j.thumb_1024_url){ const im = new Image(); im.crossOrigin="anonymous"; im.src = j.thumb_1024_url; }
+    }catch(_){}
+  });
+}
+
+/* ---------- navigation rose ---------- */
+function buildRose(){
+  const rose = $("rose"); rose.innerHTML = "";
+  if(!current) return;
+  // keep the nearest node in each 45° sector
+  const sectors = new Map();
+  for(const e of current.nb){
+    const s = Math.round(e.b/45) % 8;
+    const held = sectors.get(s);
+    if(!held || e.d < held.d) sectors.set(s, e);
+  }
+  const list = [...sectors.values()].sort((a,b)=>a.b-b.b);
+  let best = null;
+  const tgt = nearestTarget();
+  if(tgt){
+    let bd = 1e9;
+    for(const e of list){
+      const dd = metres(e.n, tgt);
+      if(dd < bd){ bd = dd; best = e; }
+    }
+  }
+  for(const e of list){
+    const btn = document.createElement("button");
+    btn.className = "hop" + (e === best ? " best" : "");
+    btn.innerHTML = "<b>"+cardinal(e.b)+"</b><i>"+Math.round(e.d)+" m</i>";
+    btn.addEventListener("click", ()=> goTo(e.n, false));
+    rose.appendChild(btn);
+  }
+}
+
+/* ---------- targets ---------- */
+function pickTargets(){
+  const pool = nodes.filter(n => n.dc > 40 && n.dc < searchRadius*0.92);
+  const shuffled = pool.slice().sort(()=>Math.random()-0.5);
+  targets = [];
+  for(const n of shuffled){
+    if(targets.length >= 5) break;
+    if(targets.every(t => metres(t, n) > 90)) targets.push(n);
+  }
+  targets.forEach((t,i)=>{ t.label = "Address " + String.fromCharCode(65+i); t.found = false; });
+  foundCount = 0; hopCount = 0;
+  $("score").textContent = "0 / " + targets.length;
+  $("hops").textContent = "0";
+}
+function nearestTarget(){
+  let best=null, bd=1e9;
+  for(const t of targets){
+    if(t.found) continue;
+    const d = metres(current, t);
+    if(d<bd){ bd=d; best=t; }
+  }
+  return best;
+}
+function checkTargets(){
+  for(const t of targets){
+    if(t.found) continue;
+    if(metres(current, t) < REACH){
+      t.found = true; foundCount++;
+      $("score").textContent = foundCount + " / " + targets.length;
+      toast("Logged", t.label);
+      if(foundCount === targets.length) finish();
+    }
+  }
+}
+let toastTimer=0;
+function toast(k,t){
+  $("toastK").textContent=k; $("toastT").textContent=t;
+  $("toast").classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>$("toast").classList.remove("on"),2100);
+}
+function finish(){
+  $("doneHops").textContent = hopCount;
+  $("doneT").textContent = "All "+targets.length+" addresses found in "+districtName+".";
+  $("done").classList.add("on");
+}
+
+/* ============================================================
+   INPUT
+   ============================================================ */
+let drag = null;
+const cv = $("scene");
+cv.addEventListener("pointerdown", e=>{
+  if(!running) return;
+  cv.setPointerCapture(e.pointerId);
+  cv.classList.add("grabbing");
+  drag = { id:e.pointerId, x:e.clientX, y:e.clientY };
+});
+cv.addEventListener("pointermove", e=>{
+  if(!drag || e.pointerId !== drag.id) return;
+  yaw   -= (e.clientX - drag.x) * 0.0032;
+  pitch -= (e.clientY - drag.y) * 0.0032;
+  pitch = Math.max(-1.3, Math.min(1.3, pitch));
+  drag.x = e.clientX; drag.y = e.clientY;
+});
+function endDrag(e){ if(drag && e.pointerId===drag.id){ drag=null; cv.classList.remove("grabbing"); } }
+cv.addEventListener("pointerup", endDrag);
+cv.addEventListener("pointercancel", endDrag);
+
+addEventListener("keydown", e=>{
+  if(!running) return;
+  if(e.code==="ArrowLeft")  yaw += 0.09;
+  if(e.code==="ArrowRight") yaw -= 0.09;
+  if(e.code==="BracketLeft")  nudge(-5);
+  if(e.code==="BracketRight") nudge(5);
+  if(e.code==="KeyW" || e.code==="Space"){
+    e.preventDefault();
+    // hop toward whichever neighbour best matches where you're looking
+    const facing = (((-yaw*180/Math.PI) % 360) + 360) % 360;
+    let best=null, bs=1e9;
+    if(current){
+      for(const en of current.nb){
+        let dd = Math.abs(((en.b - facing + 540) % 360) - 180);
+        const score = dd + en.d*0.4;
+        if(dd < 60 && score < bs){ bs = score; best = en; }
+      }
+      if(best) goTo(best.n, false);
+    }
+  }
+});
+function nudge(deg){
+  panoOffset = ((panoOffset + deg) % 360 + 360) % 360;
+  $("offv").innerHTML = (panoOffset>180?panoOffset-360:panoOffset) + "&deg;";
+  if(sphere && current) sphere.rotation.y = THREE.MathUtils.degToRad(-current.angle + panoOffset);
+}
+$("nudgeL").addEventListener("click", ()=>nudge(-5));
+$("nudgeR").addEventListener("click", ()=>nudge(5));
+
+addEventListener("resize", ()=>{
+  if(!renderer || !camera) return;
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ============================================================
+   COMPASS TAPE + MINIMAP + LOOP
+   ============================================================ */
+function drawTape(bearing, targetBearing){
+  const c=$("tape"), g=c.getContext("2d"), W=c.width, H=c.height;
+  g.clearRect(0,0,W,H);
+  const SPANd=132, ppd=W/SPANd, mid=W/2;
+  g.fillStyle="rgba(14,20,24,0.42)"; g.fillRect(0,0,W,H);
+  const start=Math.floor((bearing-SPANd/2)/5)*5;
+  for(let d=start; d<=bearing+SPANd/2; d+=5){
+    const delta=d-bearing, x=mid+delta*ppd;
+    if(x<0||x>W) continue;
+    const dd=((d%360)+360)%360;
+    const card = dd===0?"N":dd===90?"E":dd===180?"S":dd===270?"W":null;
+    g.globalAlpha = 1 - Math.min(1, Math.abs(delta)/(SPANd/2))*0.75;
+    if(card){
+      g.fillStyle="#5FB8C4"; g.font="600 17px 'IBM Plex Mono', monospace";
+      g.textAlign="center"; g.textBaseline="middle"; g.fillText(card,x,H*0.5);
+    } else if(dd%45===0){
+      g.fillStyle="rgba(245,239,227,0.72)"; g.font="400 12px 'IBM Plex Mono', monospace";
+      g.textAlign="center"; g.textBaseline="middle"; g.fillText(String(dd),x,H*0.5);
+    } else { g.fillStyle="rgba(245,239,227,0.32)"; g.fillRect(x-0.5,H*0.5-4,1,8); }
+    g.globalAlpha=1;
+  }
+  if(targetBearing!=null){
+    let delta=targetBearing-bearing;
+    while(delta>180)delta-=360; while(delta<-180)delta+=360;
+    const off=Math.abs(delta)>SPANd/2-6;
+    const x=mid+Math.max(-SPANd/2+6,Math.min(SPANd/2-6,delta))*ppd;
+    g.fillStyle="#D8B14A"; g.beginPath();
+    if(off){ const dir=delta>0?1:-1; g.moveTo(x+dir*9,H-4); g.lineTo(x,H-12); g.lineTo(x,H-4); }
+    else { g.moveTo(x-6,H-3); g.lineTo(x+6,H-3); g.lineTo(x,H-12); }
+    g.closePath(); g.fill();
+  }
+  g.fillStyle="#F5EFE3"; g.fillRect(mid-1,0,2,7);
+  g.fillStyle="rgba(245,239,227,0.28)"; g.fillRect(0,H-1,W,1);
+}
+
+const MSPAN = 300;
+function drawMinimap(){
+  const c=$("mini"), g=c.getContext("2d"), S=c.width, R=S/2;
+  g.clearRect(0,0,S,S);
+  g.save(); g.beginPath(); g.arc(R,R,R-2,0,Math.PI*2); g.clip();
+  g.fillStyle="#0A1013"; g.fillRect(0,0,S,S);
+  if(current){
+    const k=S/MSPAN;
+    g.fillStyle="rgba(95,184,196,0.35)";
+    for(const n of nodes){
+      const px=R+(n.x-current.x)*k, py=R+(n.z-current.z)*k;
+      if(px<-4||px>S+4||py<-4||py>S+4) continue;
+      g.fillRect(px-0.9, py-0.9, 1.8, 1.8);
+    }
+    for(const t of targets){
+      const px=R+(t.x-current.x)*k, py=R+(t.z-current.z)*k;
+      g.beginPath(); g.arc(px,py,t.found?3:4.5,0,Math.PI*2);
+      g.fillStyle=t.found?"#4C5A5E":"#D8B14A"; g.fill();
+    }
+    g.translate(R,R); g.rotate(-yaw);
+    g.beginPath(); g.moveTo(0,-8); g.lineTo(5.5,6); g.lineTo(0,3); g.lineTo(-5.5,6); g.closePath();
+    g.fillStyle="#F5EFE3"; g.fill();
+  }
+  g.restore();
+  g.beginPath(); g.arc(R,R,R-2,0,Math.PI*2);
+  g.strokeStyle="rgba(245,239,227,0.22)"; g.lineWidth=2; g.stroke();
+}
+
+function enterGame(){
+  running = true;
+  $("hud").classList.add("on");
+  loop();
+}
+function loop(){
+  raf = requestAnimationFrame(loop);
+  if(!running || !renderer || !camera) return;
+  camera.rotation.order = "YXZ";
+  camera.rotation.y = yaw;
+  camera.rotation.x = pitch;
+  renderer.render(scene, camera);
+
+  const bearing = (((-yaw*180/Math.PI)%360)+360)%360;
+  const t = current ? nearestTarget() : null;
+  if(t){
+    $("tgtName").textContent = t.label;
+    const d = metres(current, t);
+    $("tgtDist").textContent = d<1000 ? Math.round(d)+" m" : (d/1000).toFixed(2)+" km";
+    drawTape(bearing, bearingTo(current, t));
+  } else {
+    $("tgtName").textContent = targets.length ? "All logged" : "—";
+    $("tgtDist").textContent = "—";
+    drawTape(bearing, null);
+  }
+  drawMinimap();
+}
+</script>
+</body>
+</html>
