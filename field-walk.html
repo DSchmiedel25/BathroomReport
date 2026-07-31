@@ -106,6 +106,16 @@
     background:rgba(10,16,19,.72);backdrop-filter:blur(2px);}
   #dot{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;
     border-radius:50%;background:rgba(245,239,227,.6);box-shadow:0 0 4px rgba(0,0,0,.8);}
+  #shotpanel{position:absolute;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 206px);
+    width:min(300px,40vw);border:1px solid rgba(216,177,74,.45);background:rgba(10,16,19,.88);
+    padding:6px;display:none;pointer-events:none;}
+  #shotpanel.on{display:block;}
+  #shotimg{width:100%;display:block;background:#11181C;}
+  #shotcap{display:block;font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--brass);margin-top:5px;}
+  @media (max-width:520px){
+    #shotpanel{width:44vw;bottom:calc(env(safe-area-inset-bottom,0px) + 176px);}
+  }
   #photostat{position:absolute;left:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 132px);
     font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;line-height:1.7;max-width:60vw;
     color:rgba(95,184,196,.9);text-shadow:0 1px 5px rgba(0,0,0,.95);}
@@ -282,6 +292,7 @@
   </div>
   <canvas id="mini" width="224" height="224"></canvas>
   <div id="dot"></div>
+  <div id="shotpanel"><img id="shotimg" alt=""><span id="shotcap"></span></div>
   <div id="photostat"></div>
   <div id="moment"></div>
   <div id="keys">W A S D — walk<br>Shift — run<br>Mouse — look<br>Esc — pause</div>
@@ -295,6 +306,8 @@
 <div id="veil">
   <div class="eyebrow">Paused</div>
   <div class="t" id="veilT">Click to look around. Walk with W A S D, hold Shift to run.</div>
+  <div id="veilPhotos" style="font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
+       color:var(--brass);max-width:40ch;line-height:1.7;"></div>
   <button class="btn-ghost" id="resume">Step outside</button>
   <button class="btn-ghost" id="quit" style="border-color:transparent;color:var(--steel)">Back to register</button>
 </div>
@@ -337,6 +350,15 @@ const OVERPASS = [
 /* ---------- real imagery sources ---------- */
 const MLY_TOKEN = "MLY|27349781664703494|177bdf9d6eac575b5b3b74e7d9efcfc4";
 const MLY_GRAPH = "https://graph.mapillary.com";
+/* The Entity API documents the Authorization header; the query-string form is
+   documented for vector tiles. Send the header, and keep the query param too
+   so whichever the server honours, one of them lands. */
+function mlyFetch(path){
+  const sep = path.indexOf("?") === -1 ? "?" : "&";
+  return fetch(MLY_GRAPH + path + sep + "access_token=" + encodeURIComponent(MLY_TOKEN), {
+    headers: { "Authorization": "OAuth " + MLY_TOKEN }
+  });
+}
 
 /* USGS orthoimagery is public domain but only covers the United States.
    There is no free, openly-licensed, high-resolution aerial layer for the
@@ -511,6 +533,8 @@ let wantAerial = true, wantPhotos = true, aerialActive = false, districtIsUS = f
     [...seg.children].forEach(b=>{
       const on = b.dataset.l === "aerial" ? wantAerial : wantPhotos;
       b.setAttribute("aria-pressed", on ? "true":"false");
+      const label = b.dataset.l === "aerial" ? "Aerial ground" : "Street photos";
+      b.textContent = label + (on ? "  ON" : "  OFF");
     });
     const bits = [];
     if(wantAerial) bits.push("Ground becomes USGS orthoimagery — public domain, US only, down to 6 inches per pixel. The painted road and park layers switch off underneath it.");
@@ -844,7 +868,7 @@ function loadTex(url){
   return new Promise((res, rej)=> texLoader.load(url, res, undefined, rej));
 }
 
-let aerialTried = 0, aerialFailed = 0;
+let aerialTried = 0, aerialFailed = 0, aerialGaveUp = false;
 function buildAerial(){
   const halfLat = worldRadius*1.08/111320;
   const halfLon = worldRadius*1.08/(111320*cosLat);
@@ -862,10 +886,10 @@ function buildAerial(){
     const nw = toXZ(t2lat(y, z),   t2lon(x, z));
     const se = toXZ(t2lat(y+1, z), t2lon(x+1, z));
     const w = Math.abs(se.x - nw.x), d = Math.abs(se.z - nw.z);
-    if(w < 1 || d < 1) continue;
+    if(w < 1 || d < 1 || aerialGaveUp) continue;
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat0.clone());
     m.rotation.x = -Math.PI/2;
-    m.position.set((nw.x+se.x)/2, 0.02, (nw.z+se.z)/2);
+    m.position.set((nw.x+se.x)/2, 0.16, (nw.z+se.z)/2);
     scene.add(track(m));
     aerialTried++;
     loadTex(AERIAL_URL(z,x,y)).then(t=>{
@@ -876,7 +900,13 @@ function buildAerial(){
       m.material.map = t;
       m.material.color.setScalar(groundTint);
       m.material.needsUpdate = true;
-    }).catch(()=>{ aerialFailed++; });
+    }).catch(()=>{
+      aerialFailed++;
+      if(aerialFailed >= 3 && !aerialGaveUp){
+        aerialGaveUp = true;
+        console.warn("Aerial tiles refused cross-origin; keeping painted ground");
+      }
+    });
   }
   aerialActive = true;
 }
@@ -889,9 +919,7 @@ let shots = [], shotTimer = 0, shotGeoFlat = null, shotGeoPano = null, shotMarks
 let photoStatus = "off", photoNote = "", photoFailed = 0;
 
 async function mlyImages(bbox, fields, limit){
-  const url = MLY_GRAPH + "/images?access_token=" + encodeURIComponent(MLY_TOKEN)
-            + "&fields=" + fields + "&bbox=" + bbox + "&limit=" + limit;
-  const r = await fetch(url);
+  const r = await mlyFetch("/images?fields=" + fields + "&bbox=" + bbox + "&limit=" + limit);
   const txt = await r.text();
   let j;
   try{ j = JSON.parse(txt); }
@@ -980,6 +1008,54 @@ async function buildPhotos(lat, lon, onMsg){
   console.log("Mapillary: " + data.length + " frames returned, " + shots.length + " placed");
 }
 
+/* If WebGL refuses the photographs, show them in a plain <img> panel instead.
+   An ordinary image element can display a cross-origin file quite happily —
+   it only taints canvases, which we never read back. */
+let domPhotos = false, texRefusals = 0, panelShot = null;
+
+async function ensureUrl(sh){
+  if(sh.url || sh.urlFail) return sh.url;
+  try{
+    const r = await mlyFetch("/" + sh.id + "?fields=thumb_1024_url,captured_at,is_pano");
+    const j = await r.json();
+    if(j.error) throw new Error(j.error.message || "entity error");
+    sh.url = j.thumb_1024_url; sh.at = j.captured_at;
+  }catch(e){
+    sh.urlFail = true;
+    if(!photoNote) photoNote = "thumbnail lookup failed: " + e.message;
+  }
+  return sh.url;
+}
+
+async function updatePanel(){
+  if(!shots.length) return;
+  let best = null, bd = 42;
+  for(const sh of shots){
+    const d = Math.hypot(sh.x - player.x, sh.z - player.z);
+    if(d < bd){ bd = d; best = sh; }
+  }
+  if(best === panelShot) return;
+
+  if(panelShot && panelShot.mesh) panelShot.mesh.material.opacity = 0.20;
+  panelShot = best;
+  const p = $("shotpanel");
+  if(!best){ p.classList.remove("on"); return; }
+  best.mesh.material.opacity = 0.55;
+
+  const u = await ensureUrl(best);
+  if(!u || panelShot !== best){ p.classList.remove("on"); return; }
+  const img = $("shotimg");
+  img.onerror = ()=>{
+    photoNote = "even plain image elements are blocked here";
+    p.classList.remove("on");
+  };
+  img.src = u;
+  const d = best.at ? new Date(best.at) : null;
+  $("shotcap").textContent = (d && !isNaN(d) ? d.toISOString().slice(0,10) : "Mapillary")
+                           + (best.pano ? " · 360" : "") + " · " + Math.round(bd) + " m";
+  p.classList.add("on");
+}
+
 /* Only a handful of photographs are ever resident in memory. */
 function streamPhotos(){
   if(!shots.length) return;
@@ -1013,8 +1089,9 @@ async function hydrate(s){
   s.loading = true;
   try{
     if(!s.url){
-      const r = await fetch(MLY_GRAPH+"/"+s.id+"?access_token="+encodeURIComponent(MLY_TOKEN)+"&fields=thumb_1024_url");
+      const r = await mlyFetch("/" + s.id + "?fields=thumb_1024_url");
       const j = await r.json();
+      if(j.error) throw new Error(j.error.message || "entity error");
       s.url = j.thumb_1024_url;
     }
     if(!s.url) throw new Error("no thumbnail");
@@ -1030,7 +1107,11 @@ async function hydrate(s){
   }catch(err){
     s.dead = true;             // expired URL or blocked host — stop retrying this one
     photoFailed++;
-    if(!photoNote) photoNote = "image load blocked: " + (err && err.message ? err.message : err);
+    texRefusals++;
+    if(texRefusals >= 2 && !domPhotos){
+      domPhotos = true;
+      photoNote = "WebGL refused the photos — showing them in a panel instead";
+    }
   }
   s.loading = false;
 }
@@ -1051,7 +1132,9 @@ function disposeWorld(){
   for(const s2 of shots){ if(s2.tex) s2.tex.dispose(); }
   shots = []; shotMarks = null; precip = null;
   photoStatus = "off"; photoNote = ""; photoFailed = 0;
-  aerialTried = aerialFailed = 0;
+  domPhotos = false; texRefusals = 0; panelShot = null;
+  $("shotpanel").classList.remove("on");
+  aerialTried = aerialFailed = 0; aerialGaveUp = false;
   disposables.length = 0;
   grid.clear();
   objectives = [];
@@ -1152,8 +1235,8 @@ function buildWorld(data){
   // ---- ground imagery ----
   if(wantAerial && districtIsUS) buildAerial();
 
-  // ---- flat areas (water, green) — redundant once real aerial is down ----
-  if(!aerialActive){
+  // ---- flat areas (water, green) ----
+  {
     const pos = [], col = [];
     const c = new THREE.Color();
     for(const a of areas){
@@ -1178,7 +1261,7 @@ function buildWorld(data){
   }
 
   // ---- roads ----
-  if(!aerialActive){
+  {
     const pos = [], col = [];
     const c = new THREE.Color();
     // pavement apron first (slightly lower), then carriageway
@@ -1745,6 +1828,12 @@ function enterGame(){
     if(aerialTried && aerialFailed > aerialTried*0.6)
       toast("Aerial refused", "The tile host blocked the images — switch Aerial ground off");
   }, 6000);
+  const pnote = !wantPhotos
+      ? "Street photos are switched off in the register."
+      : photoStatus === "ready"
+        ? shots.length + " photographs placed. Walk up to a brass frame to see it."
+        : "Photographs unavailable — " + photoStatus + (photoNote ? ": " + photoNote : "");
+  $("veilPhotos").textContent = pnote;
   $("veil").classList.add("on");
   $("veilT").textContent = touch
     ? "Drag the lower-left to walk, drag anywhere else to look. Hold Lift to rise off the street — let go and you'll fall back down. Reach every brass beacon."
@@ -1794,7 +1883,7 @@ function loop(){
   stepPrecip(dt);
 
   shotTimer += dt;
-  if(shotTimer > 0.45){ shotTimer = 0; streamPhotos(); }
+  if(shotTimer > 0.45){ shotTimer = 0; updatePanel(); if(!domPhotos) streamPhotos(); }
 
   renderer.render(scene, camera);
   updateHUD();
@@ -1925,14 +2014,16 @@ function updateHUD(){
   $("time").textContent = fmt(elapsed);
   $("alt").textContent = Math.round(player.y) + " m";
 
-  if(wantPhotos){
+  if(!wantPhotos){ $("photostat").textContent = "Street photos: off"; }
+  else {
     const el = $("photostat");
     let live = 0; for(const s2 of shots) if(s2.tex) live++;
     const bad = photoStatus !== "ready";
     el.classList.toggle("bad", bad);
     el.innerHTML = bad
       ? "Photos: " + photoStatus + (photoNote ? "<br>" + photoNote.slice(0,90) : "")
-      : "Photos " + live + " shown / " + shots.length + " placed"
+      : (domPhotos ? "Photos in panel / " + shots.length + " placed"
+                   : "Photos " + live + " shown / " + shots.length + " placed")
         + (photoFailed ? " / " + photoFailed + " blocked" : "")
         + (photoNote ? "<br>" + photoNote.slice(0,80) : "");
   }
