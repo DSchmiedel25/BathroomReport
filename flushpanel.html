@@ -258,6 +258,7 @@
     <button class="nav-link" data-page="tips">💬 Tips</button>
     <button class="nav-link" data-page="addloc">➕ Add location</button>
     <button class="nav-link" data-page="bakereview">🕐 Bake review</button>
+    <button class="nav-link" data-page="ovreview">📝 Override review</button>
     <div class="sidebar-foot">
       <div class="who" id="whoami"></div>
       <button class="btn full" id="signoutBtn">Sign out</button>
@@ -380,6 +381,12 @@
     <section class="page" data-view="bakereview">
       <div class="hint" style="margin-bottom:8px">Community-verified hours waiting to bake, conflicts to resolve, and active admin overrides. Read-only: after reviewing, run <code>node fetch-and-bake-hours.js</code> to bake pending hours into the static files, then push (bump <code>sw.js</code>).</div>
       <div id="bakeReviewList"><div class="loading">Open to load…</div></div>
+    </section>
+
+    <!-- Override review (read-only preview of what bake-overrides.js will change) -->
+    <section class="page" data-view="ovreview">
+      <div class="hint" style="margin-bottom:8px">Every admin override, diffed against the record currently in the <code>*-locations.js</code> files. This is what <code>node bake-overrides.js overrides.json</code> would write. Read-only.</div>
+      <div id="ovReviewList"><div class="loading">Open to load…</div></div>
     </section>
   </main>
 </div>
@@ -618,12 +625,13 @@ document.querySelectorAll('.nav-link').forEach(btn => btn.addEventListener('clic
   const page = btn.dataset.page;
   document.querySelectorAll('.nav-link').forEach(n => n.classList.toggle('active', n === btn));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.dataset.view === page));
-  const _titles = { reports:'Reports', requests:'Location requests', tips:'Tips', addloc:'Add location', bakereview:'Bake review' };
-  const _subs = { reports:'Flags on existing locations.', requests:'Submissions for places that aren’t on the map yet.', tips:'Community tips — edit or remove.', addloc:'Generate a paste-ready record for a *-locations.js file — no Firestore.', bakereview:'Community-verified hours to review before the next bake.' };
+  const _titles = { reports:'Reports', requests:'Location requests', tips:'Tips', addloc:'Add location', bakereview:'Bake review', ovreview:'Override review' };
+  const _subs = { reports:'Flags on existing locations.', requests:'Submissions for places that aren’t on the map yet.', tips:'Community tips — edit or remove.', addloc:'Generate a paste-ready record for a *-locations.js file — no Firestore.', bakereview:'Community-verified hours to review before the next bake.', ovreview:'What the next override bake would change.' };
   $('#pageTitle').textContent = _titles[page] || 'Reports';
   $('#pageSub').textContent = _subs[page] || '';
   if(page === 'tips') loadTips();
   if(page === 'bakereview') loadBakeReview();
+  if(page === 'ovreview') loadOverrideReview();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }));
 
@@ -1071,6 +1079,127 @@ async function loadBakeReview(){
   }catch(e){
     console.error('bake review load failed', e);
     el.innerHTML = '<div class="global-error">Could not load hour status. Check your connection and admin access.</div>';
+  }
+}
+
+// ================= OVERRIDE REVIEW (read-only preview of the next bake) =================
+/* Mirrors bake-overrides.js. That script is the authority on what actually lands in the
+ * static files, so the map, the comparison and the clear-on-empty rule are copied from it
+ * rather than reimplemented. Changing FIELD_MAP in one place means changing it in both.
+ *
+ * Deliberately NOT merged into the Bake review page: that one reads hourStatus, which is
+ * server-derived hours consensus. This reads the overrides collection, which is admin
+ * corrections to any field. Two different sources, two different review questions. */
+const OV_FIELD_MAP = {
+  hrs:'hrs', hours:'hours', addr:'addr', city:'city', state:'state',
+  zipCode:'zipCode', phone:'phone', lat:'lat', lng:'lng', locName:'n'
+};
+
+function ovFmt(v){
+  if(v === undefined) return '\u2014';
+  if(v === '') return '(empty)';
+  if(v && typeof v === 'object') return Object.entries(v).map(([k,x]) => k + ' ' + x).join(', ');
+  return String(v);
+}
+
+async function loadOverrideReview(){
+  const el = $('#ovReviewList');
+  el.innerHTML = '<div class="loading">Loading overrides\u2026</div>';
+  try{
+    const snap = await getDocs(collection(db, 'overrides'));
+    const removes = [], edits = [], creates = [], orphans = [], noops = [];
+
+    snap.forEach(d => {
+      const ov = d.data() || {};
+      const id = d.id;
+      /* Override ids were written under the raw location id before slashes were escaped, so
+       * resolve both forms - the same normalisation the save path does via fsId(). */
+      const seed = locById[id] || locById[fsId(id)] || null;
+
+      if(ov.remove === true){
+        (seed ? removes : orphans).push({ id, ov, seed, why: seed ? '' : 'remove flag, but no matching record - nothing to delete' });
+        return;
+      }
+
+      if(!seed){
+        // bake-overrides.js can CREATE a record, but only with a chain and valid coords.
+        const okCoord = v => v !== '' && v != null && !Number.isNaN(parseFloat(v));
+        if(ov.chain && okCoord(ov.lat) && okCoord(ov.lng)) creates.push({ id, ov });
+        else orphans.push({ id, ov, seed:null,
+          why: !ov.chain ? 'no chain field - bake will skip it'
+                         : 'missing or invalid lat/lng - bake will skip it' });
+        return;
+      }
+
+      const changes = [];
+      for(const [ovKey, recKey] of Object.entries(OV_FIELD_MAP)){
+        if(!(ovKey in ov)) continue;
+        const val = ov[ovKey];
+        // Empty single-window string / empty per-day map means "unknown": the bake DELETES it.
+        if((ovKey === 'hrs' && val === '') ||
+           (ovKey === 'hours' && val && Object.keys(val).length === 0)){
+          if(recKey in seed) changes.push({ field: recKey, from: seed[recKey], to: undefined, cleared: true });
+          continue;
+        }
+        if(JSON.stringify(seed[recKey]) !== JSON.stringify(val)){
+          changes.push({ field: recKey, from: seed[recKey], to: val });
+        }
+      }
+      (changes.length ? edits : noops).push({ id, ov, seed, changes });
+    });
+
+    const card = (title, body, sub) =>
+      '<article class="card"><div class="card-head"><div>' +
+        '<h3 class="card-title">' + title + '</h3>' +
+        (sub ? '<div class="sub">' + sub + '</div>' : '') +
+      '</div></div>' + body + '</article>';
+
+    const rowsFor = (changes) => changes.map(c =>
+      '<div class="tip-row"><span class="tip-text"><strong>' + esc(c.field) + '</strong> ' +
+      (c.cleared
+        ? '<span style="opacity:.7">cleared</span> <span style="opacity:.5">(was ' + esc(ovFmt(c.from)) + ')</span>'
+        : esc(ovFmt(c.from)) + ' <span style="opacity:.5">\u2192</span> ' + esc(ovFmt(c.to))) +
+      '</span></div>').join('');
+
+    const section = (heading, list, render) => {
+      if(!list.length) return '<div class="hint" style="margin:10px 0">' + heading + ': none.</div>';
+      return '<h3 style="margin:16px 0 6px">' + heading + ' (' + list.length + ')</h3>' +
+        list.map(render).join('');
+    };
+
+    let html = '';
+
+    html += section('\u270f\ufe0f Field changes - will bake', edits, e =>
+      card(esc((e.seed && e.seed.n) || e.id), rowsFor(e.changes), esc(e.id)));
+
+    html += section('\u2795 New locations - will be created', creates, c =>
+      card(esc(c.ov.locName || c.ov.n || c.id),
+        '<div class="tip-row"><span class="tip-text">' +
+          esc(ovFmt(c.ov.addr)) + ' \u00b7 ' + esc(c.ov.lat) + ', ' + esc(c.ov.lng) +
+        '</span></div>',
+        esc(c.id) + ' \u2192 chain ' + esc(c.ov.chain)));
+
+    html += section('\ud83d\uddd1\ufe0f Removals - record will be deleted', removes, r =>
+      card(esc((r.seed && r.seed.n) || r.id),
+        '<div class="tip-row"><span class="tip-text" style="color:#f6a6a6">Permanently removed from its locations file.</span></div>',
+        esc(r.id)));
+
+    html += section('\u26a0\ufe0f Skipped by the bake - needs attention', orphans, o =>
+      card(esc(o.ov.locName || o.id),
+        '<div class="tip-row"><span class="tip-text">' + esc(o.why) + '</span></div>',
+        esc(o.id)));
+
+    if(noops.length){
+      html += '<div class="hint" style="margin:16px 0 0">' + noops.length +
+        ' override(s) already match the static files \u2014 nothing to bake for them.</div>';
+    }
+
+    const any = edits.length || creates.length || removes.length || orphans.length;
+    el.innerHTML = any ? html
+      : '<div class="hint">Nothing pending \u2014 every override is already baked into the static files.</div>';
+  }catch(e){
+    console.error('override review load failed', e);
+    el.innerHTML = '<div class="global-error">Could not load overrides. Check your connection and admin access.</div>';
   }
 }
 

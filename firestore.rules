@@ -286,6 +286,22 @@ service cloud.firestore {
       allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
     }
 
+    /* Collection group read — FlushPanel's tips moderation view.
+     *
+     * The rule above governs DIRECT reads of one location's entries, which is why tips render
+     * on the map: app.js reads tips/{locId}/entries per location. A collectionGroup('entries')
+     * query is matched against the COLLECTION GROUP path instead, which that rule does not
+     * cover, so loadTips() was denied. The panel catches that error and logs it to the console,
+     * so the failure surfaced only as an empty "No tips to moderate." list.
+     *
+     * Admin-only on purpose: nothing public needs to read every tip in the database at once,
+     * and the recursive wildcard would otherwise reach any future `entries` subcollection
+     * anywhere under /documents. Rules OR together, so the public per-location read above is
+     * unaffected by this block. */
+    match /{path=**}/entries/{entryId} {
+      allow read: if isAdmin();
+    }
+
 
     // ============================================================
     //  Community activity log (feeds recap/most-recent)
