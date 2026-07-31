@@ -5,11 +5,11 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "start with introspect; then discover, probe, smoke, full"
+        description: "start with sitemap, then pages"
         required: true
-        default: introspect
+        default: sitemap
         type: choice
-        options: [introspect, discover, probe, smoke, full]
+        options: [sitemap, pages, introspect, discover, probe, smoke, full]
       commit:
         description: "Commit the result back to the repo"
         required: true
@@ -27,7 +27,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
+
+      - name: Crawl sitemap
+        if: inputs.mode == 'sitemap'
+        run: node scrape-caseys.js --sitemap
+
+      - name: Fetch store pages
+        if: inputs.mode == 'pages'
+        run: node scrape-caseys.js --pages
 
       - name: Introspect schema
         if: inputs.mode == 'introspect'
@@ -50,19 +58,21 @@ jobs:
         run: node scrape-caseys.js
 
       - name: Upload result
-        if: inputs.mode == 'smoke' || inputs.mode == 'full'
+        if: inputs.mode == 'sitemap' || inputs.mode == 'pages' || inputs.mode == 'smoke' || inputs.mode == 'full'
         uses: actions/upload-artifact@v4
         with:
           name: caseys-${{ inputs.mode }}-${{ github.run_number }}
-          path: caseys_full.json
+          path: |
+            caseys_full.json
+            caseys_sitemap.json
           if-no-files-found: warn
 
       - name: Commit
-        if: inputs.mode == 'full' && inputs.commit == 'true'
+        if: (inputs.mode == 'full' || inputs.mode == 'pages') && inputs.commit == 'true'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add caseys_full.json
+          git add caseys_full.json caseys_sitemap.json
           git diff --staged --quiet && echo "no changes" && exit 0
           git commit -m "Casey's location refresh $(date -u +%Y-%m-%d)"
           git push
