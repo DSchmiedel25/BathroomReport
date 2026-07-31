@@ -373,7 +373,7 @@ window.stewartsLocations = [
 {"n":"Strongs Avenue, Rutland","lat":"43.599309","lng":"-72.970968","addr":"140 Strongs Avenue, Rutland, VT 05701","id":"rutland-strongsave","hrs":"0500-2300"},
 {"n":"Geyser Road, Ballston Spa","lat":"43.046356","lng":"-73.849701","addr":"448 Geyser Road, Ballston Spa, NY 12020","id":"ballstonspa-geyserrd448","hrs":"","osm":{"gas":1}},
 {"n":"Tower Drive, Scotchtown","lat":"41.471737","lng":"-74.383417","addr":"333 Tower Drive, Scotchtown, NY 10941","id":"scotchtown-towerdr","hrs":"","osm":{"gas":1}},
-{"n":"Albany, NY","lat":42.67317,"lng":-73.750417,"addr":"90 Shaker Road, Albany, NY 12204","id":"stewarts-osm-ny-albany","src":"osm","osm":{"gas":1}},
+{"n":"Albany, NY","lat":42.67359,"lng":-73.75128,"addr":"351 Northern Blvd #397","id":"stewarts-osm-ny-albany","src":"osm","osm":{"gas":1},"hrs":"0500-2300","city":"Albany","state":"NY","zipCode":"12204"},
 {"n":"Albany, NY","lat":42.724142,"lng":-73.841119,"addr":"1710 Central Avenue, Albany, NY","id":"stewarts-osm-ny-albany-2","src":"osm"},
 {"n":"Latham, NY","lat":42.736741,"lng":-73.760871,"addr":"567 Watervliet Shaker Road, Latham, NY 12110","id":"stewarts-osm-ny-latham","src":"osm"},
 {"n":"Albany, NY","lat":42.654046,"lng":-73.772653,"addr":"10 New Scotland Avenue, Albany, NY 12208","id":"stewarts-osm-ny-albany-3","src":"osm"},
