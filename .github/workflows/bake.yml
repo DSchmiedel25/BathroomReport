@@ -36,19 +36,33 @@ jobs:
       - name: Install firebase-admin
         run: npm install firebase-admin --no-save
 
+      # A failing bake step must stay VISIBLE. These used to end in
+      #   || echo "... — continuing"
+      # which swallowed the exit code, so the step went green whatever happened and the job
+      # always reported success. That is how a fatal SyntaxError in the overrides bake ran
+      # unnoticed. `continue-on-error` keeps the original intent — one broken step should not
+      # stop the others — while still marking the step failed and flagging the run at the end.
       - name: Bake overrides
+        id: bake_overrides
+        continue-on-error: true
         run: |
-          node fetch-and-bake.js || echo "overrides step had an issue — continuing"
+          node fetch-and-bake.js
           if ls baked/*-locations.js >/dev/null 2>&1; then cp baked/*-locations.js .; fi
 
       - name: Bake hours
-        run: node fetch-and-bake-hours.js || echo "hours step had an issue — continuing"
+        id: bake_hours
+        continue-on-error: true
+        run: node fetch-and-bake-hours.js
 
       - name: Bake amenities
+        id: bake_amenities
+        continue-on-error: true
         run: |
-          node export-votes.js || echo "vote export had an issue — skipping amenity bake"
+          node export-votes.js
           if [ -f votes-summary.json ]; then
-            node bake-confirmed.js votes-summary.json ./*-locations.js || echo "amenity bake had an issue — continuing"
+            node bake-confirmed.js votes-summary.json ./*-locations.js
+          else
+            echo "no votes-summary.json produced — nothing to bake"
           fi
 
       - name: Commit, bump cache, and push (only if something changed)
@@ -83,3 +97,19 @@ jobs:
       - name: Clean up key
         if: always()
         run: rm -f serviceAccountKey.json
+
+      # The commit step still runs on a partial bake (baking two of three is better than
+      # baking none), so the job would otherwise end green with a step quietly failed.
+      # This turns any failed bake step into a red run.
+      - name: Fail the run if any bake step failed
+        if: always()
+        run: |
+          FAILED=""
+          [ "${{ steps.bake_overrides.outcome }}" = "failure" ] && FAILED="$FAILED overrides"
+          [ "${{ steps.bake_hours.outcome }}"     = "failure" ] && FAILED="$FAILED hours"
+          [ "${{ steps.bake_amenities.outcome }}" = "failure" ] && FAILED="$FAILED amenities"
+          if [ -n "$FAILED" ]; then
+            echo "::error::Bake step(s) failed:$FAILED — see the step logs above."
+            exit 1
+          fi
+          echo "All bake steps succeeded."
