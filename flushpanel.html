@@ -1044,7 +1044,13 @@ async function loadBakeReview(){
     snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
     const pending   = rows.filter(r => r.verified && r.revision !== r.bakedRevision);
     const conflicts = rows.filter(r => r.state === 'conflict');
-    const overrides = rows.filter(r => r.state === 'admin_override');
+    /* Overrides are permanent, but a BAKED one is not a to-do. Same revision check the
+     * pending list uses, so this page means "something needs doing" rather than being a
+     * permanent inventory — an override drops off once fetch-and-bake-hours.js has stamped
+     * bakedRevision for it. (That script stamps admin_override rows as well as verified
+     * ones; if it ever stops, these would stick here forever again.) */
+    const overrides = rows.filter(r => r.state === 'admin_override'
+                                    && r.revision !== r.bakedRevision);
     /* Only a verified doc has a live `value`. An unverified one keeps its history in prevValue,
      * so show that explicitly as "was" rather than printing it where a current value goes —
      * conflict rows used to render the previously-verified hours as though they were the hours
@@ -1072,10 +1078,10 @@ async function loadBakeReview(){
       block('✅ Pending confirmed — will bake', pending, r => 'agree ' + (r.agreeCount || 0) + ' · confirmed ' + fmtWhen(r.lastConfirmedAt)) +
       block('⚠️ Conflicts — need a human', conflicts, r => 'tie at agree ' + (r.agreeCount || 0)
              + (r.prevConfirmedAt ? ' · last confirmed ' + fmtWhen(r.prevConfirmedAt) : '')) +
-      block('🔒 Admin overrides — active', overrides, r => 'override in effect');
+      block('🔒 Admin overrides — not yet baked', overrides, r => 'override set, waiting on the next bake');
     el.innerHTML = (pending.length || conflicts.length || overrides.length)
       ? html
-      : '<div class="hint">Nothing to review — no verified-and-unbaked hours, conflicts, or overrides right now.</div>';
+      : '<div class="hint">Nothing to review — everything verified or overridden has been baked into the static files.</div>';
   }catch(e){
     console.error('bake review load failed', e);
     el.innerHTML = '<div class="global-error">Could not load hour status. Check your connection and admin access.</div>';

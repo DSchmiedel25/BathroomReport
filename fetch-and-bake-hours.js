@@ -62,10 +62,13 @@ async function main(){
    * Runs under the service account, which bypasses the `allow write: if false` rule on
    * hourStatus — no client can forge a baked stamp.
    *
-   * Only verified rows are stamped. Conflicts and single-report rows are deliberately left alone:
-   * they were never baked, and they must keep surfacing for a human. */
+   * Only rows that actually GET baked are stamped: community-verified ones, and admin
+   * overrides (bake-hours.js writes those into the files too — a baked record carries
+   * meta.hrsSrc = 'admin_override'). Conflicts and single-report rows are deliberately left
+   * alone: they were never baked, and they must keep surfacing for a human. */
   const toStamp = Object.entries(status).filter(([, r]) =>
-    r && r.verified && r.revision !== undefined && r.revision !== r.bakedRevision);
+    r && (r.verified || r.state === 'admin_override')
+      && r.revision !== undefined && r.revision !== r.bakedRevision);
 
   if (!toStamp.length){
     console.log('\nNo newly baked rows to stamp — bakedRevision already current.');
