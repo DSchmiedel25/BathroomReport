@@ -106,20 +106,6 @@
     background:rgba(10,16,19,.72);backdrop-filter:blur(2px);}
   #dot{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;
     border-radius:50%;background:rgba(245,239,227,.6);box-shadow:0 0 4px rgba(0,0,0,.8);}
-  #shotpanel{position:absolute;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 206px);
-    width:min(300px,40vw);border:1px solid rgba(216,177,74,.45);background:rgba(10,16,19,.88);
-    padding:6px;display:none;pointer-events:none;}
-  #shotpanel.on{display:block;}
-  #shotimg{width:100%;display:block;background:#11181C;}
-  #shotcap{display:block;font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
-    color:var(--brass);margin-top:5px;}
-  @media (max-width:520px){
-    #shotpanel{width:44vw;bottom:calc(env(safe-area-inset-bottom,0px) + 176px);}
-  }
-  #photostat{position:absolute;left:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 132px);
-    font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;line-height:1.7;max-width:60vw;
-    color:rgba(95,184,196,.9);text-shadow:0 1px 5px rgba(0,0,0,.95);}
-  #photostat.bad{color:#E88A6A;}
   #moment{position:absolute;left:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 92px);
     font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:rgba(216,177,74,.85);
     line-height:1.9;text-shadow:0 1px 5px rgba(0,0,0,.95);}
@@ -225,6 +211,14 @@
     </div>
 
     <div class="sec">
+      <div class="sec-head"><span class="eyebrow">Aerial ground</span><span class="eyebrow" id="aerialNote"></span></div>
+      <div class="seg" id="aseg"><button type="button" data-a="1" aria-pressed="true">Aerial ON</button></div>
+      <label class="f" style="margin-top:10px"><span>CORS proxy &mdash; only if tiles are refused</span>
+        <input type="text" id="proxy" placeholder="https://corsproxy.io/?url="></label>
+      <p class="foot" style="margin-top:9px">USGS orthoimagery, public domain, United States only. The tile host does not grant cross-origin access, so WebGL may refuse it &mdash; a proxy prefix routes the tiles through a host that does. Painted streets stay underneath either way.</p>
+    </div>
+
+    <div class="sec">
       <div class="sec-head"><span class="eyebrow">Conditions</span><span class="eyebrow" id="sunread">&mdash;</span></div>
       <div class="seg" id="wseg">
         <button type="button" data-w="clear" aria-pressed="true">Clear</button>
@@ -236,12 +230,14 @@
     </div>
 
     <div class="sec">
-      <div class="sec-head"><span class="eyebrow">Real imagery</span><span class="eyebrow" id="aerialNote"></span></div>
-      <div class="seg" id="layers">
-        <button type="button" data-l="aerial" aria-pressed="true">Aerial ground</button>
-        <button type="button" data-l="photos" aria-pressed="true">Street photos</button>
+      <div class="sec-head"><span class="eyebrow">Conditions</span><span class="eyebrow" id="sunread">&mdash;</span></div>
+      <div class="seg" id="wseg">
+        <button type="button" data-w="clear" aria-pressed="true">Clear</button>
+        <button type="button" data-w="overcast" aria-pressed="false">Overcast</button>
+        <button type="button" data-w="rain" aria-pressed="false">Rain</button>
+        <button type="button" data-w="snow" aria-pressed="false">Snow</button>
       </div>
-      <p class="foot" style="margin-top:9px" id="layerNote"></p>
+      <p class="foot" style="margin-top:9px">Sun position is computed from the date, time and coordinates you enter. Time is read as local clock time; the offset comes from your longitude, so it is right to the hour almost everywhere.</p>
     </div>
 
     <div class="sec">
@@ -258,7 +254,6 @@
     <p class="foot">
       Map data © OpenStreetMap contributors, ODbL 1.0, via the public Overpass API.
       Aerial ground: USGS The National Map orthoimagery, public domain, United States only.
-      Street photographs © Mapillary contributors, provided by Meta Platforms Ireland Ltd.
       Rendering by three.js (MIT). Building heights come from <code>height</code> and <code>building:levels</code>
       tags where surveyed, and are estimated where they aren't.
     </p>
@@ -292,8 +287,6 @@
   </div>
   <canvas id="mini" width="224" height="224"></canvas>
   <div id="dot"></div>
-  <div id="shotpanel"><img id="shotimg" alt=""><span id="shotcap"></span></div>
-  <div id="photostat"></div>
   <div id="moment"></div>
   <div id="keys">W A S D — walk<br>Shift — run<br>Mouse — look<br>Esc — pause</div>
   <div id="pad"><div id="padKnob"></div></div>
@@ -306,8 +299,6 @@
 <div id="veil">
   <div class="eyebrow">Paused</div>
   <div class="t" id="veilT">Click to look around. Walk with W A S D, hold Shift to run.</div>
-  <div id="veilPhotos" style="font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
-       color:var(--brass);max-width:40ch;line-height:1.7;"></div>
   <button class="btn-ghost" id="resume">Step outside</button>
   <button class="btn-ghost" id="quit" style="border-color:transparent;color:var(--steel)">Back to register</button>
 </div>
@@ -348,38 +339,6 @@ const OVERPASS = [
 ];
 
 /* ---------- real imagery sources ---------- */
-const MLY_TOKEN = "MLY|27349781664703494|177bdf9d6eac575b5b3b74e7d9efcfc4";
-const MLY_GRAPH = "https://graph.mapillary.com";
-/* The Entity API documents the Authorization header; the query-string form is
-   documented for vector tiles. Send the header, and keep the query param too
-   so whichever the server honours, one of them lands. */
-function mlyFetch(path){
-  const sep = path.indexOf("?") === -1 ? "?" : "&";
-  return fetch(MLY_GRAPH + path + sep + "access_token=" + encodeURIComponent(MLY_TOKEN), {
-    headers: { "Authorization": "OAuth " + MLY_TOKEN }
-  });
-}
-
-/* USGS orthoimagery is public domain but only covers the United States.
-   There is no free, openly-licensed, high-resolution aerial layer for the
-   whole planet — so districts outside the US fall back to painted ground. */
-const AERIAL_URL = (z,x,y) =>
-  "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/"+z+"/"+y+"/"+x;
-const AERIAL_MAXZ = 19;
-
-/* ---------- web mercator ---------- */
-const t2n = z => Math.pow(2, z);
-function lon2t(lon, z){ return (lon+180)/360 * t2n(z); }
-function lat2t(lat, z){
-  const r = lat*Math.PI/180;
-  return (1 - Math.log(Math.tan(r) + 1/Math.cos(r))/Math.PI)/2 * t2n(z);
-}
-function t2lon(x, z){ return x/t2n(z)*360 - 180; }
-function t2lat(y, z){
-  const n = Math.PI - 2*Math.PI*y/t2n(z);
-  return 180/Math.PI * Math.atan(0.5*(Math.exp(n) - Math.exp(-n)));
-}
-
 const EYE = 1.68, WALK = 3.3, RUN = 6.8, REACH = 9;
 const R_EARTH = 6378137;
 
@@ -486,11 +445,29 @@ let selected = 0;
       selected = i;
       [...rows.children].forEach((c,j)=>c.setAttribute("aria-selected", j===i?"true":"false"));
       $("coords").value="";
-      updateAerialNote(); refreshSun();
+      refreshSun(); updateAerialNote();
     };
     el.addEventListener("click", pick);
     el.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); pick(); }});
     rows.appendChild(el);
+  });
+})();
+
+let wantAerial = true, aerialActive = false, districtIsUS = false;
+function currentIsUS(){
+  const c = parseCoords($("coords").value);
+  if(c) return c.lat > 24 && c.lat < 50 && c.lon > -125 && c.lon < -66;
+  return !!LOCATIONS[selected].us;
+}
+function updateAerialNote(){
+  $("aerialNote").textContent = currentIsUS() ? "Coverage here" : "No US coverage";
+}
+(function setupAerial(){
+  const b = $("aseg").firstElementChild;
+  b.addEventListener("click", ()=>{
+    wantAerial = !wantAerial;
+    b.setAttribute("aria-pressed", wantAerial ? "true":"false");
+    b.textContent = wantAerial ? "Aerial ON" : "Aerial OFF";
   });
 })();
 
@@ -514,8 +491,8 @@ function refreshSun(){
   const state = e > 12 ? "full sun" : e > 0 ? "low sun" : e > -6 ? "twilight" : "night";
   $("sunread").textContent = e.toFixed(0) + "° " + Math.round(r.sun.az) + "° · " + state;
 }
-["coords","cdate","ctime"].forEach(id =>
-  $(id).addEventListener("input", ()=>{ refreshSun(); updateAerialNote(); }));
+["coords","cdate","ctime"].forEach(id => $(id).addEventListener("input", ()=>{ refreshSun(); updateAerialNote(); }));
+updateAerialNote();
 
 (function setupWeather(){
   const seg = $("wseg");
@@ -524,40 +501,6 @@ function refreshSun(){
     [...seg.children].forEach(o => o.setAttribute("aria-pressed", o.dataset.w===weather ? "true":"false"));
   }));
 })();
-
-let wantAerial = true, wantPhotos = true, aerialActive = false, districtIsUS = false;
-
-(function setupLayers(){
-  const seg = $("layers");
-  const paint = ()=>{
-    [...seg.children].forEach(b=>{
-      const on = b.dataset.l === "aerial" ? wantAerial : wantPhotos;
-      b.setAttribute("aria-pressed", on ? "true":"false");
-      const label = b.dataset.l === "aerial" ? "Aerial ground" : "Street photos";
-      b.textContent = label + (on ? "  ON" : "  OFF");
-    });
-    const bits = [];
-    if(wantAerial) bits.push("Ground becomes USGS orthoimagery — public domain, US only, down to 6 inches per pixel. The painted road and park layers switch off underneath it.");
-    if(wantPhotos) bits.push("Mapillary photographs stand in the streets where they were taken, facing the way the camera faced. They load as you approach.");
-    $("layerNote").textContent = bits.join(" ") || "Stylised ground, no photographs. Fastest option.";
-  };
-  [...seg.children].forEach(b=>b.addEventListener("click", ()=>{
-    if(b.dataset.l === "aerial") wantAerial = !wantAerial; else wantPhotos = !wantPhotos;
-    paint();
-  }));
-  paint();
-  updateAerialNote();
-  refreshSun();
-})();
-
-function currentIsUS(){
-  const c = parseCoords($("coords").value);
-  if(c) return c.lat > 24 && c.lat < 50 && c.lon > -125 && c.lon < -66;
-  return !!LOCATIONS[selected].us;
-}
-function updateAerialNote(){
-  $("aerialNote").textContent = currentIsUS() ? "Aerial available here" : "No aerial outside the US";
-}
 
 $("rad").addEventListener("input", e=>{ $("radlbl").textContent = e.target.value + " m"; });
 
@@ -615,7 +558,9 @@ async function start(){
   sceneSun  = w.sun || { elev: 34, az: 215 };
   worldRadius = parseInt($("rad").value,10);
   districtIsUS = currentIsUS();
+  aerialProxy = $("proxy").value.trim();
   aerialActive = false;
+  aerialTried = aerialFailed = aerialLoaded = 0; aerialGaveUp = false;
 
   $("register").style.display = "none";
   $("loading").classList.add("on");
@@ -636,7 +581,6 @@ async function start(){
 
   originLat = lat; originLon = lon; cosLat = Math.cos(lat*Math.PI/180);
   buildWorld(data);
-  if(wantPhotos) await buildPhotos(lat, lon, setMsg);
   $("loading").classList.remove("on");
   enterGame();
 }
@@ -656,6 +600,7 @@ function buildQuery(lat,lon,r){
     + 'node'+a+'["shop"]["name"];'
     + 'node'+a+'["tourism"~"^(museum|attraction|artwork|hotel|gallery|viewpoint)$"]["name"];'
     + 'node'+a+'["natural"="tree"];'
+    + 'node'+a+'["highway"~"^(traffic_signals|street_lamp|stop|give_way)$"];'
     + ");out geom;";
 }
 
@@ -792,10 +737,488 @@ function atmosphere(elev, weather){
   }
   return { sky, sunCol, sunI, hemiI, ambI, fog, ground, day };
 }
+function buildSky(A, sunDir){
+  const geo = new THREE.SphereGeometry(Math.min(900, Q().far * 0.88), 32, 20);
+  const mat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: {
+      horizon: { value: new THREE.Color(A.sky) },
+      zenith:  { value: new THREE.Color(A.sky).multiplyScalar(0.55).lerp(new THREE.Color(0x27496B), 0.45 * A.day) },
+      sunCol:  { value: new THREE.Color(A.sunCol) },
+      sunDir:  { value: sunDir.clone().normalize() },
+      haze:    { value: A.day * 0.85 + 0.15 }
+    },
+    vertexShader: [
+      "varying vec3 vDir;",
+      "void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }"
+    ].join("\n"),
+    fragmentShader: [
+      "varying vec3 vDir;",
+      "uniform vec3 horizon; uniform vec3 zenith; uniform vec3 sunCol; uniform vec3 sunDir; uniform float haze;",
+      "void main(){",
+      "  float y = clamp(vDir.y, -0.2, 1.0);",
+      "  vec3 col = mix(horizon, zenith, pow(max(y,0.0), 0.62));",
+      "  float d = max(dot(normalize(vDir), sunDir), 0.0);",
+      "  col += sunCol * pow(d, 260.0) * 1.5;",            // the disc
+      "  col += sunCol * pow(d, 6.0) * 0.22 * haze;",      // the glow around it
+      "  col = mix(col, horizon, smoothstep(0.10, -0.05, y));",
+      "  gl_FragColor = vec4(col, 1.0);",
+      "}"
+    ].join("\n")
+  });
+  const sky = new THREE.Mesh(geo, mat);
+  sky.frustumCulled = false;
+  sky.renderOrder = -1;
+  scene.add(track(sky));
+}
+
+
+/* ============================================================
+   STREET FURNITURE — signals, lamps, stop signs, and name blades
+   ============================================================ */
+const signCache = new Map();
+
+function makeSignTexture(name){
+  if(signCache.has(name)) return signCache.get(name);
+  const W = 512, H = 128, c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  g.fillStyle = "#14612F"; g.fillRect(0,0,W,H);
+  g.strokeStyle = "#FFFFFF"; g.lineWidth = 5; g.strokeRect(8,8,W-16,H-16);
+  let txt = name.toUpperCase();
+  if(txt.length > 20) txt = txt.slice(0,19) + "\u2026";
+  let size = 60;
+  const font = px => "600 " + px + "px 'IBM Plex Sans', Helvetica, Arial, sans-serif";
+  g.font = font(size);
+  while(g.measureText(txt).width > W - 60 && size > 20){ size -= 3; g.font = font(size); }
+  g.fillStyle = "#FFFFFF"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(txt, W/2, H/2 + 2);
+  const t = new THREE.CanvasTexture(c);
+  t.encoding = THREE.sRGBEncoding; t.anisotropy = 8;
+  signCache.set(name, t);
+  return t;
+}
+
+function makePlateTexture(word, ring){
+  const S = 256, c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d");
+  g.fillStyle = ring; g.fillRect(0,0,S,S);
+  g.strokeStyle = "#FFFFFF"; g.lineWidth = 12;
+  g.beginPath(); g.arc(S/2, S/2, S*0.40, 0, Math.PI*2); g.stroke();
+  g.fillStyle = "#FFFFFF"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.font = "700 " + (word.length > 4 ? 52 : 74) + "px 'IBM Plex Sans', Helvetica, Arial, sans-serif";
+  g.fillText(word, S/2, S/2 + 4);
+  const t = new THREE.CanvasTexture(c);
+  t.encoding = THREE.sRGBEncoding; t.anisotropy = 8;
+  return t;
+}
+
+/* segment index so a signal can be turned to face its own road */
+function roadIndex(roads){
+  const C = 34, idx = new Map();
+  for(const w of roads){
+    const pts = w.geometry.map(p => toXZ(p.lat, p.lon));
+    for(let i=0;i<pts.length-1;i++){
+      const a = pts[i], b = pts[i+1];
+      const k = ((((a.x+b.x)/2)/C)|0) + ":" + ((((a.z+b.z)/2)/C)|0);
+      let arr = idx.get(k); if(!arr){ arr = []; idx.set(k, arr); }
+      arr.push({ a, b });
+    }
+  }
+  return { idx, C };
+}
+function bearingOfNearestRoad(RI, x, z){
+  let best = null, bd = 1e9;
+  for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++){
+    const arr = RI.idx.get((((x/RI.C)|0)+i) + ":" + (((z/RI.C)|0)+j));
+    if(!arr) continue;
+    for(const sgm of arr){
+      const dx = sgm.b.x - sgm.a.x, dz = sgm.b.z - sgm.a.z;
+      const L2 = dx*dx + dz*dz; if(L2 < 1e-6) continue;
+      let t = ((x - sgm.a.x)*dx + (z - sgm.a.z)*dz) / L2;
+      t = Math.max(0, Math.min(1, t));
+      const px = sgm.a.x + dx*t, pz = sgm.a.z + dz*t;
+      const d = (px-x)*(px-x) + (pz-z)*(pz-z);
+      if(d < bd){ bd = d; best = Math.atan2(dx, -dz); }
+    }
+  }
+  return best === null ? 0 : best;
+}
+
+/* a corner is any point where two differently-named ways share a vertex */
+function findCorners(roads){
+  const cells = new Map();
+  for(const w of roads){
+    const nm = w.tags && w.tags.name;
+    if(!nm) continue;
+    for(const p of w.geometry){
+      const q = toXZ(p.lat, p.lon);
+      const k = Math.round(q.x/2.5) + ":" + Math.round(q.z/2.5);
+      let e = cells.get(k);
+      if(!e){ e = { x:q.x, z:q.z, names:[] }; cells.set(k, e); }
+      if(e.names.indexOf(nm) === -1) e.names.push(nm);
+    }
+  }
+  const all = [];
+  for(const e of cells.values()) if(e.names.length >= 2) all.push(e);
+  all.sort((p,q)=> Math.hypot(p.x,p.z) - Math.hypot(q.x,q.z));
+  const kept = [];
+  for(const e of all){
+    if(kept.length >= 26) break;
+    if(kept.every(k => Math.hypot(k.x-e.x, k.z-e.z) > 55)) kept.push(e);
+  }
+  return kept;
+}
+
+function buildFurniture(street, roads){
+  const RI = roadIndex(roads);
+  const night = sceneSun.elev < 2;
+  const poleMat  = new THREE.MeshLambertMaterial({ color:0x4A4F52 });
+  const boxMat   = new THREE.MeshLambertMaterial({ color:0x24282A });
+  const lampMat  = new THREE.MeshLambertMaterial({ color:0x6E7478 });
+
+  const signals = street.filter(f => f.kind === "traffic_signals").slice(0, 90);
+  const lamps   = street.filter(f => f.kind === "street_lamp").slice(0, 160);
+  const stops   = street.filter(f => f.kind === "stop" || f.kind === "give_way").slice(0, 70);
+
+  const inst = (geo, mat, list, fn) => {
+    if(!list.length) return null;
+    const im = new THREE.InstancedMesh(geo, mat, list.length);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(1,1,1);
+    list.forEach((o,i)=>{ fn(o, m, q, v); im.setMatrixAt(i, m); });
+    im.castShadow = shadowsOn;
+    scene.add(track(im));
+    return im;
+  };
+
+  // ---- traffic signals: pole, mast arm, and a head over the roadway ----
+  if(signals.length){
+    const posed = signals.map(f => {
+      const p = toXZ(f.lat, f.lon);
+      const rot = bearingOfNearestRoad(RI, p.x, p.z);
+      // step off the carriageway, then reach back over it with the arm
+      return { x: p.x + Math.cos(rot)*5.2, z: p.z + Math.sin(rot)*5.2, rot };
+    });
+    inst(new THREE.CylinderGeometry(0.11,0.13,6.4,8), poleMat, posed, (o,m,q,v)=>{
+      q.setFromEuler(new THREE.Euler(0,0,0));
+      m.compose(new THREE.Vector3(o.x, 3.2, o.z), q, v.set(1,1,1));
+    });
+    inst(new THREE.BoxGeometry(4.4,0.16,0.16), poleMat, posed, (o,m,q,v)=>{
+      q.setFromEuler(new THREE.Euler(0, -o.rot, 0));
+      m.compose(new THREE.Vector3(o.x - Math.cos(o.rot)*2.2, 6.2, o.z - Math.sin(o.rot)*2.2), q, v.set(1,1,1));
+    });
+    inst(new THREE.BoxGeometry(0.42,1.15,0.34), boxMat, posed, (o,m,q,v)=>{
+      q.setFromEuler(new THREE.Euler(0, -o.rot, 0));
+      m.compose(new THREE.Vector3(o.x - Math.cos(o.rot)*4.2, 5.5, o.z - Math.sin(o.rot)*4.2), q, v.set(1,1,1));
+    });
+    const lens = [
+      { c:0xE03A2A, dy: 0.34, on:true  },
+      { c:0x6B5A22, dy: 0.00, on:false },
+      { c:0x2A6B38, dy:-0.34, on:false }
+    ];
+    for(const L of lens){
+      inst(new THREE.SphereGeometry(0.115, 8, 6),
+        new THREE.MeshBasicMaterial({ color:L.c }), posed, (o,m,q,v)=>{
+          q.setFromEuler(new THREE.Euler(0,-o.rot,0));
+          m.compose(new THREE.Vector3(
+            o.x - Math.cos(o.rot)*4.2 + Math.sin(o.rot)*0.18, 5.5 + L.dy,
+            o.z - Math.sin(o.rot)*4.2 - Math.cos(o.rot)*0.18), q, v.set(1,1,1));
+        });
+    }
+  }
+
+  // ---- street lamps ----
+  if(lamps.length){
+    const posed = lamps.map(f => {
+      const p = toXZ(f.lat, f.lon);
+      return { x:p.x, z:p.z, rot: bearingOfNearestRoad(RI, p.x, p.z) };
+    });
+    inst(new THREE.CylinderGeometry(0.08,0.11,7.2,8), lampMat, posed, (o,m,q,v)=>{
+      q.setFromEuler(new THREE.Euler(0,0,0));
+      m.compose(new THREE.Vector3(o.x, 3.6, o.z), q, v.set(1,1,1));
+    });
+    inst(new THREE.BoxGeometry(2.0,0.11,0.11), lampMat, posed, (o,m,q,v)=>{
+      q.setFromEuler(new THREE.Euler(0,-o.rot,0));
+      m.compose(new THREE.Vector3(o.x - Math.cos(o.rot)*1.0, 7.1, o.z - Math.sin(o.rot)*1.0), q, v.set(1,1,1));
+    });
+    inst(new THREE.BoxGeometry(0.7,0.2,0.34),
+      night ? new THREE.MeshBasicMaterial({ color:0xFFE2A8 }) : lampMat, posed, (o,m,q,v)=>{
+        q.setFromEuler(new THREE.Euler(0,-o.rot,0));
+        m.compose(new THREE.Vector3(o.x - Math.cos(o.rot)*1.9, 6.95, o.z - Math.sin(o.rot)*1.9), q, v.set(1,1,1));
+      });
+  }
+
+  // ---- stop / give way plates ----
+  if(stops.length){
+    const posed = stops.map(f => {
+      const p = toXZ(f.lat, f.lon);
+      const rot = bearingOfNearestRoad(RI, p.x, p.z);
+      return { x:p.x + Math.cos(rot)*4.0, z:p.z + Math.sin(rot)*4.0, rot, kind:f.kind };
+    });
+    inst(new THREE.CylinderGeometry(0.05,0.06,2.6,6), poleMat, posed, (o,m,q,v)=>{
+      q.setFromEuler(new THREE.Euler(0,0,0));
+      m.compose(new THREE.Vector3(o.x, 1.3, o.z), q, v.set(1,1,1));
+    });
+    for(const kind of ["stop","give_way"]){
+      const grp = posed.filter(o => o.kind === kind);
+      if(!grp.length) continue;
+      const tex = makePlateTexture(kind === "stop" ? "STOP" : "YIELD", kind === "stop" ? "#A81F1C" : "#B23A20");
+      const geo = new THREE.CircleGeometry(0.38, kind === "stop" ? 8 : 3);
+      const mat = new THREE.MeshLambertMaterial({ map:tex, side:THREE.DoubleSide });
+      inst(geo, mat, grp, (o,m,q,v)=>{
+        q.setFromEuler(new THREE.Euler(0, -o.rot + Math.PI, 0));
+        m.compose(new THREE.Vector3(o.x, 2.35, o.z), q, v.set(1,1,1));
+      });
+    }
+  }
+
+  // ---- street name blades at corners ----
+  const corners = findCorners(roads);
+  const bladeGeo = new THREE.PlaneGeometry(2.5, 0.62);
+  for(const cn of corners){
+    const rot = bearingOfNearestRoad(RI, cn.x, cn.z);
+    let px = cn.x, pz = cn.z, placed = false;
+    for(const d of [[1,1],[1,-1],[-1,1],[-1,-1]]){
+      const tx = cn.x + d[0]*5.5, tz = cn.z + d[1]*5.5;
+      if(!blocked(tx,tz)){ px = tx; pz = tz; placed = true; break; }
+    }
+    if(!placed) continue;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.07,4.2,6), poleMat);
+    pole.position.set(px, 2.1, pz);
+    pole.castShadow = shadowsOn;
+    scene.add(track(pole));
+    cn.names.slice(0,2).forEach((nm, k)=>{
+      const bl = new THREE.Mesh(bladeGeo, new THREE.MeshLambertMaterial({
+        map: makeSignTexture(nm), side: THREE.DoubleSide
+      }));
+      bl.position.set(px, 3.75 - k*0.72, pz);
+      bl.rotation.y = -rot + (k ? Math.PI/2 : 0);
+      bl.translateZ(0.02);
+      scene.add(track(bl));
+    });
+  }
+}
+
+
+/* ============================================================
+   AERIAL GROUND — USGS orthoimagery, public domain, United States only
+
+   WebGL will not accept a texture from a host that does not grant
+   cross-origin permission, and the USGS tile server does not. If direct
+   loading is refused, paste a CORS proxy prefix in the register and the
+   tiles will come through it instead.
+   ============================================================ */
+const AERIAL_URL = (z,x,y) =>
+  "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/"+z+"/"+y+"/"+x;
+const AERIAL_MAXZ = 19;
+let aerialProxy = "";
+
+const t2n = z => Math.pow(2, z);
+function lon2t(lon, z){ return (lon+180)/360 * t2n(z); }
+function lat2t(lat, z){
+  const r = lat*Math.PI/180;
+  return (1 - Math.log(Math.tan(r) + 1/Math.cos(r))/Math.PI)/2 * t2n(z);
+}
+function t2lon(x, z){ return x/t2n(z)*360 - 180; }
+function t2lat(y, z){
+  const n = Math.PI - 2*Math.PI*y/t2n(z);
+  return 180/Math.PI * Math.atan(0.5*(Math.exp(n) - Math.exp(-n)));
+}
+
+const texLoader = new THREE.TextureLoader();
+texLoader.setCrossOrigin("anonymous");
+function loadTex(url){
+  return new Promise((res, rej)=> texLoader.load(url, res, undefined, rej));
+}
+
+let aerialTried = 0, aerialFailed = 0, aerialLoaded = 0, aerialGaveUp = false;
+
+function buildAerial(){
+  const halfLat = worldRadius*1.08/111320;
+  const halfLon = worldRadius*1.08/(111320*cosLat);
+  let z = AERIAL_MAXZ, x0, x1, y0, y1;
+  for(; z >= 14; z--){
+    x0 = Math.floor(lon2t(originLon-halfLon, z)); x1 = Math.floor(lon2t(originLon+halfLon, z));
+    y0 = Math.floor(lat2t(originLat+halfLat, z)); y1 = Math.floor(lat2t(originLat-halfLat, z));
+    if((x1-x0+1)*(y1-y0+1) <= 90) break;
+  }
+  const budget = aerialProxy ? 9 : 3;   // proxies are flaky, give them more rope
+
+  for(let x=x0; x<=x1; x++) for(let y=y0; y<=y1; y++){
+    const nw = toXZ(t2lat(y, z),   t2lon(x, z));
+    const se = toXZ(t2lat(y+1, z), t2lon(x+1, z));
+    const w = Math.abs(se.x - nw.x), d = Math.abs(se.z - nw.z);
+    if(w < 1 || d < 1) continue;
+
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d),
+      new THREE.MeshLambertMaterial({ transparent:true, opacity:0 }));
+    m.rotation.x = -Math.PI/2;
+    m.position.set((nw.x+se.x)/2, 0.16, (nw.z+se.z)/2);
+    m.receiveShadow = shadowsOn;
+    scene.add(track(m));
+
+    const raw = AERIAL_URL(z,x,y);
+    const url = aerialProxy ? aerialProxy + encodeURIComponent(raw) : raw;
+    aerialTried++;
+    ((mesh)=>{
+      if(aerialGaveUp) return;
+      loadTex(url).then(t=>{
+        t.encoding = THREE.sRGBEncoding;
+        t.minFilter = THREE.LinearFilter;
+        t.generateMipmaps = false;
+        t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+        mesh.material.map = t;
+        mesh.material.color.setScalar(groundTint);
+        mesh.material.opacity = 1;
+        mesh.material.needsUpdate = true;
+        aerialLoaded++;
+      }).catch(()=>{
+        aerialFailed++;
+        if(aerialFailed >= budget && aerialLoaded === 0) aerialGaveUp = true;
+      });
+    })(m);
+  }
+  aerialActive = true;
+}
+
+/* ============================================================
+   GROUND TEXTURES — generated at load, nothing fetched
+   ============================================================ */
+function noise(g, w, h, n, a, dark){
+  for(let i=0;i<n;i++){
+    const v = Math.random()*a;
+    g.fillStyle = (dark ? "rgba(0,0,0," : "rgba(255,255,255,") + v + ")";
+    g.fillRect(Math.random()*w, Math.random()*h, 1 + Math.random()*3, 1 + Math.random()*3);
+  }
+}
+function canvasTex(c, repX, repY){
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repX || 1, repY || 1);
+  t.anisotropy = 8;
+  t.encoding = THREE.sRGBEncoding;
+  return t;
+}
+
+/* v runs across the carriageway, u along it — so a centre line sits at v=0.5 */
+function makeAsphaltTexture(centreLine){
+  const W = 256, H = 256, c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0,0,W,H);
+  noise(g, W, H, 9000, 0.20, true);
+  noise(g, W, H, 3000, 0.10, false);
+  // patches and seams
+  for(let i=0;i<5;i++){
+    g.fillStyle = "rgba(0,0,0," + (0.05 + Math.random()*0.08) + ")";
+    g.fillRect(Math.random()*W, Math.random()*H, 20+Math.random()*70, 12+Math.random()*40);
+  }
+  g.strokeStyle = "rgba(0,0,0,0.16)"; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(0, H*0.5); g.lineTo(W, H*0.5); g.stroke();
+  // tyre polish either side of centre
+  g.fillStyle = "rgba(255,255,255,0.05)";
+  g.fillRect(0, H*0.24, W, H*0.10); g.fillRect(0, H*0.66, W, H*0.10);
+  if(centreLine){
+    g.fillStyle = "#C9A227";
+    for(let y=0; y<W; y+=64) g.fillRect(y, H*0.485, 36, 5);
+    g.fillStyle = "rgba(255,255,255,0.80)";
+    g.fillRect(0, H*0.045, W, 4); g.fillRect(0, H*0.915, W, 4);   // edge lines
+  }
+  return canvasTex(c);
+}
+
+function makeSidewalkTexture(){
+  const S = 256, c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0,0,S,S);
+  noise(g, S, S, 6000, 0.13, true);
+  g.strokeStyle = "rgba(0,0,0,0.30)"; g.lineWidth = 3;
+  for(let i=0;i<=4;i++){
+    const p = i*S/4;
+    g.beginPath(); g.moveTo(p,0); g.lineTo(p,S); g.stroke();
+    g.beginPath(); g.moveTo(0,p); g.lineTo(S,p); g.stroke();
+  }
+  g.fillStyle = "rgba(0,0,0,0.07)";
+  for(let i=0;i<4;i++) for(let j=0;j<4;j++)
+    if((i+j)%3===0) g.fillRect(i*S/4+3, j*S/4+3, S/4-6, S/4-6);
+  return canvasTex(c);
+}
+
+function makePavingTexture(){
+  const S = 256, c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0,0,S,S);
+  noise(g, S, S, 5000, 0.16, true);
+  const rows = 8, hgt = S/rows;
+  g.strokeStyle = "rgba(0,0,0,0.34)"; g.lineWidth = 2;
+  for(let r=0;r<rows;r++){
+    const y = r*hgt, off = (r%2) * hgt;
+    g.beginPath(); g.moveTo(0,y); g.lineTo(S,y); g.stroke();
+    for(let x=off; x<S; x+=hgt*2){
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x, y+hgt); g.stroke();
+    }
+  }
+  return canvasTex(c);
+}
+
+function makeRoofTexture(){
+  const S = 256, c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0,0,S,S);
+  noise(g, S, S, 14000, 0.26, true);   // gravel
+  noise(g, S, S, 4000, 0.10, false);
+  g.strokeStyle = "rgba(0,0,0,0.22)"; g.lineWidth = 3;
+  for(let i=0;i<=3;i++){                // felt seams
+    const p = i*S/3;
+    g.beginPath(); g.moveTo(0,p); g.lineTo(S,p); g.stroke();
+  }
+  for(let i=0;i<3;i++){                 // weathering pools
+    g.fillStyle = "rgba(0,0,0,0.07)";
+    g.beginPath();
+    g.ellipse(Math.random()*S, Math.random()*S, 20+Math.random()*40, 14+Math.random()*26, 0, 0, 6.283);
+    g.fill();
+  }
+  return canvasTex(c);
+}
+
+function makeGrassTexture(){
+  const S = 256, c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0,0,S,S);
+  for(let i=0;i<9000;i++){
+    const dark = Math.random() < 0.55;
+    g.strokeStyle = (dark ? "rgba(0,0,0," : "rgba(255,255,255,") + (0.05 + Math.random()*0.18) + ")";
+    g.lineWidth = 1;
+    const x = Math.random()*S, y = Math.random()*S;
+    g.beginPath(); g.moveTo(x,y); g.lineTo(x + (Math.random()-0.5)*3, y - 2 - Math.random()*3); g.stroke();
+  }
+  return canvasTex(c);
+}
+
+function makeWaterTexture(){
+  const S = 256, c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0,0,S,S);
+  for(let i=0;i<600;i++){
+    g.strokeStyle = "rgba(255,255,255," + (0.04 + Math.random()*0.13) + ")";
+    g.lineWidth = 1 + Math.random()*2;
+    const x = Math.random()*S, y = Math.random()*S, w = 8 + Math.random()*40;
+    g.beginPath(); g.moveTo(x,y); g.bezierCurveTo(x+w*0.3,y-2, x+w*0.7,y+2, x+w,y); g.stroke();
+  }
+  noise(g, S, S, 2500, 0.10, true);
+  return canvasTex(c);
+}
+
 /* ============================================================
    PRECIPITATION — a slab of drops that travels with the player
    ============================================================ */
-let precip = null, baseFog = 0.006, groundTint = 1;
+let precip = null, baseFog = 0.006, groundTint = 1, shadowsOn = false;
 const P_BOX = 70, P_TOP = 46;
 
 function buildPrecip(){
@@ -860,263 +1283,6 @@ function stepPrecip(dt){
 }
 
 /* ============================================================
-   AERIAL GROUND — USGS orthoimagery tiles laid flat
-   ============================================================ */
-const texLoader = new THREE.TextureLoader();
-texLoader.setCrossOrigin("anonymous");
-function loadTex(url){
-  return new Promise((res, rej)=> texLoader.load(url, res, undefined, rej));
-}
-
-let aerialTried = 0, aerialFailed = 0, aerialGaveUp = false;
-function buildAerial(){
-  const halfLat = worldRadius*1.08/111320;
-  const halfLon = worldRadius*1.08/(111320*cosLat);
-  let z = AERIAL_MAXZ;
-  let x0, x1, y0, y1;
-  // step down zoom until the tile count is sane
-  for(; z >= 14; z--){
-    x0 = Math.floor(lon2t(originLon-halfLon, z)); x1 = Math.floor(lon2t(originLon+halfLon, z));
-    y0 = Math.floor(lat2t(originLat+halfLat, z)); y1 = Math.floor(lat2t(originLat-halfLat, z));
-    if((x1-x0+1)*(y1-y0+1) <= 90) break;
-  }
-
-  const mat0 = new THREE.MeshBasicMaterial({ color:0x2B2F2C });
-  for(let x=x0; x<=x1; x++) for(let y=y0; y<=y1; y++){
-    const nw = toXZ(t2lat(y, z),   t2lon(x, z));
-    const se = toXZ(t2lat(y+1, z), t2lon(x+1, z));
-    const w = Math.abs(se.x - nw.x), d = Math.abs(se.z - nw.z);
-    if(w < 1 || d < 1 || aerialGaveUp) continue;
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat0.clone());
-    m.rotation.x = -Math.PI/2;
-    m.position.set((nw.x+se.x)/2, 0.16, (nw.z+se.z)/2);
-    scene.add(track(m));
-    aerialTried++;
-    loadTex(AERIAL_URL(z,x,y)).then(t=>{
-      t.encoding = THREE.sRGBEncoding;
-      t.minFilter = THREE.LinearFilter;
-      t.generateMipmaps = false;
-      t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
-      m.material.map = t;
-      m.material.color.setScalar(groundTint);
-      m.material.needsUpdate = true;
-    }).catch(()=>{
-      aerialFailed++;
-      if(aerialFailed >= 3 && !aerialGaveUp){
-        aerialGaveUp = true;
-        console.warn("Aerial tiles refused cross-origin; keeping painted ground");
-      }
-    });
-  }
-  aerialActive = true;
-}
-
-/* ============================================================
-   STREET PHOTOGRAPHS — Mapillary frames standing where they were shot
-   ============================================================ */
-let shots = [], shotTimer = 0, shotGeoFlat = null, shotGeoPano = null, shotMarks = null;
-
-let photoStatus = "off", photoNote = "", photoFailed = 0;
-
-async function mlyImages(bbox, fields, limit){
-  const r = await mlyFetch("/images?fields=" + fields + "&bbox=" + bbox + "&limit=" + limit);
-  const txt = await r.text();
-  let j;
-  try{ j = JSON.parse(txt); }
-  catch(e){ throw new Error("HTTP " + r.status + " non-JSON: " + txt.slice(0,110)); }
-  if(j.error) throw new Error(j.error.message || JSON.stringify(j.error).slice(0,110));
-  if(!r.ok) throw new Error("HTTP " + r.status);
-  return j.data || [];
-}
-
-async function buildPhotos(lat, lon, onMsg){
-  const dLat = worldRadius/111320, dLon = worldRadius/(111320*cosLat);
-  const bbox = [lon-dLon, lat-dLat, lon+dLon, lat+dLat].map(v=>v.toFixed(6)).join(",");
-  let data = [];
-  photoStatus = "querying"; photoNote = "";
-
-  onMsg("Locating street photographs");
-  try{
-    data = await mlyImages(bbox,
-      "id,computed_geometry,geometry,compass_angle,computed_compass_angle,is_pano", 500);
-  }catch(e1){
-    // one of those fields may not be served here — fall back to the bare minimum
-    console.warn("Mapillary rich query failed:", e1.message);
-    photoNote = e1.message;
-    try{
-      data = await mlyImages(bbox, "id,geometry,compass_angle", 500);
-      photoNote = "reduced fields (" + e1.message + ")";
-    }catch(e2){
-      console.error("Mapillary query failed:", e2.message);
-      photoStatus = "query failed"; photoNote = e2.message;
-      return;
-    }
-  }
-
-  if(!data.length){
-    photoStatus = "no coverage";
-    photoNote = "Mapillary returned zero frames for this box";
-    return;
-  }
-
-  const seen = new Set(), picked = [];
-  for(const im of data){
-    const g = im.computed_geometry || im.geometry;
-    if(!g || !g.coordinates) continue;
-    const p = toXZ(g.coordinates[1], g.coordinates[0]);
-    if(Math.hypot(p.x, p.z) > worldRadius*0.95) continue;
-    const key = Math.round(p.x/22) + ":" + Math.round(p.z/22);
-    if(seen.has(key)) continue;
-    seen.add(key);
-    const ang = im.computed_compass_angle != null ? im.computed_compass_angle : (im.compass_angle || 0);
-    picked.push({ id:im.id, x:p.x, z:p.z, b:ang, pano:!!im.is_pano });
-    if(picked.length >= ((COARSE || SMALL) ? 70 : 150)) break;
-  }
-  if(!picked.length){
-    photoStatus = "all filtered";
-    photoNote = data.length + " frames returned but none inside the radius";
-    return;
-  }
-
-  shotGeoFlat = new THREE.PlaneGeometry(4.6, 2.6);
-  shotGeoPano = new THREE.PlaneGeometry(7.4, 3.7);
-
-  for(const sh of picked){
-    const rad = sh.b * Math.PI/180;
-    const fx = Math.sin(rad), fz = -Math.cos(rad);
-    const m = new THREE.Mesh(
-      sh.pano ? shotGeoPano : shotGeoFlat,
-      new THREE.MeshBasicMaterial({ color:0xD8B14A, transparent:true, opacity:0.20, side:THREE.DoubleSide })
-    );
-    m.position.set(sh.x + fx*3.2, sh.pano ? 2.6 : 2.2, sh.z + fz*3.2);
-    m.rotation.y = -rad;
-    scene.add(track(m));
-    sh.mesh = m;
-    shots.push(sh);
-  }
-
-  const ring = new THREE.RingGeometry(0.9, 1.5, 14);
-  const rmat = new THREE.MeshBasicMaterial({ color:0xD8B14A, transparent:true, opacity:0.4, side:THREE.DoubleSide, depthWrite:false });
-  shotMarks = new THREE.InstancedMesh(ring, rmat, shots.length);
-  const mtx = new THREE.Matrix4(),
-        q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2,0,0)),
-        sc = new THREE.Vector3(1,1,1);
-  shots.forEach((sh,i)=>{ mtx.compose(new THREE.Vector3(sh.x, 0.18, sh.z), q, sc); shotMarks.setMatrixAt(i, mtx); });
-  scene.add(track(shotMarks));
-
-  photoStatus = "ready";
-  console.log("Mapillary: " + data.length + " frames returned, " + shots.length + " placed");
-}
-
-/* If WebGL refuses the photographs, show them in a plain <img> panel instead.
-   An ordinary image element can display a cross-origin file quite happily —
-   it only taints canvases, which we never read back. */
-let domPhotos = false, texRefusals = 0, panelShot = null;
-
-async function ensureUrl(sh){
-  if(sh.url || sh.urlFail) return sh.url;
-  try{
-    const r = await mlyFetch("/" + sh.id + "?fields=thumb_1024_url,captured_at,is_pano");
-    const j = await r.json();
-    if(j.error) throw new Error(j.error.message || "entity error");
-    sh.url = j.thumb_1024_url; sh.at = j.captured_at;
-  }catch(e){
-    sh.urlFail = true;
-    if(!photoNote) photoNote = "thumbnail lookup failed: " + e.message;
-  }
-  return sh.url;
-}
-
-async function updatePanel(){
-  if(!shots.length) return;
-  let best = null, bd = 42;
-  for(const sh of shots){
-    const d = Math.hypot(sh.x - player.x, sh.z - player.z);
-    if(d < bd){ bd = d; best = sh; }
-  }
-  if(best === panelShot) return;
-
-  if(panelShot && panelShot.mesh) panelShot.mesh.material.opacity = 0.20;
-  panelShot = best;
-  const p = $("shotpanel");
-  if(!best){ p.classList.remove("on"); return; }
-  best.mesh.material.opacity = 0.55;
-
-  const u = await ensureUrl(best);
-  if(!u || panelShot !== best){ p.classList.remove("on"); return; }
-  const img = $("shotimg");
-  img.onerror = ()=>{
-    photoNote = "even plain image elements are blocked here";
-    p.classList.remove("on");
-  };
-  img.src = u;
-  const d = best.at ? new Date(best.at) : null;
-  $("shotcap").textContent = (d && !isNaN(d) ? d.toISOString().slice(0,10) : "Mapillary")
-                           + (best.pano ? " · 360" : "") + " · " + Math.round(bd) + " m";
-  p.classList.add("on");
-}
-
-/* Only a handful of photographs are ever resident in memory. */
-function streamPhotos(){
-  if(!shots.length) return;
-  const NEAR = 95, FAR = 150, BUDGET = (COARSE||SMALL) ? 5 : 9;
-  let live = 0;
-  for(const s of shots) if(s.tex) live++;
-
-  for(const s of shots){
-    const d = Math.hypot(s.x - player.x, s.z - player.z);
-    if(s.tex && d > FAR){
-      s.mesh.material.map = null;
-      s.mesh.material.color.setHex(0xD8B14A);
-      s.mesh.material.opacity = 0.20;
-      s.mesh.material.needsUpdate = true;
-      s.tex.dispose(); s.tex = null; live--;
-    }
-  }
-  if(live >= BUDGET) return;
-
-  const queue = shots
-    .filter(s => !s.tex && !s.loading && !s.dead)
-    .map(s => ({ s, d: Math.hypot(s.x - player.x, s.z - player.z) }))
-    .filter(e => e.d < NEAR)
-    .sort((a,b)=>a.d-b.d)
-    .slice(0, BUDGET - live);
-
-  for(const e of queue) hydrate(e.s);
-}
-
-async function hydrate(s){
-  s.loading = true;
-  try{
-    if(!s.url){
-      const r = await mlyFetch("/" + s.id + "?fields=thumb_1024_url");
-      const j = await r.json();
-      if(j.error) throw new Error(j.error.message || "entity error");
-      s.url = j.thumb_1024_url;
-    }
-    if(!s.url) throw new Error("no thumbnail");
-    const t = await loadTex(s.url);
-    t.encoding = THREE.sRGBEncoding;
-    t.minFilter = THREE.LinearFilter;
-    t.generateMipmaps = false;
-    s.tex = t;
-    s.mesh.material.map = t;
-    s.mesh.material.color.setHex(0xffffff);
-    s.mesh.material.opacity = 1;
-    s.mesh.material.needsUpdate = true;
-  }catch(err){
-    s.dead = true;             // expired URL or blocked host — stop retrying this one
-    photoFailed++;
-    texRefusals++;
-    if(texRefusals >= 2 && !domPhotos){
-      domPhotos = true;
-      photoNote = "WebGL refused the photos — showing them in a panel instead";
-    }
-  }
-  s.loading = false;
-}
-
-/* ============================================================
    WORLD CONSTRUCTION
    ============================================================ */
 const disposables = [];
@@ -1129,12 +1295,9 @@ function disposeWorld(){
     if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ if(m.map) m.map.dispose(); m.dispose(); }); }
     if(o.parent) o.parent.remove(o);
   }
-  for(const s2 of shots){ if(s2.tex) s2.tex.dispose(); }
-  shots = []; shotMarks = null; precip = null;
-  photoStatus = "off"; photoNote = ""; photoFailed = 0;
-  domPhotos = false; texRefusals = 0; panelShot = null;
-  $("shotpanel").classList.remove("on");
-  aerialTried = aerialFailed = 0; aerialGaveUp = false;
+  precip = null;
+  for(const t of signCache.values()) t.dispose();
+  signCache.clear();
   disposables.length = 0;
   grid.clear();
   objectives = [];
@@ -1149,28 +1312,124 @@ const WALL_COLORS = [0x9C8F79,0x8A6F60,0x7E8286,0xA1937F,0x6E6A66,0xB0A188,0x7A6
 
 function hash(n){ n = (n ^ 61) ^ (n >>> 16); n = n + (n << 3); n = n ^ (n >>> 4); n = Math.imul(n, 0x27d4eb2d); n = n ^ (n >>> 15); return (n >>> 0) / 4294967295; }
 
-function makeFacadeTexture(){
-  const c = document.createElement("canvas"); c.width = c.height = 256;
-  const g = c.getContext("2d");
-  g.fillStyle = "#ffffff"; g.fillRect(0,0,256,256);
-  for(let i=0;i<2600;i++){
-    g.fillStyle = "rgba(0,0,0,"+(Math.random()*0.055)+")";
-    g.fillRect(Math.random()*256, Math.random()*256, 2, 2);
+/* Six facade archetypes, drawn to canvas at load. Base stays near-white so the
+   per-building vertex tint does the colouring; only glass and frames are baked. */
+const ARCH = [
+  { n:"tenement", cols:4, rows:4, wW:.46, wH:.60, glass:"#3B434B", frame:"#F2EFE8", lit:.14, sill:true,  band:.0 },
+  { n:"brownstone",cols:3, rows:4, wW:.38, wH:.66, glass:"#33383E", frame:"#E8E2D6", lit:.10, sill:true,  band:.0 },
+  { n:"prewar",   cols:5, rows:4, wW:.40, wH:.56, glass:"#39414A", frame:"#EFEAE0", lit:.16, sill:true,  band:.04 },
+  { n:"warehouse",cols:3, rows:3, wW:.62, wH:.50, glass:"#2F373D", frame:"#D9D3C7", lit:.06, sill:false, band:.0 },
+  { n:"curtain",  cols:6, rows:5, wW:.84, wH:.74, glass:"#2A3E4C", frame:"#C9CFD4", lit:.22, sill:false, band:.10 },
+  { n:"concrete", cols:4, rows:5, wW:.52, wH:.44, glass:"#353C42", frame:"#DDD8CE", lit:.09, sill:false, band:.0 },
+];
+
+function grain(g, w, h, n, a){
+  for(let i=0;i<n;i++){
+    g.fillStyle = "rgba(0,0,0," + (Math.random()*a) + ")";
+    g.fillRect(Math.random()*w, Math.random()*h, 2, 2);
   }
-  const cell = 64;
-  for(let y=0;y<4;y++) for(let x=0;x<4;x++){
-    const lit = Math.random() < 0.16;
-    g.fillStyle = lit ? "#F2CE96" : "#39414A";
-    g.fillRect(x*cell+15, y*cell+13, cell-30, cell-32);
-    g.fillStyle = "rgba(0,0,0,0.22)";
-    g.fillRect(x*cell+15, y*cell+13, cell-30, 3);
-    g.fillStyle = "rgba(255,255,255,0.55)";
-    g.fillRect(x*cell+13, y*cell+cell-19, cell-26, 3);
+}
+
+function makeFacadeTexture(a){
+  const S = 512, c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0,0,S,S);
+  grain(g, S, S, 5000, 0.06);
+
+  const cw = S/a.cols, ch = S/a.rows;
+  for(let row=0; row<a.rows; row++){
+    if(a.band > 0){                        // spandrel band between floors
+      g.fillStyle = "rgba(0,0,0," + a.band + ")";
+      g.fillRect(0, row*ch, S, ch*0.14);
+    }
+    for(let col=0; col<a.cols; col++){
+      const x = col*cw, y = row*ch;
+      const ww = cw*a.wW, wh = ch*a.wH;
+      const ox = x + (cw-ww)/2, oy = y + (ch-wh)/2;
+      // reveal — the dark line that makes a window read as recessed
+      g.fillStyle = "rgba(0,0,0,0.30)";
+      g.fillRect(ox-2, oy-2, ww+4, wh+4);
+      const lit = Math.random() < a.lit;
+      const grd = g.createLinearGradient(ox, oy, ox, oy+wh);
+      if(lit){ grd.addColorStop(0,"#FFE0AE"); grd.addColorStop(1,"#E8B978"); }
+      else {
+        const gl = a.glass;
+        grd.addColorStop(0, gl);
+        grd.addColorStop(0.45, "#8FA6B4");   // sky reflection across the upper pane
+        grd.addColorStop(0.5, gl);
+        grd.addColorStop(1, gl);
+      }
+      g.fillStyle = grd; g.fillRect(ox, oy, ww, wh);
+      // mullion
+      g.fillStyle = "rgba(255,255,255,0.35)";
+      g.fillRect(ox, oy + wh*0.5 - 1, ww, 2);
+      if(a.sill){
+        g.fillStyle = "rgba(255,255,255,0.75)";
+        g.fillRect(ox-3, oy+wh, ww+6, 3);
+        g.fillStyle = "rgba(0,0,0,0.18)";
+        g.fillRect(ox-3, oy+wh+3, ww+6, 2);
+      }
+      g.strokeStyle = a.frame; g.lineWidth = 2;
+      g.strokeRect(ox, oy, ww, wh);
+    }
   }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.anisotropy = 4;
+  t.anisotropy = 8;
+  t.encoding = THREE.sRGBEncoding;
   return t;
+}
+
+/* Street level is where the eye actually is, so it gets its own treatment:
+   tall glazing, a signage band, and a doorway. */
+function makeStreetTexture(){
+  const W = 512, H = 256, c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0,0,W,H);
+  grain(g, W, H, 2600, 0.07);
+
+  g.fillStyle = "rgba(0,0,0,0.34)";        // signage band across the top
+  g.fillRect(0, 0, W, H*0.20);
+  g.fillStyle = "rgba(255,255,255,0.30)";
+  g.fillRect(0, H*0.20, W, 3);
+
+  const bays = 4, bw = W/bays;
+  for(let i=0;i<bays;i++){
+    const x = i*bw + bw*0.10, w = bw*0.80;
+    const y = H*0.28, h = H*0.60;
+    g.fillStyle = "rgba(0,0,0,0.30)";
+    g.fillRect(x-3, y-3, w+6, h+6);
+    if(i === bays-1){                       // a doorway in the last bay
+      g.fillStyle = "#2B3238"; g.fillRect(x, y, w, h);
+      g.fillStyle = "rgba(255,255,255,0.22)"; g.fillRect(x+w*0.44, y, 3, h);
+    } else {
+      const grd = g.createLinearGradient(x, y, x, y+h);
+      grd.addColorStop(0, "#94A9B6"); grd.addColorStop(0.4, "#39434B");
+      grd.addColorStop(1, "#222A30");
+      g.fillStyle = grd; g.fillRect(x, y, w, h);
+    }
+    g.strokeStyle = "#E9E4DA"; g.lineWidth = 3; g.strokeRect(x, y, w, h);
+  }
+  g.fillStyle = "rgba(0,0,0,0.42)";        // plinth
+  g.fillRect(0, H*0.92, W, H*0.08);
+
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  t.encoding = THREE.sRGBEncoding;
+  return t;
+}
+
+function archetypeFor(tags, h, id){
+  const t = (tags.building || "") + " " + (tags["building:use"] || "");
+  if(/office|commercial|retail/.test(t) && h > 38) return 4;
+  if(h > 52) return 4;
+  if(/warehouse|industrial|hangar|service/.test(t)) return 3;
+  if(/apartments|residential|house|terrace/.test(t)) return hash(id|0) < 0.5 ? 0 : 1;
+  if(h > 24) return 2;
+  return Math.floor(hash(id*3|0) * 3) % 3;
 }
 
 function signedArea(pts){
@@ -1193,7 +1452,12 @@ function buildWorld(data){
   if(!renderer){
     renderer = new THREE.WebGLRenderer({ canvas: $("scene"), antialias: Q().aa, powerPreference:"high-performance" });
     renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;   // filmic rolloff instead of clipping
+    renderer.toneMappingExposure = 1.15;
   }
+  shadowsOn = (quality === "high") && sceneSun.elev > 3 && weather !== "rain";
+  renderer.shadowMap.enabled = shadowsOn;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   applyScale();
 
   scene.add(new THREE.HemisphereLight(0xC9D6DB, 0x4A4438, A.hemiI));
@@ -1205,22 +1469,36 @@ function buildWorld(data){
     Math.max(0.06, Math.sin(er)),
     -Math.cos(er)*Math.cos(ar)
   ).multiplyScalar(100);
+  if(shadowsOn){
+    sun.castShadow = true;
+    const r = worldRadius * 1.05;
+    sun.shadow.camera.left = -r; sun.shadow.camera.right = r;
+    sun.shadow.camera.top = r;   sun.shadow.camera.bottom = -r;
+    sun.shadow.camera.near = 1;  sun.shadow.camera.far = 420;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.bias = -0.0012;
+    sun.shadow.normalBias = 0.6;
+  }
   scene.add(sun);
   scene.add(new THREE.AmbientLight(0x6E7A80, A.ambI));
   groundTint = A.ground;
+  buildSky(A, sun.position.clone());
 
   // ---- ground ----
   const gGeo = new THREE.PlaneGeometry(3000,3000);
-  const gMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(0x3A4038).multiplyScalar(groundTint) });
+  const gTex = makeAsphaltTexture(false); gTex.repeat.set(300,300);
+  const gMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(0x4A4E48).multiplyScalar(groundTint), map: gTex });
   const ground = new THREE.Mesh(gGeo, gMat); ground.rotation.x = -Math.PI/2; ground.position.y = -0.05;
+  ground.receiveShadow = shadowsOn;
   scene.add(track(ground));
 
   // ---- sort elements ----
-  const buildings = [], roads = [], areas = [], pois = [], trees = [];
+  const buildings = [], roads = [], areas = [], pois = [], trees = [], street = [];
   for(const el of data.elements){
     const t = el.tags || {};
     if(el.type === "node"){
       if(t.natural === "tree") trees.push(el);
+      else if(t.highway) street.push({ kind:t.highway, lat:el.lat, lon:el.lon });
       else if(t.name) pois.push(el);
       continue;
     }
@@ -1232,12 +1510,12 @@ function buildWorld(data){
     else if(t.leisure || t.landuse) areas.push({el, kind:"green"});
   }
 
-  // ---- ground imagery ----
+  // ---- aerial imagery, laid over the painted streets ----
   if(wantAerial && districtIsUS) buildAerial();
 
   // ---- flat areas (water, green) ----
   {
-    const pos = [], col = [];
+    const green = { pos:[], col:[], uv:[] }, wet = { pos:[], col:[], uv:[] };
     const c = new THREE.Color();
     for(const a of areas){
       let pts = a.el.geometry.map(p => toXZ(p.lat, p.lon));
@@ -1247,46 +1525,87 @@ function buildWorld(data){
       const contour = pts.map(p => new THREE.Vector2(p.x, p.z));
       let tris;
       try { tris = THREE.ShapeUtils.triangulateShape(contour, []); } catch(e){ continue; }
-      const y = a.kind === "water" ? 0.04 : 0.03;
-      c.set(a.kind === "water" ? 0x2D5567 : 0x445A3C);
-      for(const f of tris){
-        for(const idx of f){
-          const v = contour[idx];
-          pos.push(v.x, y, v.y);
-          col.push(c.r, c.g, c.b);
-        }
+      const water = a.kind === "water";
+      const T = water ? wet : green;
+      const y = water ? 0.04 : 0.03;
+      c.setHex(water ? 0x3E6B80 : 0x5E7A4C);
+      for(const f of tris) for(const idx of f){
+        const v = contour[idx];
+        T.pos.push(v.x, y, v.y);
+        T.uv.push(v.x/9, v.y/9);            // planar, so it tiles seamlessly across shapes
+        T.col.push(c.r, c.g, c.b);
       }
     }
-    if(pos.length) scene.add(track(flatMesh(pos, col)));
+    const lay = (T, map) => {
+      if(!T.pos.length) return;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(T.pos,3));
+      g.setAttribute("color", new THREE.Float32BufferAttribute(T.col,3));
+      g.setAttribute("uv", new THREE.Float32BufferAttribute(T.uv,2));
+      g.computeVertexNormals();
+      const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors:true, map, side:THREE.DoubleSide }));
+      m.receiveShadow = shadowsOn;
+      scene.add(track(m));
+    };
+    lay(green, makeGrassTexture());
+    lay(wet,   makeWaterTexture());
   }
 
   // ---- roads ----
   {
-    const pos = [], col = [];
+    const major = { pos:[], col:[], uv:[] };   // tertiary and up: centre line
+    const minor = { pos:[], col:[], uv:[] };   // residential, service
+    const foot  = { pos:[], col:[], uv:[] };   // footway, steps, pedestrian
+    const walk  = { pos:[], col:[], uv:[] };   // the pavement apron
     const c = new THREE.Color();
-    // pavement apron first (slightly lower), then carriageway
-    for(let pass = Q().apron ? 0 : 1; pass<2; pass++){
+    const BIG = { motorway:1, trunk:1, primary:1, secondary:1, tertiary:1 };
+
+    if(Q().apron){
+      c.setHex(0xBFB9AC);
       for(const w of roads){
         const type = w.tags.highway;
-        let width = ROAD_W[type] || 6;
-        const paved = PAVED[type];
-        if(pass === 0 && !paved) continue;
-        const y = pass === 0 ? 0.05 : 0.09;
-        if(pass === 0){ width += 4.2; c.set(0x6B6A63); }
-        else c.set(paved ? 0x33373A : (type === "steps" ? 0x5C564D : 0x57514A));
-        const pts = w.geometry.map(p => toXZ(p.lat, p.lon));
-        ribbon(pts, width, y, c, pos, col);
+        if(!PAVED[type]) continue;
+        ribbon(w.geometry.map(p => toXZ(p.lat, p.lon)), (ROAD_W[type]||6) + 4.6, 0.05, c, walk, 3.2);
       }
     }
-    if(pos.length) scene.add(track(flatMesh(pos, col)));
+    for(const w of roads){
+      const type = w.tags.highway;
+      const pts = w.geometry.map(p => toXZ(p.lat, p.lon));
+      const width = ROAD_W[type] || 6;
+      if(BIG[type]){ c.setHex(0x8E9296); ribbon(pts, width, 0.09, c, major, width * 0.55); }
+      else if(PAVED[type]){ c.setHex(0x86898C); ribbon(pts, width, 0.09, c, minor, width * 0.55); }
+      else { c.setHex(0xA79C8D); ribbon(pts, width, 0.08, c, foot, 2.6); }
+    }
+
+    const lay = (T, map) => {
+      if(!T.pos.length) return;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(T.pos,3));
+      g.setAttribute("color", new THREE.Float32BufferAttribute(T.col,3));
+      g.setAttribute("uv", new THREE.Float32BufferAttribute(T.uv,2));
+      g.computeVertexNormals();
+      const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({
+        vertexColors:true, map, side:THREE.DoubleSide
+      }));
+      m.receiveShadow = shadowsOn;
+      scene.add(track(m));
+    };
+    lay(walk,  makeSidewalkTexture());
+    lay(major, makeAsphaltTexture(true));
+    lay(minor, makeAsphaltTexture(false));
+    lay(foot,  makePavingTexture());
   }
 
   // ---- buildings ----
   {
-    const wPos = [], wCol = [], wUV = [];
-    const rPos = [], rCol = [];
+    const G = { pos:[], col:[], uv:[] };                       // street level
+    const U = [];                                              // one bucket per archetype
+    for(let i=0;i<ARCH.length;i++) U.push({ pos:[], col:[], uv:[] });
+    const R = { pos:[], col:[], uv:[] };
+    const clutter = { tower:[], bulk:[], hvac:[] };
     const c = new THREE.Color(), rc = new THREE.Color();
     let count = 0;
+
     for(const b of buildings){
       let pts = b.geometry.map(p => toXZ(p.lat, p.lon));
       if(pts.length > 2 && Math.abs(pts[0].x - pts[pts.length-1].x) < 1e-6 && Math.abs(pts[0].z - pts[pts.length-1].z) < 1e-6) pts.pop();
@@ -1294,33 +1613,63 @@ function buildWorld(data){
       if(signedArea(pts) < 0) pts.reverse();
 
       const h = buildingHeight(b.tags, b.id);
+      const ai = archetypeFor(b.tags || {}, h, b.id);
       const seed = hash(b.id | 0);
       c.setHex(WALL_COLORS[Math.floor(seed * WALL_COLORS.length) % WALL_COLORS.length]);
-      c.offsetHSL(0, 0, (hash(b.id*7|0) - 0.5) * 0.10);
-      rc.copy(c).multiplyScalar(0.62);
+      c.offsetHSL((hash(b.id*5|0)-0.5)*0.03, 0, (hash(b.id*7|0) - 0.5) * 0.12);
+      if(ai === 4) c.setHex(0xBFCBD2).offsetHSL(0,0,(seed-0.5)*0.08);   // glass reads cooler
+      rc.copy(c).multiplyScalar(0.55);
 
-      walls(pts, h, c, wPos, wCol, wUV);
-      roof(pts, h, rc, rPos, rCol);
+      walls(pts, h, c, G, U[ai]);
+      roof(pts, h, rc, R);
+      roofClutter(pts, h, b.id, clutter);
       indexPolygon(pts, h);
       count++;
       if(count > Q().buildings) break;
     }
-    if(wPos.length){
+
+    const mkMesh = (T, mat) => {
+      if(!T.pos.length) return;
       const g = new THREE.BufferGeometry();
-      g.setAttribute("position", new THREE.Float32BufferAttribute(wPos,3));
-      g.setAttribute("color", new THREE.Float32BufferAttribute(wCol,3));
-      g.setAttribute("uv", new THREE.Float32BufferAttribute(wUV,2));
+      g.setAttribute("position", new THREE.Float32BufferAttribute(T.pos,3));
+      g.setAttribute("color", new THREE.Float32BufferAttribute(T.col,3));
+      g.setAttribute("uv", new THREE.Float32BufferAttribute(T.uv,2));
       g.computeVertexNormals();
-      const m = new THREE.MeshLambertMaterial({ vertexColors:true, map: makeFacadeTexture(), side: THREE.DoubleSide });
-      scene.add(track(new THREE.Mesh(g,m)));
-    }
-    if(rPos.length){
-      const g = new THREE.BufferGeometry();
-      g.setAttribute("position", new THREE.Float32BufferAttribute(rPos,3));
-      g.setAttribute("color", new THREE.Float32BufferAttribute(rCol,3));
-      g.computeVertexNormals();
-      scene.add(track(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors:true, side: THREE.DoubleSide }))));
-    }
+      const m = new THREE.Mesh(g, mat);
+      m.castShadow = m.receiveShadow = shadowsOn;
+      scene.add(track(m));
+    };
+
+    mkMesh(G, new THREE.MeshLambertMaterial({ vertexColors:true, map: makeStreetTexture(), side: THREE.DoubleSide }));
+    U.forEach((T,i)=>{
+      if(!T.pos.length) return;
+      mkMesh(T, new THREE.MeshLambertMaterial({ vertexColors:true, map: makeFacadeTexture(ARCH[i]), side: THREE.DoubleSide }));
+    });
+
+    if(R.pos.length) mkMesh(R, new THREE.MeshLambertMaterial({
+      vertexColors:true, map: makeRoofTexture(), side: THREE.DoubleSide }));
+
+    // rooftop plant, instanced
+    const place = (list, geo, mat, yOff, scaleY) => {
+      if(!list.length) return;
+      const im = new THREE.InstancedMesh(geo, mat, list.length);
+      const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3();
+      list.forEach((o,i)=>{
+        q.setFromEuler(new THREE.Euler(0, hash((o.x*100)|0)*6.283, 0));
+        mtx.compose(new THREE.Vector3(o.x, o.y + yOff*o.s, o.z), q, v.set(o.s, o.s*(scaleY||1), o.s));
+        im.setMatrixAt(i, mtx);
+      });
+      im.castShadow = shadowsOn;
+      scene.add(track(im));
+    };
+    const metal = new THREE.MeshLambertMaterial({ color:0x8D9298 });
+    const wood  = new THREE.MeshLambertMaterial({ color:0x6E5A45 });
+    const brick = new THREE.MeshLambertMaterial({ color:0x7C7268 });
+    place(clutter.hvac,  new THREE.BoxGeometry(2.2, 1.3, 1.6), metal, 0.65);
+    place(clutter.bulk,  new THREE.BoxGeometry(3.4, 2.6, 3.0), brick, 1.30);
+    place(clutter.tower, new THREE.CylinderGeometry(1.7, 1.9, 3.6, 12), wood, 4.60);
+    place(clutter.tower, new THREE.ConeGeometry(2.0, 1.5, 12),          wood, 7.15);
+    place(clutter.tower, new THREE.BoxGeometry(0.24, 3.0, 0.24),        metal, 1.50);
   }
 
   // ---- trees ----
@@ -1339,8 +1688,12 @@ function buildWorld(data){
       mtx.compose(new THREE.Vector3(p.x, 1.2*k, p.z), q, s.set(k,k,k)); tI.setMatrixAt(i, mtx);
       mtx.compose(new THREE.Vector3(p.x, 3.4*k, p.z), q, s.set(k,k*1.15,k)); lI.setMatrixAt(i, mtx);
     }
+    tI.castShadow = lI.castShadow = shadowsOn;
     scene.add(track(tI)); scene.add(track(lI));
   }
+
+  // ---- street furniture ----
+  buildFurniture(street, roads);
 
   // ---- weather ----
   buildPrecip();
@@ -1365,46 +1718,90 @@ function buildingHeight(t, id){
   return 7.5 + hash(id|0)*7;
 }
 
-function walls(pts, h, color, pos, col, uv){
-  const cuts = h > 9 ? [0, 5.5, h] : [0, h];
+const GF = 4.4;   // street-level storey height
+
+function walls(pts, h, color, G, U){
   const n = pts.length;
+  const gf = Math.min(GF, h * 0.55);
+  const top = h + 0.9;                    // parapet carries past the roof slab
   let run = 0;
   for(let i=0;i<n;i++){
     const a = pts[i], b = pts[(i+1)%n];
     const dx = b.x-a.x, dz = b.z-a.z;
     const len = Math.hypot(dx,dz);
     if(len < 0.05) continue;
-    const u0 = run/16, u1 = (run+len)/16; run += len;
-    for(let s=0;s<cuts.length-1;s++){
-      const y0 = cuts[s], y1 = cuts[s+1];
-      const v0 = y0/13.6, v1 = y1/13.6;
-      const a0 = ao(y0), a1 = ao(y1);
-      push6(pos, a.x,y0,a.z,  b.x,y0,b.z,  b.x,y1,b.z);
-      push6(pos, a.x,y0,a.z,  b.x,y1,b.z,  a.x,y1,a.z);
-      pushUV(uv, u0,v0, u1,v0, u1,v1);
-      pushUV(uv, u0,v0, u1,v1, u0,v1);
-      pushC(col, color, a0,a0,a1);
-      pushC(col, color, a0,a1,a1);
-    }
+
+    // --- street level ---
+    band(a, b, 0, gf, run, run+len, 9, gf, color, G, 0.62, 0.98);
+
+    // --- upper floors, split once so the ambient gradient is not stretched ---
+    const cuts = (h - gf > 9) ? [gf, gf+5.5, h] : [gf, h];
+    for(let k=0;k<cuts.length-1;k++)
+      band(a, b, cuts[k], cuts[k+1], run, run+len, 16, 13.6, color, U, ao(cuts[k]), ao(cuts[k+1]), gf);
+
+    // --- parapet, a touch darker so the roofline reads ---
+    band(a, b, h, top, run, run+len, 16, 13.6, color, U, 0.80, 0.72, gf);
+
+    run += len;
   }
 }
-function ao(y){ return 0.44 + 0.56 * Math.min(1, y/7); }
 
-function roof(pts, h, color, pos, col){
+function band(a, b, y0, y1, u0m, u1m, uScale, vScale, color, T, s0, s1, vOff){
+  const u0 = u0m/uScale, u1 = u1m/uScale;
+  const v0 = ((y0 - (vOff||0)))/vScale, v1 = ((y1 - (vOff||0)))/vScale;
+  push6(T.pos, a.x,y0,a.z,  b.x,y0,b.z,  b.x,y1,b.z);
+  push6(T.pos, a.x,y0,a.z,  b.x,y1,b.z,  a.x,y1,a.z);
+  pushUV(T.uv, u0,v0, u1,v0, u1,v1);
+  pushUV(T.uv, u0,v0, u1,v1, u0,v1);
+  pushC(T.col, color, s0,s0,s1);
+  pushC(T.col, color, s0,s1,s1);
+}
+
+function ao(y){ return 0.52 + 0.48 * Math.min(1, y/9); }
+
+function roof(pts, h, color, T){
   const contour = pts.map(p => new THREE.Vector2(p.x, p.z));
   let tris;
   try { tris = THREE.ShapeUtils.triangulateShape(contour, []); } catch(e){ return; }
   for(const f of tris){
     for(const idx of f){
       const v = contour[idx];
-      pos.push(v.x, h, v.y);
-      col.push(color.r, color.g, color.b);
+      T.pos.push(v.x, h, v.y);
+      T.uv.push(v.x/7, v.y/7);
+      T.col.push(color.r, color.g, color.b);
     }
   }
 }
 
-function ribbon(pts, width, y, color, pos, col){
+/* Rooftop plant. Since you can land up there now, an empty slab reads as fake. */
+function roofClutter(pts, h, id, out){
+  if(h < 7) return;
+  let cx = 0, cz = 0;
+  for(const p of pts){ cx += p.x; cz += p.z; }
+  cx /= pts.length; cz /= pts.length;
+  if(!pointInPoly(cx, cz, pts)) return;
+
+  let area = 0;
+  for(let i=0,j=pts.length-1;i<pts.length;j=i++)
+    area += (pts[j].x*pts[i].z - pts[i].x*pts[j].z);
+  area = Math.abs(area/2);
+  if(area < 55) return;
+
+  const r = hash(id|0), r2 = hash(id*11|0), r3 = hash(id*7|0);
+  // a water tower on the mid-rise stock, which is what a real skyline is full of
+  if(h > 13 && h < 62 && r < 0.42) out.tower.push({ x:cx + (r2-0.5)*5, y:h, z:cz + (r3-0.5)*5, s:0.85 + r2*0.4 });
+  out.bulk.push({ x:cx + (r3-0.5)*7, y:h, z:cz + (r-0.5)*7, s:0.8 + r3*0.7 });
+  const units = 1 + Math.floor(r2*3);
+  for(let i=0;i<units;i++){
+    const ax = cx + (hash((id+i*13)|0)-0.5) * Math.min(18, Math.sqrt(area));
+    const az = cz + (hash((id+i*29)|0)-0.5) * Math.min(18, Math.sqrt(area));
+    if(pointInPoly(ax, az, pts)) out.hvac.push({ x:ax, y:h, z:az, s:0.7 + hash((id+i*5)|0)*0.8 });
+  }
+}
+
+function ribbon(pts, width, y, color, T, uScale){
   const hw = width/2;
+  let run = 0;
   for(let i=0;i<pts.length-1;i++){
     const a = pts[i], b = pts[i+1];
     let dx = b.x-a.x, dz = b.z-a.z;
@@ -1412,14 +1809,20 @@ function ribbon(pts, width, y, color, pos, col){
     if(len < 0.02) continue;
     dx/=len; dz/=len;
     const px = -dz*hw, pz = dx*hw;
-    push6(pos, a.x+px,y,a.z+pz,  b.x+px,y,b.z+pz,  b.x-px,y,b.z-pz);
-    push6(pos, a.x+px,y,a.z+pz,  b.x-px,y,b.z-pz,  a.x-px,y,a.z-pz);
-    for(let k=0;k<6;k++) col.push(color.r, color.g, color.b);
-    if(i > 0){ // fill the mitre gap with a small square
-      push6(pos, a.x-hw,y,a.z-hw, a.x+hw,y,a.z-hw, a.x+hw,y,a.z+hw);
-      push6(pos, a.x-hw,y,a.z-hw, a.x+hw,y,a.z+hw, a.x-hw,y,a.z+hw);
-      for(let k=0;k<6;k++) col.push(color.r, color.g, color.b);
+    const u0 = run/uScale, u1 = (run+len)/uScale;
+    push6(T.pos, a.x+px,y,a.z+pz,  b.x+px,y,b.z+pz,  b.x-px,y,b.z-pz);
+    push6(T.pos, a.x+px,y,a.z+pz,  b.x-px,y,b.z-pz,  a.x-px,y,a.z-pz);
+    pushUV(T.uv, u0,0, u1,0, u1,1);
+    pushUV(T.uv, u0,0, u1,1, u0,1);
+    for(let k=0;k<6;k++) T.col.push(color.r, color.g, color.b);
+    if(i > 0){   // square patch to fill the mitre gap at the joint
+      push6(T.pos, a.x-hw,y,a.z-hw, a.x+hw,y,a.z-hw, a.x+hw,y,a.z+hw);
+      push6(T.pos, a.x-hw,y,a.z-hw, a.x+hw,y,a.z+hw, a.x-hw,y,a.z+hw);
+      pushUV(T.uv, 0,0, 1,0, 1,1);
+      pushUV(T.uv, 0,0, 1,1, 0,1);
+      for(let k=0;k<6;k++) T.col.push(color.r, color.g, color.b);
     }
+    run += len;
   }
 }
 
@@ -1695,7 +2098,11 @@ document.addEventListener("pointerlockchange", ()=>{
   pointerLocked = (document.pointerLockElement === $("scene"));
   if(running && !pointerLocked && !finished && !lockUnsupported && !paused){
     paused = true;
-    $("veil").classList.add("on");
+    if(wantAerial && districtIsUS) setTimeout(()=>{
+    if(aerialLoaded > 0) toast("Aerial ground", aerialLoaded + " tiles loaded");
+    else if(aerialTried) toast("Aerial refused", "Try a CORS proxy prefix in the register");
+  }, 6000);
+  $("veil").classList.add("on");
     $("veilT").textContent = "Survey held. Step back outside, or return to the register.";
   }
 });
@@ -1820,20 +2227,6 @@ function enterGame(){
   $("keys").innerHTML = touch
     ? "Left thumb — walk<br>Lift — fly<br>Right side — look"
     : "W A S D — walk<br>Shift — run<br>Space — fly<br>Mouse — look<br>Esc — pause";
-  setTimeout(()=>{
-    if(wantPhotos && photoStatus !== "ready") toast("Photos unavailable", photoStatus);
-    else if(wantPhotos && photoFailed > shots.length*0.5) toast("Photos blocked", "The image host refused them");
-  }, 3000);
-  if(aerialActive) setTimeout(()=>{
-    if(aerialTried && aerialFailed > aerialTried*0.6)
-      toast("Aerial refused", "The tile host blocked the images — switch Aerial ground off");
-  }, 6000);
-  const pnote = !wantPhotos
-      ? "Street photos are switched off in the register."
-      : photoStatus === "ready"
-        ? shots.length + " photographs placed. Walk up to a brass frame to see it."
-        : "Photographs unavailable — " + photoStatus + (photoNote ? ": " + photoNote : "");
-  $("veilPhotos").textContent = pnote;
   $("veil").classList.add("on");
   $("veilT").textContent = touch
     ? "Drag the lower-left to walk, drag anywhere else to look. Hold Lift to rise off the street — let go and you'll fall back down. Reach every brass beacon."
@@ -1881,9 +2274,6 @@ function loop(){
   }
 
   stepPrecip(dt);
-
-  shotTimer += dt;
-  if(shotTimer > 0.45){ shotTimer = 0; updatePanel(); if(!domPhotos) streamPhotos(); }
 
   renderer.render(scene, camera);
   updateHUD();
@@ -2014,19 +2404,6 @@ function updateHUD(){
   $("time").textContent = fmt(elapsed);
   $("alt").textContent = Math.round(player.y) + " m";
 
-  if(!wantPhotos){ $("photostat").textContent = "Street photos: off"; }
-  else {
-    const el = $("photostat");
-    let live = 0; for(const s2 of shots) if(s2.tex) live++;
-    const bad = photoStatus !== "ready";
-    el.classList.toggle("bad", bad);
-    el.innerHTML = bad
-      ? "Photos: " + photoStatus + (photoNote ? "<br>" + photoNote.slice(0,90) : "")
-      : (domPhotos ? "Photos in panel / " + shots.length + " placed"
-                   : "Photos " + live + " shown / " + shots.length + " placed")
-        + (photoFailed ? " / " + photoFailed + " blocked" : "")
-        + (photoNote ? "<br>" + photoNote.slice(0,80) : "");
-  }
   drawTape(bearing, tb);
   drawMinimap();
 }
