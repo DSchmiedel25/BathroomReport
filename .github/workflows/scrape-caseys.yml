@@ -31,27 +31,22 @@ jobs:
 
       - name: Introspect schema
         if: inputs.mode == 'introspect'
-        working-directory: data
         run: node scrape-caseys.js --introspect
 
       - name: Discover query from site JS
         if: inputs.mode == 'discover'
-        working-directory: data
         run: node scrape-caseys.js --discover
 
       - name: Probe endpoint
         if: inputs.mode == 'probe'
-        working-directory: data
         run: node scrape-caseys.js --probe
 
       - name: Smoke test (50 queries)
         if: inputs.mode == 'smoke'
-        working-directory: data
         run: node scrape-caseys.js --limit 50
 
       - name: Full crawl
         if: inputs.mode == 'full'
-        working-directory: data
         run: node scrape-caseys.js
 
       - name: Upload result
@@ -59,7 +54,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: caseys-${{ inputs.mode }}-${{ github.run_number }}
-          path: data/caseys_full.json
+          path: caseys_full.json
           if-no-files-found: warn
 
       - name: Commit
@@ -67,7 +62,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/caseys_full.json
+          git add caseys_full.json
           git diff --staged --quiet && echo "no changes" && exit 0
           git commit -m "Casey's location refresh $(date -u +%Y-%m-%d)"
           git push
