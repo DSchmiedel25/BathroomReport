@@ -1,27 +1,44 @@
 #!/usr/bin/env node
 // export-votes.js — snapshot community amenity/feature votes into votes-summary.json.
 //
-// YOU run this (it needs read access to your Firestore, which Claude does not have). It reads
-// the whole `votes` collection once and aggregates per location into yes/no tallies — the same
-// counts the app computes live per popup — then writes a small summary file you upload to Claude
-// for baking into the *-locations.js files.
+// Runs in the nightly bake workflow (and can be run by hand on any machine with Node).
+// It reads the whole `votes` collection once and aggregates per location into yes/no tallies —
+// the same counts the app computes live per popup — then writes votes-summary.json, which
+// bake-confirmed.js folds into the *-locations.js files.
 //
-// SETUP (one time, on a computer with Node — not the phone):
+// SETUP (only needed for a manual run; the workflow supplies the key from a secret):
 //   1. Firebase console → Project settings → Service accounts → "Generate new private key".
 //      Save it next to this file as  serviceAccountKey.json  (never commit it).
 //   2. npm install firebase-admin
 //
 // RUN:
-//   node export-votes.js
-//   -> writes votes-summary.json  (upload this to Claude)
+//   node export-votes.js      -> writes votes-summary.json
 //
 // The summary contains ONLY aggregate counts keyed by location id — no user identifiers.
 
-const admin = require('firebase-admin');
 const fs = require('fs');
+const path = require('path');
+const admin = require('firebase-admin');
 
-admin.initializeApp({ credential: admin.credential.cert(require('./serviceAccountKey.json')) });
-const db = admin.firestore();
+const KEY_FILE = path.join(__dirname, 'serviceAccountKey.json');
+if (!fs.existsSync(KEY_FILE)) {
+  console.error('\n\u2717 serviceAccountKey.json not found here.');
+  process.exit(1);
+}
+
+/* Initialise exactly the way fetch-and-bake-hours.js does.
+ *
+ * This used to call admin.credential.cert(...), which threw
+ *   TypeError: Cannot read properties of undefined (reading 'cert')
+ * every night — `credential` is not present on the object this firebase-admin version returns,
+ * while `cert` is. The failure was invisible because bake.yml ended the step with
+ * `|| echo "... — continuing"`, so the amenity bake has not run in a long time.
+ *
+ * Keep this in step with fetch-and-bake.js and fetch-and-bake-hours.js: if one of them changes
+ * how it initialises, they all should, because they all run in the same workflow against the
+ * same installed version. */
+admin.initializeApp({ credential: admin.cert(require(KEY_FILE)) });
+const db = require('firebase-admin/firestore').getFirestore();
 
 /* Feature keys the app tracks. Bathroom answers live under vote.amenities, store answers under
  * vote.storeFeatures, and the two sets are DISJOINT — the same key in both would let one person
@@ -42,7 +59,6 @@ const STORE_KEYS   = ['evCharging', 'airPump', 'shower', 'indoorSeating', 'wifi'
   const summary = {};   // locId -> { amenities:{key:{yes,no}}, storeFeatures:{key:{yes,no}} }
   let voteCount = 0;
 
-  // Stream the collection so a large votes set doesn't blow memory.
   const snap = await db.collection('votes').get();
   snap.forEach(doc => {
     const v = doc.data();
@@ -68,11 +84,23 @@ const STORE_KEYS   = ['evCharging', 'airPump', 'shower', 'indoorSeating', 'wifi'
     }
   });
 
-  fs.writeFileSync('votes-summary.json', JSON.stringify({
+  /* Refuse to write an empty summary.
+   *
+   * bake-confirmed.js treats this file as authoritative, so a summary with no locations would
+   * clear confirmations rather than leave them alone — the same failure mode fetch-and-bake.js
+   * and fetch-and-bake-hours.js both already guard against. An empty read is indistinguishable
+   * from a transient Firestore error or a permissions change. */
+  if (voteCount === 0) {
+    console.log('No votes returned — refusing to write votes-summary.json, because an empty');
+    console.log('summary could clear existing confirmations. Nothing written.');
+    process.exit(0);
+  }
+
+  fs.writeFileSync(path.join(__dirname, 'votes-summary.json'), JSON.stringify({
     generatedAt: new Date().toISOString(),
     votesScanned: voteCount,
     locations: summary
   }));
-  console.log(`Wrote votes-summary.json — ${voteCount} votes across ${Object.keys(summary).length} locations. Upload this to Claude.`);
+  console.log(`Wrote votes-summary.json — ${voteCount} votes across ${Object.keys(summary).length} locations.`);
   process.exit(0);
 })().catch(e => { console.error(e); process.exit(1); });
