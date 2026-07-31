@@ -106,6 +106,10 @@
     background:rgba(10,16,19,.72);backdrop-filter:blur(2px);}
   #dot{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;
     border-radius:50%;background:rgba(245,239,227,.6);box-shadow:0 0 4px rgba(0,0,0,.8);}
+  #photostat{position:absolute;left:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 132px);
+    font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;line-height:1.7;max-width:60vw;
+    color:rgba(95,184,196,.9);text-shadow:0 1px 5px rgba(0,0,0,.95);}
+  #photostat.bad{color:#E88A6A;}
   #moment{position:absolute;left:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 92px);
     font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:rgba(216,177,74,.85);
     line-height:1.9;text-shadow:0 1px 5px rgba(0,0,0,.95);}
@@ -278,6 +282,7 @@
   </div>
   <canvas id="mini" width="224" height="224"></canvas>
   <div id="dot"></div>
+  <div id="photostat"></div>
   <div id="moment"></div>
   <div id="keys">W A S D — walk<br>Shift — run<br>Mouse — look<br>Esc — pause</div>
   <div id="pad"><div id="padKnob"></div></div>
@@ -881,61 +886,98 @@ function buildAerial(){
    ============================================================ */
 let shots = [], shotTimer = 0, shotGeoFlat = null, shotGeoPano = null, shotMarks = null;
 
+let photoStatus = "off", photoNote = "", photoFailed = 0;
+
+async function mlyImages(bbox, fields, limit){
+  const url = MLY_GRAPH + "/images?access_token=" + encodeURIComponent(MLY_TOKEN)
+            + "&fields=" + fields + "&bbox=" + bbox + "&limit=" + limit;
+  const r = await fetch(url);
+  const txt = await r.text();
+  let j;
+  try{ j = JSON.parse(txt); }
+  catch(e){ throw new Error("HTTP " + r.status + " non-JSON: " + txt.slice(0,110)); }
+  if(j.error) throw new Error(j.error.message || JSON.stringify(j.error).slice(0,110));
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  return j.data || [];
+}
+
 async function buildPhotos(lat, lon, onMsg){
   const dLat = worldRadius/111320, dLon = worldRadius/(111320*cosLat);
   const bbox = [lon-dLon, lat-dLat, lon+dLon, lat+dLat].map(v=>v.toFixed(6)).join(",");
   let data = [];
-  try{
-    onMsg("Locating street photographs");
-    const r = await fetch(MLY_GRAPH+"/images?access_token="+encodeURIComponent(MLY_TOKEN)
-      + "&fields=id,computed_geometry,geometry,compass_angle,computed_compass_angle,is_pano"
-      + "&bbox="+bbox+"&limit=1500");
-    const j = await r.json();
-    if(j && j.data) data = j.data;
-  }catch(e){ console.warn("Mapillary lookup failed", e); return; }
-  if(!data.length) return;
+  photoStatus = "querying"; photoNote = "";
 
-  // thin them out so the streets aren't wallpapered — one frame per 22 m cell
+  onMsg("Locating street photographs");
+  try{
+    data = await mlyImages(bbox,
+      "id,computed_geometry,geometry,compass_angle,computed_compass_angle,is_pano", 500);
+  }catch(e1){
+    // one of those fields may not be served here — fall back to the bare minimum
+    console.warn("Mapillary rich query failed:", e1.message);
+    photoNote = e1.message;
+    try{
+      data = await mlyImages(bbox, "id,geometry,compass_angle", 500);
+      photoNote = "reduced fields (" + e1.message + ")";
+    }catch(e2){
+      console.error("Mapillary query failed:", e2.message);
+      photoStatus = "query failed"; photoNote = e2.message;
+      return;
+    }
+  }
+
+  if(!data.length){
+    photoStatus = "no coverage";
+    photoNote = "Mapillary returned zero frames for this box";
+    return;
+  }
+
   const seen = new Set(), picked = [];
   for(const im of data){
     const g = im.computed_geometry || im.geometry;
     if(!g || !g.coordinates) continue;
     const p = toXZ(g.coordinates[1], g.coordinates[0]);
     if(Math.hypot(p.x, p.z) > worldRadius*0.95) continue;
-    const key = Math.round(p.x/22)+":"+Math.round(p.z/22);
+    const key = Math.round(p.x/22) + ":" + Math.round(p.z/22);
     if(seen.has(key)) continue;
     seen.add(key);
-    const ang = im.computed_compass_angle != null ? im.computed_compass_angle : (im.compass_angle||0);
+    const ang = im.computed_compass_angle != null ? im.computed_compass_angle : (im.compass_angle || 0);
     picked.push({ id:im.id, x:p.x, z:p.z, b:ang, pano:!!im.is_pano });
-    if(picked.length >= (COARSE||SMALL ? 70 : 150)) break;
+    if(picked.length >= ((COARSE || SMALL) ? 70 : 150)) break;
   }
-  if(!picked.length) return;
+  if(!picked.length){
+    photoStatus = "all filtered";
+    photoNote = data.length + " frames returned but none inside the radius";
+    return;
+  }
 
   shotGeoFlat = new THREE.PlaneGeometry(4.6, 2.6);
   shotGeoPano = new THREE.PlaneGeometry(7.4, 3.7);
 
-  for(const s of picked){
-    const rad = s.b * Math.PI/180;
-    // sit the frame a few metres along the camera's heading, turned back to face you
+  for(const sh of picked){
+    const rad = sh.b * Math.PI/180;
     const fx = Math.sin(rad), fz = -Math.cos(rad);
     const m = new THREE.Mesh(
-      s.pano ? shotGeoPano : shotGeoFlat,
+      sh.pano ? shotGeoPano : shotGeoFlat,
       new THREE.MeshBasicMaterial({ color:0xD8B14A, transparent:true, opacity:0.20, side:THREE.DoubleSide })
     );
-    m.position.set(s.x + fx*3.2, s.pano ? 2.6 : 2.2, s.z + fz*3.2);
+    m.position.set(sh.x + fx*3.2, sh.pano ? 2.6 : 2.2, sh.z + fz*3.2);
     m.rotation.y = -rad;
     scene.add(track(m));
-    s.mesh = m;
-    shots.push(s);
+    sh.mesh = m;
+    shots.push(sh);
   }
 
-  // a dot on the ground under each, so the frames are findable from the air
   const ring = new THREE.RingGeometry(0.9, 1.5, 14);
   const rmat = new THREE.MeshBasicMaterial({ color:0xD8B14A, transparent:true, opacity:0.4, side:THREE.DoubleSide, depthWrite:false });
   shotMarks = new THREE.InstancedMesh(ring, rmat, shots.length);
-  const mtx = new THREE.Matrix4(), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2,0,0)), sc = new THREE.Vector3(1,1,1);
-  shots.forEach((s,i)=>{ mtx.compose(new THREE.Vector3(s.x, 0.18, s.z), q, sc); shotMarks.setMatrixAt(i, mtx); });
+  const mtx = new THREE.Matrix4(),
+        q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2,0,0)),
+        sc = new THREE.Vector3(1,1,1);
+  shots.forEach((sh,i)=>{ mtx.compose(new THREE.Vector3(sh.x, 0.18, sh.z), q, sc); shotMarks.setMatrixAt(i, mtx); });
   scene.add(track(shotMarks));
+
+  photoStatus = "ready";
+  console.log("Mapillary: " + data.length + " frames returned, " + shots.length + " placed");
 }
 
 /* Only a handful of photographs are ever resident in memory. */
@@ -987,6 +1029,8 @@ async function hydrate(s){
     s.mesh.material.needsUpdate = true;
   }catch(err){
     s.dead = true;             // expired URL or blocked host — stop retrying this one
+    photoFailed++;
+    if(!photoNote) photoNote = "image load blocked: " + (err && err.message ? err.message : err);
   }
   s.loading = false;
 }
@@ -1006,6 +1050,7 @@ function disposeWorld(){
   }
   for(const s2 of shots){ if(s2.tex) s2.tex.dispose(); }
   shots = []; shotMarks = null; precip = null;
+  photoStatus = "off"; photoNote = ""; photoFailed = 0;
   aerialTried = aerialFailed = 0;
   disposables.length = 0;
   grid.clear();
@@ -1692,6 +1737,10 @@ function enterGame(){
   $("keys").innerHTML = touch
     ? "Left thumb — walk<br>Lift — fly<br>Right side — look"
     : "W A S D — walk<br>Shift — run<br>Space — fly<br>Mouse — look<br>Esc — pause";
+  setTimeout(()=>{
+    if(wantPhotos && photoStatus !== "ready") toast("Photos unavailable", photoStatus);
+    else if(wantPhotos && photoFailed > shots.length*0.5) toast("Photos blocked", "The image host refused them");
+  }, 3000);
   if(aerialActive) setTimeout(()=>{
     if(aerialTried && aerialFailed > aerialTried*0.6)
       toast("Aerial refused", "The tile host blocked the images — switch Aerial ground off");
@@ -1875,6 +1924,18 @@ function updateHUD(){
   }
   $("time").textContent = fmt(elapsed);
   $("alt").textContent = Math.round(player.y) + " m";
+
+  if(wantPhotos){
+    const el = $("photostat");
+    let live = 0; for(const s2 of shots) if(s2.tex) live++;
+    const bad = photoStatus !== "ready";
+    el.classList.toggle("bad", bad);
+    el.innerHTML = bad
+      ? "Photos: " + photoStatus + (photoNote ? "<br>" + photoNote.slice(0,90) : "")
+      : "Photos " + live + " shown / " + shots.length + " placed"
+        + (photoFailed ? " / " + photoFailed + " blocked" : "")
+        + (photoNote ? "<br>" + photoNote.slice(0,80) : "");
+  }
   drawTape(bearing, tb);
   drawMinimap();
 }
