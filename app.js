@@ -118,8 +118,9 @@ perfMark('location data merged (' + seedLocations.length + ' locations)');
     const c = CHAIN_REGISTRY[l.chain || DEFAULT_CHAIN_KEY];
     if(c && c.group === 'metro'){ const m = c.metro || 'Other'; byCity[m] = (byCity[m] || 0) + 1; }
   });
-  const lines = [`🛣️ Pit stops: ${pit.toLocaleString()}`,
-    ...Object.keys(byCity).map(m => `🏙️ ${escapeHtml(m)}: ${byCity[m].toLocaleString()}`)];
+  // Also drawer content, also text-only. These are counts; a road sign beside a number adds noise.
+  const lines = [`Pit stops: ${pit.toLocaleString()}`,
+    ...Object.keys(byCity).map(m => `${escapeHtml(m)}: ${byCity[m].toLocaleString()}`)];
   el.innerHTML = `${seedLocations.length.toLocaleString()} locations mapped` +
     `<span class="d-count-breakdown">${lines.join('<br>')}</span>`;
 })();
@@ -1903,7 +1904,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.21.2';
+const BUILD = 'v2.21.5';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -4575,11 +4576,13 @@ function chainBucket(key){
 /* icon and text are separate so the drawer can render the icon inside the same fixed-width
    .d-ico slot the static rows use — emoji advance widths differ, so an inline "emoji label"
    would start its text at a different x than Passport / FAQ / Preferences above it. */
+/* No icons: these rows are rendered INTO the drawer, which is text-only, and a picture beside
+ * "Gas & convenience" says nothing the label doesn't. */
 const CK_GROUPS = [
-  { id: 'gas',    icon: '⛽',  label: 'Gas & convenience' },
-  { id: 'travel', icon: '🚛',  label: 'Travel centers' },
-  { id: 'public', icon: '🚻',  label: 'Public restrooms' },
-  { id: 'city',   icon: '🏙️', label: 'City & metro' }
+  { id: 'gas',    label: 'Gas & convenience' },
+  { id: 'travel', label: 'Travel centers' },
+  { id: 'public', label: 'Public restrooms' },
+  { id: 'city',   label: 'City & metro' }
 ];
 
 // Rebuilds are cheap but not free — skip the DOM write when nothing changed (same chains,
@@ -4621,18 +4624,16 @@ function renderChainKey(){
     const keys = allKeys.filter(k => chainBucket(k) === g.id);
     if(!keys.length) return '';
     const on = !keys.every(k => disabledChains.has(k));
-    // Named groupIco, not ico: a local `ico` shadows the global ico() helper for this whole
-    // block, so any future icon added here would fail with a confusing "not a function".
-    const groupIco = `<span class="d-ico" aria-hidden="true">${g.icon}</span>`;
+
     if(readOnly){
-      return `<div class="d-toggle ck-grouprow d-gated"><span>${groupIco}${escapeHtml(g.label)}</span>` +
+      return `<div class="d-toggle ck-grouprow d-gated"><span>${escapeHtml(g.label)}</span>` +
              `<span class="d-switch"><b></b></span></div>`;
     }
     // Reuses the drawer's own switch (same markup as Hide-closed and Appearance) rather than
     // the map key's checkmark. A checkmark reads as "selected"; the question here is
     // shown/hidden, and the drawer already has a control that says exactly that.
     return `<button type="button" class="d-toggle ck-grouprow${on ? ' on' : ''}" data-groupkeys="${keys.join(',')}"` +
-      ` role="switch" aria-checked="${on}"><span>${groupIco}${escapeHtml(g.label)}</span>` +
+      ` role="switch" aria-checked="${on}"><span>${escapeHtml(g.label)}</span>` +
       `<span class="d-switch"><b></b></span></button>`;
   }).join('');
 

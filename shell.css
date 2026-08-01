@@ -847,3 +847,40 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 /* Flattened preferences sit directly under the SETTINGS placard, so the gate note needs its own
    spacing rather than inheriting the removed box's. */
 .d-gate-note{ margin:2px 0 6px; }
+
+/* Group headings sit on the same left margin as the rows they head.
+   .d-items has no horizontal padding — every row supplies its own 20px — so a placard added
+   without it started hard against the drawer edge and read as clipped. */
+#appDrawer .d-plate{ padding-left:20px; padding-right:20px; }
+
+/* Gift shop lives in the footer, which doesn't scroll.
+   At the end of the items list it fell below the fold whenever the chain list was expanded — and
+   a shop link is a supporting link like the copyright rather than a feature competing with the
+   settings above it. Styled to be findable without shouting: it reads first in the footer, then
+   the small print. */
+#appDrawer .d-shop-foot{
+  display:block; margin:0 0 12px; padding:11px 14px; min-height:44px;
+  border:1px solid var(--shell-line); border-radius:10px;
+  color:var(--accent); font-size:13.5px; font-weight:700; text-align:center;
+  text-decoration:none; line-height:22px;
+}
+#appDrawer .d-shop-foot:hover{ border-color:var(--accent); }
+#appDrawer .d-shop-foot:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; }
+
+/* Donate / Shop the Store — centre the LABEL, not the icon-plus-label group.
+   justify-content:center was already centring the pair, so the icon's width pushed the words
+   right of the button's middle. Reading a row of two buttons, the eye tracks the words and they
+   looked off. The icon is now taken out of the flow and pinned left; the label centres on the
+   full width, so the two labels line up with each other. */
+.hiw-support-actions .hiw-btn{
+  position:relative; justify-content:center; gap:0;
+  /* Symmetric horizontal padding would let a long label slide under the pinned icon; the extra
+     left inset reserves its lane. Vertical padding still comes from the rule above. */
+  padding-left:44px; padding-right:44px;
+}
+.hiw-support-actions .hiw-btn > span{ display:block; text-align:center; }
+.hiw-support-actions .hiw-btn-icon,
+.hiw-support-actions .hiw-shop-icon{
+  position:absolute; left:14px; top:50%; transform:translateY(-50%);
+}
+.hiw-support-actions .hiw-shop-icon{ width:19px; height:19px; }

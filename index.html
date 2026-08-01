@@ -240,6 +240,7 @@
 <!-- Hot food is a covered dish, not a burger: a burger is one meal, the amenity is the category,
      and plenty of these places sell pizza or taquitos instead. -->
 <symbol id="i-hotfood" viewBox="0 0 24 24"><path d="M3 17.4h18"/><path d="M4.6 17.4a7.4 7.4 0 0114.8 0"/><path d="M12 10v-1.6"/><path d="M8.4 5.6c0-1 1-1.2 1-2.2M12 5c0-1.2 1-1.4 1-2.4M15.6 5.6c0-1 1-1.2 1-2.2"/></symbol>
+<symbol id="i-bag" viewBox="0 0 24 24"><path d="M4.6 7.6h14.8l-1.1 12a1.8 1.8 0 01-1.8 1.6H7.5a1.8 1.8 0 01-1.8-1.6z"/><path d="M8.8 10V6.4a3.2 3.2 0 016.4 0V10"/></symbol>
 <symbol id="i-warning" viewBox="0 0 24 24"><path d="M10.3 4.3L2.6 17.4A2 2 0 004.3 20.4h15.4a2 2 0 001.7-3L13.7 4.3a2 2 0 00-3.4 0z"/><path d="M12 9.4v4.2M12 17.2h.01"/></symbol>
 <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9.2 18.2h5.6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9c.6.5.9 1.1.9 1.8v.5h5.2v-.5c0-.7.3-1.3.9-1.8A6 6 0 0012 3z"/></symbol>
 </defs></svg>
@@ -378,18 +379,16 @@ This is tracked on this device only. Log in to sync it across devices.
 </div>
 
 <div class="d-plate"><span>About</span><i></i></div>
-
 <button id="infoBtn" title="FAQ and how it works">How it works</button>
+
+</div>
+<div class="d-foot">
 <a
     href="https://bathroomreport-shop.fourthwall.com/?utm_source=bathroomreport.app&utm_medium=website&utm_campaign=main_menu"
     target="_blank"
     rel="noopener noreferrer"
-    class="d-shop-link">
-Gift shop
-</a>
-
-</div>
-<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.21.2">v2.21.2 · 2026-07-31</span></div>
+    class="d-shop-link d-shop-foot">Gift shop</a>
+&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.21.5">v2.21.5 · 2026-08-01</span></div>
 </nav>
 <!-- Community banner (logged-out) -->
 <div id="communityBanner">
@@ -449,7 +448,7 @@ Gift shop
       aria-label="Support Bathroom Report through Cash App"
     >
       <img src="icon-cashapp.png" class="hiw-btn-icon" alt="">
-      Donate
+      <span>Donate</span>
     </a>
 
     <a
@@ -459,8 +458,8 @@ Gift shop
       class="hiw-btn hiw-btn-shop"
       aria-label="Shop Bathroom Report merchandise"
     >
-      <span class="hiw-shop-icon" aria-hidden="true">🛍️</span>
-      Shop the Store
+      <svg class="ico hiw-shop-icon" aria-hidden="true"><use href="#i-bag"></use></svg>
+      <span>Shop the Store</span>
     </a>
   </div>
 
@@ -486,7 +485,19 @@ Gift shop
   if(m)m.addEventListener('click',open);
   if(s)s.addEventListener('click',close);
   var dc=document.getElementById('drawerClose');if(dc)dc.addEventListener('click',close);
-  if(d)d.querySelectorAll('button:not(#themeToggle)').forEach(function(b){b.addEventListener('click',close);});
+  /* Only buttons that take you somewhere close the drawer.
+   *
+   * This was 'button:not(#themeToggle)' — every button, with one hand-picked exception. That was
+   * already wrong for the two hide switches, and turning "All places" into a real button element (for
+   * keyboard access) made it match too, so opening the chain list slammed the drawer shut.
+   *
+   * An allowlist rather than a growing :not() chain: a switch or a disclosure should leave you
+   * where you are, and the next control added here should have to opt IN to closing. */
+  var NAVIGATES = ['passportToggle','infoBtn'];   // drawerClose is wired separately, above
+  if(d)NAVIGATES.forEach(function(id){
+    var b=document.getElementById(id);
+    if(b)b.addEventListener('click',close);
+  });
   var cb=document.getElementById('cbClose');if(cb)cb.addEventListener('click',function(){document.getElementById('communityBanner').style.display='none';});
   var hiw=document.getElementById('howItWorks');
   function openHiw(e){if(e)e.preventDefault();hiw.classList.add('show');}
