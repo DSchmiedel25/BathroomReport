@@ -1904,7 +1904,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.23.0';
+const BUILD = 'v2.23.1';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -4894,7 +4894,15 @@ async function buildListView(){
     const chainChip = ch
       ? `<span class="list-item-chain" style="background:${ch.color};color:${ch.textColor};">${escapeHtml(ch.name)}</span>`
       : '';
-    return `<div class="list-item" data-locid="${loc.id}">${chainChip}<div class="list-item-name">${escapeHtml(loc.n)}</div><div class="list-item-addr">${escapeHtml(loc.addr || '')}</div><div class="list-item-meta"><span>📍 ${dist.toFixed(1)} mi</span><span>${status}</span></div></div>`;
+    /* Chain, then address. The location NAME is dropped: for most records loc.n is a street
+     * ("Watervliet Shaker Rd, Colonie") and loc.addr is the same street with a number on it, so
+     * the row said the same thing twice and pushed the distance further down.
+     *
+     * The address is the primary line now — it is the part that tells two nearby Stewart's apart,
+     * which is the only job the name was doing. Where a record has no address, the name is the
+     * fallback rather than leaving the row with nothing but a chip. */
+    const primary = loc.addr || loc.n || '';
+    return `<div class="list-item" data-locid="${loc.id}">${chainChip}<div class="list-item-name">${escapeHtml(primary)}</div><div class="list-item-meta"><span>📍 ${dist.toFixed(1)} mi</span><span>${status}</span></div></div>`;
   }).join('');
 }
 document.getElementById('listViewToggle').addEventListener('click',()=>{buildListView();document.getElementById('listViewPanel').classList.add('show');document.body.classList.add('list-open');});

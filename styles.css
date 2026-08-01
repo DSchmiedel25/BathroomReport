@@ -1067,3 +1067,8 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
   @media (prefers-reduced-data: reduce){
     :root, html[data-theme="light"]{ --grain:none; }
 }
+
+  /* The address carries the row now that the duplicate name line is gone, so it takes the weight
+     the name had rather than staying a muted subtitle. */
+  .list-item .list-item-name{ font-size:15px; font-weight:600; line-height:1.35; }
+  .list-item-chain{ margin-bottom:5px; }
