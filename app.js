@@ -472,6 +472,29 @@ const CONFIRM_THRESHOLD = 3;
 function isConfirmedYes(x){ return !!x && x.yes >= CONFIRM_THRESHOLD && x.yes > x.no; }
 function isConfirmedNo(x){  return !!x && x.no  >= CONFIRM_THRESHOLD && x.no  > x.yes; }
 
+/* ---------- Multi-state amenities ----------
+ * Most amenities answer yes/no. restroomType answers single/multiple instead, and every
+ * confirmation path here was written against {yes,no} only — so its votes tallied to nothing,
+ * isConfirmedYes could never fire, and the question never displayed and never retired.
+ * Multi-state counts now sit on the same cell ({yes:0,no:0,single:5,multiple:1}), so nothing
+ * boolean changes; these two helpers are the only readers that look past yes/no. */
+function isMultiState(a){ return !!(a && a.states && !a.states.includes('yes')); }
+
+// The winning state, or null if nothing has confirmed yet. Same bar as isConfirmedYes: at
+// threshold AND strictly ahead of every sibling, so a genuine 5-5 split stays unconfirmed
+// rather than silently resolving to whichever state was declared first.
+function confirmedState(a, x){
+  if(!isMultiState(a) || !x) return null;
+  let best = null, bestN = 0, tied = false;
+  for(const s of a.states){
+    if(s === 'unknown') continue;
+    const n = x[s] || 0;
+    if(n > bestN){ best = s; bestN = n; tied = false; }
+    else if(n === bestN && n > 0){ tied = true; }
+  }
+  return (!tied && bestN >= CONFIRM_THRESHOLD) ? best : null;
+}
+
 // ---------- Voting priority engine (v2.6) ----------
 // Usefulness tiers drive which unconfirmed questions surface first. Higher number = higher
 // priority. gas is intentionally absent (OSM-known, never asked). Anything not listed defaults
@@ -502,6 +525,10 @@ function amenitySettled(loc, key, summary){
   if(ov && ov[key] && ov[key] !== 'unknown') return true;  // admin set it — authoritative
   if(key === 'gas') return true;                      // never asked
   if(conf[key]) return true;                          // baked community confirmation
+  // Multi-state settles on its own rule — isConfirmedYes/No below can never fire for it, which
+  // is why this question was re-served to everyone on every visit no matter how many answered.
+  const def = amenityDefFor(key);
+  if(isMultiState(def)) return confirmedState(def, summary && summary[key]) !== null;
   if(isConfirmedYes(summary && summary[key])) return true;  // live community confirmation
   if(isConfirmedNo(summary && summary[key])) return true;   // community-confirmed absent — stop asking
   return false;
@@ -762,11 +789,20 @@ function refreshCommunityBlock(loc){
 
 function communityConfirmedBadges(loc, featureDefs, summary, skip){
   const conf = (loc && loc.conf) || {};
-  return featureDefs.filter(a => {
-    if(skip && skip.includes(a.key)) return false;
-    const x = summary && summary[a.key] || {yes:0,no:0};
-    return isConfirmedYes(x) || conf[a.key];
-  }).map(a => `<span class="feature-badge community">${amenityAnswerIcon(a, 'yes')} ${a.label} ⭐</span>`).join('');
+  return featureDefs.map(a => {
+    if(skip && skip.includes(a.key)) return '';
+    const x = (summary && summary[a.key]) || {yes:0,no:0};
+    if(isMultiState(a)){
+      // Multi-state badges name the ANSWER ("Single"), not the amenity — "Restroom setup ⭐"
+      // would tell the reader nothing about which setup was confirmed. loc.conf is not consulted
+      // here: it stores key -> 1 and cannot carry a state, and the offline bake deliberately
+      // skips this amenity, so live votes are the only source.
+      const st = confirmedState(a, x);
+      return st ? `<span class="feature-badge community">${amenityAnswerIcon(a, st)} ${escapeHtml(amenityStateLabel(a, st))} ⭐</span>` : '';
+    }
+    if(!(isConfirmedYes(x) || conf[a.key])) return '';
+    return `<span class="feature-badge community">${amenityAnswerIcon(a, 'yes')} ${a.label} ⭐</span>`;
+  }).join('');
 }
 
 // The unified "✅ Confirmed by visitors" block: bathroom + store community confirmations together
@@ -979,7 +1015,14 @@ function fetchCommunityDoc(locId){
       const s = {};
       defs.forEach(a => {
         const c = amen[a.key] || {};
-        s[a.key] = { yes: c.yes > 0 ? c.yes : 0, no: c.no > 0 ? c.no : 0 };
+        const cell = { yes: c.yes > 0 ? c.yes : 0, no: c.no > 0 ? c.no : 0 };
+        // Multi-state amenities carry per-state counts alongside yes/no on the same cell.
+        // Dropping them here was the second half of the bug: even once the function started
+        // writing them, the client would have thrown them away on read.
+        if(isMultiState(a)) a.states.forEach(st => {
+          if(st !== 'unknown') cell[st] = c[st] > 0 ? c[st] : 0;
+        });
+        s[a.key] = cell;
       });
       return s;
     };
@@ -2330,10 +2373,10 @@ async function attachAmenityHandlers(loc){
       const s = cache[loc.id] = cache[loc.id] || {};
       const cell = s[key] = s[key] || { yes: 0, no: 0 };
       const prevAns = bathroom ? (myVote.amenities || {})[key] : (myVote.storeFeatures || {})[key];
-      if(prevAns === 'yes' && cell.yes > 0) cell.yes--;
-      if(prevAns === 'no'  && cell.no  > 0) cell.no--;
-      if(value === 'yes') cell.yes++;
-      if(value === 'no')  cell.no++;
+      // Keyed by the answer value rather than hardcoding yes/no, so changing 'single' to
+      // 'multiple' moves the count the same way changing 'yes' to 'no' always has.
+      if(prevAns && cell[prevAns] > 0) cell[prevAns]--;
+      if(value) cell[value] = (cell[value] || 0) + 1;
     }
     /* Snapshot before committing optimistically. The cached vote and the local tally bump above
      * were applied before the write and never undone on failure, so a rejected answer left the
