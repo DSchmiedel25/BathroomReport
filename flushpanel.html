@@ -279,7 +279,7 @@
     <div class="sidebar-foot">
       <div class="who" id="whoami"></div>
       <button class="btn full" id="signoutBtn">Sign out</button>
-      <div class="panel-version">FlushPanel v2.3 · 2026-07-31</div>
+      <div class="panel-version">FlushPanel v2.4 · 2026-08-01</div>
     </div>
   </aside>
 
@@ -508,6 +508,9 @@ import {
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  initializeAppCheck, ReCaptchaV3Provider
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
 
 // Same project as the public app (public client config — safe to ship).
 const firebaseConfig = {
@@ -520,6 +523,25 @@ const firebaseConfig = {
   measurementId: "G-Q63YXL8XVY"
 };
 const app = initializeApp(firebaseConfig);
+
+/* App Check, matching firebase.js.
+ *
+ * This panel builds its own Firebase app rather than sharing the public one, so it needs its own
+ * App Check registration — without it, turning enforcement on in the console would reject every
+ * request FlushPanel makes and lock the only admin out of the moderation queue. The site key is
+ * bound to the domain and public by design; the secret key stays in the Firebase console.
+ *
+ * Must precede getFirestore/getAuth so every call carries a token. Wrapped so a reCAPTCHA
+ * failure degrades to unattested requests rather than a blank panel. */
+try{
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider('6LdaNnAtAAAAAAuYD76f2g40rfCcQNgYEm49xZQz'),
+    isTokenAutoRefreshEnabled: true
+  });
+}catch(e){
+  console.warn('App Check did not initialise; requests will be unattested', e && e.code);
+}
+
 const db = getFirestore(app);
 const auth = getAuth(app);
 
