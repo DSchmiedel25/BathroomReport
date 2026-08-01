@@ -805,21 +805,29 @@ function communityConfirmedBadges(loc, featureDefs, summary, skip){
   }).join('');
 }
 
-// The unified "✅ Confirmed by visitors" block: bathroom + store community confirmations together
-// in one flat row (icons distinguish them; no internal split). Empty → returns '' so the whole
-// block collapses. 'accessible' is excluded because it has its own prominent badge.
+/* The unified "✅ Confirmed by visitors" block: bathroom + store community confirmations together
+ * in one flat row (icons distinguish them; no internal split). Empty → returns '' so the whole
+ * block collapses.
+ *
+ * Two exclusions, for different reasons:
+ *   accessible  — has its own prominent badge higher up; a second one is duplication.
+ *   hasRestroom — asymmetric by design. Its job is the confirmed-NO case, which prunes the pin
+ *                 from the map. Confirmed YES already does its work by removing the "not listed
+ *                 as having a public restroom" doubt line; a "Public restroom ⭐" badge on top of
+ *                 that says nothing, since every pin here is a bathroom to begin with. */
 function communitySummaryHtml(loc){
   const bSummary = amenityCache[loc.id];
   const sSummary = storeFeatureCache[loc.id];
-  return communityConfirmedBadges(loc, BATHROOM_AMENITIES, bSummary, ['accessible'])
+  return communityConfirmedBadges(loc, BATHROOM_AMENITIES, bSummary, ['accessible', 'hasRestroom'])
        + communityConfirmedBadges(loc, STORE_FEATURES, sSummary);
 }
 function communitySectionHasContent(loc){ return communitySummaryHtml(loc) !== ''; }
 
 function amenitySummaryHtml(summary, loc){
   // OSM-verified bathroom badges only — community confirmations now live in the unified
-  // "Confirmed by visitors" block above. 'accessible' has its own prominent badge.
-  const verified = osmVerifiedBadges(loc, BATHROOM_AMENITIES, summary, ['accessible']);
+  // "Confirmed by visitors" block above. Same two exclusions as that block: 'accessible' has its
+  // own prominent badge, and 'hasRestroom' says nothing useful in the affirmative.
+  const verified = osmVerifiedBadges(loc, BATHROOM_AMENITIES, summary, ['accessible', 'hasRestroom']);
   if(!summary && !verified) return '<span class="feature-badge unconfirmed">Loading features…</span>';
   if(!verified) return '<span class="feature-badge unconfirmed">Nothing verified yet</span>';
   return verified;
@@ -1092,9 +1100,10 @@ function refreshStoreIcons(loc){
   const el = document.getElementById('store-icons-' + loc.id);
   if(el) el.innerHTML = storeFeatureIconsHtml(loc, storeFeatureCache[loc.id]);
 }
-// Same, for the OSM bathroom-features section (excluding accessible, which has its own badge).
+// Same, for the OSM bathroom-features section. The exclusions must match amenitySummaryHtml
+// exactly, or the section reports content it will not render and shows up empty.
 function osmBathroomHasContent(loc){
-  return osmVerifiedBadges(loc, BATHROOM_AMENITIES, amenityCache[loc.id], ['accessible']) !== '';
+  return osmVerifiedBadges(loc, BATHROOM_AMENITIES, amenityCache[loc.id], ['accessible', 'hasRestroom']) !== '';
 }
 
 async function loadStoreFeatureSummary(locId){
