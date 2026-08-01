@@ -200,12 +200,13 @@
 <div id="listViewItems"></div>
 </div>
 </div>
-<div id="accountPanel">
+<div id="accountPanel" role="dialog" aria-modal="true" aria-labelledby="accountHeaderTitle">
+<div class="acct-grab" aria-hidden="true"><i></i></div>
 <div id="accountHeader">
-<span>👤 Account</span>
+<span id="accountHeaderTitle">👤 Account</span>
 <button id="accountClose" aria-label="Close account panel">✕</button>
 </div>
-<div style="padding:16px;overflow-y:auto;flex:1;">
+<div class="acct-body" style="padding:4px 16px 16px;overflow-y:auto;">
 <div id="loggedOutView">
 <p style="color:var(--cream);font-size:13px;margin:0 0 12px;">
 You can <b>FIND</b> without an account. Sign in to <b>RATE</b>, <b>SHARE</b>, and
@@ -215,19 +216,64 @@ You can <b>FIND</b> without an account. Sign in to <b>RATE</b>, <b>SHARE</b>, an
 <input type="text" id="authUsername" maxlength="20" placeholder="letters, numbers, underscore" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
 <div class="rating-label" style="color:var(--cream);">Password</div>
 <input type="password" id="authPassword" placeholder="at least 6 characters" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
-<p style="background:#3a2226;border:1px solid #e53935;border-radius:6px;padding:8px 10px;color:#ffab91;font-size:12px;margin:0 0 12px;">
-⚠️ There's no email attached to this account, so there's no way to reset a forgotten password: <b>not by you, not by us</b>. Once it's set, write it down somewhere safe. If it's lost, that username is gone for good.
+<div class="rating-label" style="color:var(--cream);">Email <span style="opacity:.7;font-weight:400;">(new accounts)</span></div>
+<input type="email" id="authEmail" autocomplete="email" inputmode="email" maxlength="254" placeholder="so you can reset a forgotten password" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
+<p style="background:#1e2a33;border:1px solid #2ea1aa;border-radius:6px;padding:8px 10px;color:#bcd7dd;font-size:12px;margin:0 0 12px;">
+📧 Used only to reset your password. We'll send a link to confirm it. Not shown publicly, not used for anything else. Logging in? Leave it blank.
 </p>
 <button class="btn btn-amber" id="authSignUpBtn" style="width:100%;margin-bottom:8px;">Sign Up (new account)</button>
 <button class="btn btn-secondary" id="authLogInBtn" style="width:100%;">Log In (existing account)</button>
+<button class="btn btn-secondary" id="authForgotBtn" style="width:100%;margin-top:8px;font-size:13px;">Forgot your password?</button>
 <button id="onboardingInfoBtn" class="btn btn-secondary" style="width:100%;margin-top:8px;">ℹ️ How it works</button>
 <div class="save-note" id="authNote" style="height:auto;margin-top:8px;"></div>
 </div>
 <div id="loggedInView" style="display:none;">
-<p style="color:var(--cream);font-size:15px;margin:0 0 12px;">
-Logged in as <b id="loggedInUsername" style="color:var(--amber);"></b>
-</p>
-<button class="btn btn-danger" id="logOutBtn" style="width:100%;">Log Out</button>
+
+<div class="acct-id">
+<div class="acct-avatar" id="acctAvatar" aria-hidden="true"></div>
+<div>
+<div class="acct-name" id="loggedInUsername"></div>
+<div class="acct-since" id="acctSince"></div>
+</div>
+</div>
+
+<button class="acct-stats" id="acctStats" aria-label="View your Passport">
+<span class="acct-stat"><b id="acctStatRated">–</b><span>Rated</span></span>
+<span class="acct-stat"><b id="acctStatVisited">–</b><span>Visited</span></span>
+<span class="acct-stat"><b id="acctStatAwards">–</b><span>Awards</span></span>
+</button>
+<span class="acct-stats-more" aria-hidden="true">Open Passport →</span>
+
+<div class="acct-plate"><span>Recovery</span><i></i></div>
+<button class="acct-row" id="acctEmailRow">
+<span class="acct-row-main">
+<span class="acct-row-label">Email</span>
+<span class="acct-row-sub" id="acctEmailValue">Loading…</span>
+</span>
+<span class="acct-chip none" id="acctEmailChip">Not set</span>
+</button>
+<div class="acct-note" id="acctEmailNote"></div>
+
+<div class="acct-plate"><span>Security</span><i></i></div>
+<button class="acct-row" id="acctPasswordRow">
+<span class="acct-row-main">
+<span class="acct-row-label">Change password</span>
+<span class="acct-row-sub">We'll email you a link</span>
+</span>
+<span class="acct-row-go" aria-hidden="true">›</span>
+</button>
+<div class="acct-note" id="acctPasswordNote"></div>
+
+<div class="acct-plate"><span>Appearance</span><i></i></div>
+<div class="acct-row acct-row-static">
+<span class="acct-row-main"><span class="acct-row-label">Theme</span></span>
+<span class="acct-seg" role="group" aria-label="Theme">
+<button id="acctThemeLight" aria-pressed="false">Light</button>
+<button id="acctThemeDark" aria-pressed="false">Dark</button>
+</span>
+</div>
+
+<button class="acct-signout" id="logOutBtn">Log out</button>
 </div>
 <div id="passportSection">
 <div class="account-section-title">🎫 Bathroom Passport</div>
@@ -287,7 +333,7 @@ This is tracked on this device only. Log in to sync it across devices.
 </select>
 </div>
 </div>
-<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.16.0">v2.16.0 · 2026-07-31</span></div>
+<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.18.0">v2.18.0 · 2026-07-31</span></div>
 </nav>
 <!-- Community banner (logged-out) -->
 <div id="communityBanner">

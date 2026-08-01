@@ -136,6 +136,11 @@ function applyTheme(theme){
     btn.classList.toggle('on', theme === 'light');
   }
   if(typeof setMapTilesForTheme === 'function') setMapTilesForTheme(theme);
+  // The account sheet has its own Light/Dark control; keep the two in step whichever is used.
+  const lt = document.getElementById('acctThemeLight');
+  const dk = document.getElementById('acctThemeDark');
+  if(lt) lt.setAttribute('aria-pressed', String(theme === 'light'));
+  if(dk) dk.setAttribute('aria-pressed', String(theme !== 'light'));
 }
 document.getElementById('themeToggle').addEventListener('click', () => {
   if(!isLoggedIn()) return;                       // gated: anonymous keeps the default theme
@@ -1190,7 +1195,32 @@ function usernameToEmail(username){
   return clean + '@stewarts-map.local';
 }
 
-async function signUpAccount(username, password){
+/* Basic shape check, mirroring looksLikeEmail() in functions/index.js. Whether an address is
+ * DELIVERABLE cannot be decided here — that is what the confirmation link is for. This only
+ * catches a typo before the account is created around it. */
+function looksLikeEmail(e){
+  return typeof e === 'string' && e.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
+}
+
+/* Store a recovery address and send its confirmation link.
+ *
+ * Shared by signup and the account panel. Returns a reason rather than throwing, because both
+ * callers show it inline. */
+async function saveRecoveryEmail(email){
+  try{
+    const {functions, httpsCallable} = await fb();
+    await httpsCallable(functions, 'setRecoveryEmail')({ email });
+    return { ok: true };
+  }catch(e){
+    const code = (e && e.code) || '';
+    if(code.includes('resource-exhausted')) return { ok: false, reason: 'Just sent one — give it a minute.' };
+    if(code.includes('invalid-argument')) return { ok: false, reason: "That doesn't look like an email address." };
+    console.error('saveRecoveryEmail failed', code, e);
+    return { ok: false, reason: "Couldn't send the confirmation email — try again from Account settings." };
+  }
+}
+
+async function signUpAccount(username, password, email){
   const clean = username.trim();
   if(clean.length < 3) return { ok: false, reason: 'Username needs to be at least 3 characters.' };
   /* The input carries maxlength=20, but that is client-side and bypassable, and the votes rule
@@ -1200,6 +1230,7 @@ async function signUpAccount(username, password){
   if(clean.length > 20) return { ok: false, reason: 'Username can be at most 20 characters.' };
   if(!/^[a-zA-Z0-9_]+$/.test(clean)) return { ok: false, reason: 'Letters, numbers, and underscores only.' };
   if(password.length < 6) return { ok: false, reason: 'Password needs to be at least 6 characters.' };
+  if(!looksLikeEmail(String(email || '').trim())) return { ok: false, reason: 'Enter an email address so you can recover this account.' };
   try{
     const {auth, createUserWithEmailAndPassword, updateProfile, db, doc, setDoc} = await fb();
     const oldAnonId = getClientId(); // capture before login changes what getEffectiveId() returns
@@ -1221,7 +1252,12 @@ async function signUpAccount(username, password){
       window.__currentUser = cred.user;
     }catch(e){ console.warn('could not set display name (non-fatal)', e && e.code); }
     await migrateAnonymousDataToAccount(oldAnonId, cred.user.uid, clean);
-    return { ok: true };
+
+    /* Recovery email last, and non-fatal. The account exists and is usable by this point; a
+     * send failure means an unconfirmed address, not a failed signup. Telling somebody their
+     * signup failed after it actually succeeded would be the worse outcome. */
+    const rec = await saveRecoveryEmail(String(email).trim().toLowerCase());
+    return { ok: true, emailSent: rec.ok, emailReason: rec.reason };
   }catch(e){
     if(e.code === 'auth/email-already-in-use') return { ok: false, reason: 'That username is already taken.' };
     console.error('signUpAccount failed', e);
@@ -1244,6 +1280,36 @@ async function logInAccount(username, password){
     console.error('logInAccount failed', e);
     return { ok: false, reason: 'Something went wrong — try again.' };
   }
+}
+
+/* Ask for a reset link.
+ *
+ * ALWAYS resolves ok, whatever happened server-side — no such username, no recovery address, an
+ * unverified one, rate limited. Usernames appear publicly on ratings and the leaderboard, so a
+ * response that distinguished "no such account" from "sent" would turn this into a way to test
+ * which of those names has a live account behind it. The message below says "if" for that
+ * reason, and it is not a hedge. */
+async function requestPasswordReset(username){
+  try{
+    const {functions, httpsCallable} = await fb();
+    await httpsCallable(functions, 'requestPasswordReset')({ username });
+  }catch(e){
+    console.error('requestPasswordReset failed', e && e.code);
+  }
+  return { ok: true };
+}
+
+/* What the account panel shows about recovery: none / unverified / verified.
+ * One read of the person's own document, only when the panel is opened. */
+async function recoveryStatus(){
+  try{
+    const u = window.__currentUser; if(!u) return null;
+    const {db, doc, getDoc} = await fb();
+    const snap = await getDoc(doc(db, 'recovery', u.uid));
+    if(!snap.exists()) return { email: null, verified: false };
+    const d = snap.data() || {};
+    return { email: d.email || null, verified: d.verified === true };
+  }catch(e){ return null; }
 }
 
 async function logOutAccount(){
@@ -4831,7 +4897,9 @@ function openAccountPanel(mode){
   if(loggedOut) loggedOut.style.display = isPassport ? 'none' : '';
   if(loggedIn) loggedIn.style.display = isPassport ? 'none' : '';
   updateAccountUI(isPassport);
-  checkAndUnlockAchievements();
+  /* In account mode renderAccountSheet runs checkAndUnlockAchievements itself, for the stats
+   * strip — calling it here too would duplicate the work and could fire an unlock toast twice. */
+  if(isPassport) checkAndUnlockAchievements(); else renderAccountSheet();
   if(isPassport){
     requestAnimationFrame(() => {
       const p = document.getElementById('passportSection');
@@ -4850,6 +4918,27 @@ document.getElementById('accountClose').addEventListener('click', () => {
   setTimeout(() => { suppressNextLocateClick = false; }, 400);
 });
 
+document.getElementById('authForgotBtn').addEventListener('click', async () => {
+  const username = document.getElementById('authUsername').value.trim();
+  const note = document.getElementById('authNote');
+  const btn = document.getElementById('authForgotBtn');
+  if(!username){
+    note.style.color = '#e57373';
+    note.textContent = 'Type your username above first.';
+    return;
+  }
+  btn.disabled = true;
+  note.style.color = '#999';
+  note.textContent = 'Checking…';
+  await requestPasswordReset(username);
+  /* Deliberately says "if". The server cannot distinguish outcomes here without revealing
+   * whether that username has an account behind it — usernames are public on ratings and the
+   * leaderboard, so that would be a real leak. Wording matches what the server actually knows. */
+  note.style.color = '#4caf50';
+  note.textContent = 'If that account has a confirmed email, a reset link is on its way.';
+  btn.disabled = false;
+});
+
 document.getElementById('authSignUpBtn').addEventListener('click', async () => {
   const username = document.getElementById('authUsername').value;
   const password = document.getElementById('authPassword').value;
@@ -4864,13 +4953,15 @@ document.getElementById('authSignUpBtn').addEventListener('click', async () => {
     note.textContent = 'Account created! You\'re logged in.';
     updateAccountUI();
     loadAllRatings();
-    // Success needs no further reading — close the panel so the map is usable immediately.
+    // Close the panel so the map is usable immediately — but ONLY on a clean run. If the
+    // confirmation mail failed there is something to read and act on, and closing over it would
+    // leave the account quietly unrecoverable behind a success message.
     // Guarded: if the user opened Passport in the meantime, leave their panel alone.
-    setTimeout(() => {
+    if(result.emailSent) setTimeout(() => {
       if(accountPanelMode === 'passport') return;
       document.getElementById('accountPanel')?.classList.remove('show');
       note.textContent = '';
-    }, 900);
+    }, 1600);
   } else {
     note.style.color = '#e57373';
     note.textContent = result.reason;
@@ -4905,6 +4996,142 @@ document.getElementById('authLogInBtn').addEventListener('click', async () => {
     note.textContent = result.reason;
   }
   btn.disabled = false;
+});
+
+/* ---------- Account sheet ----------
+ * Everything here reads from state the app already holds — the ratings loaded at sign-in, the
+ * auth user object, one document for the recovery address. Opening the sheet costs a single
+ * Firestore read, and only when signed in. */
+
+// Initials for the avatar. Two letters where the name splits on an underscore, otherwise one.
+function acctInitials(name){
+  const n = String(name || '').trim();
+  if(!n) return '?';
+  const parts = n.split(/[_\s]+/).filter(Boolean);
+  return (parts.length > 1 ? parts[0][0] + parts[1][0] : n.slice(0, 2)).toUpperCase();
+}
+
+function renderAccountIdentity(){
+  const u = window.__currentUser; if(!u) return;
+  const name = displayNameFor() || 'You';
+  const nameEl = document.getElementById('loggedInUsername');
+  const avEl = document.getElementById('acctAvatar');
+  const sinceEl = document.getElementById('acctSince');
+  if(nameEl) nameEl.textContent = name;
+  if(avEl) avEl.textContent = acctInitials(name);
+  if(sinceEl){
+    // metadata.creationTime is an RFC-1123 string from Firebase; absent on a restored session.
+    const created = u.metadata && u.metadata.creationTime ? new Date(u.metadata.creationTime) : null;
+    sinceEl.textContent = created && !isNaN(created)
+      ? 'Member since ' + created.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+      : '';
+  }
+}
+
+/* The three numbers, from the same values the Passport screen uses — no extra reads, and no
+ * chance of the summary disagreeing with the detail it links to. */
+async function renderAccountStats(){
+  const set = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
+  try{
+    /* checkAndUnlockAchievements is what the Passport screen itself runs, and it returns both
+     * the stats and the evaluated achievements. Reusing it means the summary here cannot drift
+     * from the detail it links to — and it works off myVoteCache, which is already in memory,
+     * so this adds no reads. It may also unlock something and fire the toast, which is correct:
+     * opening your account is as good a moment as any to be told. */
+    const out = await checkAndUnlockAchievements();
+    if(!out || !out.stats) return;
+    set('acctStatRated', out.stats.bathroomRatedCount ?? 0);
+    set('acctStatVisited', out.stats.visitedCount ?? 0);
+    set('acctStatAwards', Object.values(out.results || {}).filter(r => r.unlocked).length);
+  }catch(e){
+    // A summary is not worth breaking the sheet over — leave the dashes in place.
+    console.warn('account stats unavailable', e);
+  }
+}
+
+/* Recovery address: value plus a state that is never colour alone — the chip's word says it too.
+ * Three real states, and "not set" is the one that matters, because that account cannot be
+ * recovered at all. */
+async function renderAccountRecovery(){
+  const valEl = document.getElementById('acctEmailValue');
+  const chipEl = document.getElementById('acctEmailChip');
+  if(!valEl || !chipEl) return;
+  const st = await recoveryStatus();
+  chipEl.className = 'acct-chip';
+  if(!st){
+    valEl.textContent = "Couldn't load";
+    chipEl.classList.add('none'); chipEl.textContent = 'Unknown';
+  } else if(!st.email){
+    valEl.textContent = 'Add one so you can reset your password';
+    chipEl.classList.add('none'); chipEl.textContent = 'Not set';
+  } else if(st.verified){
+    valEl.textContent = st.email;
+    chipEl.classList.add('ok'); chipEl.textContent = '✓ Confirmed';
+  } else {
+    valEl.textContent = st.email;
+    chipEl.classList.add('wait'); chipEl.textContent = 'Check inbox';
+  }
+}
+
+function renderAccountSheet(){
+  if(!isLoggedIn()) return;
+  renderAccountIdentity();
+  renderAccountStats();      // async, renders when ready; dashes show meanwhile
+  renderAccountRecovery();   // async likewise
+}
+
+// Stats strip is the way through to the Passport — the numbers are a summary of what is there.
+document.getElementById('acctStats')?.addEventListener('click', () => openAccountPanel('passport'));
+
+/* Add or change the recovery address. A prompt rather than an inline form: this is a rare,
+ * one-line action, and a field that sits in the sheet permanently would be visual weight spent
+ * on something most people touch once. */
+document.getElementById('acctEmailRow')?.addEventListener('click', async () => {
+  const note = document.getElementById('acctEmailNote');
+  const st = await recoveryStatus();
+  const entered = window.prompt(
+    st && st.email ? 'Change your recovery email:' : 'Email address for password resets:',
+    (st && st.email) || ''
+  );
+  if(entered === null) return;                       // cancelled
+  const email = entered.trim();
+  if(!email) return;
+  if(st && st.email === email.toLowerCase() && st.verified){
+    note.style.color = 'var(--muted)';
+    note.textContent = "That address is already confirmed.";
+    return;
+  }
+  note.style.color = 'var(--muted)';
+  note.textContent = 'Sending…';
+  const res = await saveRecoveryEmail(email.toLowerCase());
+  note.style.color = res.ok ? '#4ad07a' : '#f08a86';
+  note.textContent = res.ok ? 'Confirmation sent — check your inbox.' : res.reason;
+  if(res.ok) renderAccountRecovery();
+});
+
+/* Change password reuses the reset flow rather than asking for a new one in the sheet. The link
+ * goes to the confirmed address, which means a stolen phone with an unlocked session still
+ * cannot change the password — worth the extra step. */
+document.getElementById('acctPasswordRow')?.addEventListener('click', async () => {
+  const note = document.getElementById('acctPasswordNote');
+  const st = await recoveryStatus();
+  if(!st || !st.email || !st.verified){
+    note.style.color = '#f0a93a';
+    note.textContent = 'Confirm a recovery email first — that is where the link goes.';
+    return;
+  }
+  note.style.color = 'var(--muted)';
+  note.textContent = 'Sending…';
+  await requestPasswordReset(displayNameFor() || '');
+  note.style.color = '#4ad07a';
+  note.textContent = 'Link sent to ' + st.email + '.';
+});
+
+document.getElementById('acctThemeLight')?.addEventListener('click', () => {
+  localStorage.setItem('theme', 'light'); applyTheme('light');
+});
+document.getElementById('acctThemeDark')?.addEventListener('click', () => {
+  localStorage.setItem('theme', 'dark'); applyTheme('dark');
 });
 
 document.getElementById('logOutBtn').addEventListener('click', async () => {

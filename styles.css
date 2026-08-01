@@ -460,12 +460,10 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
 }
   .list-item:active{background:rgba(255,255,255,.08);
 }
-  #accountPanel{
-    position:absolute;inset:0;z-index:1500;background:var(--charcoal);display:none;
-    flex-direction:column;
-}
-  #accountPanel.show{display:flex;
-}
+  /* #accountPanel itself is defined once, in the account-sheet block at the end of this file.
+     The full-screen rule that used to live here contradicted it — same specificity, so only the
+     source order decided which won, and a later reorder or a minifier would have silently put
+     the panel back to full-screen. */
   #accountClose{background:none;border:none;color:var(--cream);font-size:22px;cursor:pointer;
 }
 
@@ -757,3 +755,170 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
 /* Unified drawer collapse — metro city rows */
 .metro-city{padding:0;
 }
+
+  /* ============================================================
+     Account panel — bottom sheet (v2.18)
+     ============================================================
+     Was position:absolute;inset:0 — a full-screen page whatever it held. Logged in that meant
+     one line of text and a button over ~1500px of empty navy, which reads as a broken screen
+     rather than a short one.
+
+     Now a sheet: it grows to its content and stops. The same element still serves Passport,
+     which is long, so the cap is what keeps that scrollable instead of running off-screen.
+
+     Colours come from the existing theme variables (--charcoal is already the navy) rather than
+     a parallel palette, so light mode keeps working without a second set of overrides. */
+  #accountPanel{
+    position:fixed; inset:auto 0 0 0; z-index:1500; display:none;
+    flex-direction:column;
+    /* Grows with content; the cap is what makes Passport scroll rather than overflow. */
+    max-height:min(88dvh, 900px);
+    background:var(--charcoal);
+    border-top:1px solid var(--panel-border);
+    border-radius:18px 18px 0 0;
+    box-shadow:0 -18px 48px rgba(0,0,0,.45);
+    /* Home indicator on iPhone, and the notch in landscape. */
+    padding-bottom:env(safe-area-inset-bottom);
+    padding-left:env(safe-area-inset-left);
+    padding-right:env(safe-area-inset-right);
+}
+  #accountPanel.show{ display:flex; }
+  @media (prefers-reduced-motion: no-preference){
+    #accountPanel.show{ animation:acctSheetUp .22s cubic-bezier(.32,.72,0,1); }
+    @keyframes acctSheetUp{ from{ transform:translateY(12px); opacity:.6; } }
+}
+  /* Wide screens: a sheet pinned to the full width of a desktop browser looks like a mistake. */
+  @media (min-width:720px){
+    #accountPanel{
+      inset:auto 0 auto 50%; top:50%; transform:translate(-50%,-50%);
+      width:min(460px, 92vw); border-radius:18px; border:1px solid var(--panel-border);
+    }
+}
+
+  /* Grab handle. Purely an affordance — it says "this is a sheet, it can be dismissed" before
+     anyone has to find the ✕. Hidden on desktop where the sheet is a centred dialog. */
+  .acct-grab{ display:flex; justify-content:center; padding:8px 0 2px; flex:none; }
+  .acct-grab i{ display:block; width:38px; height:4px; border-radius:2px; background:var(--panel-border); }
+  @media (min-width:720px){ .acct-grab{ display:none; } }
+
+  /* ---- Identity ---- */
+  .acct-id{ display:flex; align-items:center; gap:12px; padding:4px 0 16px; }
+  .acct-avatar{
+    width:46px; height:46px; border-radius:50%; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--accent); color:#04211f;
+    font-family:var(--font-display); font-weight:700; font-size:19px; letter-spacing:.01em;
+}
+  .acct-name{ font-family:var(--font-display); font-weight:600; font-size:19px; color:var(--cream); line-height:1.15; }
+  .acct-since{ font-size:12px; color:var(--muted); margin-top:2px; }
+
+  /* ---- Stats strip → Passport ---- */
+  .acct-stats{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:2px;
+    width:100%; padding:0; margin:0 0 4px;
+    background:transparent; border:1px solid var(--panel-border); border-radius:12px;
+    overflow:hidden; cursor:pointer; text-align:left; color:inherit;
+    font:inherit; -webkit-tap-highlight-color:transparent;
+}
+  .acct-stats:hover{ border-color:var(--accent); }
+  .acct-stats:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; }
+  .acct-stat{ padding:12px 8px; text-align:center; background:var(--panel-bg); }
+  .acct-stat b{
+    display:block; font-family:var(--font-display); font-weight:600;
+    font-size:22px; line-height:1.1; color:var(--cream);
+}
+  .acct-stat span{
+    display:block; margin-top:3px; font-size:9.5px; font-weight:800;
+    letter-spacing:.09em; text-transform:uppercase; color:var(--muted);
+}
+  .acct-stats-more{
+    display:block; text-align:right; font-size:12px; color:var(--accent);
+    margin:0 2px 18px; font-weight:700;
+}
+
+  /* ---- Enamel placard ----
+     The one deliberate flourish: section labels set like the engraved plate on a restroom door.
+     Small, letterspaced display type sitting on a teal keyline. Everything else in the sheet
+     stays plain so this is the thing that carries the character. */
+  .acct-plate{
+    display:flex; align-items:center; gap:10px;
+    margin:0 0 10px; padding-top:14px;
+    border-top:1px solid var(--panel-border);
+}
+  .acct-plate span{
+    font-family:var(--font-display); font-weight:600;
+    font-size:10.5px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--accent); white-space:nowrap;
+}
+  .acct-plate i{ flex:1; height:1px; background:var(--accent); opacity:.28; }
+
+  /* ---- Rows ---- */
+  .acct-row{
+    display:flex; align-items:center; gap:10px; justify-content:space-between;
+    width:100%; min-height:44px; padding:9px 12px; margin-bottom:8px;
+    background:var(--panel-bg); border:1px solid var(--panel-border); border-radius:11px;
+    color:var(--cream); font:inherit; font-size:14px; text-align:left; cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+}
+  .acct-row:hover{ border-color:var(--accent); }
+  .acct-row:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; }
+  .acct-row-static{ cursor:default; }
+  .acct-row-static:hover{ border-color:var(--panel-border); }
+  .acct-row-main{ min-width:0; flex:1; }
+  .acct-row-label{ font-weight:600; }
+  .acct-row-sub{
+    font-size:12px; color:var(--muted); margin-top:2px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+  .acct-row-go{ color:var(--muted); flex:none; font-size:16px; }
+
+  /* Status chip. Never colour alone — the icon and the word each carry the state, so it still
+     reads on a mono display or to someone who cannot separate the two greens. */
+  .acct-chip{
+    flex:none; display:inline-flex; align-items:center; gap:4px;
+    padding:3px 9px; border-radius:999px;
+    font-size:11px; font-weight:800; letter-spacing:.03em; white-space:nowrap;
+}
+  .acct-chip.ok{ background:rgba(0,194,68,.14); color:#4ad07a; border:1px solid rgba(0,194,68,.35); }
+  .acct-chip.wait{ background:rgba(245,158,11,.14); color:#f0a93a; border:1px solid rgba(245,158,11,.38); }
+  .acct-chip.none{ background:rgba(229,57,53,.13); color:#f08a86; border:1px solid rgba(229,57,53,.35); }
+
+  /* ---- Theme toggle ---- */
+  .acct-seg{ display:flex; gap:4px; flex:none; background:rgba(255,255,255,.05); border-radius:9px; padding:3px; }
+  .acct-seg button{
+    min-height:32px; padding:5px 13px; border:0; border-radius:7px; background:transparent;
+    color:var(--muted); font:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
+}
+  .acct-seg button[aria-pressed="true"]{ background:var(--accent); color:#04211f; }
+  .acct-seg button:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; }
+
+  /* ---- Log out ----
+     Deliberately quiet. It was a full-width red-outlined button, which made the loudest thing on
+     the screen the one action nobody opens this panel to perform. */
+  .acct-signout{
+    display:block; width:100%; min-height:44px; margin:18px 0 4px;
+    background:none; border:0; color:var(--muted);
+    font:inherit; font-size:14px; font-weight:700; cursor:pointer;
+}
+  .acct-signout:hover{ color:#f08a86; }
+  .acct-signout:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; border-radius:8px; }
+
+  /* Inline feedback under a row — result of a resend, a password email, an error. */
+  .acct-note{ font-size:12px; margin:-2px 2px 12px; min-height:1em; }
+
+  /* The sheet's scroll container.
+     It used to carry flex:1, which stretched it to fill a panel that was itself full-screen —
+     the two together are why one button rendered over a screenful of empty navy. It now takes
+     its height from its content, and only scrolls once #accountPanel's max-height caps it, which
+     is what Passport needs and Account never reaches. */
+  .acct-body{ min-height:0; }
+
+  /* Header inside the sheet: the grab handle already reads as the top edge, so the heavy 2px
+     accent rule beneath it becomes a second competing divider. A hairline is enough. */
+  #accountPanel #accountHeader{
+    border-bottom:1px solid var(--panel-border);
+    padding:6px 16px 12px;
+    font-family:var(--font-display); font-weight:600; font-size:17px;
+}
+  #accountPanel #accountClose{ min-width:44px; min-height:44px; }
+  #accountPanel #accountClose:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; border-radius:8px; }
