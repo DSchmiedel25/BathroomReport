@@ -1889,6 +1889,41 @@ function metroPopupHtml(loc, agg, myVote){
 
 /* Reference into the sprite in index.html. Every icon in one place, so a shape can be redrawn
  * once and every use follows. */
+/* Build-consistency check.
+ *
+ * app.js, index.html and the stylesheets have to be uploaded together, and when they are not the
+ * result is silent: the icon helper emits <use href="#i-compass"> against a sprite that is not in
+ * an older index.html, so every icon renders as empty space with no console error and no layout
+ * break. A popup looks subtly wrong rather than obviously broken, and the only visible symptom is
+ * a version stamp nobody thinks to check.
+ *
+ * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
+ * say so where it will actually be seen instead of leaving it to be discovered by eye. */
+const BUILD = 'v2.19.1';
+(function checkBuild(){
+  try{
+    const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
+    const sprite = !!document.querySelector('#i-compass');
+    if(stamped === BUILD && sprite) return;
+    const why = [];
+    if(stamped !== BUILD) why.push(`index.html is ${stamped}, app.js is ${BUILD}`);
+    if(!sprite) why.push('the icon sprite is missing from index.html, so icons will render blank');
+    console.error('[BathroomReport] Files are out of step — ' + why.join('; ') +
+      '. Upload index.html, app.js, styles.css, shell.css and sw.js together.');
+    // Visible to an admin on the page itself, not only in a console nobody has open on a phone.
+    window.addEventListener('DOMContentLoaded', () => {
+      const bar = document.createElement('div');
+      bar.setAttribute('role', 'status');
+      bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#c62828;' +
+        'color:#fff;font:600 12px/1.4 system-ui,sans-serif;padding:8px 12px;text-align:center;' +
+        'padding-bottom:calc(8px + env(safe-area-inset-bottom));';
+      bar.textContent = 'Build mismatch: ' + why.join('; ') + '. Tap to dismiss.';
+      bar.addEventListener('click', () => bar.remove());
+      document.body.appendChild(bar);
+    });
+  }catch(e){ /* a diagnostic must never be the thing that breaks the page */ }
+})();
+
 function ico(name, cls){
   return `<svg class="ico${cls ? ' ' + cls : ''}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
 }
