@@ -1904,7 +1904,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.22.0';
+const BUILD = 'v2.22.1';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -4881,7 +4881,20 @@ async function buildListView(){
     const status = open===true ? '🟢 Open'
       : open===false ? '🔴 Closed'
       : (todayHrsString(loc) ? '🕐 ' + formatHrsDisplay(loc) : '⚪ Hours unavailable');
-    return `<div class="list-item" data-locid="${loc.id}"><div class="list-item-name">${escapeHtml(loc.n)}</div><div class="list-item-addr">${escapeHtml(loc.addr)}</div><div class="list-item-meta"><span>📍 ${dist.toFixed(1)} mi</span><span>${status}</span></div></div>`;
+    /* The chain, which the list never showed.
+     *
+     * Rows rendered loc.n only — the LOCATION name ("Watervliet Shaker Rd, Colonie"). "Stewart's
+     * Shops" and "Cumberland Farms" appeared purely because that happens to be the name field on
+     * those records, so the list looked inconsistent when it was actually uniform. Scanning for a
+     * brand you trust is half of what this list is for.
+     *
+     * Same brand-coloured chip the popup uses. Omitted entirely where there is no chain — public
+     * restrooms and metro entries — rather than shown empty. */
+    const ch = CHAIN_REGISTRY[loc.chain || ''];
+    const chainChip = ch
+      ? `<span class="list-item-chain" style="background:${ch.color};color:${ch.textColor};">${escapeHtml(ch.name)}</span>`
+      : '';
+    return `<div class="list-item" data-locid="${loc.id}">${chainChip}<div class="list-item-name">${escapeHtml(loc.n)}</div><div class="list-item-addr">${escapeHtml(loc.addr || '')}</div><div class="list-item-meta"><span>📍 ${dist.toFixed(1)} mi</span><span>${status}</span></div></div>`;
   }).join('');
 }
 document.getElementById('listViewToggle').addEventListener('click',()=>{buildListView();document.getElementById('listViewPanel').classList.add('show');document.body.classList.add('list-open');});
