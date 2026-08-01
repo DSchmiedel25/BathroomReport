@@ -31,7 +31,7 @@ function fsId(id) {
  *
  * Keys are not enumerated here on purpose: whatever keys appear in a vote's amenities /
  * storeFeatures maps get tallied, so adding an amenity in app.js needs no function redeploy.
- * Values are compared as strings; 'yes' and 'no' are the only ones that move a counter. */
+ * Values are compared as strings; see COUNTED_ANSWERS below for the ones that move a counter. */
 /* The amenity and store-feature keys this function will tally, kept DISJOINT.
  *
  * They used to be one flat set checked against both maps, so a vote carrying accessible:'yes' in
@@ -49,6 +49,23 @@ const AMENITY_KEYS = new Set([
   ...AMENITY_KEYS_BY_FIELD.amenities,
   ...AMENITY_KEYS_BY_FIELD.storeFeatures,
 ]);
+
+/* Answer values that move a counter.
+ *
+ * This used to be a literal `sv !== 'yes' && sv !== 'no'` test, which silently discarded every
+ * restroomType answer — that amenity is multi-state ('single' / 'multiple'), not boolean. The key
+ * was allowlisted above and the votes were being written and stored correctly, but nothing ever
+ * reached aggregates/{locId}.amen, so the client's tally stayed {yes:0,no:0} forever. Downstream
+ * that meant the setup answer could never confirm, never render a badge, and never retire from
+ * the question rotation, so it was re-asked to everyone on every visit indefinitely.
+ *
+ * Multi-state counts live on the SAME cell as yes/no ({yes,no,single,multiple}), so readers that
+ * only know about yes/no are unaffected. This list is bounded on purpose: `cell[sv]` is a
+ * client-influenced key, and an open-ended set would let a vote grow the aggregate document.
+ * It must stay in sync with the value allowlist in firestore.rules and the `states` arrays in
+ * app.js. 'unknown' and '' are excluded — they are not answers (the app deliberately does not
+ * persist "Not sure"; it only bumps that person's local not-sure counter). */
+const COUNTED_ANSWERS = new Set(['yes', 'no', 'single', 'multiple']);
 
 /* Reduce every vote for one location into the exact aggregate.
  *
@@ -82,9 +99,9 @@ function reduceVotes(docs) {
       for (const [key, val] of Object.entries(m)) {
         if (!AMENITY_KEYS_BY_FIELD[field].has(key)) continue;
         const sv = String(val);
-        if (sv !== 'yes' && sv !== 'no') continue;
+        if (!COUNTED_ANSWERS.has(sv)) continue;
         const cell = (out.amen[key] = out.amen[key] || { yes: 0, no: 0 });
-        cell[sv] += 1;
+        cell[sv] = (cell[sv] || 0) + 1;
       }
     }
   }
