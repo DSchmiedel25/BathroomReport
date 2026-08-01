@@ -991,3 +991,21 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
   .legend{ display:grid; grid-template-columns:auto 1fr; gap:9px 12px; align-items:center; margin:10px 0 4px; }
   .legend .ico{ width:19px; height:19px; color:var(--accent); }
   .legend b{ font-weight:600; font-size:13.5px; }
+
+  /* ============================================================
+     Popup corrections after seeing it on device (v2.19.2)
+     ============================================================ */
+  /* Directions is the one primary action and should read that way. .popup-actions is a flex row
+     built for three buttons; with one child left in it, the button shrank to its label instead of
+     filling the width — which made the loudest action on the card the smallest thing on it. */
+  .popup-actions > .directions-btn{ flex:1 1 100%; justify-content:center; gap:8px; }
+  .popup-actions .btn{ display:inline-flex; align-items:center; justify-content:center; }
+
+  /* Placards bring their own keyline, and several sections already had a border-top of their own.
+     Together they drew two rules with dead space between them — the empty band between the last
+     confirmed badge and TIPS. The placard's line wins; the section's is removed. */
+  .tips-section{ border-top:none; padding-top:0; }
+  .community-section + .tips-section{ margin-top:0; }
+  /* Same double-framing inside the rating card: it has a border and a radius of its own, and the
+     placard added a rule across the top of it. Inside a framed card the label alone is enough. */
+  .rating-col .plate{ border-top:none; padding-top:0; margin-top:2px; }

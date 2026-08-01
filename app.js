@@ -753,10 +753,10 @@ function renderAmenityStepHtml(myVote, locId){
   const cursor = (locId != null && visitCursor[locId]) || 0;
 
   if(cursor >= list.length){
-    return `<div class="amenity-complete">🚽 That's everything — thanks for the intel!</div>`;
+    return `<div class="amenity-complete">${ico('check')} That's everything — thanks for the intel!</div>`;
   }
   const a = amenityDefFor(list[cursor]);
-  if(!a){ return `<div class="amenity-complete">🚽 That's everything — thanks for the intel!</div>`; }
+  if(!a){ return `<div class="amenity-complete">${ico('check')} That's everything — thanks for the intel!</div>`; }
   const states = a.states || ['unknown', 'yes', 'no'];
   const buttons = states.map(s =>
     `<button type="button" class="amenity-answer-btn" data-key="${a.key}" data-value="${s}">${amenityAnswerIcon(a, s)} ${amenityStateLabel(a, s)}</button>`
@@ -1068,7 +1068,7 @@ function renderStoreFeatureStepHtml(myVote){
   const mine = myVote.storeFeatures || {};
   const idx = STORE_FEATURES.findIndex(a => mine[a.key] === undefined);
   if(idx === -1){
-    return `<div class="amenity-complete">🏪 That's everything — thanks for the intel!</div>`;
+    return `<div class="amenity-complete">${ico('check')} That's everything — thanks for the intel!</div>`;
   }
   const a = STORE_FEATURES[idx];
   const states = a.states || ['unknown', 'yes', 'no'];
@@ -1899,7 +1899,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.19.1';
+const BUILD = 'v2.19.2';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
