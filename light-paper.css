@@ -1,0 +1,135 @@
+/* ============================================================
+   Light mode: warm paper surface + hue-corrected teal
+   Append to the END of shell.css (it loads last, so this wins).
+
+   Why the teal changes at all:
+   #2EA1AA is tuned against #0E0F12. Dropped onto warm paper, two
+   things go wrong. Simultaneous contrast makes a cyan read greener
+   when the surround is warm, so the logo teal drifts olive. And its
+   contrast against paper is 2.77:1 — below the 3:1 floor for UI
+   shapes and well below 4.5:1 for text. It was already marginal on
+   white (3.09:1); warm paper pushes it under.
+
+   So light mode splits one token into two: a fill teal nudged
+   bluer to cancel the warm surround, and a deeper teal for text.
+   Dark mode is untouched.
+   ============================================================ */
+
+html[data-theme="light"]{
+  /* ---- surfaces ---- */
+  --shell-bg:      #EFEBE3;   /* behind the map chrome */
+  --shell-chrome:  #F5F2EC;   /* panels, drawer, header — was #ffffff */
+  --shell-chrome2: #EAE7E0;   /* inputs, pressed states — was #eceef1 */
+  --shell-line:    rgba(58, 48, 34, .12);
+  --shell-ink:     #14161A;
+  --shell-muted:   #6B6660;   /* warm gray; 5.09:1 on paper */
+  --shell-shadow:  0 12px 40px rgba(60, 50, 35, .18);
+
+  /* ---- teal, corrected for a warm surround ---- */
+  --accent:        #2B98A6;   /* fills: 3.06:1 on paper, reads as the same teal */
+  --accent-deep:   #237E8A;
+  --accent-text:   #1B6F78;   /* text/icons: 5.23:1 on paper */
+  --accent-ink:    #04211F;   /* on accent fills: 4.95:1 — keep, don't use white */
+  --grain:         .035;
+}
+
+/* ------------------------------------------------------------
+   Grain. Inline SVG turbulence — no asset, no request, tiles at
+   any size. 0.035 is the ceiling before it competes with the map.
+   ------------------------------------------------------------ */
+html[data-theme="light"] #appDrawer,
+html[data-theme="light"] #header,
+html[data-theme="light"] .hiw-card{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E");
+  background-repeat:repeat;
+}
+
+/* ------------------------------------------------------------
+   Text uses of the accent get the deeper value. Fills keep
+   --accent. These are the spots shell.css sets as color:.
+   ------------------------------------------------------------ */
+html[data-theme="light"] #headerBrand h1 .wm-accent,
+html[data-theme="light"] #appDrawer .d-brand b .wm-accent,
+html[data-theme="light"] #appDrawer .d-tagline i,
+html[data-theme="light"] .tag-verb,
+html[data-theme="light"] .d-plate,
+html[data-theme="light"] #communityBanner a,
+html[data-theme="light"] .hiw-body h3,
+html[data-theme="light"] .hiw-body a{
+  color:var(--accent-text);
+}
+
+/* Outlined controls: deeper border and label so they don't wash out */
+html[data-theme="light"] #accountToggle,
+html[data-theme="light"] #appDrawer .d-city-jump{
+  border-color:var(--accent-text) !important;
+  color:var(--accent-text) !important;
+}
+
+/* The hairline in the section plate was tuned for a dark ground */
+html[data-theme="light"] .d-plate i{ background:var(--accent-text); opacity:.30; }
+
+/* ------------------------------------------------------------
+   Two spots hardcode white on the accent fill. That's 3.42:1 —
+   fails. --accent-ink is the near-black the rest of the app
+   already uses on teal, and clears 4.95:1.
+   ------------------------------------------------------------ */
+html[data-theme="light"] #appDrawer .d-city-jump.sel,
+html[data-theme="light"] #appDrawer .d-gift{
+  color:var(--accent-ink) !important;
+}
+
+/* ------------------------------------------------------------
+   Toggles. The ON track was a 30% accent wash tuned against dark;
+   on paper it needs more presence or it looks disabled.
+   ------------------------------------------------------------ */
+html[data-theme="light"] #appDrawer .d-switch{
+  background:var(--shell-chrome2);
+  border:1px solid var(--shell-line);
+}
+html[data-theme="light"] #appDrawer .d-switch b{ background:#6B6660; }
+html[data-theme="light"] #appDrawer .d-toggle.on .d-switch{
+  background:color-mix(in srgb, var(--accent) 42%, transparent);
+  border-color:color-mix(in srgb, var(--accent) 55%, transparent);
+}
+html[data-theme="light"] #appDrawer .d-toggle.on .d-switch b{ background:var(--accent-deep); }
+
+/* ------------------------------------------------------------
+   Cast shadow. #appDrawer only had a 1px right border, so it sat
+   flush against the map instead of over it — and a shadow does
+   more to sell "layer above" than the texture does.
+   Two layers: a tight one for the contact edge, a wide soft one
+   for the lift. Warm-tinted, because a neutral black shadow on
+   warm paper reads as grime.
+   ------------------------------------------------------------ */
+html[data-theme="light"] #appDrawer{
+  box-shadow:
+    2px 0 4px rgba(60, 50, 35, .10),
+    12px 0 40px rgba(60, 50, 35, .20);
+  border-right:1px solid rgba(58, 48, 34, .14);
+}
+
+/* Header sits on the map too; it was explicitly shadowless. */
+html[data-theme="light"] #header{
+  box-shadow:0 2px 14px rgba(60, 50, 35, .13) !important;
+}
+
+/* Scrim: warm it to match, or the dim behind the drawer goes cold. */
+html[data-theme="light"] #drawerScrim{
+  background:rgba(40, 33, 24, .38);
+}
+
+/* ------------------------------------------------------------
+   Escape hatches. Noise bands badly in forced-color modes and on
+   e-ink, and it's purely decorative.
+   ------------------------------------------------------------ */
+@media (forced-colors:active){
+  html[data-theme="light"] #appDrawer,
+  html[data-theme="light"] #header,
+  html[data-theme="light"] .hiw-card{ background-image:none; }
+}
+@media (prefers-reduced-transparency:reduce){
+  html[data-theme="light"] #appDrawer,
+  html[data-theme="light"] #header,
+  html[data-theme="light"] .hiw-card{ background-image:none; }
+}
