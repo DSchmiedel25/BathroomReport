@@ -791,11 +791,6 @@ function communityConfirmedBadges(loc, featureDefs, summary, skip){
   const conf = (loc && loc.conf) || {};
   return featureDefs.map(a => {
     if(skip && skip.includes(a.key)) return '';
-    // "Public restroom" is a TARGETED question (see restroomDoubted / visibleAmenityKeys). Its
-    // confirmed chip must stay scoped to doubted pins too: on a normal store it's noise, and a
-    // stale baked conf.hasRestroom (e.g. an early test vote from when the pin was still doubted)
-    // must not resurface it everywhere. Mirrors the question gate so display == askability.
-    if(a.key === 'hasRestroom' && !restroomDoubted(loc)) return '';
     const x = (summary && summary[a.key]) || {yes:0,no:0};
     if(isMultiState(a)){
       // Multi-state badges name the ANSWER ("Single"), not the amenity — "Restroom setup ⭐"
@@ -1767,7 +1762,7 @@ function metroPopupHtml(loc, agg, myVote){
     <div class="popup-actions">
       <button class="btn btn-primary directions-btn" id="directions-btn-${loc.id}" data-lat="${loc.lat}" data-lng="${loc.lng}">🧭 Directions</button>
       <button class="btn btn-secondary btn-icon-only share-btn" title="Share" data-shareurl="${shareUrl}" data-sharename="${(loc.n||'').replace(/"/g,'&quot;')}">🔗</button>
-      ${isLoggedIn() ? `<button class="btn btn-danger btn-icon-only report-toggle-btn" title="Report an issue" id="report-toggle-${loc.id}">🚩</button>` : ''}
+      ${reportButtonHtml(loc)}
     </div>
     <div class="report-section" id="report-section-${loc.id}" style="display:none;">
       <div class="report-heading">Report a problem with this listing</div>
@@ -1867,7 +1862,7 @@ function popupHtml(loc, agg, myVote){
     <div class="popup-actions">
       <button class="btn btn-primary directions-btn" id="directions-btn-${loc.id}" data-lat="${loc.lat}" data-lng="${loc.lng}">🧭 Directions</button>
       <button class="btn btn-secondary btn-icon-only share-btn" title="Share" data-shareurl="${shareUrl}" data-sharename="${loc.n.replace(/"/g,'&quot;')}">🔗</button>
-      ${isLoggedIn() ? `<button class="btn btn-danger btn-icon-only report-toggle-btn" title="Report an issue" id="report-toggle-${loc.id}">🚩</button>` : ''}
+      ${reportButtonHtml(loc)}
     </div>
     <div class="report-section" id="report-section-${loc.id}" style="display:none;">
       <div class="report-heading">Report a problem with this listing</div>
@@ -2033,16 +2028,108 @@ function attachShareHandler(loc){
   });
 }
 
+/* One live report per person per location.
+ *
+ * The popup used to hide the category buttons after a send, which lasted exactly as long as the
+ * popup stayed open — reopening it gave the buttons back, and addDoc() happily wrote another
+ * document. Nothing server-side objected, so one person could fill the queue with the same
+ * complaint about the same store.
+ *
+ * The id is now derived from the location and the reporter, and the write is a create, which
+ * Firestore refuses when the document already exists. The rules require that shape too, so the
+ * limit holds whatever the client does. Resolving or dismissing in FlushPanel archives the
+ * report and deletes the live doc, which is what frees the slot for a fresh one. */
+function reportDocId(locId, uid){ return fsId(locId) + '_' + uid; }
+
+/* The flag button, or the pending state where this person already has a live report here.
+ * Both popups render it through this so the two stay in step. */
+function reportPendingHtml(loc){
+  return `<span class="report-pending" id="report-pending-${loc.id}" title="Your report is with a moderator" role="status">🚩 Reported</span>`;
+}
+function reportButtonHtml(loc){
+  if(!isLoggedIn()) return '';
+  if(hasReportedLocally(loc.id)) return reportPendingHtml(loc);
+  return `<button class="btn btn-danger btn-icon-only report-toggle-btn" title="Report an issue" aria-label="Report a problem with this location" id="report-toggle-${loc.id}">🚩</button>`;
+}
+
+/* Local memory of what this person has already reported. UI hint only — it decides whether the
+ * popup offers the flag button or says "under review", and it is deliberately NOT the thing that
+ * enforces the limit. Clearing site data resets it; the create then fails on the server and the
+ * popup corrects itself. */
+const REPORTED_KEY = 'reportedLocations';
+function reportedLocal(){
+  try{ return JSON.parse(localStorage.getItem(REPORTED_KEY) || '{}') || {}; }catch(e){ return {}; }
+}
+function hasReportedLocally(locId){ return !!reportedLocal()[locId]; }
+function markReportedLocally(locId, on){
+  try{
+    const m = reportedLocal();
+    if(on) m[locId] = Date.now(); else delete m[locId];
+    localStorage.setItem(REPORTED_KEY, JSON.stringify(m));
+  }catch(e){ /* private mode / quota — the server limit still holds, so this is cosmetic */ }
+}
+
+/* Is this person muted from reporting right now?
+ *
+ * Read at SUBMIT time, never on page load. Almost nobody reports in a given session, and a
+ * per-load check would spend a document read on every visitor to catch the rare muted one.
+ * reporters/{uid} only exists for people who have been marked for spam or muted by hand, so for
+ * everyone else this is a miss on a document that was never created.
+ *
+ * Fails OPEN. A network blip must not silently discard a good report; the worst case is one
+ * report from a muted person landing in a queue that is being reviewed by hand anyway. */
+async function reportMuteState(uid){
+  try{
+    const {db, doc, getDoc} = await fb();
+    const snap = await getDoc(doc(db, 'reporters', uid));
+    if(!snap.exists()) return { muted: false };
+    const d = snap.data() || {};
+    const until = typeof d.mutedUntil === 'number' ? d.mutedUntil : 0;
+    // 0 with a mute on record means indefinite; otherwise it is an expiry.
+    const muted = d.muted === true ? (until === 0 || until > Date.now()) : false;
+    return { muted, until };
+  }catch(e){ return { muted: false }; }
+}
+
+/* Count an attempt made while muted.
+ *
+ * Client-written, so treat it as a signal rather than evidence: it counts the person who keeps
+ * tapping the button, not one who bypasses the app. The rules let an owner increment this single
+ * field and nothing else on their own record. Best-effort — a failure here must not change what
+ * the reporter sees, since the whole point is that a muted submit looks identical to a real one. */
+async function countBlockedAttempt(uid){
+  try{
+    const {db, doc, setDoc, increment} = await fb();
+    await setDoc(doc(db, 'reporters', uid), { blockedAttempts: increment(1) }, { merge: true });
+  }catch(e){ /* deliberately silent */ }
+}
+
 // Report a wrong/closed/incorrect pin — logs to Firestore (visible in FlushPanel) AND opens an email
 async function logReport(loc, reason){
   try{
-    const {db, collection, addDoc} = await fb();
+    const uid = (window.__currentUser && window.__currentUser.uid) || '';
+    if(!uid) return false;   // the flag button only renders for signed-in people
+
+    /* A muted person sees exactly what a successful reporter sees. Telling them would teach a
+     * spammer to make a fresh account; the cost is that a false positive is invisible to them,
+     * which is why blockedAttempts is surfaced in FlushPanel for you to notice instead. */
+    const mute = await reportMuteState(uid);
+    if(mute.muted){
+      await countBlockedAttempt(uid);
+      markReportedLocally(loc.id, true);   // keep the fiction consistent when the popup reopens
+      return true;
+    }
+
+    const {db, doc, setDoc} = await fb();
     const chainKey = loc.chain || DEFAULT_CHAIN_KEY;
     // Capture enough to identify and fix the exact stop from FlushPanel — including
     // coordinates, which pin down the location even when the street address is blank
     // (many imported stops have no address yet). None of these are moderator-only
     // fields, so the write still satisfies the reports create rules.
-    await addDoc(collection(db, 'reports'), {
+    /* reporterName is denormalised on purpose. FlushPanel shows who reported without a lookup per
+     * card, and it is the handle the person chose to be known by — the raw uid stays on the doc
+     * for identity, but a moderator should be reading a name. */
+    await setDoc(doc(db, 'reports', reportDocId(loc.id, uid)), {
       locId: loc.id,
       locName: loc.n,
       addr: loc.addr || null,
@@ -2053,12 +2140,26 @@ async function logReport(loc, reason){
       state: (loc.state ?? (loc.address && loc.address.state)) ?? null,
       lat: loc.lat,
       lng: loc.lng,
-      reporterId: (window.__currentUser && window.__currentUser.uid) || getClientId(),
+      reporterId: uid,
+      reporterName: displayNameFor() || null,
       reason: reason,
       ts: Date.now()
-    });
+    }, { merge: false });
+    markReportedLocally(loc.id, true);
     return true;
   }catch(e){
+    /* Two very different failures land here and must not read the same.
+     *
+     * A rules rejection means a live report from this person already exists (the write targets an
+     * existing document, which the create-only rule refuses) — the local hint was cleared, or
+     * they are on a second device. That is not an error to them, so record it and say so.
+     *
+     * Anything else is a real failure — offline, quota, an outage — and telling someone their
+     * report is filed when it is not is the worst outcome here, so those still surface. */
+    if(e && e.code === 'permission-denied'){
+      markReportedLocally(loc.id, true);
+      return 'duplicate';
+    }
     return false;
   }
 }
@@ -2115,12 +2216,23 @@ function attachReportHandler(loc){
 
   const send = async (reason) => {
     if(note){ note.style.color=''; note.textContent = 'Sending…'; }
+    // true = filed, 'duplicate' = one is already open for this person here, false = real failure.
     const sent = await logReport(loc, reason);
     if(note){
       note.style.color = sent ? '#2f6b3c' : '#c62828';
-      note.textContent = sent ? 'Report sent — thank you!' : "Couldn't send — check your connection and try again.";
+      note.textContent = sent === 'duplicate'
+        ? "You've already reported this one — it's still being reviewed."
+        : sent ? 'Report sent — thank you!'
+        : "Couldn't send — check your connection and try again.";
     }
-    if(sent){ newCats.style.display='none'; if(otherRow) otherRow.style.display='none'; }
+    if(sent){
+      newCats.style.display='none';
+      if(otherRow) otherRow.style.display='none';
+      // Replace the flag button with the pending state, so closing and reopening the popup shows
+      // the same thing rather than re-offering a report that cannot be filed.
+      const flag = document.getElementById('report-toggle-' + loc.id);
+      if(flag) flag.outerHTML = reportPendingHtml(loc);
+    }
   };
 
   // Category buttons: a tap sends immediately, except "Other" which reveals the free-text row.

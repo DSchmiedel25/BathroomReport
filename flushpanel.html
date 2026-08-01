@@ -159,6 +159,22 @@
   .mini.fix{background:rgba(67,198,203,.13); color:var(--accent); border-color:rgba(67,198,203,.3)}
   .mini.resolve{background:rgba(87,200,145,.13); color:#7ee0ad; border-color:rgba(87,200,145,.28)}
   .mini.dismiss{background:rgba(145,166,187,.1); color:#bac6d1}
+  /* Helpful / Spam. `.on` marks the active verdict — aria-pressed carries the same state, so it
+     is never colour alone. */
+  .mini.judge{background:rgba(145,166,187,.08); color:#bac6d1}
+  .mini.judge.on{background:rgba(87,200,145,.18); color:#7ee0ad; border-color:rgba(87,200,145,.4)}
+  .mini.judge.spam.on{background:rgba(229,57,53,.18); color:#ff9b98; border-color:rgba(229,57,53,.42)}
+
+  /* Who filed it. The handle reads first; the raw uid sits under it for identity, small enough
+     not to compete but selectable when you need to match it against a reporter record. */
+  .reporter{margin:8px 0 2px; padding:8px 10px; border:1px solid var(--line); border-radius:9px; background:rgba(255,255,255,.02)}
+  .reporter-name{font-size:13px; font-weight:700; color:#dce7ef}
+  .reporter-uid{font-size:11px; color:#8b98a5; margin-top:2px; word-break:break-all;
+    font-family:ui-monospace,SFMono-Regular,monospace; user-select:all}
+  .reporter-stats{font-size:11.5px; color:#a9b6c3; margin-top:5px}
+  .muted-name{color:#7d8894; font-style:italic; font-weight:400}
+  .spam-count{color:#ff9b98}
+  .muted-flag{color:#ffc46b}
   .mini.reopen{background:rgba(243,189,99,.12); color:var(--warning)}
   .mini.danger{background:rgba(239,91,99,.12); color:#ff8f95; border-color:rgba(239,91,99,.24)}
   .btn.danger{background:rgba(239,91,99,.14); color:#ff8f95; border-color:rgba(239,91,99,.28)}
@@ -256,13 +272,14 @@
     <button class="nav-link active" data-page="reports">⚑ Reports <span class="nav-badge" id="badgeReports">0</span></button>
     <button class="nav-link" data-page="requests">＋ Location requests <span class="nav-badge" id="badgeRequests">0</span></button>
     <button class="nav-link" data-page="tips">💬 Tips</button>
+    <button class="nav-link" data-page="reporters">👤 Reporters <span class="nav-badge" id="badgeReporters">0</span></button>
     <button class="nav-link" data-page="addloc">➕ Add location</button>
     <button class="nav-link" data-page="bakereview">🕐 Bake review</button>
     <button class="nav-link" data-page="ovreview">📝 Override review</button>
     <div class="sidebar-foot">
       <div class="who" id="whoami"></div>
       <button class="btn full" id="signoutBtn">Sign out</button>
-      <div class="panel-version">FlushPanel v2.2 · 2026-07-20</div>
+      <div class="panel-version">FlushPanel v2.3 · 2026-07-31</div>
     </div>
   </aside>
 
@@ -288,6 +305,11 @@
         <button class="filter-tab" data-status="all">All</button>
       </div>
       <div id="reportsList"><div class="loading">Loading reports…</div></div>
+    </section>
+
+    <!-- Reporters (only people with a spam mark or an active mute) -->
+    <section class="page" data-view="reporters">
+      <div id="reportersList"><div class="loading">Loading…</div></div>
     </section>
 
     <!-- Requests -->
@@ -548,6 +570,34 @@ let reportFilter = 'pending';
 let currentFix = null; // { locId, effective }
 let currentUser = null;
 
+/* Reporter standing, keyed by uid. Only people who have been marked for spam or muted appear
+ * here, so this stays a handful of documents however large the user base gets — that is the
+ * whole reason it is a separate collection rather than a field on a per-user record. */
+let reporters = {};
+
+/* Resolved and dismissed reports live in reportHistory, not reports. Loaded lazily the first
+ * time one of those tabs is opened, so the default Pending view never pays for an archive that
+ * only grows. */
+let reportHistory = [];
+let historyLoaded = false;
+
+/* Auto-mute ladder, in days. Steps once per MUTE, not per spam mark: three spam marks earns the
+ * current tier, and the tier never resets. Past the end of the ladder nothing is applied
+ * automatically — a fifth offence is a decision about a person, so it is flagged for a human
+ * rather than escalated by a counter. */
+const MUTE_LADDER_DAYS = [3, 7, 14, 28];
+const SPAM_MARKS_PER_MUTE = 3;
+const DAY_MS = 86400000;
+
+function isMuted(rep){
+  if(!rep || rep.muted !== true) return false;
+  return !rep.mutedUntil || rep.mutedUntil > Date.now();
+}
+function muteLabel(rep){
+  if(!isMuted(rep)) return '';
+  return rep.mutedUntil ? 'muted until ' + new Date(rep.mutedUntil).toLocaleDateString() : 'muted indefinitely';
+}
+
 // ---------- Helpers ----------
 const $ = sel => document.querySelector(sel);
 const esc = s => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
@@ -625,8 +675,8 @@ document.querySelectorAll('.nav-link').forEach(btn => btn.addEventListener('clic
   const page = btn.dataset.page;
   document.querySelectorAll('.nav-link').forEach(n => n.classList.toggle('active', n === btn));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.dataset.view === page));
-  const _titles = { reports:'Reports', requests:'Location requests', tips:'Tips', addloc:'Add location', bakereview:'Bake review', ovreview:'Override review' };
-  const _subs = { reports:'Flags on existing locations.', requests:'Submissions for places that aren’t on the map yet.', tips:'Community tips — edit or remove.', addloc:'Generate a paste-ready record for a *-locations.js file — no Firestore.', bakereview:'Community-verified hours to review before the next bake.', ovreview:'What the next override bake would change.' };
+  const _titles = { reports:'Reports', reporters:'Reporters', requests:'Location requests', tips:'Tips', addloc:'Add location', bakereview:'Bake review', ovreview:'Override review' };
+  const _subs = { reports:'Flags on existing locations.', reporters:'People with a spam mark or an active mute. Empty is good.', requests:'Submissions for places that aren’t on the map yet.', tips:'Community tips — edit or remove.', addloc:'Generate a paste-ready record for a *-locations.js file — no Firestore.', bakereview:'Community-verified hours to review before the next bake.', ovreview:'What the next override bake would change.' };
   $('#pageTitle').textContent = _titles[page] || 'Reports';
   $('#pageSub').textContent = _subs[page] || '';
   if(page === 'tips') loadTips();
@@ -643,9 +693,11 @@ async function loadAll(){
   $('#refreshBtn').disabled = true;
   $('#globalError').classList.add('hidden');
   try{
-    const [repSnap, reqSnap] = await Promise.all([
+    // Third read is the reporters collection: flagged accounts only, so a few documents at most.
+    const [repSnap, reqSnap, rptrSnap] = await Promise.all([
       getDocs(collection(db, 'reports')),
-      getDocs(collection(db, 'missingReports'))
+      getDocs(collection(db, 'missingReports')),
+      getDocs(collection(db, 'reporters'))
     ]);
 
     allReports = [];
@@ -656,8 +708,15 @@ async function loadAll(){
     reqSnap.forEach(d => allRequests.push({ id: d.id, ...d.data() }));
     allRequests.sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
+    reporters = {};
+    rptrSnap.forEach(d => { reporters[d.id] = { uid: d.id, ...d.data() }; });
+
+    historyLoaded = false;   // a refresh should re-fetch the archive if a history tab is open
+    reportHistory = [];
+
     renderReports();
     renderRequests();
+    renderReporters();
     updateBadges();
   }catch(e){
     console.error('Load failed', e);
@@ -677,16 +736,74 @@ function updateBadges(){
 
 // ================= REPORTS =================
 document.querySelectorAll('#reportFilters .filter-tab').forEach(tab =>
-  tab.addEventListener('click', () => {
+  tab.addEventListener('click', async () => {
     document.querySelectorAll('#reportFilters .filter-tab').forEach(t => t.classList.toggle('active', t === tab));
     reportFilter = tab.dataset.status;
+    // The archive is only read when a tab that needs it is opened, and only once per session —
+    // it grows without bound, so the default Pending view must never pay for it.
+    if(reportFilter !== 'pending' && !historyLoaded){
+      $('#reportsList').innerHTML = '<div class="loading">Loading archive…</div>';
+      try{
+        const snap = await getDocs(collection(db, 'reportHistory'));
+        reportHistory = [];
+        snap.forEach(d => reportHistory.push({ id: d.id, ...d.data() }));
+        reportHistory.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+        historyLoaded = true;
+      }catch(e){
+        console.error('history load failed', e);
+        $('#reportsList').innerHTML = '<div class="empty">Could not load the archive.</div>';
+        return;
+      }
+    }
     renderReports();
   })
 );
 
+/* How many reports this person has on record, and how many were judged spam.
+ *
+ * Counted in memory from what is already loaded — no per-card reads. The report count spans the
+ * live queue and the archive when the archive happens to be loaded, so it reads as "at least
+ * this many"; the spam count comes off the reporter record and is always exact. */
+function reporterStats(uid){
+  if(!uid) return { reports: 0, spam: 0, helpful: 0, rep: null };
+  const rep = reporters[uid] || null;
+  const live = allReports.filter(r => r.reporterId === uid).length;
+  const past = reportHistory.filter(r => r.reporterId === uid).length;
+  return {
+    reports: live + past,
+    spam: (rep && rep.spamCount) || 0,
+    helpful: (rep && rep.helpfulCount) || 0,
+    rep
+  };
+}
+
+/* The reporter line: chosen handle, raw uid beneath it, and history where any exists.
+ * Reports written before reporterName shipped have no handle and simply show the uid. */
+function reporterBlockHtml(r){
+  const uid = r.reporterId || '';
+  if(!uid) return '';
+  const st = reporterStats(uid);
+  const name = r.reporterName ? esc(r.reporterName) : '<span class="muted-name">no handle on this report</span>';
+  const bits = [];
+  if(st.reports > 1) bits.push(`${st.reports} reports`);
+  if(st.spam > 0) bits.push(`<b class="spam-count">${st.spam} spam</b>`);
+  if(st.helpful > 0) bits.push(`${st.helpful} helpful`);
+  if(isMuted(st.rep)) bits.push(`<b class="muted-flag">${esc(muteLabel(st.rep))}</b>`);
+  if(st.rep && st.rep.blockedAttempts) bits.push(`${st.rep.blockedAttempts} blocked attempt${st.rep.blockedAttempts === 1 ? '' : 's'}`);
+  return `<div class="reporter">
+    <div class="reporter-name">👤 ${name}</div>
+    <div class="reporter-uid mono">${esc(uid)}</div>
+    ${bits.length ? `<div class="reporter-stats">${bits.join(' · ')}</div>` : ''}
+  </div>`;
+}
+
 function renderReports(){
   const root = $('#reportsList');
-  const rows = reportFilter === 'all' ? allReports : allReports.filter(r => statusOf(r) === reportFilter);
+  // Resolved and dismissed now live in the archive; pending is the only live status.
+  const source = (reportFilter === 'resolved' || reportFilter === 'dismissed') ? reportHistory
+               : reportFilter === 'all' ? allReports.concat(reportHistory)
+               : allReports;
+  const rows = reportFilter === 'all' ? source : source.filter(r => statusOf(r) === reportFilter);
   if(!rows.length){
     root.innerHTML = `<div class="empty">No ${reportFilter === 'all' ? '' : reportFilter + ' '}reports.</div>`;
     return;
@@ -717,13 +834,18 @@ function renderReports(){
         <span class="pill ${st}">${st}</span>
       </div>
       <div class="chips">${chips}</div>
+      ${reporterBlockHtml(r)}
       ${r.moderatorNote ? `<div class="card-note"><b>Note:</b> ${esc(r.moderatorNote)}</div>` : ''}
       <div class="card-foot">
         <span class="meta">Submitted ${when(r.ts)}</span>
         <div class="actions">
           ${locId ? `<button class="mini fix" data-act="fix" data-id="${r.id}">✎ Fix location</button>` : ''}
           <button class="mini" data-act="note" data-id="${r.id}">✐ Note</button>
-          ${st !== 'pending' ? `<button class="mini reopen" data-act="status" data-status="pending" data-id="${r.id}">Reopen</button>` : ''}
+          ${r.reporterId ? `
+            <button class="mini judge ${r.judged === 'helpful' ? 'on' : ''}" data-act="judge" data-judge="helpful" data-id="${r.id}"
+              aria-pressed="${r.judged === 'helpful'}">👍 Helpful</button>
+            <button class="mini judge spam ${r.judged === 'spam' ? 'on' : ''}" data-act="judge" data-judge="spam" data-id="${r.id}"
+              aria-pressed="${r.judged === 'spam'}">🚩 Spam</button>` : ''}
           ${st !== 'resolved' ? `<button class="mini resolve" data-act="status" data-status="resolved" data-id="${r.id}">Resolve</button>` : ''}
           ${st !== 'dismissed' ? `<button class="mini dismiss" data-act="status" data-status="dismissed" data-id="${r.id}">Dismiss</button>` : ''}
         </div>
@@ -735,7 +857,13 @@ function renderReports(){
 // Report actions (event delegation)
 $('#reportsList').addEventListener('click', async (e) => {
   const btn = e.target.closest('button[data-act]'); if(!btn) return;
-  const report = allReports.find(r => r.id === btn.dataset.id); if(!report) return;
+  /* Cards on the Resolved and Dismissed tabs come from reportHistory, not the live queue, so a
+   * lookup against allReports alone found nothing and every button on an archived card silently
+   * did nothing. Which collection a report lives in also decides where its writes go. */
+  const report = allReports.find(r => r.id === btn.dataset.id)
+              || reportHistory.find(r => r.id === btn.dataset.id);
+  if(!report) return;
+  const archived = !allReports.some(r => r.id === report.id);
 
   if(btn.dataset.act === 'fix'){ openFix(report); return; }
 
@@ -745,7 +873,7 @@ $('#reportsList').addEventListener('click', async (e) => {
     if(note === null) return;
     btn.disabled = true;
     try{
-      await updateDoc(doc(db, 'reports', report.id), { moderatorNote: note });
+      await updateDoc(doc(db, archived ? 'reportHistory' : 'reports', report.id), { moderatorNote: note });
       report.moderatorNote = note; renderReports(); toast('Note saved.');
     }catch(err){ console.error(err); toast('Could not save note.', true); btn.disabled = false; }
     return;
@@ -754,23 +882,210 @@ $('#reportsList').addEventListener('click', async (e) => {
   if(btn.dataset.act === 'status'){
     const status = btn.dataset.status;
     btn.disabled = true;
-    const ok = await setReportStatus(report, status);
+    // Already in the archive — just restate the outcome rather than re-running the move.
+    const ok = archived ? await setArchivedStatus(report, status)
+                        : await setReportStatus(report, status);
     if(!ok){ toast('Could not update — try again.', true); btn.disabled = false; }
+  }
+
+  if(btn.dataset.act === 'judge'){
+    btn.disabled = true;
+    const ok = await judgeReport(report, btn.dataset.judge, archived);
+    if(!ok){ toast('Could not save that mark — try again.', true); btn.disabled = false; }
   }
 });
 
+/* Changing the outcome of a report that is already archived. It stays archived either way — the
+ * live slot was released when it was first handled, and reopening it would silently re-block that
+ * person from reporting the location. Only the recorded outcome changes. */
+async function setArchivedStatus(report, status){
+  const patch = { status };
+  if(status === 'resolved'){ patch.resolvedAt = Date.now(); patch.resolvedBy = currentUser.email || currentUser.uid; }
+  if(status === 'dismissed'){ patch.dismissedAt = Date.now(); patch.dismissedBy = currentUser.email || currentUser.uid; }
+  try{
+    await updateDoc(doc(db, 'reportHistory', report.id), patch);
+    Object.assign(report, patch);
+    renderReports();
+    toast('Updated to ' + status + '.');
+    return true;
+  }catch(e){ console.error('archived status update failed', e); return false; }
+}
+
+/* Resolving or dismissing ARCHIVES the report: copy to reportHistory, then delete the live doc.
+ *
+ * Two things follow from the delete. It releases that person's one-live-report slot for the
+ * location, so somebody whose report has been dealt with can report the place again while
+ * somebody with an open report still cannot. And the live queue only ever holds pending items,
+ * so FlushPanel's load stays flat instead of growing with every report ever filed.
+ *
+ * Copy first, delete second. The reverse loses the report outright if the second write fails;
+ * this way the worst case is a duplicate in the archive, which is visible and harmless. */
 async function setReportStatus(report, status){
   const patch = { status };
   if(status === 'resolved'){ patch.resolvedAt = Date.now(); patch.resolvedBy = currentUser.email || currentUser.uid; }
   if(status === 'dismissed'){ patch.dismissedAt = Date.now(); patch.dismissedBy = currentUser.email || currentUser.uid; }
   try{
-    await updateDoc(doc(db, 'reports', report.id), patch);
-    Object.assign(report, patch);
+    const archived = { ...report, ...patch, archivedAt: Date.now() };
+    delete archived.id;
+    await setDoc(doc(db, 'reportHistory', report.id), archived);
+    await deleteDoc(doc(db, 'reports', report.id));
+
+    allReports = allReports.filter(r => r.id !== report.id);
+    if(historyLoaded) reportHistory.unshift({ id: report.id, ...archived });
+
     renderReports(); updateBadges();
-    toast(status === 'pending' ? 'Reopened.' : status.charAt(0).toUpperCase() + status.slice(1) + '.');
+    toast(status.charAt(0).toUpperCase() + status.slice(1) + ' — archived.');
     return true;
   }catch(e){ console.error('status update failed', e); return false; }
 }
+
+/* Mark a report helpful or spam. Toggling off reverses the count, so a misclick is undoable —
+ * which matters because the third spam mark mutes somebody automatically.
+ *
+ * Helpful marks do NOT offset spam marks. They are there for your judgment; letting them cancel
+ * would mean somebody could bank goodwill to buy room for junk. */
+async function judgeReport(report, verdict, archived){
+  const uid = report.reporterId;
+  if(!uid) return false;
+  const was = report.judged || null;
+  const now = was === verdict ? null : verdict;   // clicking the active verdict clears it
+
+  const rep = reporters[uid] || { uid, spamCount: 0, helpfulCount: 0, blockedAttempts: 0, muted: false, mutedUntil: 0, muteTier: 0 };
+  const next = {
+    uid,
+    username: report.reporterName || rep.username || null,
+    spamCount:    (rep.spamCount || 0)    + (now === 'spam' ? 1 : 0)    - (was === 'spam' ? 1 : 0),
+    helpfulCount: (rep.helpfulCount || 0) + (now === 'helpful' ? 1 : 0) - (was === 'helpful' ? 1 : 0),
+    blockedAttempts: rep.blockedAttempts || 0,
+    muted: rep.muted === true,
+    mutedUntil: rep.mutedUntil || 0,
+    muteTier: rep.muteTier || 0,
+    lastSpamAt: now === 'spam' ? Date.now() : (rep.lastSpamAt || 0)
+  };
+  if(next.spamCount < 0) next.spamCount = 0;
+  if(next.helpfulCount < 0) next.helpfulCount = 0;
+
+  /* Auto-mute: every SPAM_MARKS_PER_MUTE spam marks earns the next rung of the ladder. The tier
+   * counts mutes, not marks, and never resets — so the second offence is longer than the first
+   * however much time passed. Past the end of the ladder nothing is applied: a fifth offence is
+   * a decision about a person, flagged for you rather than escalated by a counter. */
+  let autoMuted = false, needsDecision = false;
+  const earnedTier = Math.floor(next.spamCount / SPAM_MARKS_PER_MUTE);
+  if(now === 'spam' && earnedTier > (rep.muteTier || 0)){
+    if(earnedTier <= MUTE_LADDER_DAYS.length){
+      next.muteTier = earnedTier;
+      next.muted = true;
+      next.mutedUntil = Date.now() + MUTE_LADDER_DAYS[earnedTier - 1] * DAY_MS;
+      autoMuted = true;
+    } else {
+      next.muteTier = earnedTier;
+      next.needsDecision = true;
+      needsDecision = true;
+    }
+  }
+
+  try{
+    await setDoc(doc(db, 'reporters', uid), next, { merge: true });
+    await updateDoc(doc(db, archived ? 'reportHistory' : 'reports', report.id), { judged: now });
+    reporters[uid] = { ...rep, ...next };
+    report.judged = now;
+    renderReports(); renderReporters();
+    toast(needsDecision ? 'Past the ladder — mute or ban by hand in Reporters.'
+        : autoMuted ? `Auto-muted for ${MUTE_LADDER_DAYS[next.muteTier - 1]} days.`
+        : now ? `Marked ${now}.` : 'Mark cleared.');
+    return true;
+  }catch(e){ console.error('judge failed', e); return false; }
+}
+
+// ================= REPORTERS =================
+/* Only people who need watching: at least one spam mark, an active mute, a blocked attempt, or
+ * a decision waiting past the end of the ladder. Somebody whose spam marks were all undone drops
+ * off the list on the next load, which is the intended behaviour — the view is a worklist, not a
+ * permanent record. */
+function watchedReporters(){
+  return Object.values(reporters)
+    .filter(r => (r.spamCount || 0) > 0 || isMuted(r) || (r.blockedAttempts || 0) > 0 || r.needsDecision)
+    .sort((a, b) => (b.lastSpamAt || 0) - (a.lastSpamAt || 0));
+}
+
+function renderReporters(){
+  const root = $('#reportersList');
+  if(!root) return;
+  const rows = watchedReporters();
+  const badge = $('#badgeReporters');
+  if(badge) badge.textContent = rows.filter(r => isMuted(r) || r.needsDecision).length;
+
+  if(!rows.length){
+    root.innerHTML = '<div class="empty">Nobody flagged. Mark a report as spam to start tracking someone.</div>';
+    return;
+  }
+  root.innerHTML = rows.map(r => {
+    const muted = isMuted(r);
+    const bits = [
+      `${r.spamCount || 0} spam`,
+      `${r.helpfulCount || 0} helpful`,
+      r.blockedAttempts ? `${r.blockedAttempts} blocked attempt${r.blockedAttempts === 1 ? '' : 's'}` : '',
+      r.muteTier ? `tier ${r.muteTier}` : ''
+    ].filter(Boolean).join(' · ');
+    return `<article class="card">
+      <div class="card-head">
+        <div>
+          <h3 class="card-title">${r.username ? esc(r.username) : 'No handle on record'}</h3>
+          <div class="card-loc mono">${esc(r.uid)}</div>
+        </div>
+        <span class="pill ${muted ? 'dismissed' : r.needsDecision ? 'pending' : 'resolved'}">${muted ? esc(muteLabel(r)) : r.needsDecision ? 'needs a decision' : 'active'}</span>
+      </div>
+      <div class="reporter-stats">${bits}</div>
+      ${r.needsDecision ? `<div class="card-note"><b>Past the ladder.</b> The automatic escalation has run out — mute indefinitely, or clear the marks if this was a false alarm.</div>` : ''}
+      <div class="card-foot">
+        <span class="meta">${r.lastSpamAt ? 'Last spam mark ' + when(r.lastSpamAt) : 'No spam marks'}</span>
+        <div class="actions">
+          ${MUTE_LADDER_DAYS.map(d => `<button class="mini" data-ract="mute" data-days="${d}" data-uid="${esc(r.uid)}">${d}d</button>`).join('')}
+          <button class="mini dismiss" data-ract="mute" data-days="0" data-uid="${esc(r.uid)}">Mute indefinitely</button>
+          ${muted ? `<button class="mini reopen" data-ract="unmute" data-uid="${esc(r.uid)}">Unmute</button>` : ''}
+          <button class="mini" data-ract="clear" data-uid="${esc(r.uid)}">Clear marks</button>
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+}
+
+$('#reportersList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-ract]'); if(!btn) return;
+  const uid = btn.dataset.uid;
+  const rep = reporters[uid]; if(!rep) return;
+  const act = btn.dataset.ract;
+
+  let patch = null, msg = '';
+  if(act === 'mute'){
+    const days = Number(btn.dataset.days);
+    // 0 days means indefinite: muted with no expiry, only liftable by hand.
+    patch = { muted: true, mutedUntil: days ? Date.now() + days * DAY_MS : 0, needsDecision: false };
+    msg = days ? `Muted for ${days} days.` : 'Muted indefinitely.';
+  } else if(act === 'unmute'){
+    // Clears the mute but KEEPS muteTier, so the next offence resumes the ladder where it left
+    // off rather than starting over at three days.
+    patch = { muted: false, mutedUntil: 0, needsDecision: false };
+    msg = 'Unmuted.';
+  } else if(act === 'clear'){
+    if(!window.confirm('Clear this person\'s spam and helpful marks? Their mute tier resets too, so the ladder starts again from 3 days.')) return;
+    patch = { spamCount: 0, helpfulCount: 0, muteTier: 0, needsDecision: false };
+    msg = 'Marks cleared.';
+  }
+  if(!patch) return;
+
+  btn.disabled = true;
+  try{
+    await setDoc(doc(db, 'reporters', uid), patch, { merge: true });
+    Object.assign(rep, patch);
+    renderReporters(); renderReports();
+    toast(msg);
+  }catch(e){
+    console.error('reporter update failed', e);
+    toast('Could not update — try again.', true);
+    btn.disabled = false;
+  }
+});
 
 // ================= FIX MODAL =================
 function effectiveValues(locId){

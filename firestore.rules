@@ -32,6 +32,30 @@ service cloud.firestore {
     }
 
     // Public submissions may not set moderator-only workflow fields.
+    /* Mirror of fsId() in app.js and functions/index.js. 6,595 OSM-derived ids contain a slash,
+     * which Firestore reads as a path separator, so the report document id uses the same
+     * substitution the rest of the system does. Rules have no replace(), and a slash cannot
+     * appear in a single-segment {id} wildcard anyway, so the check below reconstructs the
+     * expected id from the two possible forms. */
+    function fsLocId(locId) {
+      return locId.split('/').join('__');
+    }
+
+    /* Reporting mute. reporters/{uid} exists ONLY for people marked for spam or muted by hand,
+     * so this is a miss for effectively everyone — a rules `get` against a document that was
+     * never created. `muted` must be an explicit true, the same pattern as admins.enabled: a
+     * missing or malformed field must not silently mute somebody.
+     *
+     * mutedUntil == 0 alongside muted:true means indefinite, set by hand. Otherwise it is an
+     * expiry, and the mute lapses on its own without anything having to run. */
+    function notMutedFromReporting() {
+      return !exists(/databases/$(database)/documents/reporters/$(request.auth.uid))
+        || !(get(/databases/$(database)/documents/reporters/$(request.auth.uid)).data.muted == true)
+        || (get(/databases/$(database)/documents/reporters/$(request.auth.uid)).data.mutedUntil is number
+            && get(/databases/$(database)/documents/reporters/$(request.auth.uid)).data.mutedUntil != 0
+            && get(/databases/$(database)/documents/reporters/$(request.auth.uid)).data.mutedUntil < request.time.toMillis());
+    }
+
     function hasNoModeratorFields() {
       return !request.resource.data.keys().hasAny([
         'moderatorNote','moderatorNotes','resolvedAt','resolvedBy',
@@ -477,18 +501,37 @@ service cloud.firestore {
     // from outside the app). Phase 1 just pins the shape logReport() actually sends.
     // addr / chain / chainKey / storeNumber / city / state may be null, so only the
     // always-present primitives are type-checked.
+    /* One LIVE report per person per location.
+     *
+     * The id is fsId(locId) + '_' + uid and creates only — Firestore refuses a create on an
+     * existing document, so the second report is rejected by the same mechanism that protects
+     * votes. Previously this was addDoc() with a random id and no server-side limit at all, so
+     * one person could file the same complaint about the same store any number of times.
+     *
+     * "Live" is the operative word: resolving or dismissing in FlushPanel copies the report to
+     * reportHistory and deletes it here, which is what releases the slot. Someone whose report
+     * was handled can report the same place again; someone whose report is still open cannot.
+     *
+     * reporterId must be the caller's own uid — it drives the mute check and the spam counts in
+     * FlushPanel, so a client that could put someone else's uid there could get a third party
+     * muted. */
     match /reports/{id} {
-      allow create: if startsPending() && hasNoModeratorFields()
+      allow create: if signedIn() && startsPending() && hasNoModeratorFields()
+        && id == fsLocId(request.resource.data.locId) + '_' + request.auth.uid
+        && request.resource.data.reporterId == request.auth.uid
+        && notMutedFromReporting()
         && request.resource.data.keys().hasOnly([
              'locId','locName','addr','chainKey','chain','storeNumber',
-             'city','state','lat','lng','reporterId','reason','ts','status'
+             'city','state','lat','lng','reporterId','reporterName','reason','ts','status'
            ])
         && request.resource.data.locId is string
+        && request.resource.data.locId.size() <= 200
         && request.resource.data.reason is string
         && request.resource.data.reason.size() <= 200
         && request.resource.data.ts is number
         && boundedStrOrAbsent('locName', 160)
-        && boundedStrOrAbsent('reporterId', 64);
+        && boundedStrOrAbsent('reporterId', 64)
+        && boundedStrOrAbsent('reporterName', 40);
       allow read:   if isAdmin();
       allow update: if isAdmin() && validReportStatus();
       allow delete: if isAdmin();
@@ -513,6 +556,46 @@ service cloud.firestore {
       allow read:   if isAdmin();
       allow update: if isAdmin() && validReportStatus();
       allow delete: if isAdmin();
+    }
+
+
+    // ============================================================
+    //  Reporter standing (admin-owned, one doc per flagged person)
+    // ============================================================
+    /* Created only when a moderator marks a report as spam or mutes somebody, so this collection
+     * holds problem accounts rather than every user — which is what keeps the FlushPanel load to
+     * a handful of documents no matter how the user base grows.
+     *
+     * Everything that carries consequence (spamCount, muted, mutedUntil, muteTier) is
+     * admin-written. The single exception is blockedAttempts: a muted person's own client
+     * increments it so a moderator can see somebody still trying. That is a signal, not evidence
+     * — the client controls whether it sends the increment at all, so it counts the confused
+     * repeat-tapper, never a determined one. It is allowlisted to that one field precisely
+     * because it is the only thing here a non-admin may touch. */
+    match /reporters/{uid} {
+      allow read:  if isAdmin() || (signedIn() && uid == request.auth.uid);
+      allow create, update, delete: if isAdmin();
+
+      // Owner increment, strictly bounded: their own doc, only blockedAttempts, only upward,
+      // and only by one. Cannot create the document, so it never grants a way to self-register.
+      allow update: if signedIn() && uid == request.auth.uid
+        && touchedKeys().hasOnly(['blockedAttempts'])
+        && request.resource.data.blockedAttempts is int
+        && request.resource.data.blockedAttempts ==
+             ((resource.data.blockedAttempts is int ? resource.data.blockedAttempts : 0) + 1);
+    }
+
+
+    // ============================================================
+    //  Resolved / dismissed reports (admin-only archive)
+    // ============================================================
+    /* Where a report goes when it is resolved or dismissed. Moving it out of `reports` is what
+     * frees that person's one-live-report slot for the location, and it keeps the live queue
+     * holding only open items — so FlushPanel's load stays flat instead of growing with every
+     * report ever filed. Never client-readable: it carries reporterId across many locations,
+     * which is exactly the visit history that closing /votes was meant to protect. */
+    match /reportHistory/{id} {
+      allow read, create, update, delete: if isAdmin();
     }
 
 

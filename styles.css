@@ -140,6 +140,14 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
 }
   .btn-icon-only{padding:7px 11px;font-size:15px;
 }
+  /* Where the 🚩 button would be once this person already has a live report here. Deliberately
+     not a button: there is nothing to press, and a disabled button invites tapping to find out
+     why. Sized to match .btn-icon-only so the action row does not reflow when it swaps in. */
+  .report-pending{
+    display:inline-flex;align-items:center;padding:7px 11px;font-size:13px;font-weight:600;
+    border-radius:8px;background:#2b2b2b;color:var(--muted, #9aa3ad);
+    border:2px solid #3a3a3a;white-space:nowrap;
+}
   .btn-amber{background:var(--amber);color:#1c1c1e;font-weight:700;flex:none;
 }
   .popup-actions{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;
