@@ -595,13 +595,13 @@ const BATHROOM_AMENITIES = [
       multiple:"Men's & women's"
     }},
   {key:'accessible', label:'Wheelchair accessible', stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-accessible"></use></svg>'}},
-  {key:'changing', label:'Changing table', stateIcons:{yes:'🚼'}},
+  {key:'changing', label:'Changing table', stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-changing"></use></svg>'}},
   /* Asked ONLY where the operator's own data doesn't list a public restroom (see
    * restroomDoubted). This is the one question that can prune the map: every other amenity adds
    * detail to a pin already assumed valid, while this one lets people tell us a pin shouldn't
    * exist. Confirmed-no hides it, at the same CONFIRM_THRESHOLD as everything else. */
   {key:'hasRestroom', label:'Public restroom', question:'Is there a public restroom here?',
-    stateIcons:{yes:'🚻'}}
+    stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-restroom"></use></svg>'}}
 ];
 const amenityCache = {};
 
@@ -609,13 +609,13 @@ const amenityCache = {};
 // myVote.amenities), tucked inside the already-collapsed Store rating section so the
 // bathroom-first flow stays exactly as quick as it was.
 const STORE_FEATURES = [
-  {key:'evCharging', label:'EV Charging', stateIcons:{yes:'⚡'}},
-  {key:'airPump', label:'Air pump', stateIcons:{yes:'🛞'}},
-  {key:'shower', label:'Showers', stateIcons:{yes:'🚿'}},
-  {key:'indoorSeating', label:'Indoor seating', stateIcons:{yes:'🪑'}},
-  {key:'wifi', label:'WiFi', stateIcons:{yes:'📶'}},
-  {key:'grabAndGo', label:'Grab & go snacks', stateIcons:{yes:'🥤'}},
-  {key:'hotFood', label:'Hot food', stateIcons:{yes:'🍔'}}
+  {key:'evCharging', label:'EV Charging', stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-ev"></use></svg>'}},
+  {key:'airPump', label:'Air pump', stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-air"></use></svg>'}},
+  {key:'shower', label:'Showers', stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-shower"></use></svg>'}},
+  {key:'indoorSeating', label:'Indoor seating', stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-seating"></use></svg>'}},
+  {key:'wifi', label:'WiFi', stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-wifi"></use></svg>'}},
+  {key:'grabAndGo', label:'Grab & go snacks', stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-grabgo"></use></svg>'}},
+  {key:'hotFood', label:'Hot food', stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-hotfood"></use></svg>'}}
 ];
 const storeFeatureCache = {};
 
@@ -1082,7 +1082,7 @@ function renderStoreFeatureStepHtml(myVote){
 
 function storeFeatureEditorHtml(locId, myVote){
   return `<div class="amenities-editor">
-    <div class="feature-title">🏪 Store features you saw</div>
+    ${plate('Store features')}
     <div class="store-feature-step" id="store-feature-step-${locId}">${renderStoreFeatureStepHtml(myVote)}</div>
     <div class="save-note" id="store-feature-note-${locId}"></div>
   </div>`;
@@ -1899,7 +1899,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.19.2';
+const BUILD = 'v2.20.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
