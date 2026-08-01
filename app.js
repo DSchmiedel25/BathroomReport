@@ -2157,19 +2157,31 @@ async function logReport(loc, reason){
     markReportedLocally(loc.id, true);
     return true;
   }catch(e){
-    /* Two very different failures land here and must not read the same.
+    /* A rules rejection is NOT necessarily a duplicate.
      *
-     * A rules rejection means a live report from this person already exists (the write targets an
-     * existing document, which the create-only rule refuses) — the local hint was cleared, or
-     * they are on a second device. That is not an error to them, so record it and say so.
+     * This used to map every permission-denied to "you've already reported this one", which is
+     * only one of the reasons Firestore refuses a create — a field the allowlist does not accept,
+     * a document id the rules reconstruct differently, a mute, a rules version older than the
+     * client all produce the identical code. Reporting them all as a duplicate hid genuine
+     * breakage behind a reassuring message.
      *
-     * Anything else is a real failure — offline, quota, an outage — and telling someone their
-     * report is filed when it is not is the worst outcome here, so those still surface. */
-    if(e && e.code === 'permission-denied'){
-      markReportedLocally(loc.id, true);
-      return 'duplicate';
+     * A duplicate is now established by looking: if a report from this person really does exist
+     * at this location, say so. Otherwise surface the code, because a rejection nobody can see is
+     * a rejection nobody can fix. */
+    const code = (e && e.code) || 'unknown';
+    if(code === 'permission-denied'){
+      try{
+        const {db, doc, getDoc} = await fb();
+        const uid2 = (window.__currentUser && window.__currentUser.uid) || '';
+        const existing = await getDoc(doc(db, 'reports', reportDocId(loc.id, uid2)));
+        if(existing.exists()){
+          markReportedLocally(loc.id, true);
+          return 'duplicate';
+        }
+      }catch(e2){ /* can't read it either — fall through and report the original refusal */ }
     }
-    return false;
+    console.error('logReport rejected:', code, e);
+    return { error: code, message: (e && e.message) || '' };
   }
 }
 
@@ -2225,16 +2237,26 @@ function attachReportHandler(loc){
 
   const send = async (reason) => {
     if(note){ note.style.color=''; note.textContent = 'Sending…'; }
-    // true = filed, 'duplicate' = one is already open for this person here, false = real failure.
+    // true = filed, 'duplicate' = one is already open here, {error} = refused, with the reason.
     const sent = await logReport(loc, reason);
+    const ok = sent === true || sent === 'duplicate';
     if(note){
-      note.style.color = sent ? '#2f6b3c' : '#c62828';
-      note.textContent = sent === 'duplicate'
-        ? "You've already reported this one — it's still being reviewed."
-        : sent ? 'Report sent — thank you!'
-        : "Couldn't send — check your connection and try again.";
+      note.style.color = ok ? '#2f6b3c' : '#c62828';
+      if(sent === 'duplicate'){
+        note.textContent = "You've already reported this one — it's still being reviewed.";
+      } else if(sent === true){
+        note.textContent = 'Report sent — thank you!';
+      } else if(sent && sent.error === 'permission-denied'){
+        /* Named plainly rather than dressed up as a connection problem. This is a server-side
+         * refusal, and sending the reader to check their wifi is the wrong place to look. */
+        note.textContent = "Couldn't send — the server refused this write (permission-denied). Not a connection problem.";
+      } else if(sent && sent.error === 'unavailable'){
+        note.textContent = "Couldn't send — you appear to be offline. Try again in a moment.";
+      } else {
+        note.textContent = "Couldn't send" + (sent && sent.error ? " (" + sent.error + ")" : "") + " — please try again.";
+      }
     }
-    if(sent){
+    if(ok){
       newCats.style.display='none';
       if(otherRow) otherRow.style.display='none';
       // Replace the flag button with the pending state, so closing and reopening the popup shows
