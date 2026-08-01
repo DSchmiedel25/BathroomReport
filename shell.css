@@ -884,3 +884,28 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
   position:absolute; left:14px; top:50%; transform:translateY(-50%);
 }
 .hiw-support-actions .hiw-shop-icon{ width:19px; height:19px; }
+
+/* ---------- Drawer row rhythm (v2.21.6) ----------
+   Every drawer row carries the same padding:15px 20px, yet the chain-group rows rendered about
+   twice the height of the SETTINGS switches. The cause is flexbox, not the padding:
+
+   .d-items is a flex column, so its DIRECT children default to flex-shrink:1 and get squeezed
+   once the content overflows. The three settings switches are direct children and were being
+   compressed; the group rows live inside #chainKeyAllList, a plain block, so they kept their
+   natural height. Identical rules, two different results, and rows clipped mid-glyph where the
+   list met the footer.
+
+   flex:none on every child restores natural heights and lets the container scroll, which is what
+   overflow-y:auto was there to do all along. */
+#appDrawer .d-items > *{ flex:0 0 auto; }
+
+/* Breathing room at the end of the scroll so the last row doesn't sit flush against the footer's
+   border and read as cut off. */
+#appDrawer .d-items{ padding-bottom:10px; }
+
+/* One rhythm for the group headings: equal space above, tight to what they head. Previously each
+   inherited whatever the section before it happened to leave behind. */
+#appDrawer .d-plate{ margin:18px 0 6px; }
+#appDrawer .d-plate:first-of-type{ margin-top:10px; }
+/* A divider immediately under a heading draws two lines a few pixels apart. */
+#appDrawer .d-plate + .d-section{ border-top:none !important; }

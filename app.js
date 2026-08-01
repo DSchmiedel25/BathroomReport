@@ -1229,7 +1229,7 @@ async function saveRecoveryEmail(email){
     if(code.includes('resource-exhausted')) return { ok: false, reason: 'Just sent one — give it a minute.' };
     if(code.includes('invalid-argument')) return { ok: false, reason: "That doesn't look like an email address." };
     console.error('saveRecoveryEmail failed', code, e);
-    return { ok: false, reason: "Couldn't send the confirmation email — try again from Account settings." };
+    return { ok: false, reason: "Couldn't send the confirmation email — try again later." };
   }
 }
 
@@ -1904,7 +1904,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.21.5';
+const BUILD = 'v2.21.7';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -5027,10 +5027,17 @@ document.getElementById('authSignUpBtn').addEventListener('click', async () => {
   btn.disabled = true;
   note.style.color = '#999';
   note.textContent = 'Creating your account...';
-  const result = await signUpAccount(username, password);
+  const email = document.getElementById('authEmail').value;
+  const result = await signUpAccount(username, password, email);
   if(result.ok){
-    note.style.color = '#4caf50';
-    note.textContent = 'Account created! You\'re logged in.';
+    /* The account exists either way — the recovery email is sent after it is created and is
+     * deliberately non-fatal. Saying "created" and nothing else would leave somebody quietly
+     * unrecoverable behind a success message, so a failed send is named and points somewhere. */
+    note.style.color = result.emailSent ? '#4caf50' : '#f59e0b';
+    note.textContent = result.emailSent
+      ? "Account created — check your email to confirm it."
+      : "Account created, but " + (result.emailReason || "the confirmation email didn't send.")
+        + " You can add it from Account settings.";
     updateAccountUI();
     loadAllRatings();
     // Close the panel so the map is usable immediately — but ONLY on a clean run. If the
