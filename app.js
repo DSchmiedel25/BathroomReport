@@ -1904,7 +1904,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.23.1';
+const BUILD = 'v2.24.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -3242,12 +3242,41 @@ function renderBathroomPassport(stats, results){
   const pct = stats.totalLocations > 0 ? ((stats.visitedCount / stats.totalLocations) * 100).toFixed(1) : '0.0';
   const unlockedCount = Object.values(results).filter(r => r.unlocked).length;
 
+  /* Progress is stamps collected, not percent of the map.
+   *
+   * It used to show visited/totalLocations, which is a share of 28,074 — that reads "0.0%
+   * complete" after three ratings and will keep reading 0.0% for years. Technically true, and a
+   * discouraging first thing to see in your own passport. Stamps are finite and finishable, so
+   * they are the number worth putting at the top; the map count stays below as context. */
+  const stampPct = ACHIEVEMENT_DEFS.length ? (unlockedCount / ACHIEVEMENT_DEFS.length) * 100 : 0;
+  const issued = (() => {
+    const u = window.__currentUser;
+    const t = u && u.metadata && u.metadata.creationTime ? new Date(u.metadata.creationTime) : null;
+    return t && !isNaN(t) ? t.toLocaleDateString(undefined, { month:'short', year:'numeric' }) : '—';
+  })();
+
   container.innerHTML = `
-    <div class="passport-stat-line">${pct}% complete</div>
-    <div class="passport-progress-bar"><div class="passport-progress-fill" style="width:${Math.min(100,pct)}%;"></div></div>
+    <div class="passport-datapage">
+      <div class="dp-top">
+        <div class="dp-id">
+          <div class="dp-kind">Bathroom Report &middot; Holder</div>
+          <div class="dp-name">${escapeHtml(displayNameFor() || 'You')}</div>
+          <div class="dp-fields">
+            <div class="dp-f"><b>Issued</b><span>${escapeHtml(issued)}</span></div>
+            <div class="dp-f"><b>Stamps</b><span>${unlockedCount} / ${ACHIEVEMENT_DEFS.length}</span></div>
+            <div class="dp-f"><b>Rated</b><span>${stats.bathroomRatedCount}</span></div>
+          </div>
+        </div>
+        <div class="dp-seal" aria-hidden="true">BATH<br>ROOM<br>RPT</div>
+      </div>
+    </div>
+
+    <div class="passport-progress">
+      <b>${unlockedCount}</b><span>of ${ACHIEVEMENT_DEFS.length} stamps collected</span>
+    </div>
+    <div class="passport-progress-bar"><div class="passport-progress-fill" style="width:${Math.min(100, stampPct)}%;"></div></div>
     <div class="passport-mini-stats">
-      <div>🚻 ${stats.bathroomRatedCount} bathrooms reviewed</div>
-      <div>🏆 ${unlockedCount} / ${ACHIEVEMENT_DEFS.length} achievements unlocked</div>
+      <div>${stats.visitedCount} of ${stats.totalLocations.toLocaleString()} places visited &middot; ${pct}%</div>
     </div>
   `;
 
@@ -3289,28 +3318,63 @@ function renderBathroomPassport(stats, results){
       return ACHIEVEMENT_DEFS.indexOf(a) - ACHIEVEMENT_DEFS.indexOf(b);
     });
 
-    listEl.innerHTML = ordered.map(def => {
+    /* Earned achievements render as STAMPS, locked ones stay as rows.
+     *
+     * The two are not the same kind of thing. An earned one is a trophy — you already know what
+     * it was for, and what you want is to see it. A locked one is an instruction: a stamp reading
+     * "GEM COLLECTOR" tells you nothing about how to get it, and the description is the entire
+     * point of showing it at all.
+     *
+     * Eight stamps fit where three rows did, so the earned ones stop being a scroll. The order
+     * computed above still holds within each group. */
+    const earned = ordered.filter(d => results[d.key].unlocked);
+    const rest   = ordered.filter(d => !results[d.key].unlocked);
+
+    // Deterministic tilt from the key, not the index: a stamp must not jump to a new angle
+    // because an earlier one was unlocked. Real stamps land where they land and stay.
+    const tilt = (key) => {
+      let h = 0;
+      for(let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) & 0xffff;
+      return (((h % 100) / 100) * 5 - 2.5).toFixed(2);   // -2.5deg … +2.5deg
+    };
+
+    const stampsHtml = earned.map(def => {
+      const r = results[def.key];
+      const d = r.unlockedAt ? new Date(r.unlockedAt) : null;
+      // Short date in a document hand: "22 JUL 26", not "7/22/2026".
+      const dateStr = d ? d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'2-digit' }).toUpperCase() : '';
+      return `<div class="stamp" style="--tilt:${tilt(def.key)}deg" title="${escapeHtml(def.desc)}">
+        <span class="stamp-ico" aria-hidden="true">${def.icon}</span>
+        <span class="stamp-name">${escapeHtml(def.name)}</span>
+        ${dateStr ? `<span class="stamp-date">${dateStr}</span>` : ''}
+      </div>`;
+    }).join('');
+
+    const rowsHtml = rest.map(def => {
       const r = results[def.key];
       // A tiered achievement (Hours Hero) reveals after its first milestone and then shows a
       // rolling bar, unlike binary hidden trophies which stay masked until fully earned.
       const tiered = Array.isArray(def.tiers);
-      const secret = def.hidden && !r.unlocked && !(tiered && r.revealed);
+      const secret = def.hidden && !(tiered && r.revealed);
       const icon = secret ? '❓' : def.icon;
       const name = secret ? 'Hidden Trophy' : def.name;
       const desc = secret ? 'Keep exploring to reveal this one.' : def.desc;
-      const dateStr = r.unlockedAt ? new Date(r.unlockedAt).toLocaleDateString() : null;
-      const progressStr = (!secret && !r.unlocked && r.total > 1) ? `${r.current} / ${r.total}` : '';
-      return `<div class="achievement-card ${r.unlocked ? 'unlocked' : 'locked'}${secret ? ' hidden-trophy' : ''}">
+      const progressStr = (!secret && r.total > 1) ? `${r.current} / ${r.total}` : '';
+      return `<div class="achievement-card locked${secret ? ' hidden-trophy' : ''}">
         <div class="achievement-icon">${icon}</div>
         <div class="achievement-info">
-          <div class="achievement-name">${name}</div>
-          <div class="achievement-desc">${desc}</div>
-          ${r.unlocked
-            ? `<div class="achievement-date">Unlocked ${dateStr}</div>`
-            : (progressStr ? `<div class="achievement-progress">${progressStr}</div>` : '')}
+          <div class="achievement-name">${escapeHtml(name)}</div>
+          <div class="achievement-desc">${escapeHtml(desc)}</div>
+          ${progressStr ? `<div class="achievement-progress">${progressStr}</div>` : ''}
         </div>
       </div>`;
     }).join('');
+
+    listEl.innerHTML =
+      (earned.length ? `<div class="stamp-grid">${stampsHtml}</div>` : '')
+      + (rest.length
+          ? `<div class="plate"><span>${earned.length ? 'Still to earn' : 'Collect your first'}</span><i></i></div>${rowsHtml}`
+          : '');
   }
 }
 
@@ -4988,7 +5052,7 @@ function openAccountPanel(mode){
   panel.classList.add('show');
   const isPassport = mode === 'passport';
   const title = document.querySelector('#accountHeader span');
-  if(title) title.textContent = isPassport ? '🎫 Bathroom Passport' : '👤 Account';
+  if(title) title.textContent = isPassport ? 'Bathroom Passport' : 'Account';
   const loggedOut = document.getElementById('loggedOutView');
   const loggedIn = document.getElementById('loggedInView');
   const passport = document.getElementById('passportSection');
