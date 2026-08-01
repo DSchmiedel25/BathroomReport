@@ -2066,6 +2066,29 @@ function reportButtonHtml(loc){
  * enforces the limit. Clearing site data resets it; the create then fails on the server and the
  * popup corrects itself. */
 const REPORTED_KEY = 'reportedLocations';
+
+/* One-time purge of entries written by a broken build.
+ *
+ * v2.15.1 and earlier treated EVERY permission-denied as "you already reported this", and marked
+ * the location locally on the way out. Reports were being refused for an unrelated reason (the
+ * rules require numeric coordinates; 19 of the 40 chain files store them as strings), so people
+ * ended up with locations flagged as reported that Firestore had never accepted — the popup
+ * showed "🚩 Reported" over nothing, and there was no way to clear it from a phone.
+ *
+ * The flag is a UI hint with no authority — the server decides whether a report exists — so
+ * discarding it costs nothing. Anyone with a genuine open report sees the pending state return
+ * the next time they open that popup and the create is refused as a real duplicate.
+ *
+ * Keyed by schema version rather than app version so it runs exactly once, not on every release. */
+const REPORTED_SCHEMA = 2;
+(function purgeStaleReportFlags(){
+  try{
+    if(Number(localStorage.getItem('reportedLocationsSchema')) === REPORTED_SCHEMA) return;
+    localStorage.removeItem(REPORTED_KEY);
+    localStorage.setItem('reportedLocationsSchema', String(REPORTED_SCHEMA));
+  }catch(e){ /* private mode — nothing was stored to begin with */ }
+})();
+
 function reportedLocal(){
   try{ return JSON.parse(localStorage.getItem(REPORTED_KEY) || '{}') || {}; }catch(e){ return {}; }
 }

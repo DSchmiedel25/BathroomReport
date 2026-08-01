@@ -572,7 +572,12 @@ service cloud.firestore {
         && boundedStrOrAbsent('locName', 160)
         && boundedStrOrAbsent('reporterId', 64)
         && boundedStrOrAbsent('reporterName', 40);
-      allow read:   if isAdmin();
+      /* A reporter may read their OWN report, and only that one. Without it the client cannot
+       * tell "you already reported this" apart from "the rules refused this write" — both arrive
+       * as permission-denied — which is exactly how a broken create spent a day disguised as a
+       * duplicate. `get` only: listing stays admin-only, so nobody can walk the queue. */
+      allow get:    if isAdmin() || (signedIn() && resource.data.reporterId == request.auth.uid);
+      allow list:   if isAdmin();
       allow update: if isAdmin() && validReportStatus();
       allow delete: if isAdmin();
     }
