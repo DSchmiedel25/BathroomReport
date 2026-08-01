@@ -858,14 +858,35 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
    a shop link is a supporting link like the copyright rather than a feature competing with the
    settings above it. Styled to be findable without shouting: it reads first in the footer, then
    the small print. */
+/* Enamel badge. A plain outlined box read as one more disabled-looking row in a column of
+   controls; filled, with the plaque lettering the placards use, it reads as an object. This is
+   the only decorative element in the drawer and that is the point — spend the boldness in one
+   place and keep everything around it quiet. */
 #appDrawer .d-shop-foot{
-  display:block; margin:0 0 12px; padding:11px 14px; min-height:44px;
-  border:1px solid var(--shell-line); border-radius:10px;
-  color:var(--accent); font-size:13.5px; font-weight:700; text-align:center;
-  text-decoration:none; line-height:22px;
+  display:grid; grid-template-columns:auto 1fr; align-items:center;
+  column-gap:11px; row-gap:2px;
+  margin:0 0 14px; padding:12px 16px; min-height:44px;
+  background:var(--accent); color:var(--accent-ink) !important;
+  border:0; border-radius:12px; text-decoration:none;
+  /* A hairline highlight along the top edge — the sheen on a porcelain plaque. Subtle enough to
+     read as material rather than as a gradient. */
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28), 0 2px 8px rgba(0,0,0,.14);
 }
-#appDrawer .d-shop-foot:hover{ border-color:var(--accent); }
-#appDrawer .d-shop-foot:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; }
+#appDrawer .d-shop-foot .ico{ grid-row:1 / span 2; width:22px; height:22px; }
+#appDrawer .d-shop-label{
+  font-family:var(--font-display); font-weight:600;
+  font-size:14px; letter-spacing:.09em; text-transform:uppercase; line-height:1.1;
+}
+#appDrawer .d-shop-sub{
+  font-family:var(--font-body); font-weight:600;
+  font-size:10.5px; line-height:1.3; opacity:.72;
+}
+#appDrawer .d-shop-foot:hover{ filter:brightness(1.06); }
+#appDrawer .d-shop-foot:active{ transform:translateY(1px); }
+#appDrawer .d-shop-foot:focus-visible{ outline:3px solid var(--shell-ink); outline-offset:2px; }
+@media (prefers-reduced-motion: reduce){
+  #appDrawer .d-shop-foot:active{ transform:none; }
+}
 
 /* Donate / Shop the Store — centre the LABEL, not the icon-plus-label group.
    justify-content:center was already centring the pair, so the icon's width pushed the words
