@@ -2135,25 +2135,49 @@ async function logReport(loc, reason){
     // coordinates, which pin down the location even when the street address is blank
     // (many imported stops have no address yet). None of these are moderator-only
     // fields, so the write still satisfies the reports create rules.
+    /* Coordinates are coerced, not passed through.
+     *
+     * 19 of the 40 chain data files store lat/lng as STRINGS ("42.702557") and 21 as numbers —
+     * an artifact of the different sources they were imported from. The rules validate the range,
+     * which requires a number, so sending the raw value refused every report from those 19 chains
+     * with permission-denied.
+     *
+     * Number() on a decimal string is exact — no precision is invented or lost. Anything that
+     * does not parse to a real point on Earth is omitted entirely rather than sent as NaN, since
+     * the rules accept a report with no coordinates but not one with nonsense in them. */
+    const nLat = Number(loc.lat), nLng = Number(loc.lng);
+    const coordsOk = Number.isFinite(nLat) && Number.isFinite(nLng)
+      && Math.abs(nLat) <= 90 && Math.abs(nLng) <= 180;
+
     /* reporterName is denormalised on purpose. FlushPanel shows who reported without a lookup per
      * card, and it is the handle the person chose to be known by — the raw uid stays on the doc
-     * for identity, but a moderator should be reading a name. */
-    await setDoc(doc(db, 'reports', reportDocId(loc.id, uid)), {
+     * for identity, but a moderator should be reading a name.
+     *
+     * Named reportDoc rather than payload: tools/audit-ui.js finds every field written onto a
+     * VOTE by scanning for `payload.<field> =`, so a second variable of that name here made
+     * lat/lng look like vote fields the rules reject.
+     *
+     * Built up rather than declared in one literal because the rules distinguish ABSENT from
+     * null: `boundedStrOrAbsent` passes when a key is missing and fails when it is present
+     * holding null, so an optional field with no value has to be left out, not set to null. */
+    const reportDoc = {
       locId: loc.id,
       locName: loc.n,
-      addr: loc.addr || null,
       chainKey: chainKey,
       chain: (CHAIN_REGISTRY[chainKey] || {}).name || chainKey,
-      storeNumber: (loc.storeNumber ?? loc.num) ?? null,
-      city: (loc.city ?? (loc.address && loc.address.city)) ?? null,
-      state: (loc.state ?? (loc.address && loc.address.state)) ?? null,
-      lat: loc.lat,
-      lng: loc.lng,
       reporterId: uid,
-      reporterName: displayNameFor() || null,
       reason: reason,
       ts: Date.now()
-    }, { merge: false });
+    };
+    const addIf = (k, v) => { if(v !== null && v !== undefined && v !== '') reportDoc[k] = v; };
+    addIf('addr', loc.addr);
+    addIf('storeNumber', loc.storeNumber ?? loc.num);
+    addIf('city', loc.city ?? (loc.address && loc.address.city));
+    addIf('state', loc.state ?? (loc.address && loc.address.state));
+    addIf('reporterName', displayNameFor());
+    if(coordsOk){ reportDoc.lat = nLat; reportDoc.lng = nLng; }
+
+    await setDoc(doc(db, 'reports', reportDocId(loc.id, uid)), reportDoc, { merge: false });
     markReportedLocally(loc.id, true);
     return true;
   }catch(e){
