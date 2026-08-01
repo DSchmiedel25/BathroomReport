@@ -200,6 +200,37 @@
 <div id="listViewItems"></div>
 </div>
 </div>
+<!-- ============================================================================
+     Icon sprite — one stroke set, inherits currentColor.
+     Replaces the sixteen unrelated emoji the popup used to carry. Emoji are rendered by the OS,
+     so their weight, palette and perspective are all outside our control and differ between iOS
+     and Android; ♿ arriving as a blue-and-white badge beside a flat teal card is what made the
+     card read as assembled rather than designed.
+     One 24px grid, 1.75 stroke, round caps. No network request, scales cleanly, and colour comes
+     from the surrounding text so every icon follows the theme automatically.
+     Recognition beats invention here: each shape stays close to the convention people already
+     read, especially the accessibility mark.
+     ============================================================================ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.6 8.4l-2.1 5.1-5.1 2.1 2.1-5.1z"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a4.5 4.5 0 006.4 0l2.6-2.6a4.5 4.5 0 00-6.4-6.4L11.4 5.3"/><path d="M14 11a4.5 4.5 0 00-6.4 0L5 13.6a4.5 4.5 0 006.4 6.4l1.2-1.2"/></symbol>
+<symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h11l-1.7 3.4L16 11H5z"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.2V12l3.2 2"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.6h17M8.4 3v3.6M15.6 3v3.6"/></symbol>
+<symbol id="i-accessible" viewBox="0 0 24 24"><circle cx="13.4" cy="4.3" r="1.9"/><path d="M11 8.2l.5 4.1h4.2"/><path d="M16.9 20.4l-1.6-4.6h-4.6"/><circle cx="9.6" cy="15.6" r="4.9"/></symbol>
+<symbol id="i-fuel" viewBox="0 0 24 24"><path d="M4 20.5V5.2A2.2 2.2 0 016.2 3h5.6A2.2 2.2 0 0114 5.2v15.3"/><path d="M2.8 20.5h12.4"/><path d="M6.6 8.4h4.8"/><path d="M14 9.4h2.6a2 2 0 012 2v5.1a1.7 1.7 0 003.4 0V8.6l-2.4-2.4"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.4" width="15" height="10.1" rx="2.4"/><path d="M8.2 10.4V7.6a3.8 3.8 0 017.6 0v2.8"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21.2s7-5.6 7-11.1A7 7 0 005 10.1c0 5.5 7 11.1 7 11.1z"/><circle cx="12" cy="9.8" r="2.6"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M16.4 3.9l3.7 3.7L8.3 19.4l-4.6.9.9-4.6z"/><path d="M14.2 6.1l3.7 3.7"/></symbol>
+<symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></symbol>
+<symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 114.3 2.1c-.9.8-1.9 1.3-1.9 2.6"/><path d="M12 17.1h.01"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M4.6 12.6l4.8 4.8L19.4 7.4"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.4l2.7 5.5 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.8l6-.9z"/></symbol>
+<symbol id="i-restroom" viewBox="0 0 24 24"><circle cx="7.4" cy="4.2" r="1.8"/><path d="M7.4 7.6h0a2.4 2.4 0 012.4 2.4v4.2H8.6v6.4H6.2v-6.4H5V10a2.4 2.4 0 012.4-2.4z"/><circle cx="16.6" cy="4.2" r="1.8"/><path d="M16.6 7.6a2.4 2.4 0 012.4 2.2l.8 4.6h-1.6l-.4 6.2h-2.4l-.4-6.2h-1.6l.8-4.6a2.4 2.4 0 012.4-2.2z"/></symbol>
+<symbol id="i-warning" viewBox="0 0 24 24"><path d="M10.3 4.3L2.6 17.4A2 2 0 004.3 20.4h15.4a2 2 0 001.7-3L13.7 4.3a2 2 0 00-3.4 0z"/><path d="M12 9.4v4.2M12 17.2h.01"/></symbol>
+<symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9.2 18.2h5.6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9c.6.5.9 1.1.9 1.8v.5h5.2v-.5c0-.7.3-1.3.9-1.8A6 6 0 0012 3z"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24"><path d="M20.4 14.2a2.4 2.4 0 01-2.4 2.4H8.4L4 20.4V6a2.4 2.4 0 012.4-2.4h11.6A2.4 2.4 0 0120.4 6z"/></symbol>
+</defs></svg>
 <div id="accountPanel" role="dialog" aria-modal="true" aria-labelledby="accountHeaderTitle">
 <div class="acct-grab" aria-hidden="true"><i></i></div>
 <div id="accountHeader">
@@ -333,7 +364,7 @@ This is tracked on this device only. Log in to sync it across devices.
 </select>
 </div>
 </div>
-<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.18.0">v2.18.0 · 2026-07-31</span></div>
+<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.19.1">v2.19.1 · 2026-07-31</span></div>
 </nav>
 <!-- Community banner (logged-out) -->
 <div id="communityBanner">
@@ -348,10 +379,27 @@ This is tracked on this device only. Log in to sync it across devices.
 <div class="hiw-head"><h2>How Bathroom Report works</h2><button id="howItWorksClose" aria-label="Close">✕</button></div>
 <div class="hiw-body">
 <section><h3>What this is</h3><p>Bathroom Report helps you find a clean, open public bathroom fast, at convenience stores, travel stops, and other reliable spots. It’s community-powered and growing nationwide. The whole idea in four words: <b class="tag-verb">FIND. RATE. SHARE. IMPROVE.</b></p></section>
-<section><h3><span class="tag-verb">FIND</span></h3><p>Open the map, tap 🚽 Bathroom Now for the closest option, or use the key to see which places are around you. Hours show when we have them. A spot with unknown hours still appears, and we never mark a place closed on a guess. <b>No account needed</b> for any of this.</p></section>
+<section><h3><span class="tag-verb">FIND</span></h3><p>Open the map, tap Bathroom Now for the closest option, or use the key to see which places are around you. Hours show when we have them. A spot with unknown hours still appears, and we never mark a place closed on a guess. <b>No account needed</b> for any of this.</p></section>
 <section><h3><span class="tag-verb">RATE</span></h3><p>Ratings come from people who’ve actually been there, because you can only rate <b>when you’re on-site</b>. They cover the bathroom itself, so you know what to expect before you go. Something broken? Flag it right from the pin.</p></section>
-<section><h3><span class="tag-verb">SHARE</span></h3><p>Get directions, share a spot with a friend, leave a tip (“need a key,” “buzzer required”), or report wrong info, all from a pin. Signed out, directions open in your device’s default maps app. Spotted a place we don’t have? Send it in with 📍 We Missed One?</p></section>
+<section><h3><span class="tag-verb">SHARE</span></h3><p>Get directions, share a spot with a friend, leave a tip (“need a key,” “buzzer required”), or report wrong info, all from a pin. Signed out, directions open in your device’s default maps app. Spotted a place we don’t have? Send it in with We Missed One?</p></section>
 <section><h3><span class="tag-verb">IMPROVE</span></h3><p>Confirm a store’s hours, answer quick amenity questions, and build your Passport as you go. Every location is reviewed before it goes on the map, and whole data sources get rejected. One national chain claimed restrooms at 16,000 sites with no evidence behind it, so none of them are here. Nothing is <b>bulk-imported unchecked</b>, and your reports are how it keeps getting better.</p></section>
+<!-- Symbol key. The icons are drawn rather than emoji now, so the shapes carry no built-in
+     meaning the way ♿ or ⛽ did — a legend is what makes replacing them safe. Built from the same
+     sprite as the popups, so it cannot drift from what it explains. -->
+<section><h3>What the symbols mean</h3>
+<div class="legend">
+<svg class="ico" aria-hidden="true"><use href="#i-accessible"></use></svg><b>Step-free access to the restroom</b>
+<svg class="ico" aria-hidden="true"><use href="#i-fuel"></use></svg><b>Fuel on site</b>
+<svg class="ico" aria-hidden="true"><use href="#i-lock"></use></svg><b>Key, code, or asking staff</b>
+<svg class="ico" aria-hidden="true"><use href="#i-clock"></use></svg><b>Opening hours</b>
+<svg class="ico" aria-hidden="true"><use href="#i-calendar"></use></svg><b>Hours change with the season</b>
+<svg class="ico" aria-hidden="true"><use href="#i-pin"></use></svg><b>Pin is approximate</b>
+<svg class="ico ico-fill" aria-hidden="true"><use href="#i-star"></use></svg><b>Confirmed by more than one visitor</b>
+<svg class="ico" aria-hidden="true"><use href="#i-help"></use></svg><b>Nobody has told us yet</b>
+<svg class="ico" aria-hidden="true"><use href="#i-flag"></use></svg><b>Report something wrong</b>
+</div>
+<p>A green dot means open now, red means closed, grey means we don't have the hours. We never mark a place closed on a guess.</p>
+</section>
 <section><h3>Accounts &amp; privacy</h3><p>Signing in is optional. The whole map works without an account. Sign in to rate, add tips, build your Passport, filter places, choose your default directions app, and switch appearance, all synced across your devices. Like most sites, Bathroom Report also uses basic analytics to understand overall usage; it doesn’t identify you personally.</p></section>
 <section><h3>Not affiliated</h3><p>Bathroom Report is an independent, community-created project. It isn’t affiliated with or endorsed by any business listed. &copy; 2025&ndash;2026 Bathroom Report. All rights reserved. Map data &copy; OpenStreetMap contributors.</p></section>
 <section class="hiw-support">

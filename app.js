@@ -594,7 +594,7 @@ const BATHROOM_AMENITIES = [
       single:'Single',
       multiple:"Men's & women's"
     }},
-  {key:'accessible', label:'Wheelchair accessible', stateIcons:{yes:'♿️'}},
+  {key:'accessible', label:'Wheelchair accessible', stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-accessible"></use></svg>'}},
   {key:'changing', label:'Changing table', stateIcons:{yes:'🚼'}},
   /* Asked ONLY where the operator's own data doesn't list a public restroom (see
    * restroomDoubted). This is the one question that can prune the map: every other amenity adds
@@ -628,7 +628,15 @@ function amenityStateLabel(a, val){
 
 // Icons for each possible answer value across all amenities (both yes/no and the
 // restroom-type single/multiple states)
-const AMENITY_ANSWER_ICONS = {yes:'✅', no:'❌', unknown:'🤷', single:'🚪', multiple:'🚻'};
+/* Answer marks, drawn rather than emoji so they sit at the same weight as everything else on
+ * the card. 'unknown' is the same help mark used wherever the app says it does not know. */
+const AMENITY_ANSWER_ICONS = {
+  yes: `<svg class="ico" aria-hidden="true"><use href="#i-check"></use></svg>`,
+  no: `<svg class="ico" aria-hidden="true"><use href="#i-ban"></use></svg>`,
+  unknown: `<svg class="ico" aria-hidden="true"><use href="#i-help"></use></svg>`,
+  single: `<svg class="ico" aria-hidden="true"><use href="#i-lock"></use></svg>`,
+  multiple: `<svg class="ico" aria-hidden="true"><use href="#i-restroom"></use></svg>`
+};
 
 function amenityAnswerIcon(a, val){
   if(a.stateIcons && a.stateIcons[val]) return a.stateIcons[val];
@@ -760,7 +768,7 @@ function renderAmenityStepHtml(myVote, locId){
 
 function amenityEditorHtml(locId, myVote){
   return `<div class="amenities-editor">
-    <div class="feature-title">✅ Confirm what you saw</div>
+    ${plate('Help out')}
     <div class="amenity-step" id="amenity-step-${locId}">${renderAmenityStepHtml(myVote, locId)}</div>
     <div class="save-note" id="amenities-note-${locId}"></div>
   </div>`;
@@ -803,10 +811,10 @@ function communityConfirmedBadges(loc, featureDefs, summary, skip){
       // here: it stores key -> 1 and cannot carry a state, and the offline bake deliberately
       // skips this amenity, so live votes are the only source.
       const st = confirmedState(a, x);
-      return st ? `<span class="feature-badge community">${amenityAnswerIcon(a, st)} ${escapeHtml(amenityStateLabel(a, st))} ⭐</span>` : '';
+      return st ? `<span class="feature-badge community">${amenityAnswerIcon(a, st)} ${escapeHtml(amenityStateLabel(a, st))} <svg class="ico ico-fill" aria-hidden="true"><use href="#i-star"></use></svg></span>` : '';
     }
     if(!(isConfirmedYes(x) || conf[a.key])) return '';
-    return `<span class="feature-badge community">${amenityAnswerIcon(a, 'yes')} ${a.label} ⭐</span>`;
+    return `<span class="feature-badge community">${amenityAnswerIcon(a, 'yes')} ${a.label} <svg class="ico ico-fill" aria-hidden="true"><use href="#i-star"></use></svg></span>`;
   }).join('');
 }
 
@@ -863,11 +871,11 @@ function accessIndicatorHtml(locId){
   if(!communityYes && !osmYes && !limited) return '';
   if(!communityYes && !osmYes && limited){
     const t = 'Limited step-free access — verified';
-    return `<span class="access-indicator limited" title="${t}" aria-label="${t}">♿</span>`;
+    return `<span class="access-indicator limited" title="${t}" aria-label="${t}">${ico('accessible')}</span>`;
   }
   const cls = communityYes ? 'access-indicator community' : 'access-indicator verified';
   const title = communityYes ? 'Wheelchair accessible — confirmed by visitors' : 'Wheelchair accessible — verified';
-  return `<span class="${cls}" title="${title}" aria-label="${title}">♿</span>`;
+  return `<span class="${cls}" title="${title}" aria-label="${title}">${ico('accessible')}</span>`;
 }
 
 // Some public restrooms (park comfort stations especially) only open for part of the year.
@@ -986,21 +994,21 @@ function accessibleBadgeHtml(locId){
   // Community confirmations are the strongest signal and win when present.
   const summary = amenityCache[locId];
   if(summary && isConfirmedAccessible(summary)){
-    return '<div class="accessible-badge">♿ Wheelchair accessible — confirmed by visitors</div>';
+    return `<div class="accessible-badge">${ico('accessible')} Wheelchair accessible — confirmed by visitors</div>`;
   }
   const loc = locationsById[locId];
   // Baked community confirmation (from a prior votes bake) also counts as visitor-confirmed.
   if(loc && loc.conf && loc.conf.accessible){
-    return '<div class="accessible-badge">♿ Wheelchair accessible — confirmed by visitors</div>';
+    return `<div class="accessible-badge">${ico('accessible')} Wheelchair accessible — confirmed by visitors</div>`;
   }
   // Fall back to accessibility data baked into the location files (sourced from
   // OpenStreetMap wheelchair / toilets:wheelchair tags at bake time).
   const osmAccessible = loc && ((loc.osm && loc.osm.accessible) || loc.wheelchair === 'yes' || loc.wheelchair === 'designated');
   if(osmAccessible){
-    return '<div class="accessible-badge">♿ Wheelchair accessible — verified</div>';
+    return `<div class="accessible-badge">${ico('accessible')} Wheelchair accessible — verified</div>`;
   }
   if(isAccessLimited(loc)){
-    return '<div class="accessible-badge access-limited">♿ Limited step-free access — verified</div>';
+    return `<div class="accessible-badge access-limited">${ico('accessible')} Limited step-free access — verified</div>`;
   }
   return '';
 }
@@ -1091,7 +1099,7 @@ function storeFeatureIconsHtml(loc, summary){
   const pill = (glyph, label) =>
     `<span class="store-icon" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}" role="img">${glyph}</span>`;
   const out = [];
-  if(osm.gas) out.push(pill('⛽', 'Gas station'));
+  if(osm.gas) out.push(pill(ico('fuel'), 'Gas station'));
   STORE_FEATURES.forEach(a => {
     if(!osm[a.key]) return;
     if(conf[a.key]) return;
@@ -1738,9 +1746,9 @@ function ratingSectionInnerHtml(loc, agg, myVote){
     return oooHardHtml(loc, status);
   }
   const softNote = status.phase === 'soft'
-    ? `<div class="ooo-soft-note">⚠️ Reported out of order ${relativeTimeFromNow(status.since)} — might be working now.</div>`
+    ? `<div class="ooo-soft-note">${ico('warning')} Reported out of order ${relativeTimeFromNow(status.since)} — might be working now.</div>`
     : '';
-  return `<span class="rating-label">🚻 Rate this bathroom</span>
+  return `${plate('Rate this bathroom')}
       <div class="rating-score-line"><span class="rating-score">${avgStr(agg.bathroomSum, agg.bathroomCount)}★</span> ${ratingConfidenceHtml(agg.bathroomCount)}</div>
       <div class="rate-stack" id="ratestack-bathroom-${loc.id}">
         ${starsHtml(loc.id,'bathroom',myVote.bathroom)}
@@ -1749,14 +1757,14 @@ function ratingSectionInnerHtml(loc, agg, myVote){
       </div>
       <div class="save-note" id="note-bathroom-${loc.id}"></div>
       ${softNote}
-      <button type="button" class="ooo-report-link" id="ooo-report-${loc.id}">⚠️ Report out of order</button>`;
+      <button type="button" class="ooo-report-link" id="ooo-report-${loc.id}">${ico('warning')} Report out of order</button>`;
 }
 
 // The hard-phase readout: no stars, a clear notice, and an "It's working now" clear button. A
 // re-report ("still broken") button is offered too (GPS-gated) so persistent outages escalate.
 function oooHardHtml(loc, status){
   return `<div class="ooo-hard">
-      <div class="ooo-hard-title">⚠️ Reported out of order</div>
+      <div class="ooo-hard-title">${ico('warning')} Reported out of order</div>
       <div class="ooo-hard-sub">Reported ${relativeTimeFromNow(status.since)}. Rating hidden until it's confirmed working.</div>
       <button type="button" class="btn btn-primary ooo-working-btn" id="ooo-working-${loc.id}">✓ It's working now</button>
       <button type="button" class="ooo-report-link" id="ooo-stillbroken-${loc.id}">Still broken — report again</button>
@@ -1774,7 +1782,7 @@ function oooHardHtml(loc, status){
  * positive case is worth stating because those chains vary. */
 function accessBadge(loc, force){
   const a = accessState(loc);
-  if(a === 'customer') return '<div class="access-badge access-customer">🔑 Customers only</div>';
+  if(a === 'customer') return `<div class="access-badge access-customer">${ico('lock')} Customers only</div>`;
   if(a === 'unknown'){
     /* THREE unknowns, and wording them the same would misinform in two directions.
      *
@@ -1792,13 +1800,13 @@ function accessBadge(loc, force){
      *    leaving the interstate on that promise is the exact failure this app exists to prevent,
      *    so this one stays hedged. */
     if(loc && loc.metroInfo)
-      return '<div class="access-badge access-unknown">❔ Access unknown</div>';
+      return `<div class="access-badge access-unknown">${ico('help')} Access unknown</div>`;
     const facility = (loc && loc.meta && loc.meta.facility) || '';
     if(facility === 'bare' || facility === 'polygon' || facility === 'picnic')
-      return '<div class="access-badge access-unknown">❔ Unconfirmed — may be a pull-off only</div>';
-    return '<div class="access-badge access-unknown">🤞 Probably — nobody\'s confirmed yet</div>';
+      return `<div class="access-badge access-unknown">${ico('help')} Unconfirmed — may be a pull-off only</div>`;
+    return `<div class="access-badge access-unknown">${ico('help')} Probably — nobody's confirmed yet</div>`;
   }
-  return force ? '<div class="access-badge access-public">✅ Public restroom</div>' : '';
+  return force ? `<div class="access-badge access-public">${ico('check')} Public restroom</div>` : '';
 }
 function metroAccessBadge(loc){ return accessBadge(loc, true); }
 
@@ -1812,10 +1820,10 @@ function metroPopupHtml(loc, agg, myVote){
   const chain = chainFor(loc);
   const raw = (loc.metroInfo && loc.metroInfo.hoursRaw) || '';
   const hoursLine = raw
-    ? `<div class="hours-line">🕐 ${escapeHtml(raw)}</div>`
-    : `<div class="hours-line">🕐 Hours not listed yet — know them? Tap 🚩 below to send them in.</div>`;
+    ? `<div class="hours-line">${ico('clock')} ${escapeHtml(raw)}</div>`
+    : `<div class="hours-line">${ico('clock')} Hours not listed yet — know them? Tap Report below to send them in.</div>`;
   const recency = agg ? relativeTimeFromNow(agg.lastRatedAt || agg.lastUpdated) : '';
-  const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}${ratedByHtml(agg)}</div>` : '';
+  const recencyLine = recency ? `<div class="hours-line">${ico('pencil')} Last rated ${recency}${ratedByHtml(agg)}</div>` : '';
   const seasonalLine = seasonalNoteHtml(loc);
   // A doubted store shows the caveat until the community settles it either way.
   // The access badge above now carries this — one statement per fact, not two lines saying the
@@ -1827,26 +1835,31 @@ function metroPopupHtml(loc, agg, myVote){
     </div>
     <div class="addr addr-title">${escapeHtml(loc.addr || '')}</div>
     ${metroAccessBadge(loc)}
-    ${(loc.metroInfo && loc.metroInfo.fee) ? `<div class="hours-line">${loc.metroInfo.fee === 'free' ? '✅ Free to use' : '💰 Paid / fee'}</div>` : ''}
-    ${(loc.metroInfo && loc.metroInfo.disposal) ? `<div class="hours-line">🚻 Basic facilities (portable / chemical unit)</div>` : ''}
+    ${(loc.metroInfo && loc.metroInfo.fee) ? `<div class="hours-line">${loc.metroInfo.fee === 'free' ? `${ico('check')} Free to use` : `${ico('help')} Paid / fee`}</div>` : ''}
+    ${(loc.metroInfo && loc.metroInfo.disposal) ? `<div class="hours-line">${ico('restroom')} Basic facilities (portable / chemical unit)</div>` : ''}
     ${hoursLine}
     ${seasonalLine}
     ${restroomDoubtLine}
     ${recencyLine}
     <div id="accessible-badge-${loc.id}">${accessibleBadgeHtml(loc.id)}</div>
     <div class="popup-actions">
-      <button class="btn btn-primary directions-btn" id="directions-btn-${loc.id}" data-lat="${loc.lat}" data-lng="${loc.lng}">🧭 Directions</button>
-      <button class="btn btn-secondary btn-icon-only share-btn" title="Share" data-shareurl="${shareUrl}" data-sharename="${(loc.n||'').replace(/"/g,'&quot;')}">🔗</button>
+      <button class="btn btn-primary directions-btn" id="directions-btn-${loc.id}" data-lat="${loc.lat}" data-lng="${loc.lng}">${ico('compass','ico-lg')} Directions</button>
+    </div>
+    <!-- Metro was left on the old three-abreast row. Its share button was icon-only, so the new
+         "Copied" feedback would have overflowed a control sized for one glyph, and Report — now a
+         labelled pill — sat in a row built for icons. -->
+    <div class="popup-subactions">
+      <button class="share-btn" data-shareurl="${shareUrl}" data-sharename="${(loc.n||'').replace(/"/g,'&quot;')}">${ico('link')} Share</button>
       ${reportButtonHtml(loc)}
     </div>
     <div class="report-section" id="report-section-${loc.id}" style="display:none;">
       <div class="report-heading">Report a problem with this listing</div>
       <div class="report-cats" id="report-cats-${loc.id}">
-        <button type="button" class="report-cat-btn" data-reason="Permanently closed">🚫 Permanently closed</button>
-        <button type="button" class="report-cat-btn" data-reason="Wrong address / location">📍 Wrong address</button>
-        <button type="button" class="report-cat-btn" data-reason="Wrong hours">🕐 Wrong hours</button>
-        <button type="button" class="report-cat-btn" data-reason="Not a real location">❓ Not a real location</button>
-        <button type="button" class="report-cat-btn" data-reason="__other__">✏️ Other</button>
+        <button type="button" class="report-cat-btn" data-reason="Permanently closed">${ico('ban')} Permanently closed</button>
+        <button type="button" class="report-cat-btn" data-reason="Wrong address / location">${ico('pin')} Wrong address</button>
+        <button type="button" class="report-cat-btn" data-reason="Wrong hours">${ico('clock')} Wrong hours</button>
+        <button type="button" class="report-cat-btn" data-reason="Not a real location">${ico('help')} Not a real location</button>
+        <button type="button" class="report-cat-btn" data-reason="__other__">${ico('pencil')} Other</button>
       </div>
       <div class="report-other-row" id="report-other-row-${loc.id}" style="display:none;">
         <input type="text" class="tip-input" id="report-input-${loc.id}" maxlength="80" placeholder="Briefly describe the problem" />
@@ -1858,11 +1871,11 @@ function metroPopupHtml(loc, agg, myVote){
       ${ratingSectionInnerHtml(loc, agg, myVote)}
     </div>
     <div class="community-section${communitySectionHasContent(loc) ? '' : ' is-empty'}" id="community-section-${loc.id}">
-      <div class="feature-title">✅ Confirmed by visitors</div>
+      ${plate('Confirmed by visitors')}
       <div class="feature-badges" id="community-summary-${loc.id}">${communitySummaryHtml(loc)}</div>
     </div>
     <div class="tips-section">
-      <span class="rating-label">💬 Tips from visitors</span>
+      ${plate('Tips')}
       <ul class="tips-list" id="tips-list-${loc.id}"><li style="color:#999;">Loading…</li></ul>
       <div class="tip-input-row">
         <input type="text" class="tip-input" id="tip-input-${loc.id}" maxlength="${MAX_TIP_LENGTH}" placeholder="e.g. need a key, buzzer required" />
@@ -1870,8 +1883,18 @@ function metroPopupHtml(loc, agg, myVote){
       </div>
     </div>
     ${amenityEditorHtml(loc.id, myVote)}
-    <div class="feature-summary osm-bathroom-section${osmBathroomHasContent(loc) ? '' : ' is-empty'}"><div class="feature-title">🚻 Bathroom features</div><div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>` : `<div class="popup-signin-hint">🔒 Sign in to rate this bathroom, add tips, or report an issue.</div>`}
+    <div class="feature-summary osm-bathroom-section${osmBathroomHasContent(loc) ? '' : ' is-empty'}">${plate('Bathroom features')}<div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>` : `<div class="popup-signin-hint">${ico('lock')} Sign in to rate this bathroom, add tips, or report an issue.</div>`}
   </div>`;
+}
+
+/* Reference into the sprite in index.html. Every icon in one place, so a shape can be redrawn
+ * once and every use follows. */
+function ico(name, cls){
+  return `<svg class="ico${cls ? ' ' + cls : ''}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
+}
+// A section heading. Structure carried by type, not by a picture.
+function plate(label){
+  return `<div class="plate"><span>${label}</span><i></i></div>`;
 }
 
 function popupHtml(loc, agg, myVote){
@@ -1881,35 +1904,49 @@ function popupHtml(loc, agg, myVote){
   const openStatus = isLocationOpenNow(loc);
   // "Today" only where the week actually varies — on a single all-week window it's noise.
   const hoursPrefix = (hasPerDayHours(loc) && hoursText !== 'Open 24 hours') ? 'Today ' : '';
+  /* Open status leads.
+   *
+   * It was a small coloured word trailing the hours, at the same weight as the address and the
+   * last-rated note. It is the single most important fact on the card — somebody standing outside
+   * at 11pm needs it before anything else — so it gets its own line and the loudest type in the
+   * block. Three channels carry it (dot, colour, word), so it survives greyscale and colour
+   * blindness alike.
+   *
+   * Unknown stays visibly unknown, and is never rendered as closed. */
   let hoursLine = '';
   if(hoursText){
-    const statusHtml = openStatus === true
-      ? '<span style="color:#2e7d32;font-weight:700;">Open now</span>'
-      : openStatus === false
-        ? '<span style="color:#c62828;font-weight:700;">Closed now</span>'
-        : '';
-    hoursLine = `<div class="hours-line">🕐 ${hoursPrefix}${hoursText}${statusHtml ? ' · ' + statusHtml : ''}</div>`;
+    const cls = openStatus === true ? 'status-open' : openStatus === false ? 'status-shut' : 'status-maybe';
+    const word = openStatus === true ? 'Open now' : openStatus === false ? 'Closed now' : 'Hours listed';
+    hoursLine = `<div class="status-line ${cls}">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span class="status-word">${word}</span>
+      <span class="status-hours">${hoursPrefix}${hoursText}</span>
+    </div>`;
   } else {
-    hoursLine = `<div class="hours-line">🕐 Hours not listed yet — know them? Tap 🕐 Report hours below.</div>`;
+    hoursLine = `<div class="status-line status-maybe">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span class="status-word">Hours unknown</span>
+      <span class="status-hours">Know them? Report hours below.</span>
+    </div>`;
   }
   const recency = relativeTimeFromNow(agg.lastRatedAt || agg.lastUpdated);
-  const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}${ratedByHtml(agg)}</div>` : '';
+  const recencyLine = recency ? `<div class="hours-line">${ico('pencil')} Last rated ${recency}${ratedByHtml(agg)}</div>` : '';
   hoursLine += seasonalNoteHtml(loc);
   if(restroomDoubted(loc) && !(loc.conf && loc.conf.hasRestroom)
      && !isConfirmedYes((amenityCache[loc.id]||{}).hasRestroom)){
-    hoursLine += '<div class="hours-line restroom-doubt">❔ Not listed as having a public restroom — can you confirm?</div>';
+    hoursLine += `<div class="hours-line restroom-doubt">${ico('help')} Not listed as having a public restroom — can you confirm?</div>`;
   }
   const chain = chainFor(loc);
   // Report hours is offered ONLY where hours are unknown — it fills blanks. Correcting wrong
-  // hours stays in the 🚩 Report-a-problem flow ("Wrong hours").
+  // hours stays in the Report-a-problem flow ("Wrong hours").
   const hoursReportHtml = (hoursText || !isLoggedIn()) ? '' : `
-    <button type="button" class="btn btn-secondary hours-report-toggle" id="hours-report-toggle-${loc.id}" style="margin:6px 0;width:100%;">🕐 Report hours</button>
+    <button type="button" class="btn btn-secondary hours-report-toggle" id="hours-report-toggle-${loc.id}" style="margin:6px 0;width:100%;">${ico('clock')} Report hours</button>
     <div class="hours-report-section" id="hours-report-section-${loc.id}" style="display:none;background:#141619;border:1px solid #2a2e35;border-radius:10px;padding:10px;margin-bottom:6px;">
       <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:#f6f8fa;">${isMapAdmin() ? "You're an admin — the hours you set are applied to the map right away." : "What hours is this store open? Two travelers agreeing makes it official."}</div>
       <div id="hours-mode-${loc.id}">
-        <button type="button" data-mode="24" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">🕛 Open 24 hours</button>
-        <button type="button" data-mode="same" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">🕐 Same hours every day</button>
-        <button type="button" data-mode="sunday" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">📅 Sunday is different</button>
+        <button type="button" data-mode="24" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">${ico('clock')} Open 24 hours</button>
+        <button type="button" data-mode="same" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">${ico('clock')} Same hours every day</button>
+        <button type="button" data-mode="sunday" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">${ico('calendar')} Sunday is different</button>
       </div>
       <div id="hours-same-${loc.id}" style="display:none;margin-top:8px;align-items:center;gap:10px;color:#f6f8fa;font-size:13px;">
         <label>Open <select id="hr-open-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></label>
@@ -1935,18 +1972,23 @@ function popupHtml(loc, agg, myVote){
     ${hoursReportHtml}
     ${isMapAdmin() ? adminAmenityPanelHtml(loc) : ''}
     <div class="popup-actions">
-      <button class="btn btn-primary directions-btn" id="directions-btn-${loc.id}" data-lat="${loc.lat}" data-lng="${loc.lng}">🧭 Directions</button>
-      <button class="btn btn-secondary btn-icon-only share-btn" title="Share" data-shareurl="${shareUrl}" data-sharename="${loc.n.replace(/"/g,'&quot;')}">🔗</button>
+      <button class="btn btn-primary directions-btn" id="directions-btn-${loc.id}" data-lat="${loc.lat}" data-lng="${loc.lng}">${ico('compass','ico-lg')} Directions</button>
+    </div>
+    <!-- Directions is what most people opened this card for, so it stands alone. Share and Report
+         sat beside it at equal weight, turning one obvious choice and two occasional ones into
+         three co-equal ones. -->
+    <div class="popup-subactions">
+      <button class="share-btn" data-shareurl="${shareUrl}" data-sharename="${loc.n.replace(/"/g,'&quot;')}">${ico('link')} Share</button>
       ${reportButtonHtml(loc)}
     </div>
     <div class="report-section" id="report-section-${loc.id}" style="display:none;">
       <div class="report-heading">Report a problem with this listing</div>
       <div class="report-cats" id="report-cats-${loc.id}">
-        <button type="button" class="report-cat-btn" data-reason="Permanently closed">🚫 Permanently closed</button>
-        <button type="button" class="report-cat-btn" data-reason="Wrong address / location">📍 Wrong address</button>
-        <button type="button" class="report-cat-btn" data-reason="Wrong hours">🕐 Wrong hours</button>
-        <button type="button" class="report-cat-btn" data-reason="Not a real location">❓ Not a real location</button>
-        <button type="button" class="report-cat-btn" data-reason="__other__">✏️ Other</button>
+        <button type="button" class="report-cat-btn" data-reason="Permanently closed">${ico('ban')} Permanently closed</button>
+        <button type="button" class="report-cat-btn" data-reason="Wrong address / location">${ico('pin')} Wrong address</button>
+        <button type="button" class="report-cat-btn" data-reason="Wrong hours">${ico('clock')} Wrong hours</button>
+        <button type="button" class="report-cat-btn" data-reason="Not a real location">${ico('help')} Not a real location</button>
+        <button type="button" class="report-cat-btn" data-reason="__other__">${ico('pencil')} Other</button>
       </div>
       <div class="report-other-row" id="report-other-row-${loc.id}" style="display:none;">
         <input type="text" class="tip-input" id="report-input-${loc.id}" maxlength="80" placeholder="Briefly describe the problem" />
@@ -1958,11 +2000,11 @@ function popupHtml(loc, agg, myVote){
       ${ratingSectionInnerHtml(loc, agg, myVote)}
     </div>
     <div class="community-section${communitySectionHasContent(loc) ? '' : ' is-empty'}" id="community-section-${loc.id}">
-      <div class="feature-title">✅ Confirmed by visitors</div>
+      ${plate('Confirmed by visitors')}
       <div class="feature-badges" id="community-summary-${loc.id}">${communitySummaryHtml(loc)}</div>
     </div>
     <div class="tips-section">
-      <span class="rating-label">💬 Tips from visitors</span>
+      ${plate('Tips')}
       <ul class="tips-list" id="tips-list-${loc.id}"><li style="color:#999;">Loading…</li></ul>
       <div class="tip-input-row">
         <input type="text" class="tip-input" id="tip-input-${loc.id}" maxlength="${MAX_TIP_LENGTH}" placeholder="e.g. need a key, buzzer required" />
@@ -1970,8 +2012,8 @@ function popupHtml(loc, agg, myVote){
       </div>
     </div>
     ${amenityEditorHtml(loc.id, myVote)}
-    <div class="feature-summary osm-bathroom-section${osmBathroomHasContent(loc) ? '' : ' is-empty'}"><div class="feature-title">🚻 Bathroom features</div><div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>
-` : `<div class="popup-signin-hint">🔒 Sign in to rate this bathroom, add tips, or report an issue.</div>`}
+    <div class="feature-summary osm-bathroom-section${osmBathroomHasContent(loc) ? '' : ' is-empty'}">${plate('Bathroom features')}<div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>
+` : `<div class="popup-signin-hint">${ico('lock')} Sign in to rate this bathroom, add tips, or report an issue.</div>`}
   </div>`;
 }
 
@@ -2096,8 +2138,11 @@ function attachShareHandler(loc){
     } else if(navigator.clipboard){
       try{
         await navigator.clipboard.writeText(url);
-        newBtn.textContent = '✅';
-        setTimeout(() => { newBtn.textContent = '🔗'; }, 2000);
+        /* innerHTML, not textContent: the button now holds an <svg> and a label, and assigning
+         * textContent would delete both and leave a bare glyph where the control had been. */
+        const restore = newBtn.innerHTML;
+        newBtn.innerHTML = `${ico('check')} Copied`;
+        setTimeout(() => { newBtn.innerHTML = restore; }, 2000);
       }catch(e){ /* clipboard blocked — nothing we can do silently */ }
     }
   });
@@ -2119,12 +2164,14 @@ function reportDocId(locId, uid){ return fsId(locId) + '_' + uid; }
 /* The flag button, or the pending state where this person already has a live report here.
  * Both popups render it through this so the two stay in step. */
 function reportPendingHtml(loc){
-  return `<span class="report-pending" id="report-pending-${loc.id}" title="Your report is with a moderator" role="status">🚩 Reported</span>`;
+  return `<span class="report-pending" id="report-pending-${loc.id}" title="Your report is with a moderator" role="status">${ico('flag')} Reported</span>`;
 }
 function reportButtonHtml(loc){
   if(!isLoggedIn()) return '';
   if(hasReportedLocally(loc.id)) return reportPendingHtml(loc);
-  return `<button class="btn btn-danger btn-icon-only report-toggle-btn" title="Report an issue" aria-label="Report a problem with this location" id="report-toggle-${loc.id}">🚩</button>`;
+  /* Sits in the quiet sub-action row now, so it inherits that styling rather than btn-danger —
+   * reporting a problem is a normal, welcome thing to do, not a destructive action. */
+  return `<button class="report-toggle-btn" aria-label="Report a problem with this location" id="report-toggle-${loc.id}">${ico('flag')} Report</button>`;
 }
 
 /* Local memory of what this person has already reported. UI hint only — it decides whether the
@@ -3672,7 +3719,7 @@ function renderTipsList(loc, tips){
     listEl.innerHTML = '<li style="color:#999;">No tips yet — be the first!</li>';
     return;
   }
-  listEl.innerHTML = tips.map(t => `<li>💡 ${escapeHtml(t)}</li>`).join('');
+  listEl.innerHTML = tips.map(t => `<li><svg class="ico" aria-hidden="true"><use href="#i-bulb"></use></svg> ${escapeHtml(t)}</li>`).join('');
 }
 
 /* Escape for BOTH text content and attribute values.
@@ -4535,16 +4582,18 @@ function renderChainKey(){
     const keys = allKeys.filter(k => chainBucket(k) === g.id);
     if(!keys.length) return '';
     const on = !keys.every(k => disabledChains.has(k));
-    const ico = `<span class="d-ico" aria-hidden="true">${g.icon}</span>`;
+    // Named groupIco, not ico: a local `ico` shadows the global ico() helper for this whole
+    // block, so any future icon added here would fail with a confusing "not a function".
+    const groupIco = `<span class="d-ico" aria-hidden="true">${g.icon}</span>`;
     if(readOnly){
-      return `<div class="d-toggle ck-grouprow d-gated"><span>${ico}${escapeHtml(g.label)}</span>` +
+      return `<div class="d-toggle ck-grouprow d-gated"><span>${groupIco}${escapeHtml(g.label)}</span>` +
              `<span class="d-switch"><b></b></span></div>`;
     }
     // Reuses the drawer's own switch (same markup as Hide-closed and Appearance) rather than
     // the map key's checkmark. A checkmark reads as "selected"; the question here is
     // shown/hidden, and the drawer already has a control that says exactly that.
     return `<button type="button" class="d-toggle ck-grouprow${on ? ' on' : ''}" data-groupkeys="${keys.join(',')}"` +
-      ` role="switch" aria-checked="${on}"><span>${ico}${escapeHtml(g.label)}</span>` +
+      ` role="switch" aria-checked="${on}"><span>${groupIco}${escapeHtml(g.label)}</span>` +
       `<span class="d-switch"><b></b></span></button>`;
   }).join('');
 

@@ -516,8 +516,14 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 /* Store features as head-row icons (replaces the old "Store amenities" section). */
 .store-icons{ display:inline-flex; align-items:center; gap:5px; }
 .store-icon{ font-size:15px; line-height:1; opacity:.9; }
-.access-indicator.community{ filter:none; }                 /* green-tier: community-confirmed */
-.access-indicator.verified{ opacity:.85; }                  /* teal-tier: OSM-verified */
+/* Provenance by colour, now that the mark is drawn and inherits currentColor.
+   These were `filter:none` (which did nothing — there was no base filter to cancel) and a 15%
+   opacity shift, so the three tiers were effectively indistinguishable. Colour is never the only
+   channel: every one of these carries a title and an aria-label spelling the tier out. */
+.access-indicator{ color:var(--shell-muted); }
+.access-indicator.community{ color:#00C244; }   /* confirmed by visitors */
+.access-indicator.verified{ color:#2ea1aa; }    /* verified from OSM data */
+.access-indicator.limited{ color:#f59e0b; }     /* step-free but tight — not the same as yes */
 
 /* ---------- Drawer close (X) button ---------- */
 #appDrawer .d-close{

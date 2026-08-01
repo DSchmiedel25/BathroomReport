@@ -922,3 +922,72 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
 }
   #accountPanel #accountClose{ min-width:44px; min-height:44px; }
   #accountPanel #accountClose:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; border-radius:8px; }
+
+  /* ============================================================
+     Icons + placards — popup pass (v2.19)
+     ============================================================ */
+  /* One stroke set from the sprite in index.html. Colour is inherited, never set here, so an
+     icon always matches the text it sits beside and follows the theme without a second rule. */
+  .ico{
+    width:1em; height:1em; flex:none; vertical-align:-0.13em;
+    fill:none; stroke:currentColor; stroke-width:1.75;
+    stroke-linecap:round; stroke-linejoin:round;
+}
+  .ico-lg{ width:1.15em; height:1.15em; }
+  /* The community-confirmed mark is the one solid icon — filled reads as "settled", which is
+     exactly what it means, and it distinguishes it at a glance from the outlined set. */
+  .ico-fill{ fill:currentColor; stroke:none; }
+
+  /* Enamel placard — same device as the account sheet: small letterspaced display type on a teal
+     keyline, like the engraved plate on a restroom door. Replaces ten decorative emoji that were
+     each doing a heading's job with a picture. */
+  .plate{
+    display:flex; align-items:center; gap:9px;
+    margin:16px 0 9px; padding-top:12px;
+    border-top:1px solid var(--popup-divider);
+}
+  .plate span{
+    font-family:var(--font-display); font-weight:600;
+    font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--accent); white-space:nowrap;
+}
+  .plate i{ flex:1; height:1px; background:var(--accent); opacity:.26; }
+
+  /* Open / closed / unknown. The dot is a second channel alongside the colour, and the word
+     carries it regardless — status is never colour alone. */
+  .status-line{ display:flex; align-items:center; gap:7px; font-size:14px; margin:8px 0 2px; }
+  .status-dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+  .status-open  .status-dot{ background:var(--green); }
+  .status-shut  .status-dot{ background:#c62828; }
+  .status-maybe .status-dot{ background:var(--muted); }
+  .status-word{ font-weight:800; letter-spacing:.02em; }
+  .status-open  .status-word{ color:var(--green); }
+  .status-shut  .status-word{ color:#c62828; }
+  .status-maybe .status-word{ color:var(--popup-muted); }
+  .status-hours{ color:var(--popup-muted); font-size:13px; }
+
+  /* Rating line. "early score" survives as small caps rather than a bordered chip — it is an
+     honesty signal, not decoration, and a 4.0 from one rating genuinely is not a 4.0 from forty.
+     Same information, less furniture. */
+  .rating-line{ display:flex; align-items:baseline; gap:7px; flex-wrap:wrap; font-size:13px; margin:2px 0 0; }
+  .rating-line b{ font-family:var(--font-display); font-weight:600; font-size:16px; color:var(--popup-text); }
+  .rating-meta{ color:var(--popup-muted); font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+
+  /* Quiet secondary actions beneath the one primary button. Directions is what most people came
+     for; Share and Report were competing with it at equal weight. */
+  .popup-subactions{ display:flex; gap:6px; margin-top:6px; }
+  .popup-subactions button{
+    flex:1; min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    background:none; border:1px solid var(--popup-border); border-radius:10px;
+    color:var(--popup-muted); font:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
+}
+  .popup-subactions button:hover{ border-color:var(--accent); color:var(--accent); }
+  .popup-subactions button:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; }
+  .popup-subactions .report-pending{ flex:1; justify-content:center; }
+
+  /* Symbol legend in How it works. Built from the same sprite, so it cannot drift from the icons
+     it explains. A drawn accessibility mark with no key is a guess — the legend is what makes
+     replacing the emoji safe. */
+  .legend{ display:grid; grid-template-columns:auto 1fr; gap:9px 12px; align-items:center; margin:10px 0 4px; }
+  .legend .ico{ width:19px; height:19px; color:var(--accent); }
+  .legend b{ font-weight:600; font-size:13.5px; }
