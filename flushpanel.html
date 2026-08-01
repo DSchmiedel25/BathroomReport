@@ -692,39 +692,57 @@ document.querySelectorAll('.nav-link').forEach(btn => btn.addEventListener('clic
 async function loadAll(){
   $('#refreshBtn').disabled = true;
   $('#globalError').classList.add('hidden');
-  try{
-    // Third read is the reporters collection: flagged accounts only, so a few documents at most.
-    const [repSnap, reqSnap, rptrSnap] = await Promise.all([
-      getDocs(collection(db, 'reports')),
-      getDocs(collection(db, 'missingReports')),
-      getDocs(collection(db, 'reporters'))
-    ]);
 
+  /* allSettled, not all. These are three independent queues, and Promise.all meant a single
+   * rejection discarded the two that succeeded — so adding the reporters read gave every future
+   * permissions problem the power to blank the whole panel. The commonest cause is the most
+   * mundane one: rules deployed later than the code that depends on them. Each queue now fails
+   * on its own and says which one, while the rest still render. */
+  const [rep, req, rptr] = await Promise.allSettled([
+    getDocs(collection(db, 'reports')),
+    getDocs(collection(db, 'missingReports')),
+    getDocs(collection(db, 'reporters'))
+  ]);
+
+  const failed = [];
+
+  if(rep.status === 'fulfilled'){
     allReports = [];
-    repSnap.forEach(d => allReports.push({ id: d.id, ...d.data() }));
+    rep.value.forEach(d => allReports.push({ id: d.id, ...d.data() }));
     allReports.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  } else { console.error('reports load failed', rep.reason); failed.push('reports'); }
 
+  if(req.status === 'fulfilled'){
     allRequests = [];
-    reqSnap.forEach(d => allRequests.push({ id: d.id, ...d.data() }));
+    req.value.forEach(d => allRequests.push({ id: d.id, ...d.data() }));
     allRequests.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  } else { console.error('requests load failed', req.reason); failed.push('location requests'); }
 
+  if(rptr.status === 'fulfilled'){
     reporters = {};
-    rptrSnap.forEach(d => { reporters[d.id] = { uid: d.id, ...d.data() }; });
+    rptr.value.forEach(d => { reporters[d.id] = { uid: d.id, ...d.data() }; });
+  } else { console.error('reporters load failed', rptr.reason); failed.push('reporters'); }
 
-    historyLoaded = false;   // a refresh should re-fetch the archive if a history tab is open
-    reportHistory = [];
+  historyLoaded = false;   // a refresh should re-fetch the archive if a history tab is open
+  reportHistory = [];
 
-    renderReports();
-    renderRequests();
-    renderReporters();
-    updateBadges();
-  }catch(e){
-    console.error('Load failed', e);
-    const el = $('#globalError'); el.classList.remove('hidden');
-    el.textContent = 'Could not load the moderation queues. Check your connection and that this account has admin access.';
-  }finally{
-    $('#refreshBtn').disabled = false;
+  // Always render, so a queue that loaded is visible even when another did not — and so the
+  // "Loading…" placeholder never sits there permanently after a failure.
+  renderReports();
+  renderRequests();
+  renderReporters();
+  updateBadges();
+
+  if(failed.length){
+    const el = $('#globalError');
+    el.classList.remove('hidden');
+    const permission = [rep, req, rptr].some(r => r.status === 'rejected' && r.reason && r.reason.code === 'permission-denied');
+    el.textContent = `Could not load: ${failed.join(', ')}. `
+      + (permission
+          ? 'Firestore refused the read — the most likely cause is that firestore.rules has not been deployed yet (firebase deploy --only firestore:rules), or this account is not an enabled admin.'
+          : 'Check your connection and try Refresh.');
   }
+  $('#refreshBtn').disabled = false;
 }
 $('#refreshBtn').addEventListener('click', loadAll);
 

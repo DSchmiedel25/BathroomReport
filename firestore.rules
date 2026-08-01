@@ -56,6 +56,45 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/reporters/$(request.auth.uid)).data.mutedUntil < request.time.toMillis());
     }
 
+    /* Each value in a per-day hours map must be the same short window string a single-window
+     * report sends ("0500-2300", "24"). Rules have no iteration, so this checks every day
+     * explicitly; a day that is absent passes, since a partial week is a legitimate submission. */
+    function validDayWindow(m, d) {
+      return !(d in m) || (m[d] is string && m[d].size() > 0 && m[d].size() <= 24);
+    }
+    function validDayWindows(m) {
+      return validDayWindow(m, 'sun') && validDayWindow(m, 'mon') && validDayWindow(m, 'tue')
+          && validDayWindow(m, 'wed') && validDayWindow(m, 'thu') && validDayWindow(m, 'fri')
+          && validDayWindow(m, 'sat');
+    }
+
+    /* Coordinates that are absent, or a real point on Earth. Latitude and longitude were accepted
+     * as any number at all, so a report could carry lat:9e12 — not representable as a place, but
+     * perfectly valid JSON, and it would render as a map link going nowhere. */
+    function validLatOrAbsent(k) {
+      return !(k in request.resource.data)
+        || (request.resource.data[k] is number
+            && request.resource.data[k] >= -90 && request.resource.data[k] <= 90);
+    }
+    function validLngOrAbsent(k) {
+      return !(k in request.resource.data)
+        || (request.resource.data[k] is number
+            && request.resource.data[k] >= -180 && request.resource.data[k] <= 180);
+    }
+    // Either both coordinates or neither — half a pair locates nothing.
+    function coordsPaired() {
+      return ('lat' in request.resource.data) == ('lng' in request.resource.data);
+    }
+
+    /* A client-supplied timestamp inside a believable window. `ts is number` alone allowed a
+     * far-future stamp, which would pin a report to the top of any queue sorted by time, and an
+     * ancient one, which would bury it. 60s of slack absorbs ordinary clock skew. */
+    function saneTs() {
+      return request.resource.data.ts is number
+        && request.resource.data.ts <= request.time.toMillis() + 60000
+        && request.resource.data.ts > 1700000000000;
+    }
+
     function hasNoModeratorFields() {
       return !request.resource.data.keys().hasAny([
         'moderatorNote','moderatorNotes','resolvedAt','resolvedBy',
@@ -528,7 +567,8 @@ service cloud.firestore {
         && request.resource.data.locId.size() <= 200
         && request.resource.data.reason is string
         && request.resource.data.reason.size() <= 200
-        && request.resource.data.ts is number
+        && saneTs()
+        && validLatOrAbsent('lat') && validLngOrAbsent('lng') && coordsPaired()
         && boundedStrOrAbsent('locName', 160)
         && boundedStrOrAbsent('reporterId', 64)
         && boundedStrOrAbsent('reporterName', 40);
@@ -550,9 +590,8 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['description','ts','lat','lng','status'])
         && request.resource.data.description is string
         && request.resource.data.description.size() <= 600
-        && request.resource.data.ts is number
-        && numOrAbsent('lat')
-        && numOrAbsent('lng');
+        && saneTs()
+        && validLatOrAbsent('lat') && validLngOrAbsent('lng') && coordsPaired();
       allow read:   if isAdmin();
       allow update: if isAdmin() && validReportStatus();
       allow delete: if isAdmin();
@@ -573,7 +612,12 @@ service cloud.firestore {
      * repeat-tapper, never a determined one. It is allowlisted to that one field precisely
      * because it is the only thing here a non-admin may touch. */
     match /reporters/{uid} {
-      allow read:  if isAdmin() || (signedIn() && uid == request.auth.uid);
+      /* get and list are split deliberately. An owner may read their OWN record — which is what
+       * makes the blockedAttempts increment below possible — but listing the collection would
+       * hand any signed-in user the full set of flagged accounts, so that stays admin-only. A
+       * single `allow read` covering both would have granted it. */
+      allow get:  if isAdmin() || (signedIn() && uid == request.auth.uid);
+      allow list: if isAdmin();
       allow create, update, delete: if isAdmin();
 
       // Owner increment, strictly bounded: their own doc, only blockedAttempts, only upward,
@@ -693,7 +737,14 @@ service cloud.firestore {
              (request.resource.data.kind == 'perday'
                && request.resource.data.value is map
                && request.resource.data.value.keys().size() > 0
-               && request.resource.data.value.keys().size() <= 7)
+               && request.resource.data.value.keys().size() <= 7
+               /* Size alone let anything through: { banana: 12345 } was a valid submission. The
+                * Cloud Function's canonicaliser rejected it later, but the document was already
+                * written and the trigger had already fired. Constrain both halves here — the day
+                * names match DAYS in functions/index.js, and each window is the same short string
+                * a single-window report uses. */
+               && request.resource.data.value.keys().hasOnly(['sun','mon','tue','wed','thu','fri','sat'])
+               && validDayWindows(request.resource.data.value))
            );
       allow delete: if signedIn() && request.auth.uid == uid;
     }
