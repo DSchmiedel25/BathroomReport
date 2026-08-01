@@ -791,6 +791,11 @@ function communityConfirmedBadges(loc, featureDefs, summary, skip){
   const conf = (loc && loc.conf) || {};
   return featureDefs.map(a => {
     if(skip && skip.includes(a.key)) return '';
+    // "Public restroom" is a TARGETED question (see restroomDoubted / visibleAmenityKeys). Its
+    // confirmed chip must stay scoped to doubted pins too: on a normal store it's noise, and a
+    // stale baked conf.hasRestroom (e.g. an early test vote from when the pin was still doubted)
+    // must not resurface it everywhere. Mirrors the question gate so display == askability.
+    if(a.key === 'hasRestroom' && !restroomDoubted(loc)) return '';
     const x = (summary && summary[a.key]) || {yes:0,no:0};
     if(isMultiState(a)){
       // Multi-state badges name the ANSWER ("Single"), not the amenity — "Restroom setup ⭐"
