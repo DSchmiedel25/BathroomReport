@@ -1904,7 +1904,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.24.0';
+const BUILD = 'v2.25.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -3255,22 +3255,13 @@ function renderBathroomPassport(stats, results){
     return t && !isNaN(t) ? t.toLocaleDateString(undefined, { month:'short', year:'numeric' }) : '—';
   })();
 
-  container.innerHTML = `
-    <div class="passport-datapage">
-      <div class="dp-top">
-        <div class="dp-id">
-          <div class="dp-kind">Bathroom Report &middot; Holder</div>
-          <div class="dp-name">${escapeHtml(displayNameFor() || 'You')}</div>
-          <div class="dp-fields">
-            <div class="dp-f"><b>Issued</b><span>${escapeHtml(issued)}</span></div>
-            <div class="dp-f"><b>Stamps</b><span>${unlockedCount} / ${ACHIEVEMENT_DEFS.length}</span></div>
-            <div class="dp-f"><b>Rated</b><span>${stats.bathroomRatedCount}</span></div>
-          </div>
-        </div>
-        <div class="dp-seal" aria-hidden="true">BATH<br>ROOM<br>RPT</div>
-      </div>
-    </div>
+  const setTxt = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
+  setTxt('dpName', displayNameFor() || 'You');
+  setTxt('dpIssued', issued);
+  setTxt('dpStamps', `${unlockedCount} / ${ACHIEVEMENT_DEFS.length}`);
+  setTxt('dpRated', stats.bathroomRatedCount);
 
+  container.innerHTML = `
     <div class="passport-progress">
       <b>${unlockedCount}</b><span>of ${ACHIEVEMENT_DEFS.length} stamps collected</span>
     </div>
@@ -4973,9 +4964,8 @@ document.getElementById('listViewToggle').addEventListener('click',()=>{buildLis
 document.getElementById('listViewClose').addEventListener('click',()=>{document.getElementById('listViewPanel').classList.remove('show');document.body.classList.remove('list-open');suppressNextLocateClick=true;setTimeout(()=>{suppressNextLocateClick=false;},400);});
 
 // Account panel
-// Which view the shared panel is currently showing ('account' | 'passport'). Auth-state changes
-// re-run updateAccountUI with no argument; defaulting to this keeps the current view intact.
-let accountPanelMode = 'account';
+/* accountPanelMode is gone. It tracked which of two views the shared panel was showing; there is
+ * one view now, and which FACE is showing lives on the .flipped class where the CSS can see it. */
 
 // Signed-out shaping of the drawer + key, in one place so every auth change agrees:
 //  • Passport is a signed-in feature — hide the entry rather than teasing it.
@@ -5012,30 +5002,20 @@ function applyAuthVisibility(){
   renderChainKey();
 }
 
-function updateAccountUI(passportMode){
-  if(passportMode === undefined) passportMode = (accountPanelMode === 'passport');
+function updateAccountUI(){
   const loggedIn = isLoggedIn();
   applyAuthVisibility();
-  // In passport mode both auth sections stay hidden — the panel is showing the Passport view.
-  if(passportMode){
-    document.getElementById('loggedOutView').style.display = 'none';
-    document.getElementById('loggedInView').style.display = 'none';
-  } else {
-    document.getElementById('loggedOutView').style.display = loggedIn ? 'none' : 'block';
-    document.getElementById('loggedInView').style.display = loggedIn ? 'block' : 'none';
-  }
+  document.getElementById('loggedOutView').style.display = loggedIn ? 'none' : 'block';
+  document.getElementById('loggedInView').style.display = loggedIn ? 'block' : 'none';
   const _cb = document.getElementById('communityBanner');
   if(_cb) _cb.style.display = loggedIn ? 'none' : '';   // banner is logged-out only
   document.body.classList.toggle('logged-in', loggedIn);   // gates signed-in-only UI (theme toggle, etc.)
   syncChainFilterToAuth();                                  // logged-out shows all chains; logged-in restores the filter
   const accountBtn = document.getElementById('accountToggle');
   if(loggedIn){
-    const email = window.__currentUser.email || '';
     // Show the name as chosen. This used to uppercase it, which turned "Dave" into "DAVE" —
     // a third rendering of the same name. Never shows the raw address or uid.
-    const username = displayNameFor();
-    document.getElementById('loggedInUsername').textContent = username;
-    if(accountBtn) accountBtn.textContent = '👤 ' + username;
+    if(accountBtn) accountBtn.textContent = '👤 ' + displayNameFor();
   } else if(accountBtn){
     accountBtn.textContent = '👤 Log In';
   }
@@ -5043,33 +5023,25 @@ function updateAccountUI(passportMode){
   if(syncNote) syncNote.style.display = loggedIn ? 'none' : 'block';
 }
 
-// The account panel doubles as the Passport panel — but as two distinct VIEWS, not one long
-// scroll. Opening via 👤 shows only the auth section; opening via 🎫 shows only the
-// Passport/achievements (with the sign-in nudge handled by passportSyncNote when logged out).
+/* One panel. Account and Passport were two modes of the same element, switched between; they are
+ * now one view whose card flips. `mode` no longer picks a view — it only decides which FACE is
+ * showing when the panel opens, so the drawer's Passport row lands on the passport and the avatar
+ * lands wherever you left it.
+ *
+ * Always opens on the front for the passport route: arriving on the back of a card you asked to
+ * see the front of would be disorienting. */
 function openAccountPanel(mode){
-  accountPanelMode = mode === 'passport' ? 'passport' : 'account';
   const panel = document.getElementById('accountPanel');
   panel.classList.add('show');
-  const isPassport = mode === 'passport';
-  const title = document.querySelector('#accountHeader span');
-  if(title) title.textContent = isPassport ? 'Bathroom Passport' : 'Account';
-  const loggedOut = document.getElementById('loggedOutView');
-  const loggedIn = document.getElementById('loggedInView');
-  const passport = document.getElementById('passportSection');
-  if(passport) passport.style.display = isPassport ? '' : 'none';
-  // Auth sections: shown in account mode (updateAccountUI decides which of the two), hidden in
-  // passport mode. Inline '' lets updateAccountUI's own display logic take over in account mode.
-  if(loggedOut) loggedOut.style.display = isPassport ? 'none' : '';
-  if(loggedIn) loggedIn.style.display = isPassport ? 'none' : '';
-  updateAccountUI(isPassport);
-  /* In account mode renderAccountSheet runs checkAndUnlockAchievements itself, for the stats
-   * strip — calling it here too would duplicate the work and could fire an unlock toast twice. */
-  if(isPassport) checkAndUnlockAchievements(); else renderAccountSheet();
-  if(isPassport){
-    requestAnimationFrame(() => {
-      const p = document.getElementById('passportSection');
-      if(p) p.scrollIntoView({ block: 'start' });
-    });
+  updateAccountUI();
+
+  const title = document.getElementById('accountHeaderTitle');
+  if(title) title.textContent = isLoggedIn() ? 'Bathroom Passport' : 'Account';
+
+  if(isLoggedIn()){
+    renderAccountSheet();
+    // Height has to be set once the panel is actually laid out, or the faces measure as zero.
+    requestAnimationFrame(() => flipCardTo(false));
   }
 }
 
@@ -5130,7 +5102,6 @@ document.getElementById('authSignUpBtn').addEventListener('click', async () => {
     // leave the account quietly unrecoverable behind a success message.
     // Guarded: if the user opened Passport in the meantime, leave their panel alone.
     if(result.emailSent) setTimeout(() => {
-      if(accountPanelMode === 'passport') return;
       document.getElementById('accountPanel')?.classList.remove('show');
       note.textContent = '';
     }, 1600);
@@ -5159,7 +5130,6 @@ document.getElementById('authLogInBtn').addEventListener('click', async () => {
     // Success needs no further reading — close the panel so the map is usable immediately.
     // Guarded: if the user opened Passport in the meantime, leave their panel alone.
     setTimeout(() => {
-      if(accountPanelMode === 'passport') return;
       document.getElementById('accountPanel')?.classList.remove('show');
       note.textContent = '';
     }, 900);
@@ -5175,51 +5145,12 @@ document.getElementById('authLogInBtn').addEventListener('click', async () => {
  * auth user object, one document for the recovery address. Opening the sheet costs a single
  * Firestore read, and only when signed in. */
 
-// Initials for the avatar. Two letters where the name splits on an underscore, otherwise one.
-function acctInitials(name){
-  const n = String(name || '').trim();
-  if(!n) return '?';
-  const parts = n.split(/[_\s]+/).filter(Boolean);
-  return (parts.length > 1 ? parts[0][0] + parts[1][0] : n.slice(0, 2)).toUpperCase();
-}
-
-function renderAccountIdentity(){
-  const u = window.__currentUser; if(!u) return;
-  const name = displayNameFor() || 'You';
-  const nameEl = document.getElementById('loggedInUsername');
-  const avEl = document.getElementById('acctAvatar');
-  const sinceEl = document.getElementById('acctSince');
-  if(nameEl) nameEl.textContent = name;
-  if(avEl) avEl.textContent = acctInitials(name);
-  if(sinceEl){
-    // metadata.creationTime is an RFC-1123 string from Firebase; absent on a restored session.
-    const created = u.metadata && u.metadata.creationTime ? new Date(u.metadata.creationTime) : null;
-    sinceEl.textContent = created && !isNaN(created)
-      ? 'Member since ' + created.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-      : '';
-  }
-}
-
-/* The three numbers, from the same values the Passport screen uses — no extra reads, and no
- * chance of the summary disagreeing with the detail it links to. */
-async function renderAccountStats(){
-  const set = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
-  try{
-    /* checkAndUnlockAchievements is what the Passport screen itself runs, and it returns both
-     * the stats and the evaluated achievements. Reusing it means the summary here cannot drift
-     * from the detail it links to — and it works off myVoteCache, which is already in memory,
-     * so this adds no reads. It may also unlock something and fire the toast, which is correct:
-     * opening your account is as good a moment as any to be told. */
-    const out = await checkAndUnlockAchievements();
-    if(!out || !out.stats) return;
-    set('acctStatRated', out.stats.bathroomRatedCount ?? 0);
-    set('acctStatVisited', out.stats.visitedCount ?? 0);
-    set('acctStatAwards', Object.values(out.results || {}).filter(r => r.unlocked).length);
-  }catch(e){
-    // A summary is not worth breaking the sheet over — leave the dashes in place.
-    console.warn('account stats unavailable', e);
-  }
-}
+/* renderAccountIdentity and renderAccountStats are gone with the elements they filled.
+ *
+ * The avatar/name/member-since block and the three-number stats strip both duplicated the front
+ * of the card, which now carries the holder name, the issue date, the stamp count and the rating
+ * count in larger type. acctInitials went with the avatar. Anything still wanting those numbers
+ * reads them from checkAndUnlockAchievements, which is what fills the data page. */
 
 /* Recovery address: value plus a state that is never colour alone — the chip's word says it too.
  * Three real states, and "not set" is the one that matters, because that account cannot be
@@ -5247,13 +5178,71 @@ async function renderAccountRecovery(){
 
 function renderAccountSheet(){
   if(!isLoggedIn()) return;
-  renderAccountIdentity();
-  renderAccountStats();      // async, renders when ready; dashes show meanwhile
-  renderAccountRecovery();   // async likewise
+  /* checkAndUnlockAchievements computes the stats AND calls renderBathroomPassport, which is
+   * what fills the data page on the front of the card. One call covers the whole front face. */
+  checkAndUnlockAchievements();
+  renderAccountRecovery();   // async; the chip shows its loading state meanwhile
 }
 
-// Stats strip is the way through to the Passport — the numbers are a summary of what is there.
-document.getElementById('acctStats')?.addEventListener('click', () => openAccountPanel('passport'));
+/* ---------- The flip ----------
+ * Front is the passport data page, back is account settings. Two heights, animated between,
+ * because the faces hold different amounts.
+ *
+ * The hidden face must be INERT, not merely invisible: backface-visibility hides it visually but
+ * leaves it in the accessibility tree and the tab order, so a screen reader would read both sides
+ * and Tab would land on buttons nobody can see. */
+const flipScene = document.getElementById('flipScene');
+const flipFront = document.getElementById('flipFront');
+const flipBack  = document.getElementById('flipBack');
+
+function flipShowingBack(){ return !!flipScene && flipScene.classList.contains('flipped'); }
+
+function flipSizeTo(el){ if(flipScene && el) flipScene.style.height = el.offsetHeight + 'px'; }
+
+function flipSync(){
+  if(!flipScene) return;
+  const back = flipShowingBack();
+  const hidden = back ? flipFront : flipBack;
+  const shown  = back ? flipBack : flipFront;
+  hidden.setAttribute('inert', ''); hidden.setAttribute('aria-hidden', 'true');
+  shown.removeAttribute('inert'); shown.removeAttribute('aria-hidden');
+  const toBack = document.getElementById('flipToBack');
+  if(toBack) toBack.setAttribute('aria-expanded', String(back));
+  // The header names whichever face you are looking at, rather than going stale after a flip.
+  const title = document.getElementById('accountHeaderTitle');
+  if(title && isLoggedIn()) title.textContent = back ? 'Account' : 'Bathroom Passport';
+}
+
+function flipCardTo(back){
+  if(!flipScene) return;
+  flipScene.classList.toggle('flipped', back);
+  flipSizeTo(back ? flipBack : flipFront);
+  flipSync();
+}
+
+function toggleFlip(){
+  const next = !flipShowingBack();
+  flipCardTo(next);
+  // Focus follows the face, or it stays on a button that just turned away.
+  const t = document.getElementById(next ? 'flipToFront' : 'flipToBack');
+  if(t) t.focus({ preventScroll:true });
+}
+
+document.getElementById('flipToBack')?.addEventListener('click', e => { e.stopPropagation(); toggleFlip(); });
+document.getElementById('flipToFront')?.addEventListener('click', e => { e.stopPropagation(); toggleFlip(); });
+// Tapping the card flips too — the bar is the signpost, not the only way in. Real controls on the
+// back keep working.
+document.getElementById('flipCard')?.addEventListener('click', e => {
+  if(e.target.closest('.acct-row') || e.target.closest('.acct-seg')) return;
+  toggleFlip();
+});
+// Fonts change the measured height, so size again once they have loaded.
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(() => {
+  if(flipScene) flipSizeTo(flipShowingBack() ? flipBack : flipFront);
+});
+window.addEventListener('resize', () => {
+  if(flipScene) flipSizeTo(flipShowingBack() ? flipBack : flipFront);
+});
 
 /* Add or change the recovery address. A prompt rather than an inline form: this is a rare,
  * one-line action, and a field that sits in the sheet permanently would be visual weight spent

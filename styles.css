@@ -1081,31 +1081,31 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
   .passport-datapage{
     position:relative; overflow:hidden;
     background:linear-gradient(160deg, var(--accent) 0%, var(--accent-deep, #26828a) 100%);
-    color:#04211f; border-radius:14px; padding:16px; margin-bottom:16px;
+    color:#04211f; border-radius:14px; padding:20px; margin-bottom:16px;
     box-shadow:inset 0 1px 0 rgba(255,255,255,.3), 0 3px 12px rgba(0,0,0,.22);
 }
   .passport-datapage .dp-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
   .passport-datapage .dp-id{ min-width:0; }
   .passport-datapage .dp-kind{
-    font-family:var(--font-display); font-weight:600; font-size:9.5px;
+    font-family:var(--font-display); font-weight:600; font-size:10px;
     letter-spacing:.18em; text-transform:uppercase; opacity:.72;
 }
   .passport-datapage .dp-name{
-    font-family:var(--font-display); font-weight:600; font-size:26px; line-height:1.1; margin-top:3px;
+    font-family:var(--font-display); font-weight:600; font-size:32px; line-height:1.08; margin-top:4px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-  .passport-datapage .dp-fields{ display:flex; gap:22px; margin-top:12px; flex-wrap:wrap; }
+  .passport-datapage .dp-fields{ display:flex; gap:26px; margin-top:18px; flex-wrap:wrap; }
   .passport-datapage .dp-f b{
-    display:block; font-size:8.5px; letter-spacing:.13em; text-transform:uppercase;
+    display:block; font-size:9px; letter-spacing:.13em; text-transform:uppercase;
     opacity:.66; font-weight:800;
 }
-  .passport-datapage .dp-f span{ font-family:var(--font-display); font-weight:600; font-size:14px; }
+  .passport-datapage .dp-f span{ font-family:var(--font-display); font-weight:600; font-size:17px; }
   .passport-datapage .dp-seal{
-    width:54px; height:54px; flex:none; border-radius:50%;
+    width:66px; height:66px; flex:none; border-radius:50%;
     border:2px dashed rgba(4,33,31,.45);
     display:flex; align-items:center; justify-content:center; text-align:center;
-    font-family:var(--font-display); font-weight:600; font-size:8px; letter-spacing:.08em;
-    line-height:1.15; opacity:.7; transform:rotate(-8deg);
+    font-family:var(--font-display); font-weight:600; font-size:9px; letter-spacing:.08em;
+    line-height:1.2; opacity:.7; transform:rotate(-8deg);
 }
 
   .passport-progress{ display:flex; align-items:baseline; gap:8px; margin:2px 0 8px; }
@@ -1142,3 +1142,71 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
   /* The "Still to earn" heading reuses the popup placard. That rule's keyline is var(--popup-divider),
      which is only defined inside a popup — here it would fall back to nothing and draw no line. */
   #achievementsList .plate{ border-top-color:var(--panel-border); margin-top:20px; }
+
+  /* ============================================================
+     Account + Passport — one panel, one flip card (v2.25)
+     ============================================================
+     The two panels were one element already, switched between as modes. They are now one view:
+     the passport data page faces out, account settings live on its back. The avatar/name block
+     and the three-number stats strip are gone — the front says both, in larger type.
+
+     Two heights, not one: the faces hold different amounts, so a shared height would mean either
+     dead space under the front or a cramped back. The container animates between them. */
+  :root{ --cardH-front:180px; --cardH-back:320px; }
+
+  .flip-scene{ perspective:1400px; transition:height .5s cubic-bezier(.4,0,.2,1); margin-bottom:16px; }
+  .flip-card{
+    position:relative; width:100%; height:100%;
+    transform-style:preserve-3d; transition:transform .5s cubic-bezier(.4,0,.2,1);
+}
+  .flip-scene.flipped .flip-card{ transform:rotateY(180deg); }
+  /* top/left/right, but NOT bottom. With inset:0 each face stretches to the container's height,
+     so measuring the front while the container was still at the back's 320px returned 320 — it
+     could never report its own 180 and the card never shrank on the way back. */
+  .flip-face{
+    position:absolute; top:0; left:0; right:0;
+    backface-visibility:hidden; -webkit-backface-visibility:hidden;
+    border-radius:14px; overflow:hidden;
+}
+  .flip-back{ transform:rotateY(180deg); }
+
+  /* The data page is the front face now, so it takes its height from the variable and lays its
+     content out down the card rather than packing it at the top. */
+  #flipFront.passport-datapage{
+    margin-bottom:0; min-height:var(--cardH-front);
+    padding:20px 20px 54px;
+    display:flex; flex-direction:column; justify-content:space-between;
+}
+  #flipFront .dp-top, #flipFront .dp-fields{ flex:none; }
+
+  .flip-back{
+    background:var(--panel-bg, rgba(255,255,255,.02));
+    border:1px solid var(--panel-border);
+    padding:16px 16px 56px; min-height:var(--cardH-back);
+}
+  .flip-back .acct-plate:first-child{ margin-top:0; padding-top:0; border-top:0; }
+
+  /* The invitation. A flip nobody knows about is settings you cannot find, so it is a full-width
+     bar that says what happens rather than an icon in a corner. */
+  .flip-btn{
+    position:absolute; left:0; right:0; bottom:0;
+    display:flex; align-items:center; justify-content:center; gap:7px;
+    min-height:44px; padding:12px; border:0; cursor:pointer;
+    background:rgba(4,33,31,.15); color:#04211f;
+    font-family:var(--font-display); font-size:11px; font-weight:600;
+    letter-spacing:.14em; text-transform:uppercase;
+}
+  .flip-back .flip-btn{ background:rgba(127,127,127,.10); color:var(--muted); }
+  .flip-btn:focus-visible{ outline:3px solid #04211f; outline-offset:-3px; }
+  .flip-back .flip-btn:focus-visible{ outline-color:var(--accent); }
+
+  /* Reduced motion gets the same interaction without the turn. */
+  @media (prefers-reduced-motion: reduce){
+    .flip-scene, .flip-card{ transition:none; }
+    .flip-card{ transform-style:flat; }
+    .flip-scene.flipped .flip-card{ transform:none; }
+    .flip-face{ backface-visibility:visible; transition:opacity .15s linear; }
+    .flip-back{ transform:none; opacity:0; }
+    .flip-scene.flipped #flipFront{ opacity:0; }
+    .flip-scene.flipped .flip-back{ opacity:1; }
+}

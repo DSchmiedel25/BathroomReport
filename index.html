@@ -273,61 +273,73 @@ You can <b>FIND</b> without an account. Sign in to <b>RATE</b>, <b>SHARE</b>, an
 </div>
 <div id="loggedInView" style="display:none;">
 
-<div class="acct-id">
-<div class="acct-avatar" id="acctAvatar" aria-hidden="true"></div>
-<div>
-<div class="acct-name" id="loggedInUsername"></div>
-<div class="acct-since" id="acctSince"></div>
+<!-- Account and Passport are one panel now. The flip card is the identity: the data page faces
+     out, settings live on the back. The avatar/name block and the three-number stats strip that
+     used to sit here are gone — the front of the card says both, in bigger type. -->
+<div class="flip-scene" id="flipScene">
+  <div class="flip-card" id="flipCard">
+
+    <div class="flip-face passport-datapage" id="flipFront">
+      <div class="dp-top">
+        <div class="dp-id">
+          <div class="dp-kind">Bathroom Report &middot; Holder</div>
+          <div class="dp-name" id="dpName"></div>
+          <div class="dp-fields">
+            <div class="dp-f"><b>Issued</b><span id="dpIssued">—</span></div>
+            <div class="dp-f"><b>Stamps</b><span id="dpStamps">—</span></div>
+            <div class="dp-f"><b>Rated</b><span id="dpRated">—</span></div>
+          </div>
+        </div>
+        <div class="dp-seal" aria-hidden="true">BATH<br>ROOM<br>RPT</div>
+      </div>
+      <button class="flip-btn" id="flipToBack" aria-expanded="false" aria-controls="flipCard">&#8635; Flip for account</button>
+    </div>
+
+    <div class="flip-face flip-back" id="flipBack">
+      <div class="acct-plate"><span>Recovery</span><i></i></div>
+      <button class="acct-row" id="acctEmailRow">
+        <span class="acct-row-main">
+          <span class="acct-row-label">Email</span>
+          <span class="acct-row-sub" id="acctEmailValue">Loading…</span>
+        </span>
+        <span class="acct-chip none" id="acctEmailChip">Not set</span>
+      </button>
+      <div class="acct-note" id="acctEmailNote"></div>
+
+      <div class="acct-plate"><span>Security</span><i></i></div>
+      <button class="acct-row" id="acctPasswordRow">
+        <span class="acct-row-main">
+          <span class="acct-row-label">Change password</span>
+          <span class="acct-row-sub">We'll email you a link</span>
+        </span>
+        <span class="acct-row-go" aria-hidden="true">&rsaquo;</span>
+      </button>
+      <div class="acct-note" id="acctPasswordNote"></div>
+
+      <div class="acct-plate"><span>Appearance</span><i></i></div>
+      <div class="acct-row acct-row-static">
+        <span class="acct-row-main"><span class="acct-row-label">Theme</span></span>
+        <span class="acct-seg" role="group" aria-label="Theme">
+          <button id="acctThemeLight" aria-pressed="false">Light</button>
+          <button id="acctThemeDark" aria-pressed="false">Dark</button>
+        </span>
+      </div>
+
+      <button class="flip-btn" id="flipToFront">&#8635; Flip back to passport</button>
+    </div>
+
+  </div>
 </div>
-</div>
 
-<button class="acct-stats" id="acctStats" aria-label="View your Passport">
-<span class="acct-stat"><b id="acctStatRated">–</b><span>Rated</span></span>
-<span class="acct-stat"><b id="acctStatVisited">–</b><span>Visited</span></span>
-<span class="acct-stat"><b id="acctStatAwards">–</b><span>Awards</span></span>
-</button>
-<span class="acct-stats-more" aria-hidden="true">Open Passport →</span>
-
-<div class="acct-plate"><span>Recovery</span><i></i></div>
-<button class="acct-row" id="acctEmailRow">
-<span class="acct-row-main">
-<span class="acct-row-label">Email</span>
-<span class="acct-row-sub" id="acctEmailValue">Loading…</span>
-</span>
-<span class="acct-chip none" id="acctEmailChip">Not set</span>
-</button>
-<div class="acct-note" id="acctEmailNote"></div>
-
-<div class="acct-plate"><span>Security</span><i></i></div>
-<button class="acct-row" id="acctPasswordRow">
-<span class="acct-row-main">
-<span class="acct-row-label">Change password</span>
-<span class="acct-row-sub">We'll email you a link</span>
-</span>
-<span class="acct-row-go" aria-hidden="true">›</span>
-</button>
-<div class="acct-note" id="acctPasswordNote"></div>
-
-<div class="acct-plate"><span>Appearance</span><i></i></div>
-<div class="acct-row acct-row-static">
-<span class="acct-row-main"><span class="acct-row-label">Theme</span></span>
-<span class="acct-seg" role="group" aria-label="Theme">
-<button id="acctThemeLight" aria-pressed="false">Light</button>
-<button id="acctThemeDark" aria-pressed="false">Dark</button>
-</span>
-</div>
-
-<button class="acct-signout" id="logOutBtn">Log out</button>
-</div>
-<div id="passportSection">
 <p id="passportSyncNote" style="color:var(--muted);font-size:11.5px;margin:0 0 8px;display:none;">
 This is tracked on this device only. Log in to sync it across devices.
 </p>
 <div id="bathroomPassportBody"></div>
 <div id="achievementsSection">
-<div class="account-section-title">🏆 Achievements</div>
 <div id="achievementsList"></div>
 </div>
+
+<button class="acct-signout" id="logOutBtn">Log out</button>
 </div>
 </div>
 </div>
@@ -395,7 +407,7 @@ This is tracked on this device only. Log in to sync it across devices.
   <span class="d-shop-label">Gift shop</span>
   <span class="d-shop-sub">Signature Collection &middot; numbered Collector Series</span>
 </a>
-&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.24.0">v2.24.0 · 2026-08-01</span></div>
+&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.25.0">v2.25.0 · 2026-08-01</span></div>
 </nav>
 <!-- Community banner (logged-out) -->
 <div id="communityBanner">
