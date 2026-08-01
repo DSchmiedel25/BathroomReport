@@ -1009,3 +1009,9 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
   /* Same double-framing inside the rating card: it has a border and a radius of its own, and the
      placard added a rule across the top of it. Inside a framed card the label alone is enough. */
   .rating-col .plate{ border-top:none; padding-top:0; margin-top:2px; }
+
+  /* The accessibility mark stays as the standard ♿ rather than a drawing.
+     It is an international symbol people recognise instantly, and someone who needs step-free
+     access should not have to decode a house style to find it — recognition beats consistency on
+     this one. Sized to sit level with the drawn icons around it. */
+  .legend-emoji{ font-size:17px; line-height:1; text-align:center; }

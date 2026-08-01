@@ -520,10 +520,14 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
    These were `filter:none` (which did nothing — there was no base filter to cancel) and a 15%
    opacity shift, so the three tiers were effectively indistinguishable. Colour is never the only
    channel: every one of these carries a title and an aria-label spelling the tier out. */
-.access-indicator{ color:var(--shell-muted); }
-.access-indicator.community{ color:#00C244; }   /* confirmed by visitors */
-.access-indicator.verified{ color:#2ea1aa; }    /* verified from OSM data */
-.access-indicator.limited{ color:#f59e0b; }     /* step-free but tight — not the same as yes */
+/* ♿ is an emoji again — a deliberate exception, since it is an international symbol people
+   recognise instantly and someone who needs step-free access should not have to decode a house
+   style to find it. That means colour cannot carry the tier here: an emoji ignores currentColor.
+   The title and aria-label already spell each tier out, which is what actually conveys it; the
+   opacity step is a faint secondary hint, not the message. */
+.access-indicator.community{ opacity:1; }      /* confirmed by visitors */
+.access-indicator.verified{ opacity:.85; }     /* verified from OSM data */
+.access-indicator.limited{ opacity:.7; }       /* step-free but tight — not the same as yes */
 
 /* ---------- Drawer close (X) button ---------- */
 #appDrawer .d-close{
@@ -809,3 +813,37 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 
 /* "Is there a public restroom?" caveat — a question, not a status. Never styled like open/closed. */
 .hours-line.restroom-doubt{ color:var(--shell-muted); font-size:12px; }
+
+/* ---------- Drawer grouping (v2.21) ----------
+   The items were a flat list of seven: Passport, FAQ, Gift shop, Getting around, All places,
+   Preferences, Directions app. Nothing said which were navigation, which were map settings and
+   which was the shop, so they all carried the same weight and the drawer read as a pile.
+   Same placards as the popups — the heading does the work an icon was being asked to do. */
+.d-plate{
+  display:flex; align-items:center; gap:9px;
+  margin:20px 0 8px; padding-top:2px;
+}
+.d-plate:first-of-type{ margin-top:14px; }
+.d-plate span{
+  font-family:var(--font-display); font-weight:600;
+  font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--accent); white-space:nowrap;
+}
+.d-plate i{ flex:1; height:1px; background:var(--accent); opacity:.26; }
+
+/* No .d-ico rules for drawn icons: the drawer rows are text-only. Every label — Passport, All
+   places, Appearance, How it works — already says what it is, so a picture beside each was
+   decoration, and a column of eleven is what made the menu look busy in the first place. The
+   .d-ico class itself stays defined elsewhere; the chain-key group rows still use it. */
+
+/* All places is a real button now, not a div with a click handler — it is operable by keyboard
+   and announces its expanded state. */
+#allChainsToggle{
+  width:100%; background:none; border:0; font:inherit; color:inherit;
+  text-align:left; cursor:pointer;
+}
+#allChainsToggle:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; border-radius:8px; }
+
+/* Flattened preferences sit directly under the SETTINGS placard, so the gate note needs its own
+   spacing rather than inheriting the removed box's. */
+.d-gate-note{ margin:2px 0 6px; }

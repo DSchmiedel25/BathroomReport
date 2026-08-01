@@ -129,11 +129,15 @@ function applyTheme(theme){
   document.documentElement.setAttribute('data-theme', theme);
   const btn = document.getElementById('themeToggle');
   if(btn){
-    const ic = btn.querySelector('.theme-ico');
-    if(ic) ic.textContent = theme === 'light' ? '☀️' : '🌙';
-    const lbl = btn.querySelector('.theme-label');
-    if(lbl) lbl.textContent = theme === 'light' ? 'Light mode' : 'Dark mode';
-    btn.classList.toggle('on', theme === 'light');
+    /* The row reads "Dark mode", so the switch is ON when the theme IS dark. It previously said
+     * "Appearance" and lit up for LIGHT — a switch whose label named a category rather than a
+     * state, so there was no way to tell what "on" meant without flipping it. Naming the state
+     * is what makes the switch answerable at a glance.
+     *
+     * Note the polarity: this is deliberately the inverse of what it used to be. */
+    const isDark = theme !== 'light';
+    btn.classList.toggle('on', isDark);
+    btn.setAttribute('aria-pressed', String(isDark));
   }
   if(typeof setMapTilesForTheme === 'function') setMapTilesForTheme(theme);
   // The account sheet has its own Light/Dark control; keep the two in step whichever is used.
@@ -594,7 +598,7 @@ const BATHROOM_AMENITIES = [
       single:'Single',
       multiple:"Men's & women's"
     }},
-  {key:'accessible', label:'Wheelchair accessible', stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-accessible"></use></svg>'}},
+  {key:'accessible', label:'Wheelchair accessible', stateIcons:{yes:'♿️'}},
   {key:'changing', label:'Changing table', stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-changing"></use></svg>'}},
   /* Asked ONLY where the operator's own data doesn't list a public restroom (see
    * restroomDoubted). This is the one question that can prune the map: every other amenity adds
@@ -871,11 +875,11 @@ function accessIndicatorHtml(locId){
   if(!communityYes && !osmYes && !limited) return '';
   if(!communityYes && !osmYes && limited){
     const t = 'Limited step-free access — verified';
-    return `<span class="access-indicator limited" title="${t}" aria-label="${t}">${ico('accessible')}</span>`;
+    return `<span class="access-indicator limited" title="${t}" aria-label="${t}">♿</span>`;
   }
   const cls = communityYes ? 'access-indicator community' : 'access-indicator verified';
   const title = communityYes ? 'Wheelchair accessible — confirmed by visitors' : 'Wheelchair accessible — verified';
-  return `<span class="${cls}" title="${title}" aria-label="${title}">${ico('accessible')}</span>`;
+  return `<span class="${cls}" title="${title}" aria-label="${title}">♿</span>`;
 }
 
 // Some public restrooms (park comfort stations especially) only open for part of the year.
@@ -994,21 +998,21 @@ function accessibleBadgeHtml(locId){
   // Community confirmations are the strongest signal and win when present.
   const summary = amenityCache[locId];
   if(summary && isConfirmedAccessible(summary)){
-    return `<div class="accessible-badge">${ico('accessible')} Wheelchair accessible — confirmed by visitors</div>`;
+    return `<div class="accessible-badge">♿ Wheelchair accessible — confirmed by visitors</div>`;
   }
   const loc = locationsById[locId];
   // Baked community confirmation (from a prior votes bake) also counts as visitor-confirmed.
   if(loc && loc.conf && loc.conf.accessible){
-    return `<div class="accessible-badge">${ico('accessible')} Wheelchair accessible — confirmed by visitors</div>`;
+    return `<div class="accessible-badge">♿ Wheelchair accessible — confirmed by visitors</div>`;
   }
   // Fall back to accessibility data baked into the location files (sourced from
   // OpenStreetMap wheelchair / toilets:wheelchair tags at bake time).
   const osmAccessible = loc && ((loc.osm && loc.osm.accessible) || loc.wheelchair === 'yes' || loc.wheelchair === 'designated');
   if(osmAccessible){
-    return `<div class="accessible-badge">${ico('accessible')} Wheelchair accessible — verified</div>`;
+    return `<div class="accessible-badge">♿ Wheelchair accessible — verified</div>`;
   }
   if(isAccessLimited(loc)){
-    return `<div class="accessible-badge access-limited">${ico('accessible')} Limited step-free access — verified</div>`;
+    return `<div class="accessible-badge access-limited">♿ Limited step-free access — verified</div>`;
   }
   return '';
 }
@@ -1899,7 +1903,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.20.0';
+const BUILD = 'v2.21.2';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -4752,21 +4756,10 @@ function onChainKeyRowTap(e){
   map.on('moveend', renderChainKey);
 })();
 
-// Drawer "Preferences" — remembered collapse, same pattern as the other drawer sections.
-(function(){
-  const toggle = document.getElementById('prefsToggle');
-  const body = document.getElementById('prefsBody');
-  const arrow = document.getElementById('prefsArrow');
-  if(!toggle || !body || !arrow) return;
-  const setCollapsed = (collapsed) => {
-    body.classList.toggle('collapsed', collapsed);
-    arrow.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
-    localStorage.setItem('prefsCollapsed', collapsed ? '1' : '0');
-  };
-  const saved = localStorage.getItem('prefsCollapsed');
-  setCollapsed(saved === null ? true : saved === '1');
-  toggle.addEventListener('click', () => setCollapsed(!body.classList.contains('collapsed')));
-})();
+/* The Preferences collapse is gone. Three switches behind a disclosure — one of them Appearance,
+ * which is the single thing most people open this drawer to change — cost a tap for no benefit
+ * once the SETTINGS heading says what they are. The stored prefsCollapsed key is simply left; it
+ * is one localStorage entry and removing it would break nothing but tell nobody anything. */
 
 // Drawer "All chains" — holds the grouped full list moved out of the map key.
 (function(){
@@ -4777,6 +4770,8 @@ function onChainKeyRowTap(e){
   const setCollapsed = (collapsed) => {
     body.classList.toggle('collapsed', collapsed);
     arrow.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+    // It is a real <button> now, so its state has to be announced, not just drawn.
+    toggle.setAttribute('aria-expanded', String(!collapsed));
     localStorage.setItem('allChainsCollapsed', collapsed ? '1' : '0');
   };
   const saved = localStorage.getItem('allChainsCollapsed');

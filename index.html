@@ -217,7 +217,6 @@
 <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h11l-1.7 3.4L16 11H5z"/></symbol>
 <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.2V12l3.2 2"/></symbol>
 <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.6h17M8.4 3v3.6M15.6 3v3.6"/></symbol>
-<symbol id="i-accessible" viewBox="0 0 24 24"><circle cx="13.4" cy="4.3" r="1.9"/><path d="M11 8.2l.5 4.1h4.2"/><path d="M16.9 20.4l-1.6-4.6h-4.6"/><circle cx="9.6" cy="15.6" r="4.9"/></symbol>
 <symbol id="i-fuel" viewBox="0 0 24 24"><path d="M4 20.5V5.2A2.2 2.2 0 016.2 3h5.6A2.2 2.2 0 0114 5.2v15.3"/><path d="M2.8 20.5h12.4"/><path d="M6.6 8.4h4.8"/><path d="M14 9.4h2.6a2 2 0 012 2v5.1a1.7 1.7 0 003.4 0V8.6l-2.4-2.4"/></symbol>
 <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.4" width="15" height="10.1" rx="2.4"/><path d="M8.2 10.4V7.6a3.8 3.8 0 017.6 0v2.8"/></symbol>
 <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21.2s7-5.6 7-11.1A7 7 0 005 10.1c0 5.5 7 11.1 7 11.1z"/><circle cx="12" cy="9.8" r="2.6"/></symbol>
@@ -243,7 +242,6 @@
 <symbol id="i-hotfood" viewBox="0 0 24 24"><path d="M3 17.4h18"/><path d="M4.6 17.4a7.4 7.4 0 0114.8 0"/><path d="M12 10v-1.6"/><path d="M8.4 5.6c0-1 1-1.2 1-2.2M12 5c0-1.2 1-1.4 1-2.4M15.6 5.6c0-1 1-1.2 1-2.2"/></symbol>
 <symbol id="i-warning" viewBox="0 0 24 24"><path d="M10.3 4.3L2.6 17.4A2 2 0 004.3 20.4h15.4a2 2 0 001.7-3L13.7 4.3a2 2 0 00-3.4 0z"/><path d="M12 9.4v4.2M12 17.2h.01"/></symbol>
 <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9.2 18.2h5.6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9c.6.5.9 1.1.9 1.8v.5h5.2v-.5c0-.7.3-1.3.9-1.8A6 6 0 0012 3z"/></symbol>
-<symbol id="i-chat" viewBox="0 0 24 24"><path d="M20.4 14.2a2.4 2.4 0 01-2.4 2.4H8.4L4 20.4V6a2.4 2.4 0 012.4-2.4h11.6A2.4 2.4 0 0120.4 6z"/></symbol>
 </defs></svg>
 <div id="accountPanel" role="dialog" aria-modal="true" aria-labelledby="accountHeaderTitle">
 <div class="acct-grab" aria-hidden="true"><i></i></div>
@@ -339,46 +337,59 @@ This is tracked on this device only. Log in to sync it across devices.
 <nav id="appDrawer" aria-label="Menu">
 <div class="d-brand"><img src="logo.png" alt=""><span class="d-brand-text"><b>BATHROOM <span class="wm-accent">REPORT</span></b><span class="d-tagline">FIND<i>.</i> RATE<i>.</i> SHARE<i>.</i> IMPROVE<i>.</i></span></span><button id="drawerClose" class="d-close" aria-label="Close menu" title="Close">✕</button></div>
 <div class="d-items">
-<button id="passportToggle"><span class="d-ico" aria-hidden="true">🎫</span>Passport</button>
-<button id="infoBtn" title="FAQ and how it works"><span class="d-ico" aria-hidden="true">❓</span>FAQ: How it works</button>
-<a
-    href="https://bathroomreport-shop.fourthwall.com/?utm_source=bathroomreport.app&utm_medium=website&utm_campaign=main_menu"
-    target="_blank"
-    rel="noopener noreferrer"
-    class="d-shop-link">
-    <span class="d-ico" aria-hidden="true">🛍️</span>Gift shop
-</a>
+
+<!-- Grouped with the same placards the popups use. Seven items previously sat at one level, so
+     navigation, map settings and the gift shop all read as equally important. The groups say what
+     each thing is FOR, which is the information the flat list was missing. -->
+<button id="passportToggle">Passport</button>
+
+<div class="d-plate"><span>Map</span><i></i></div>
+
 <div id="travelModePref" class="d-section" style="display:none">
-<div class="d-section-label"><span class="d-ico" aria-hidden="true">🧭</span>Getting around</div>
+<div class="d-section-label">Getting around</div>
 <select id="travelModeSelect" class="nav-pref-select" aria-label="Getting around">
-<option value="road">🛣️ On the road</option>
-<option value="foot">🚶 On foot</option>
+<option value="road">On the road</option>
+<option value="foot">On foot</option>
 </select>
 <div id="travelModeCoverage" class="d-coverage-note" style="display:none"></div>
 </div>
+
 <div id="allChains" class="d-section">
-<div id="allChainsToggle" class="d-collapse-head"><span class="d-ico" aria-hidden="true">📍</span>All places <span id="allChainsArrow" class="d-collapse-arrow">▾</span></div>
+<button type="button" id="allChainsToggle" class="d-collapse-head" aria-expanded="false" aria-controls="chainKeyAllList">All places <span id="allChainsArrow" class="d-collapse-arrow" aria-hidden="true">▾</span></button>
 <div id="chainKeyAllList" class="collapsed"></div>
 </div>
-<div class="d-section">
-<div id="prefsToggle" class="d-collapse-head"><span class="d-ico" aria-hidden="true">⚙️</span>Preferences <span id="prefsArrow" class="d-collapse-arrow">▾</span></div>
-<div id="prefsBody" class="collapsed">
-<button id="openNowToggle" class="d-toggle" aria-pressed="true"><span><span class="d-ico" aria-hidden="true">🚫</span>Hide confirmed closed</span><span class="d-switch"><b></b></span></button>
-<button id="accessibleToggle" class="d-toggle"><span><span class="d-ico" aria-hidden="true">♿</span>Hide confirmed step-only</span><span class="d-switch"><b></b></span></button>
-<button id="themeToggle" class="d-toggle"><span><span class="d-ico theme-ico" aria-hidden="true">🌙</span>Appearance</span><span class="d-switch"><b></b></span></button>
+
+<div class="d-plate"><span>Settings</span><i></i></div>
+
+<!-- Preferences was a collapsed box hiding three switches — including Appearance, which is the
+     one people come here to find. Flattened: the group heading already says what these are. -->
+<button id="openNowToggle" class="d-toggle" aria-pressed="true"><span>Hide confirmed closed</span><span class="d-switch"><b></b></span></button>
+<button id="accessibleToggle" class="d-toggle"><span>Hide confirmed step-only</span><span class="d-switch"><b></b></span></button>
+<button id="themeToggle" class="d-toggle"><span>Dark mode</span><span class="d-switch"><b></b></span></button>
 <div class="d-gate-note" id="prefsGateNote" hidden>Sign in to change these</div>
-</div>
-</div>
+
 <div id="navAppPref" class="d-section">
-<div class="d-section-label"><span class="d-ico" aria-hidden="true">🧭</span>Directions app</div>
+<div class="d-section-label">Directions app</div>
 <select id="navAppSelect" class="nav-pref-select" aria-label="Preferred directions app">
 <option value="apple">Apple Maps</option>
 <option value="google">Google Maps</option>
 <option value="waze">Waze</option>
 </select>
 </div>
+
+<div class="d-plate"><span>About</span><i></i></div>
+
+<button id="infoBtn" title="FAQ and how it works">How it works</button>
+<a
+    href="https://bathroomreport-shop.fourthwall.com/?utm_source=bathroomreport.app&utm_medium=website&utm_campaign=main_menu"
+    target="_blank"
+    rel="noopener noreferrer"
+    class="d-shop-link">
+Gift shop
+</a>
+
 </div>
-<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.20.0">v2.20.0 · 2026-07-31</span></div>
+<div class="d-foot">&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.21.2">v2.21.2 · 2026-07-31</span></div>
 </nav>
 <!-- Community banner (logged-out) -->
 <div id="communityBanner">
@@ -402,7 +413,7 @@ This is tracked on this device only. Log in to sync it across devices.
      sprite as the popups, so it cannot drift from what it explains. -->
 <section><h3>What the symbols mean</h3>
 <div class="legend">
-<svg class="ico" aria-hidden="true"><use href="#i-accessible"></use></svg><b>Step-free access to the restroom</b>
+<span class="legend-emoji" aria-hidden="true">♿</span><b>Step-free access to the restroom</b>
 <svg class="ico" aria-hidden="true"><use href="#i-fuel"></use></svg><b>Fuel on site</b>
 <svg class="ico" aria-hidden="true"><use href="#i-lock"></use></svg><b>Key, code, or asking staff</b>
 <svg class="ico" aria-hidden="true"><use href="#i-clock"></use></svg><b>Opening hours</b>
