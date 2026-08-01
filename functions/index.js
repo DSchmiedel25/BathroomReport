@@ -129,18 +129,36 @@ exports.recomputeBathroomAggregate = onDocumentWritten('votes/{voteId}', async (
   await db.runTransaction(async (tx) => {
     const votesSnap = await tx.get(db.collection('votes').where('locId', '==', locId));
     const totals = reduceVotes(votesSnap.docs.map((d) => d.data()));
+    const curSnap = await tx.get(ref);
+    const cur = curSnap.exists ? (curSnap.data() || {}) : {};
 
     const patch = {
       schemaVersion:  2,
       bathroomSum:    totals.bathroomSum,
       bathroomCount:  totals.bathroomCount,
       amen:           totals.amen,
-      lastUpdated:    Date.now(),
     };
+
     /* lastRatedAt/By come from the votes too, so they no longer depend on which event fired.
-     * Cleared when no rating remains, rather than left pointing at a rating that is gone. */
-    if (totals.lastRatedAt) patch.lastRatedAt = totals.lastRatedAt;
-    if (totals.lastRatedBy) patch.lastRatedBy = totals.lastRatedBy;
+     *
+     * These MUST be deleted rather than merely omitted. The write below merges, and a merge
+     * leaves an omitted field exactly as it was — so when a location's last rating was deleted
+     * the count correctly fell to zero while the name and timestamp of the deleted rating stayed
+     * on the document. bathroomCount === 0 hid it in the popup, but FlushPanel and anything else
+     * reading the aggregate still saw a rater who no longer exists. */
+    patch.lastRatedAt = totals.lastRatedAt || FieldValue.delete();
+    patch.lastRatedBy = totals.lastRatedBy || FieldValue.delete();
+
+    /* lastUpdated used to be set on every execution, which made it "when this function last ran"
+     * rather than "when this aggregate last changed" — and since delivery is at-least-once, a
+     * duplicate event moved it while nothing about the totals differed. Compare against what is
+     * already stored and leave the timestamp alone when the recomputation agrees with it. */
+    const changed = cur.bathroomSum !== totals.bathroomSum
+      || cur.bathroomCount !== totals.bathroomCount
+      || (cur.lastRatedAt || 0) !== (totals.lastRatedAt || 0)
+      || (cur.lastRatedBy || null) !== (totals.lastRatedBy || null)
+      || JSON.stringify(cur.amen || {}) !== JSON.stringify(totals.amen || {});
+    if (changed || !curSnap.exists) patch.lastUpdated = Date.now();
 
     /* amen is written whole, not merged, so a key whose last vote was withdrawn disappears
      * instead of lingering at its old count. The rest of the document still merges, preserving
