@@ -400,3 +400,180 @@ describe('server-derived collections are read-only to clients', () => {
     await assertFails(setDoc(doc(asAdmin(), 'admins', ME), { enabled: true }));
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+/* Reports — one live report per person per location.
+ *
+ * A test report submitted from the app was refused with permission-denied and the client, which
+ * mapped every refusal to "you've already reported this one", hid it. These assertions exist to
+ * say WHICH clause refuses: each varies exactly one thing from a payload that should be accepted,
+ * so a failure names its own cause instead of leaving the whole rule under suspicion.
+ *
+ * The first test is the important one. If it fails, the rule refuses a write the app makes in
+ * normal operation, and the ones below it will say why. */
+describe('reports — one live report per person per location', () => {
+  // Exactly what app.js logReport() sends. Keep in step with it.
+  const validReport = (uid, locId) => ({
+    locId,
+    locName: "Stewart's Shops - Test",
+    addr: '123 Main Street',
+    chainKey: 'stewarts',
+    chain: "Stewart's Shops",
+    storeNumber: null,
+    city: 'Albany',
+    state: 'NY',
+    lat: 42.65,
+    lng: -73.75,
+    reporterId: uid,
+    reporterName: 'dave',
+    reason: 'Permanently closed',
+    ts: Date.now(),
+  });
+
+  // Mirror of fsId() in app.js and fsLocId() in the rules.
+  const reportId = (locId, uid) => `${locId.split('/').join('__')}_${uid}`;
+
+  test('I can file a report on a location', async () => {
+    const locId = 'stewarts-123';
+    await assertSucceeds(
+      setDoc(doc(asMe(), 'reports', reportId(locId, ME)), validReport(ME, locId))
+    );
+  });
+
+  test('an OSM id containing a slash still works', async () => {
+    const locId = 'node/456';
+    await assertSucceeds(
+      setDoc(doc(asMe(), 'reports', reportId(locId, ME)), validReport(ME, locId))
+    );
+  });
+
+  test('a second report on the same location is refused', async () => {
+    const locId = 'stewarts-123';
+    const id = reportId(locId, ME);
+    await assertSucceeds(setDoc(doc(asMe(), 'reports', id), validReport(ME, locId)));
+    await assertFails(setDoc(doc(asMe(), 'reports', id), validReport(ME, locId)));
+  });
+
+  test('a different location is still allowed', async () => {
+    await assertSucceeds(setDoc(doc(asMe(), 'reports', reportId('a', ME)), validReport(ME, 'a')));
+    await assertSucceeds(setDoc(doc(asMe(), 'reports', reportId('b', ME)), validReport(ME, 'b')));
+  });
+
+  test('someone else may report the same location', async () => {
+    const locId = 'stewarts-123';
+    await assertSucceeds(setDoc(doc(asMe(), 'reports', reportId(locId, ME)), validReport(ME, locId)));
+    await assertSucceeds(setDoc(doc(asThem(), 'reports', reportId(locId, THEM)), validReport(THEM, locId)));
+  });
+
+  test('a null reporterName is refused (null is present, not absent)', async () => {
+    const locId = 'stewarts-123';
+    await assertFails(setDoc(doc(asMe(), 'reports', reportId(locId, ME)),
+      { ...validReport(ME, locId), reporterName: null }));
+  });
+
+  test('an arbitrary document id is refused', async () => {
+    const locId = 'stewarts-123';
+    await assertFails(setDoc(doc(asMe(), 'reports', 'whatever'), validReport(ME, locId)));
+  });
+
+  test('I cannot report as someone else', async () => {
+    const locId = 'stewarts-123';
+    await assertFails(setDoc(doc(asMe(), 'reports', reportId(locId, THEM)), validReport(THEM, locId)));
+  });
+
+  test('a signed-out visitor cannot report', async () => {
+    const locId = 'stewarts-123';
+    await assertFails(setDoc(doc(asAnon(), 'reports', `${locId}_anon`), validReport('anon', locId)));
+  });
+
+  test('a far-future timestamp is refused', async () => {
+    const locId = 'stewarts-123';
+    await assertFails(setDoc(doc(asMe(), 'reports', reportId(locId, ME)),
+      { ...validReport(ME, locId), ts: Date.now() + 86400000 }));
+  });
+
+  test('an impossible latitude is refused', async () => {
+    const locId = 'stewarts-123';
+    await assertFails(setDoc(doc(asMe(), 'reports', reportId(locId, ME)),
+      { ...validReport(ME, locId), lat: 999 }));
+  });
+
+  test('half a coordinate pair is refused', async () => {
+    const locId = 'stewarts-123';
+    const r = validReport(ME, locId); delete r.lng;
+    await assertFails(setDoc(doc(asMe(), 'reports', reportId(locId, ME)), r));
+  });
+
+  test('a reporter cannot read the queue', async () => {
+    const locId = 'stewarts-123';
+    await assertSucceeds(setDoc(doc(asMe(), 'reports', reportId(locId, ME)), validReport(ME, locId)));
+    await assertFails(getDocs(collection(asMe(), 'reports')));
+  });
+});
+
+describe('reporters — standing is admin-owned', () => {
+  test('an admin can list the collection', async () => {
+    await assertSucceeds(getDocs(collection(asAdmin(), 'reporters')));
+  });
+
+  test('an ordinary user cannot list it', async () => {
+    await assertFails(getDocs(collection(asMe(), 'reporters')));
+  });
+
+  test('I can read my own record', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'reporters', ME), { spamCount: 1, blockedAttempts: 0 });
+    });
+    await assertSucceeds(getDoc(doc(asMe(), 'reporters', ME)));
+    await assertFails(getDoc(doc(asMe(), 'reporters', THEM)));
+  });
+
+  test('I can increment my own blockedAttempts by one, and nothing else', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'reporters', ME), { spamCount: 2, blockedAttempts: 0 });
+    });
+    await assertSucceeds(setDoc(doc(asMe(), 'reporters', ME), { blockedAttempts: 1 }, { merge: true }));
+    // Not by more than one, and not any other field.
+    await assertFails(setDoc(doc(asMe(), 'reporters', ME), { blockedAttempts: 99 }, { merge: true }));
+    await assertFails(setDoc(doc(asMe(), 'reporters', ME), { spamCount: 0 }, { merge: true }));
+    await assertFails(setDoc(doc(asMe(), 'reporters', ME), { muted: false }, { merge: true }));
+  });
+
+  test('a muted reporter cannot file a report', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'reporters', ME),
+        { muted: true, mutedUntil: Date.now() + 86400000 });
+    });
+    const locId = 'stewarts-123';
+    await assertFails(setDoc(doc(asMe(), 'reports', `${locId}_${ME}`), {
+      locId, locName: 'x', addr: null, chainKey: 'stewarts', chain: 'S', storeNumber: null,
+      city: null, state: null, lat: 42.65, lng: -73.75,
+      reporterId: ME, reporterName: 'dave', reason: 'Wrong hours', ts: Date.now(),
+    }));
+  });
+
+  test('an expired mute lets reports through again', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'reporters', ME),
+        { muted: true, mutedUntil: Date.now() - 86400000 });
+    });
+    const locId = 'stewarts-123';
+    await assertSucceeds(setDoc(doc(asMe(), 'reports', `${locId}_${ME}`), {
+      locId, locName: 'x', addr: null, chainKey: 'stewarts', chain: 'S', storeNumber: null,
+      city: null, state: null, lat: 42.65, lng: -73.75,
+      reporterId: ME, reporterName: 'dave', reason: 'Wrong hours', ts: Date.now(),
+    }));
+  });
+});
+
+describe('reportHistory — the archive is admin-only', () => {
+  test('an admin can write and read it', async () => {
+    await assertSucceeds(setDoc(doc(asAdmin(), 'reportHistory', 'x'), { locId: 'a', status: 'resolved' }));
+    await assertSucceeds(getDocs(collection(asAdmin(), 'reportHistory')));
+  });
+
+  test('nobody else can read it', async () => {
+    await assertFails(getDocs(collection(asMe(), 'reportHistory')));
+    await assertFails(getDocs(collection(asAnon(), 'reportHistory')));
+  });
+});
