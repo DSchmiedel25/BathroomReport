@@ -474,16 +474,6 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
 }
   #passportSection .account-section-title{border-top:none;margin-top:8px;
 }
-  .passport-stat-line{font-size:13.5px;color:var(--cream);margin-bottom:6px;
-}
-  .passport-progress-bar{
-    width:100%;height:10px;background:rgba(255,255,255,.08);border-radius:6px;overflow:hidden;
-    margin-bottom:10px;
-}
-  .passport-progress-fill{height:100%;background:var(--amber);border-radius:6px;transition:width .3s ease;
-}
-  .passport-mini-stats{display:flex;gap:16px;font-size:12.5px;color:var(--muted);flex-wrap:wrap;
-}
   .achievement-card{
     display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #2a2a2a;
 }
@@ -1108,12 +1098,6 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
     line-height:1.2; opacity:.7; transform:rotate(-8deg);
 }
 
-  .passport-progress{ display:flex; align-items:baseline; gap:8px; margin:2px 0 8px; }
-  .passport-progress b{
-    font-family:var(--font-display); font-weight:600; font-size:30px; line-height:1; color:var(--cream);
-}
-  .passport-progress span{ font-size:12px; color:var(--muted); }
-
   /* Stamps. The tilt is what makes them read as stamped rather than placed — it comes from the
      achievement's key, not its position, so a stamp never changes angle because an earlier one
      was earned. Real stamps land where they land. */
@@ -1210,3 +1194,17 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
     .flip-scene.flipped #flipFront{ opacity:0; }
     .flip-scene.flipped .flip-back{ opacity:1; }
 }
+
+  /* Progress as a seam on the card, sitting directly above the flip strip.
+     The block that used to sit below the card repeated STAMPS 4/35 from the card itself, and
+     carried "places visited · 0.0%" — the figure dropped from the headline for being
+     discouraging — back in as a footnote. Both halves are derived from ACHIEVEMENT_DEFS, so the
+     count and the width follow automatically when achievements are added. */
+  .dp-progress{
+    position:absolute; left:0; right:0; bottom:44px;
+    height:5px; background:rgba(4,33,31,.18); overflow:hidden;
+}
+  .dp-progress i{ display:block; height:100%; width:0; background:rgba(4,33,31,.45); transition:width .4s ease; }
+  @media (prefers-reduced-motion: reduce){ .dp-progress i{ transition:none; } }
+  /* The card's own bottom padding has to clear both the flip strip and the seam. */
+  #flipFront.passport-datapage{ padding-bottom:60px; }

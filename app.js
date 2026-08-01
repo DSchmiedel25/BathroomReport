@@ -1904,7 +1904,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.25.0';
+const BUILD = 'v2.25.1';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -3261,15 +3261,19 @@ function renderBathroomPassport(stats, results){
   setTxt('dpStamps', `${unlockedCount} / ${ACHIEVEMENT_DEFS.length}`);
   setTxt('dpRated', stats.bathroomRatedCount);
 
-  container.innerHTML = `
-    <div class="passport-progress">
-      <b>${unlockedCount}</b><span>of ${ACHIEVEMENT_DEFS.length} stamps collected</span>
-    </div>
-    <div class="passport-progress-bar"><div class="passport-progress-fill" style="width:${Math.min(100, stampPct)}%;"></div></div>
-    <div class="passport-mini-stats">
-      <div>${stats.visitedCount} of ${stats.totalLocations.toLocaleString()} places visited &middot; ${pct}%</div>
-    </div>
-  `;
+  /* The bar is a seam on the card, above the flip strip — progress belongs to the document, not
+   * to a block floating between the card and the stamps. What used to sit here repeated STAMPS
+   * 4/35 from the card immediately below it, and reintroduced "places visited · 0.0%" — the
+   * number dropped from the headline for being discouraging — as a footnote. */
+  const bar = document.getElementById('dpProgress');
+  const fill = document.getElementById('dpProgressFill');
+  if(fill) fill.style.width = Math.min(100, stampPct) + '%';
+  if(bar){
+    bar.setAttribute('aria-valuenow', String(Math.round(stampPct)));
+    // Screen readers get the counts, since the bar alone conveys nothing to them.
+    bar.setAttribute('aria-valuetext', `${unlockedCount} of ${ACHIEVEMENT_DEFS.length} stamps collected`);
+  }
+  container.innerHTML = '';
 
   const listEl = document.getElementById('achievementsList');
   if(listEl){
