@@ -930,3 +930,10 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 #appDrawer .d-plate:first-of-type{ margin-top:10px; }
 /* A divider immediately under a heading draws two lines a few pixels apart. */
 #appDrawer .d-plate + .d-section{ border-top:none !important; }
+
+/* Drawer surface: same grain layer, same reasoning as styles.css. The variable is defined there
+   and inherits, so the recipe lives in exactly one place. */
+#appDrawer{
+  background-image:var(--grain);
+  background-repeat:repeat;
+}

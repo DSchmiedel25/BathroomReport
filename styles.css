@@ -1026,3 +1026,44 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
     font-size:10px; letter-spacing:.06em; text-transform:uppercase;
     max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
+
+  /* ============================================================
+     Surface grain (v2.23)
+     ============================================================
+     Every panel was a flat fill, which reads as a swatch rather than a surface. This is the
+     material half of the enamel direction — the typography and palette were already there.
+
+     Applied as a BACKGROUND LAYER, not a ::before overlay. A pseudo-element with inset:0 paints
+     above the element's own background but also above any child that isn't positioned, so text
+     could end up under it; grain over glyphs reads as a rendering fault rather than a material.
+     Layering it into background-image sidesteps the whole question — it is always beneath content
+     and needs no z-index bookkeeping.
+
+     feColorMatrix desaturates the turbulence first: raw fractal noise is coloured, and coloured
+     speckle over navy looks like compression artefacts.
+
+     Intensity is baked into the SVG because opacity can't be set on a background layer. Pale
+     surfaces need MORE of it than dark ones to register the same — 4.5% on navy, 6% on the light
+     theme's near-white, which is the difference between "you can tell it's there" and "nothing
+     happened". */
+  :root{
+    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)' opacity='.045'/%3E%3C/svg%3E");
+}
+  html[data-theme="light"]{
+    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)' opacity='.06'/%3E%3C/svg%3E");
+}
+
+  /* Panels only. Not the map, which has its own tiles, and not buttons or chips, where a tile
+     smaller than the grain pattern shows the seam. */
+  #listViewPanel, #accountPanel{
+    background-image:var(--grain);
+    background-repeat:repeat;
+}
+  .leaflet-popup-content-wrapper{
+    background-image:var(--grain);
+    background-repeat:repeat;
+}
+  /* Respect a request for reduced data — the tile is tiny, but a preference is a preference. */
+  @media (prefers-reduced-data: reduce){
+    :root, html[data-theme="light"]{ --grain:none; }
+}
