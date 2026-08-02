@@ -1,0 +1,80 @@
+name: Public Toilets (nationwide)
+
+# Run it from the Actions tab: "Run workflow" button. Works from the phone.
+#
+# Start with mode=count. It downloads nothing and commits nothing — it just asks Overpass how
+# many toilet nodes each state holds, so the size of this dataset is known BEFORE 50 states of
+# JSON land in the repo. The answer decides whether the region files can be eager-loaded like
+# every other chain or need loading on demand.
+#
+# Then mode=fetch (slow, ~15 min, resumable) and mode=build (fast).
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "start with count"
+        required: true
+        default: count
+        type: choice
+        options: [count, fetch, build, fetch-and-build]
+      states:
+        description: "optional: space-separated states, e.g. NY MA CA (blank = all 50)"
+        required: false
+        default: ""
+        type: string
+      commit:
+        description: "Commit the result back to the repo"
+        required: true
+        default: "false"
+        type: choice
+        options: ["true", "false"]
+
+jobs:
+  toilets:
+    runs-on: ubuntu-latest
+    # Overpass is throttled and this walks 50 states with a deliberate delay between each.
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      # Counts only. Nothing is written, so there is nothing to commit — read the numbers in
+      # the log and decide from there.
+      - name: Count nodes per state
+        if: inputs.mode == 'count'
+        run: node fetch-public-toilets.js --count ${{ inputs.states }}
+
+      - name: Fetch state exports
+        if: inputs.mode == 'fetch' || inputs.mode == 'fetch-and-build'
+        run: node fetch-public-toilets.js ${{ inputs.states }}
+
+      - name: Build region files
+        if: inputs.mode == 'build' || inputs.mode == 'fetch-and-build'
+        run: node build-public-toilets.js
+
+      # Uploaded whether or not the commit step runs, so a build can be inspected before
+      # anything is pushed to the repo.
+      - name: Upload result
+        if: inputs.mode != 'count'
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-toilets-${{ inputs.mode }}-${{ github.run_number }}
+          path: |
+            public-*-locations.js
+            public-toilets-manifest.js
+            osm-data/public-toilets-*.json
+          if-no-files-found: warn
+
+      - name: Commit
+        if: inputs.mode != 'count' && inputs.commit == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public-*-locations.js public-toilets-manifest.js osm-data/public-toilets-*.json
+          git diff --staged --quiet && echo "no changes" && exit 0
+          git commit -m "Public toilets: ${{ inputs.mode }} $(date -u +%Y-%m-%d)"
+          git push
