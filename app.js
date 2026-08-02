@@ -2092,7 +2092,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.28.0';
+const BUILD = 'v2.28.1';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -4974,7 +4974,14 @@ function onChainKeyRowTap(e){
   // with a moveend too), never continuously during a drag — the performance contract.
   map.on('moveend', renderChainKey);
   map.on('moveend', maybeLoadPublicRegions);
-  maybeLoadPublicRegions();          // the opening viewport counts as a move
+  /* Deferred, NOT called synchronously — the same temporal-dead-zone trap as the drawer count.
+   * maybeLoadPublicRegions reads publicRegionState, a `const` declared a few lines below this
+   * IIFE; the function itself hoists but the const does not, so a synchronous call here threw
+   * ReferenceError, halted top-level execution, and took out everything declared after it —
+   * the All-places drawer toggle stopped binding, and since the const then never initialized,
+   * every subsequent moveend threw too and no region ever loaded. setTimeout(0) runs after the
+   * whole script has evaluated, when every const exists. */
+  setTimeout(maybeLoadPublicRegions, 0);
 })();
 
 
