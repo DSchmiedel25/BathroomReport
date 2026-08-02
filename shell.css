@@ -477,7 +477,9 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 #appDrawer .nav-pref-select{
   width:100%; padding:11px 12px; border-radius:12px; cursor:pointer;
   background:var(--shell-chrome2); color:var(--shell-ink);
-  border:1px solid var(--shell-line); font-size:15px; font-weight:700;
+  /* 16px, not 15. iOS zooms the page for a focused SELECT exactly as it does for an input, and
+     the drawer's two dropdowns were one pixel under the threshold. */
+  border:1px solid var(--shell-line); font-size:16px; font-weight:700;
   -webkit-appearance:none; appearance:none;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23f6f8fa' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");
   background-repeat:no-repeat; background-position:right 12px center;

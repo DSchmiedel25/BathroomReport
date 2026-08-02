@@ -31,35 +31,35 @@ perfMark('app.js execute start');
  *   *Public  civic restrooms are grey — not a brand, shouldn't look like one
  * Colour is never the only cue: every row and popup carries the name. */
 const CHAIN_REGISTRY = {
-  stewarts: { name: "Stewart's Shops", color: '#5b3a8f', textColor: '#ffffff', dataVar: 'stewartsLocations' },
-  cumberlandFarms: { name: "Cumberland Farms", color: '#009639', textColor: '#ffffff', dataVar: 'cumberlandFarmsLocations' },
-  wawa: { name: "Wawa", color: '#00b3b3', textColor: '#ffffff', dataVar: 'wawaLocations' },
-  fastrac: { name: "Fastrac", color: '#0088cc', textColor: '#ffffff', dataVar: 'fastracLocations' },
-  alltownFresh: { name: "Alltown Fresh", color: '#6d8c3a', textColor: '#ffffff', dataVar: 'alltownFreshLocations' },
-  byrneDairy: { name: "Byrne Dairy", color: '#8a6d1a', textColor: '#ffffff', dataVar: 'byrneDairyLocations' },
-  parkers: { name: "Parker's", color: '#c05621', textColor: '#ffffff', dataVar: 'parkersLocations' },
-  sheetz: { name: "Sheetz", color: '#8c1c13', textColor: '#ffffff', dataVar: 'sheetzLocations' },
-  racetrac: { name: "RaceTrac", color: '#00205b', textColor: '#ffffff', dataVar: 'racetracLocations' },
-  pilotFlyingJ: { name: "Pilot Flying J", color: '#fdb913', textColor: '#1c1c1e', dataVar: 'pilotLocations' },
-  maverik: { name: "Maverik", color: '#b30086', textColor: '#ffffff', dataVar: 'maverikLocations' },
-  quiktrip: { name: "QuikTrip", color: '#e8590c', textColor: '#ffffff', dataVar: 'quiktripLocations' },
-  loves: { name: "Love's", color: '#8e44ad', textColor: '#ffffff', dataVar: 'lovesLocations' },
-  bucees: { name: "Buc-ee's", color: '#ffd200', textColor: '#1c1c1e', dataVar: 'buceesLocations' },
-  caseys: { name: "Casey's", color: '#d81b60', textColor: '#ffffff', dataVar: 'caseysLocations' },
-  kwiktrip: { name: "Kwik Trip", color: '#3f51b5', textColor: '#ffffff', dataVar: 'kwiktripLocations' },
-  royalFarms: { name: "Royal Farms", color: '#33691e', textColor: '#ffffff', dataVar: 'royalFarmsLocations' },
-  rutters: { name: "Rutter's", color: '#4e342e', textColor: '#ffffff', dataVar: 'ruttersLocations' },
-  speedway: { name: "Speedway", color: '#6a1b2a', textColor: '#ffffff', dataVar: 'speedwayLocations' },
+  stewarts: { name: "Stewart's Shops", color: '#581E1C', textColor: '#ffffff', dataVar: 'stewartsLocations' },
+  cumberlandFarms: { name: "Cumberland Farms", color: '#8DBB39', textColor: '#ffffff', dataVar: 'cumberlandFarmsLocations' },
+  wawa: { name: "Wawa", color: '#BD2C34', textColor: '#ffffff', dataVar: 'wawaLocations' },
+  fastrac: { name: "Fastrac", color: '#D72E20', textColor: '#ffffff', dataVar: 'fastracLocations' },
+  alltownFresh: { name: "Alltown Fresh", color: '#215056', textColor: '#ffffff', dataVar: 'alltownFreshLocations' },
+  byrneDairy: { name: "Byrne Dairy", color: '#34191B', textColor: '#ffffff', dataVar: 'byrneDairyLocations' },
+  parkers: { name: "Parker's", color: '#285DA5', textColor: '#ffffff', dataVar: 'parkersLocations' },
+  sheetz: { name: "Sheetz", color: '#CB3135', textColor: '#ffffff', dataVar: 'sheetzLocations' },
+  racetrac: { name: "RaceTrac", color: '#D03A2B', textColor: '#ffffff', dataVar: 'racetracLocations' },
+  pilotFlyingJ: { name: "Pilot Flying J", color: '#BE2B34', textColor: '#ffffff', dataVar: 'pilotLocations' },
+  maverik: { name: "Maverik", color: '#B82B35', textColor: '#ffffff', dataVar: 'maverikLocations' },
+  quiktrip: { name: "QuikTrip", color: '#D43139', textColor: '#ffffff', dataVar: 'quiktripLocations' },
+  loves: { name: "Love's", color: '#FAE14C', textColor: '#1c1c1e', dataVar: 'lovesLocations' },
+  bucees: { name: "Buc-ee's", color: '#FCF254', textColor: '#1c1c1e', dataVar: 'buceesLocations' },
+  caseys: { name: "Casey's", color: '#EA3624', textColor: '#ffffff', dataVar: 'caseysLocations' },
+  kwiktrip: { name: "Kwik Trip", color: '#BF3538', textColor: '#ffffff', dataVar: 'kwiktripLocations' },
+  royalFarms: { name: "Royal Farms", color: '#163C9F', textColor: '#ffffff', dataVar: 'royalFarmsLocations' },
+  rutters: { name: "Rutter's", color: '#DDD64F', textColor: '#1c1c1e', dataVar: 'ruttersLocations' },
+  speedway: { name: "Speedway", color: '#D83234', textColor: '#ffffff', dataVar: 'speedwayLocations' },
   // National / regional expansion chains. These stay hidden from the legend and Pit Stops
   // filter until their matching data file is uploaded (see chainHasData below), so a chain
   // "turns on" automatically the moment window.<dataVar> is populated — no code change needed.
   // Each file must set the exact global named in dataVar (e.g. circle-k-locations.js -> window.circleKLocations).
-  circleK: { name: "Circle K", color: '#e4002b', textColor: '#ffffff', dataVar: 'circleKLocations' },
-  travelCentersOfAmerica: { name: "TravelCenters of America", color: '#00519e', textColor: '#ffffff', dataVar: 'travelCentersOfAmericaLocations' },
-  holiday: { name: "Holiday", color: '#f57f29', textColor: '#1c1c1e', dataVar: 'holidayLocations' },
-  jacksons: { name: "Jacksons", color: '#00843d', textColor: '#ffffff', dataVar: 'jacksonsLocations' },
-  plaidPantry: { name: "Plaid Pantry", color: '#0f766e', textColor: '#ffffff', dataVar: 'plaidPantryLocations' },
-  getgo: { name: "GetGo", color: '#b3122b', textColor: '#ffffff', dataVar: 'getgoLocations' },
+  circleK: { name: "Circle K", color: '#DB4233', textColor: '#ffffff', dataVar: 'circleKLocations' },
+  travelCentersOfAmerica: { name: "TravelCenters of America", color: '#2B65A5', textColor: '#ffffff', dataVar: 'travelCentersOfAmericaLocations' },
+  holiday: { name: "Holiday", color: '#DB4433', textColor: '#ffffff', dataVar: 'holidayLocations' },
+  jacksons: { name: "Jacksons", color: '#C32D2A', textColor: '#ffffff', dataVar: 'jacksonsLocations' },
+  plaidPantry: { name: "Plaid Pantry", color: '#B7294A', textColor: '#ffffff', dataVar: 'plaidPantryLocations' },
+  getgo: { name: "GetGo", color: '#071C4F', textColor: '#ffffff', dataVar: 'getgoLocations' },
   quickChek: { name: "QuickChek", color: '#003da5', textColor: '#ffffff', dataVar: 'quickChekLocations' },
   townPump: { name: "Town Pump", color: '#8a1f2b', textColor: '#ffffff', dataVar: 'townPumpLocations' },
   restarea: { name: "Rest Area", color: '#1976d2', textColor: '#ffffff', dataVar: 'restareaLocations' },
@@ -1904,7 +1904,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.26.4';
+const BUILD = 'v2.27.1';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -1989,12 +1989,12 @@ function popupHtml(loc, agg, myVote){
         <button type="button" data-mode="sunday" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">${ico('calendar')} Sunday is different</button>
       </div>
       <div id="hours-same-${loc.id}" style="display:none;margin-top:8px;align-items:center;gap:10px;color:#f6f8fa;font-size:13px;">
-        <label>Open <select id="hr-open-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></label>
-        <label>Close <select id="hr-close-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></label>
+        <label>Open <select id="hr-open-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></label>
+        <label>Close <select id="hr-close-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></label>
       </div>
       <div id="hours-sunday-${loc.id}" style="display:none;margin-top:8px;color:#f6f8fa;font-size:13px;">
-        <div style="display:flex;align-items:center;gap:6px;margin:4px 0;"><span style="width:60px;">Mon–Sat</span><select id="hr-ms-o-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select> – <select id="hr-ms-c-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></div>
-        <div style="display:flex;align-items:center;gap:6px;margin:4px 0;"><span style="width:60px;">Sunday</span><select id="hr-su-o-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select> – <select id="hr-su-c-${loc.id}" style="font-size:13px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></div>
+        <div style="display:flex;align-items:center;gap:6px;margin:4px 0;"><span style="width:60px;">Mon–Sat</span><select id="hr-ms-o-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select> – <select id="hr-ms-c-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></div>
+        <div style="display:flex;align-items:center;gap:6px;margin:4px 0;"><span style="width:60px;">Sunday</span><select id="hr-su-o-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select> – <select id="hr-su-c-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></div>
       </div>
       <button type="button" class="btn btn-amber hours-submit" id="hours-submit-${loc.id}" style="display:none;margin-top:8px;">Send hours</button>
       <div class="save-note" id="hours-note-${loc.id}" style="margin-top:6px;"></div>
@@ -5547,6 +5547,11 @@ const missingInput = document.getElementById('missingInput');
 const missingSubmit = document.getElementById('missingSubmit');
 const missingNote = document.getElementById('missingNote');
 const missingUseLocationBtn = document.getElementById('missingUseLocationBtn');
+// The panel had no dismiss of its own — only the button that opened it, which is one control
+// doing two jobs and reads as stuck.
+document.getElementById('missingClose')?.addEventListener('click', () => {
+  document.getElementById('missingPanel')?.classList.remove('show');
+});
 let capturedMissingCoords = null;
 
 missingBtn.addEventListener('click', () => {
