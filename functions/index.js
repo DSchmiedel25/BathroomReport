@@ -407,3 +407,189 @@ exports.recomputeHourStatus = onDocumentWritten('hourReports/{storeId}/submissio
     tx.set(statusRef, out, {merge:true});
   });
 });
+
+
+/* ============================================================================
+ *  Account recovery
+ *
+ *  Accounts are username + password. The address Firebase Auth holds is
+ *  usernameToEmail() — <username>@stewarts-map.local — which is a lookup key, not a
+ *  mailbox: nothing is ever delivered there. So Firebase's own password-reset mail has
+ *  nowhere to go, and until now a forgotten password meant the account and everything in
+ *  its Passport were gone permanently, with no recourse for the person OR the admin.
+ *
+ *  These two functions add a real address alongside, without disturbing username login:
+ *  the person stores an email, proves they own it, and a reset link for the internal
+ *  address is delivered to the real one.
+ *
+ *  Everything lives server-side because each step handles something a client must not be
+ *  trusted with — the verification token, the mapping from username to account, and the
+ *  reset link itself.
+ * ========================================================================== */
+
+const {onCall, HttpsError} = require('firebase-functions/v2/https');
+const {defineSecret} = require('firebase-functions/params');
+const crypto = require('crypto');
+
+// Set with: firebase functions:secrets:set RESEND_API_KEY
+// Never in the repo, and never in the client — this key can send mail as the domain.
+const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
+
+const MAIL_FROM = 'Bathroom Report <noreply@bathroomreport.app>';
+const SITE = 'https://bathroomreport.app';
+const VERIFY_TTL_MS = 24 * 60 * 60 * 1000;   // a day is long enough to find the mail, short enough to matter
+
+async function sendMail(apiKey, to, subject, html){
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json'},
+    body: JSON.stringify({from: MAIL_FROM, to, subject, html}),
+  });
+  if (!res.ok) {
+    // Log the provider's reason, never the address or the link.
+    console.error('resend send failed', res.status, await res.text().catch(() => ''));
+    throw new Error('send failed');
+  }
+}
+
+/* Tokens are stored as a SHA-256 hash, never in the clear.
+ * recovery/{uid} is readable by its owner, so a plaintext token sitting in the document
+ * would let anyone who could read it verify an address they do not control — which is the
+ * one thing this whole flow is meant to prevent. */
+const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
+
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) =>
+  ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+
+/* Basic shape check only. Deliverability is not decidable from a regex — that is what the
+ * verification link is for. This exists to catch a typo before a mail is wasted on it. */
+const looksLikeEmail = (e) =>
+  typeof e === 'string' && e.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
+
+/* ---------------------------------------------------------------------------
+ *  setRecoveryEmail — store an address and send a verification link.
+ *  Callable, so it requires a signed-in caller and the uid comes from the verified
+ *  token rather than the request body.
+ * ------------------------------------------------------------------------- */
+exports.setRecoveryEmail = onCall({secrets: [RESEND_API_KEY], cors: true}, async (req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
+  const uid = req.auth.uid;
+  const email = String(req.data && req.data.email || '').trim().toLowerCase();
+  if (!looksLikeEmail(email)) throw new HttpsError('invalid-argument', "That doesn't look like an email address.");
+
+  const ref = db.collection('recovery').doc(uid);
+  const snap = await ref.get();
+  const prev = snap.exists ? snap.data() : {};
+
+  /* Rate limit. Each send costs quota and lands in somebody's inbox, and an unauthenticated
+   * attacker is not the threat here — a signed-in account looping this is. */
+  if (prev.lastSentAt && Date.now() - prev.lastSentAt < 60000) {
+    throw new HttpsError('resource-exhausted', 'Just sent one — give it a minute.');
+  }
+
+  const token = crypto.randomBytes(32).toString('hex');
+  await ref.set({
+    email,
+    // Changing the address always drops verification: proving you own one mailbox says
+    // nothing about the next one.
+    verified: false,
+    tokenHash: hashToken(token),
+    tokenExpires: Date.now() + VERIFY_TTL_MS,
+    lastSentAt: Date.now(),
+    updatedAt: Date.now(),
+  }, {merge: true});
+
+  const name = req.auth.token.name || 'there';
+  const link = `${SITE}/verify.html?uid=${encodeURIComponent(uid)}&t=${token}`;
+  await sendMail(RESEND_API_KEY.value(), email, 'Confirm your Bathroom Report recovery email', `
+    <p>Hi ${escapeHtml(name)},</p>
+    <p>Confirm this address so you can recover your Bathroom Report account if you ever forget your password.</p>
+    <p><a href="${link}">Confirm my email</a></p>
+    <p>This link expires in 24 hours. If you didn't ask for this, ignore it — nothing changes until the link is used.</p>
+  `);
+  return {ok: true};
+});
+
+/* ---------------------------------------------------------------------------
+ *  confirmRecoveryEmail — check the token from the emailed link.
+ *  Deliberately NOT auth-gated: the link may be opened in a different browser from the
+ *  one that is signed in. Possession of the token is the proof.
+ * ------------------------------------------------------------------------- */
+exports.confirmRecoveryEmail = onCall({cors: true}, async (req) => {
+  const uid = String(req.data && req.data.uid || '');
+  const token = String(req.data && req.data.token || '');
+  if (!uid || !token) throw new HttpsError('invalid-argument', 'Bad link.');
+
+  const ref = db.collection('recovery').doc(uid);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'That link is no longer valid.');
+  const d = snap.data() || {};
+
+  // timingSafeEqual over the hashes, so a wrong token cannot be narrowed by how long the
+  // comparison takes. Both sides are fixed-length hex, so the lengths always match.
+  const expected = Buffer.from(String(d.tokenHash || ''), 'utf8');
+  const got = Buffer.from(hashToken(token), 'utf8');
+  const match = expected.length === got.length && crypto.timingSafeEqual(expected, got);
+  if (!match || !d.tokenExpires || d.tokenExpires < Date.now()) {
+    throw new HttpsError('permission-denied', 'That link has expired or already been used.');
+  }
+
+  // Token cleared on use: single-use, so an old mail in an inbox is inert.
+  await ref.set({
+    verified: true,
+    verifiedAt: Date.now(),
+    tokenHash: FieldValue.delete(),
+    tokenExpires: FieldValue.delete(),
+  }, {merge: true});
+  return {ok: true};
+});
+
+/* ---------------------------------------------------------------------------
+ *  requestPasswordReset — username in, reset link to the verified address.
+ *
+ *  ALWAYS returns {ok:true}. No username, no recovery record, an unverified address, a
+ *  rate limit — all identical from outside. Anything else turns this into a way to test
+ *  whether a username exists, and usernames are shown publicly on ratings and the
+ *  leaderboard, so confirming one is tied to a live account is a real leak.
+ *
+ *  Failures are logged for the admin instead.
+ * ------------------------------------------------------------------------- */
+exports.requestPasswordReset = onCall({secrets: [RESEND_API_KEY], cors: true}, async (req) => {
+  const username = String(req.data && req.data.username || '').trim().toLowerCase()
+    .replace(/[^a-z0-9_]/g, '');
+  if (!username) return {ok: true};
+
+  try {
+    // Same construction as usernameToEmail() in app.js. If that ever changes, this must too.
+    const authEmail = `${username}@stewarts-map.local`;
+    const user = await getAuth().getUserByEmail(authEmail).catch(() => null);
+    if (!user) { console.log('reset: no such account'); return {ok: true}; }
+
+    const snap = await db.collection('recovery').doc(user.uid).get();
+    const d = snap.exists ? snap.data() : null;
+    if (!d || d.verified !== true || !d.email) {
+      console.log('reset: account has no verified recovery address');
+      return {ok: true};
+    }
+    if (d.lastResetAt && Date.now() - d.lastResetAt < 60000) {
+      console.log('reset: rate limited');
+      return {ok: true};
+    }
+
+    /* generatePasswordResetLink builds a link for the INTERNAL address — the one Firebase
+     * Auth actually knows about. Firebase never delivers it anywhere; we deliver it to the
+     * real mailbox instead. That is the whole trick, and why username login is untouched. */
+    const link = await getAuth().generatePasswordResetLink(authEmail);
+    await db.collection('recovery').doc(user.uid).set({lastResetAt: Date.now()}, {merge: true});
+
+    await sendMail(RESEND_API_KEY.value(), d.email, 'Reset your Bathroom Report password', `
+      <p>Someone asked to reset the password for <b>${escapeHtml(user.displayName || username)}</b>.</p>
+      <p><a href="${link}">Choose a new password</a></p>
+      <p>If that wasn't you, ignore this — your password stays as it is.</p>
+    `);
+  } catch (e) {
+    // Still {ok:true}: a send failure must not reveal that the account exists.
+    console.error('requestPasswordReset failed', e && e.message);
+  }
+  return {ok: true};
+});
