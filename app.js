@@ -77,7 +77,16 @@ const CHAIN_REGISTRY = {
   // Statewide public restrooms (parks, trailheads, small towns). Same treatment as the
   // city sets, but NOT group:'metro' — 60% of these are rural, so tying them to a metro
   // would hide most of them behind the city zoom/jump behaviour.
-  nyPublic: { name: 'Public restroom (NY)', color: '#6b7280', textColor: '#ffffff', dataVar: 'nyPublicLocations', layer: 'public', shape: 'diamond' }
+  nyPublic: { name: 'Public restroom (NY)', color: '#6b7280', textColor: '#ffffff', dataVar: 'nyPublicLocations', layer: 'public', shape: 'diamond' },
+  /* Nationwide public restrooms — parks, plazas, trailheads, municipal facilities. ONE registry
+   * entry for all ten region files, because every region file appends to the same global array
+   * rather than declaring its own. Ten entries would put ten identical "Public restroom" rows in
+   * the chain filter, each covering a part of the country the reader cannot see and has no way
+   * to reason about.
+   *
+   * Deliberately NOT group:'metro'. Most of these are outside the covered cities, and the metro
+   * group ties a chain to the foot-mode city layer, which would hide them everywhere else. */
+  usPublic: { name: 'Public restroom', color: '#6b7280', textColor: '#ffffff', dataVar: 'usPublicLocations', layer: 'public', shape: 'diamond' }
 };
 const DEFAULT_CHAIN_KEY = 'stewarts';
 
@@ -636,7 +645,10 @@ const BATHROOM_AMENITIES = [
       multiple:"Separate men's & women's"
     }},
   {key:'accessible', label:'Wheelchair accessible', stateIcons:{yes:'♿️'}},
-  {key:'changing', label:'Changing table', stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-changing"></use></svg>'}},
+  /* The one amenity whose ABSENCE is worth a badge — see showNegative in
+   * communityConfirmedBadges. Add the flag to another key only if a reader would otherwise
+   * assume the thing is there. */
+  {key:'changing', label:'Changing table', showNegative:true, stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-changing"></use></svg>'}},
   /* Asked ONLY where the operator's own data doesn't list a public restroom (see
    * restroomDoubted). This is the one question that can prune the map: every other amenity adds
    * detail to a pin already assumed valid, while this one lets people tell us a pin shouldn't
@@ -888,7 +900,21 @@ function communityConfirmedBadges(loc, featureDefs, summary, skip){
        * caller's `skip` list, the first because it has its own prominent badge and the second
        * because a confirmed no prunes the pin entirely, which makes a badge on it a
        * contradiction. */
-      if(isConfirmedNo(x)){
+      /* A confirmed NO is only worth a badge for amenities someone would otherwise ASSUME are
+       * there, or would drive over specifically hoping for. That is a short list, so it is
+       * opt-in via showNegative rather than blanket.
+       *
+       * Showers are the case that makes the rule: almost no convenience store has them, so
+       * "Showers: No" states the reader's own default assumption back at them and pushes the
+       * badges that carry information further down. The same goes for EV charging and air
+       * pumps. A changing table is the opposite — plausible anywhere, and a parent checks
+       * before leaving rather than after arriving, which is the whole reason the negative is
+       * worth as much as the positive.
+       *
+       * Known trade-off: at a truck stop, where showers ARE expected, a confirmed no genuinely
+       * informs. Making that chain-dependent means threading the chain group through here for
+       * one amenity, which is not worth it yet — revisit if truck-stop traffic warrants it. */
+      if(isConfirmedNo(x) && a.showNegative){
         return `<span class="feature-badge community-no">${AMENITY_ANSWER_ICONS.no} ${escapeHtml(a.label)}: No <svg class="ico ico-fill" aria-hidden="true"><use href="#i-star"></use></svg></span>`;
       }
       return '';
@@ -4749,7 +4775,7 @@ function chainKeyRowHtml(keys, readOnly){
 // (TRAVEL_CENTER_KEYS is defined once, near CHAIN_REGISTRY, and shared with the achievements.)
 function chainBucket(key){
   if(groupOf(key) === 'metro') return 'city';
-  if(key === 'restarea' || key === 'nyPublic') return 'public';
+  if(key === 'restarea' || key === 'nyPublic' || key === 'usPublic') return 'public';
   if(TRAVEL_CENTER_KEYS.has(key)) return 'travel';
   return 'gas';
 }
@@ -4882,6 +4908,9 @@ function onChainKeyGroupTap(e){
   saveDisabledChains();
   renderChainKey();
   applyFilters();
+  // Turning the public-restroom layer on is the trigger for its first download — without this
+  // nothing would arrive until the next pan, so the toggle would look broken for a moment.
+  if(typeof maybeLoadPublicRegions === 'function') maybeLoadPublicRegions();
   if(navigator.vibrate) navigator.vibrate(5);
   return false;
 }
@@ -4907,6 +4936,9 @@ function onChainKeyRowTap(e){
   saveDisabledChains();
   renderChainKey();
   applyFilters();
+  // Turning the public-restroom layer on is the trigger for its first download — without this
+  // nothing would arrive until the next pan, so the toggle would look broken for a moment.
+  if(typeof maybeLoadPublicRegions === 'function') maybeLoadPublicRegions();
   if(navigator.vibrate) navigator.vibrate(5);
 }
 
@@ -4935,7 +4967,124 @@ function onChainKeyRowTap(e){
   // The in-area list follows the map. moveend fires once per settled pan/zoom (zooms end
   // with a moveend too), never continuously during a drag — the performance contract.
   map.on('moveend', renderChainKey);
+  map.on('moveend', maybeLoadPublicRegions);
+  maybeLoadPublicRegions();          // the opening viewport counts as a move
 })();
+
+
+/* ============================================================================
+ *  Nationwide public restrooms — on-demand region loading
+ * ============================================================================
+ * 61,788 records in ten files, 18 MB in total. None of it is in index.html, and that is the
+ * whole design: eager-loading even one region would more than double what every visitor
+ * downloads before the map draws, for a layer most of them never turn on.
+ *
+ * Only public-toilets-manifest.js ships up front (46 KB). It carries, per region, the file
+ * name, the record count, the byte size, and the set of occupied quarter-degree grid cells.
+ * Cells rather than a bounding box because a box cannot describe a state that is not a
+ * rectangle — California's bounds reach far enough east to contain Las Vegas, so a bbox test
+ * had a Nevada viewport pulling 2.9 MB from the wrong side of the border.
+ */
+const publicRegionState = {};        // region -> 'loading' | 'loaded' | 'failed'
+
+/* Every cell the current viewport touches, padded by half a screen so a region starts loading
+ * just before it is needed rather than the instant a pin should already be visible.
+ *
+ * Takes the grid size directly: all ten regions are built at the same resolution, so this is
+ * computed ONCE per pan and tested against each region, not rebuilt ten times. */
+function viewportCells(g){
+  const latOff = Math.ceil(90 / g), lngOff = Math.ceil(180 / g), stride = Math.round(360 / g) + 2;
+  const b = map.getBounds();
+  const latPad = (b.getNorth() - b.getSouth()) * 0.5;
+  const lngPad = (b.getEast() - b.getWest()) * 0.5;
+  const south = b.getSouth() - latPad, north = b.getNorth() + latPad;
+  const west = b.getWest() - lngPad,  east = b.getEast() + lngPad;
+  /* A zoomed-out view can span the continent, and walking every quarter-degree cell in it would
+   * be tens of thousands of iterations on every pan. Past a few hundred cells the answer is
+   * always "yes, some region matches" anyway, so bail — nothing loads until the view is tight
+   * enough to mean something. Roughly: a large metro loads, a whole state does not. */
+  const cellSpan = ((north - south) / g + 1) * ((east - west) / g + 1);
+  if(cellSpan > 400) return null;
+  const out = new Set();
+  for(let la = Math.floor(south / g); la <= Math.floor(north / g); la++)
+    for(let ln = Math.floor(west / g); ln <= Math.floor(east / g); ln++)
+      out.add((la + latOff) * stride + (ln + lngOff));
+  return out;
+}
+
+/* Metered and slow connections get a deliberate opt-out. The layer being on is consent to the
+ * feature, not to a multi-megabyte download on a capped plan in the middle of a road trip —
+ * which is exactly the situation this app exists for. */
+function connectionIsConstrained(){
+  const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if(!c) return false;
+  return c.saveData === true || ['slow-2g', '2g'].includes(c.effectiveType);
+}
+
+function loadPublicRegion(entry){
+  if(publicRegionState[entry.region]) return;
+  publicRegionState[entry.region] = 'loading';
+  /* A plain <script> tag, not fetch+eval: the region files are executable JS that push onto a
+   * global, the browser streams and parses them off the main thread far better than a manual
+   * eval would, and the service worker can cache them like any other asset. */
+  const s = document.createElement('script');
+  s.src = entry.file;
+  s.async = true;
+  s.onload = () => {
+    publicRegionState[entry.region] = 'loaded';
+    ingestPublicRegion(entry);
+  };
+  s.onerror = () => {
+    // Left as 'failed' rather than cleared, so a flaky connection can't turn one bad fetch into
+    // a retry on every single pan.
+    publicRegionState[entry.region] = 'failed';
+    console.warn('public region failed to load:', entry.file);
+  };
+  document.head.appendChild(s);
+}
+
+/* Merge newly-arrived records into the structures built at startup.
+ *
+ * seedLocations and locationsById are populated once, synchronously, at script parse time —
+ * anything arriving later is invisible to the app without this: no marker, no search result, no
+ * count. Only the records this file added are walked, using the marker array's length as the
+ * high-water mark, so a second region does not re-index the first. */
+function ingestPublicRegion(entry){
+  const source = window.usPublicLocations || [];
+  const added = [];
+  for(const loc of source){
+    if(locationsById[loc.id]) continue;      // already indexed by an earlier region or the seed
+    if(!loc.chain) loc.chain = 'usPublic';
+    locationsById[loc.id] = loc;
+    seedLocations.push(loc);
+    added.push(loc);
+  }
+  if(!added.length) return;
+  added.forEach(loc => addMarker(loc));
+  // addMarker deliberately does not touch the map; applyFilters is the single authority on what
+  // is rendered, and it already batches across frames with viewport-first ordering, so several
+  // thousand new pins fill in progressively instead of freezing the map.
+  applyFilters();
+  renderChainKey();
+  perfMark(`public region ${entry.region} ingested (${added.length} locations)`);
+}
+
+function maybeLoadPublicRegions(){
+  const manifest = window.publicToiletManifest;
+  if(!Array.isArray(manifest) || !manifest.length) return;
+  if(disabledChains.has('usPublic')) return;        // layer is off — download nothing
+  if(connectionIsConstrained()) return;
+  if(typeof map === 'undefined' || !map.getBounds) return;
+  // Nothing left to consider once every region has been tried — skip the geometry entirely.
+  if(manifest.every(e => publicRegionState[e.region])) return;
+
+  const cells = viewportCells(manifest[0].grid);
+  if(!cells) return;                                // zoomed too far out to mean anything
+  for(const entry of manifest){
+    if(publicRegionState[entry.region]) continue;
+    if(entry.cells.some(c => cells.has(c))) loadPublicRegion(entry);
+  }
+}
 
 /* The Preferences collapse is gone. Three switches behind a disclosure — one of them Appearance,
  * which is the single thing most people open this drawer to change — cost a tap for no benefit

@@ -78,6 +78,12 @@
 <script defer src="bos-public-locations.js"></script>
 <script defer src="nyc-public-locations.js"></script>
 <script defer src="ny-public-locations.js"></script>
+<!-- Nationwide public restrooms. ONLY the manifest loads here (46 KB): file names, counts and
+     occupied grid cells for ten regions. The region files themselves total 18 MB and are
+     fetched at runtime by maybeLoadPublicRegions() when the layer is on AND the viewport is
+     over one. Adding them here would more than double what every visitor downloads before the
+     map draws, for a layer most never open. -->
+<script defer src="public-toilets-manifest.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Overpass:wght@400;600;700;800;900&display=swap" rel="stylesheet">
