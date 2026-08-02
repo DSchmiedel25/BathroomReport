@@ -25,6 +25,8 @@ const path = require('path');
 const OSM_DIR = 'osm-data';
 const ENDPOINT = 'https://overpass-api.de/api/interpreter';
 const DELAY_MS = 8000;      // between states — deliberately generous
+const BACKOFF_MS = 60000;   // first wait after a throttle; doubles on the second
+const MAX_RETRIES = 2;      // per state, on 429/504 only
 const TIMEOUT_S = 300;      // server-side query budget
 
 const ALL_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA',
@@ -51,6 +53,38 @@ out ${countOnly ? 'count' : 'center tags'};`;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+/* One POST, with a real retry on the two statuses that mean "come back later".
+ *
+ * 429 is an explicit rate limit and 504 is a gateway timeout, but on a small state a 504 is
+ * almost always the same thing wearing a different hat — Delaware does not take five minutes to
+ * answer, it was refused a slot. Both are worth one patient retry; anything else is a genuine
+ * failure and is reported as one.
+ *
+ * The earlier version printed "backing off 60s, then retrying once" and then threw immediately
+ * after sleeping, so the message described a retry that never happened and every throttled
+ * state landed in the failed list needing a manual re-run. */
+async function askOverpass(st, countOnly, attempt = 1) {
+  const res = await fetch(ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      // Overpass asks clients to identify themselves; an anonymous heavy client is the
+      // first thing an admin blocks.
+      'User-Agent': 'BathroomReport/1.0 (+https://bathroomreport.app)',
+    },
+    body: 'data=' + encodeURIComponent(query(st, countOnly)),
+  });
+
+  if ((res.status === 429 || res.status === 504) && attempt <= MAX_RETRIES) {
+    const wait = BACKOFF_MS * attempt;   // 60s, then 120s
+    console.log(`  ${st}  ${res.status} — waiting ${wait / 1000}s, then retry ${attempt} of ${MAX_RETRIES}`);
+    await sleep(wait);
+    return askOverpass(st, countOnly, attempt + 1);
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}${attempt > 1 ? ` after ${attempt - 1} retr${attempt === 2 ? 'y' : 'ies'}` : ''}`);
+  return res.json();
+}
+
 async function run() {
   fs.mkdirSync(OSM_DIR, { recursive: true });
   let fetched = 0, skipped = 0, failed = [];
@@ -64,25 +98,8 @@ async function run() {
     }
 
     try {
-      const res = await fetch(ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          // Overpass asks clients to identify themselves; an anonymous heavy client is the
-          // first thing an admin blocks.
-          'User-Agent': 'BathroomReport/1.0 (+https://bathroomreport.app)',
-        },
-        body: 'data=' + encodeURIComponent(query(st, COUNT_ONLY)),
-      });
+      const json = await askOverpass(st, COUNT_ONLY);
 
-      if (res.status === 429 || res.status === 504) {
-        console.log(`  ${st}  ${res.status} — backing off 60s, then retrying once`);
-        await sleep(60000);
-        throw new Error(`rate limited (${res.status})`);
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const json = await res.json();
       if (COUNT_ONLY) {
         const t = (json.elements && json.elements[0] && json.elements[0].tags) || {};
         console.log(`  ${st}  ${String(t.total || 0).padStart(6)} element(s)`);
