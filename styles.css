@@ -9,6 +9,10 @@
     --popup-bg:#0f2235; --popup-text:#f5f7fa; --popup-muted:#93a5b8; --popup-border:#2a4056;
     --popup-divider:#2a4056; --popup-report-bg:#3a2226; --popup-tip-input-bg:#0a1826;
     --popup-star-empty:#3a5165;
+    /* Yes / No answer buttons in the "Help out" step. Tokenised rather than hardcoded so the
+       light theme can override them below — the same reason the popup card colors are here. */
+    --answer-yes-bg:rgba(47,107,60,.16); --answer-yes-border:rgba(76,175,80,.42); --answer-yes-text:#8fd694;
+    --answer-no-bg:rgba(229,57,53,.14); --answer-no-border:rgba(229,57,53,.42); --answer-no-text:#f08a86;
 }/* ============================================================
    Light mode: give the app chrome (header, drawer, pills,
    overlays) light values so they follow the theme toggle.
@@ -21,6 +25,10 @@ html[data-theme="light"]{
   --shell-ink:#14161a;
   --shell-muted:#5a6470;
   --shell-shadow:0 12px 40px rgba(0,0,0,.18);
+  /* Same hues, but the tints have to sit on white and the text has to darken to stay legible —
+     the dark-mode #f08a86 washes out completely against a light card. */
+  --answer-yes-bg:rgba(47,107,60,.10); --answer-yes-border:rgba(47,107,60,.35); --answer-yes-text:#1f6b32;
+  --answer-no-bg:rgba(197,42,38,.09); --answer-no-border:rgba(197,42,38,.32); --answer-no-text:#b3251f;
 }
 /* Two spots hardcode dark-mode colors — give them readable light values */
 html[data-theme="light"] .hiw-body p{ color:#42505d;
@@ -570,6 +578,17 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
   font-size:12.5px;padding:8px 12px;border-radius:20px;cursor:pointer;
   background:var(--popup-tip-input-bg);color:var(--popup-text);border:1px solid var(--popup-border);
 }
+/* Yes and No carry their own color so the answer is legible before the label is read. "Not sure"
+   and the multi-state answers stay neutral on purpose — coloring every button would flatten the
+   contrast that makes these two stand out. */
+.amenity-answer-btn.ans-yes{
+  background:var(--answer-yes-bg);border-color:var(--answer-yes-border);color:var(--answer-yes-text);
+}
+.amenity-answer-btn.ans-no{
+  background:var(--answer-no-bg);border-color:var(--answer-no-border);color:var(--answer-no-text);
+}
+/* The sprite icons inherit currentColor from the base .ico rule, so they tint with the button
+   automatically — no extra rule needed here. */
 .amenity-answer-btn:disabled{opacity:.5;cursor:default;
 }
 .amenity-complete{font-size:13.5px;color:var(--accent);font-weight:700;padding:4px 0;

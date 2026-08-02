@@ -617,9 +617,24 @@ const BATHROOM_AMENITIES = [
       single:'Single stall',
       multiple:'Multiple stalls'
     }},
-  {key:'genderSplit', label:"Separate men's & women's",
-    question:"Separate men's and women's rooms?",
-    stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-restroom"></use></svg>'}},
+  {key:'genderSplit', label:'Restroom rooms',
+    question:"One shared restroom, or separate men's and women's?",
+    /* Multi-state rather than boolean, because a boolean only DISPLAYS in the affirmative:
+     * communityConfirmedBadges returns '' unless isConfirmedYes fires, so a confirmed NO — one
+     * shared unisex restroom — would render nothing and look identical to "nobody has answered
+     * yet". That is the answer most worth surfacing, since a single shared room is the one you
+     * can lock behind you.
+     *
+     * The values are 'single' and 'multiple', reused deliberately rather than inventing
+     * 'shared'/'split': those two are already in the value enum in firestore.rules and in
+     * COUNTED_ANSWERS in functions/index.js, so this stays a client-only change. Read as a room
+     * count the words are literal — one room, or more than one. */
+    states:['unknown','single','multiple'],
+    stateLabels:{
+      unknown:'Not sure',
+      single:'One shared restroom',
+      multiple:"Separate men's & women's"
+    }},
   {key:'accessible', label:'Wheelchair accessible', stateIcons:{yes:'♿️'}},
   {key:'changing', label:'Changing table', stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-changing"></use></svg>'}},
   /* Asked ONLY where the operator's own data doesn't list a public restroom (see
@@ -669,6 +684,20 @@ function amenityAnswerIcon(a, val){
   return AMENITY_ANSWER_ICONS[val] || '•';
 }
 
+/* The ANSWER BUTTONS deliberately ignore stateIcons and always use the generic mark.
+ *
+ * amenityAnswerIcon prefers the amenity's own glyph, which is right on a badge — "♿ Wheelchair
+ * accessible ⭐" names the feature. On a Yes/No button it is wrong: the row asked "Wheelchair
+ * accessible?" and then labelled the affirmative with a wheelchair, so both buttons showed a
+ * subject glyph and neither showed an answer. A check and a circle-slash read as yes and no
+ * without being read at all, which is the point of a three-tap flow.
+ *
+ * Multi-state answers ('single' / 'multiple') are unaffected — they have no stateIcons and were
+ * already falling through to this same set. */
+function amenityButtonIcon(val){
+  return AMENITY_ANSWER_ICONS[val] || '•';
+}
+
 // Renders whichever single question comes next (the first one this person hasn't answered
 // yet), or a friendly completion message once every feature has an answer on record.
 // Per-popup visit state: the ordered list of question keys chosen for this visit (computed once
@@ -709,13 +738,15 @@ async function saveAmenityOverride(locId, key, val){
 // Admin-only panel: each feature with Yes / No / — (clear). Only rendered when isMapAdmin().
 function adminAmenityPanelHtml(loc){
   const ov = amenityOverrideCache[loc.id] || {};
-  /* restroomType is excluded because it is multi-state and this panel only emits yes/no/clear.
-   * hasRestroom is excluded because it is not an amenity an admin should be toggling: its job is
-   * the confirmed-NO case that prunes a pin off the map, and that belongs to the report queue in
-   * FlushPanel, where the claim arrives with a reporter attached and a moderation trail. It was
-   * also never in ADMIN_AMENITY_KEYS, so the panel was rendering a control the rest of the admin
-   * path did not recognise. */
-  const feats = [...BATHROOM_AMENITIES.filter(a => a.key !== 'restroomType' && a.key !== 'hasRestroom'), ...STORE_FEATURES];
+  /* Multi-state amenities are excluded because this panel only emits yes/no/clear, which cannot
+   * express 'single' or 'multiple' — tested with isMultiState rather than by naming keys, so a
+   * future multi-state amenity can't quietly appear here with two buttons that mean nothing.
+   * hasRestroom is excluded for a different reason: its job is the confirmed-NO case that prunes
+   * a pin off the map, and that belongs to the report queue in FlushPanel, where the claim
+   * arrives with a reporter attached and a moderation trail. It was also never in
+   * ADMIN_AMENITY_KEYS, so the panel was rendering a control the rest of the admin path did not
+   * recognise. */
+  const feats = [...BATHROOM_AMENITIES.filter(a => !isMultiState(a) && a.key !== 'hasRestroom'), ...STORE_FEATURES];
   const rows = feats.map(a => {
     const cur = ov[a.key] || '';
     const btn = (val, label) => `<button type="button" class="admin-am-btn" data-key="${a.key}" data-val="${val}" style="padding:3px 9px;margin-left:4px;border-radius:6px;border:1px solid ${cur===val?'#2ea1aa':'#2a2e35'};background:${cur===val?'#0e2f33':'#1b1e23'};color:#f6f8fa;font-size:12px;cursor:pointer;">${label}</button>`;
@@ -791,7 +822,7 @@ function renderAmenityStepHtml(myVote, locId){
   if(!a){ return `<div class="amenity-complete">${ico('check')} That's everything — thanks for the intel!</div>`; }
   const states = a.states || ['unknown', 'yes', 'no'];
   const buttons = states.map(s =>
-    `<button type="button" class="amenity-answer-btn" data-key="${a.key}" data-value="${s}">${amenityAnswerIcon(a, s)} ${amenityStateLabel(a, s)}</button>`
+    `<button type="button" class="amenity-answer-btn ans-${s}" data-key="${a.key}" data-value="${s}">${amenityButtonIcon(s)} ${amenityStateLabel(a, s)}</button>`
   ).join('');
   return `<div class="amenity-progress">Question ${cursor + 1} of ${list.length}</div>
     <div class="amenity-question-label">${a.question || a.label}</div>
