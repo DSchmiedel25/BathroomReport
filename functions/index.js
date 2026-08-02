@@ -42,7 +42,7 @@ function fsId(id) {
  * Mirrors BATHROOM_AMENITIES and STORE_FEATURES in app.js. tools/audit-ui.js check 15 fails the
  * build if these drift from the rules or the client. */
 const AMENITY_KEYS_BY_FIELD = {
-  amenities:     new Set(['restroomType', 'accessible', 'changing', 'hasRestroom']),
+  amenities:     new Set(['restroomType', 'genderSplit', 'accessible', 'changing', 'hasRestroom']),
   storeFeatures: new Set(['evCharging', 'airPump', 'shower', 'indoorSeating', 'wifi', 'grabAndGo', 'hotFood']),
 };
 const AMENITY_KEYS = new Set([
