@@ -66,18 +66,24 @@ const CHAIN_REGISTRY = {
   nycDunkin: { name: "Dunkin'", color: '#ff6e0c', textColor: '#ffffff', dataVar: 'nycDunkinLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
   nycStarbucks: { name: 'Starbucks', color: '#00704a', textColor: '#ffffff', dataVar: 'nycStarbucksLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
   nycGregorys: { name: 'Gregorys Coffee', color: '#1a1a1a', textColor: '#ffffff', dataVar: 'nycGregorysLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
-  nycPublic: { name: 'Public restroom', color: '#6b7280', textColor: '#ffffff', dataVar: 'nycPublicLocations', group: 'metro', metro: 'NYC', layer: 'public', shape: 'diamond' },
+  /* All four public-restroom sets are configured IDENTICALLY — no group, layer:'public', same
+   * name — so they share one filter row, one bucket, one zoom gate, one popup, and one question
+   * list. nycPublic and bosPublic used to carry group:'metro', a flag that means "city café
+   * layer" and was applied only because those two cities were where public restrooms happened
+   * to exist first. That accident split identical places across two drawer switches, two zoom
+   * gates and two popups the moment restrooms went nationwide. */
+  nycPublic: { name: 'Public restroom', color: '#6b7280', textColor: '#ffffff', dataVar: 'nycPublicLocations', layer: 'public', shape: 'diamond' },
   bosTatte: { name: 'Tatte Bakery', color: '#b5651d', textColor: '#ffffff', dataVar: 'bosTatteLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
   bosDunkin: { name: "Dunkin'", color: '#ff6e0c', textColor: '#ffffff', dataVar: 'bosDunkinLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
   bosStarbucks: { name: 'Starbucks', color: '#00704a', textColor: '#ffffff', dataVar: 'bosStarbucksLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
   bosPavement: { name: 'Pavement Coffeehouse', color: '#00695c', textColor: '#ffffff', dataVar: 'bosPavementLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
   bosFlour: { name: 'Flour Bakery', color: '#c8506e', textColor: '#ffffff', dataVar: 'bosFlourLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
   bosNero: { name: 'Caffè Nero', color: '#3e2723', textColor: '#ffffff', dataVar: 'bosNeroLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
-  bosPublic: { name: 'Public restroom', color: '#6b7280', textColor: '#ffffff', dataVar: 'bosPublicLocations', group: 'metro', metro: 'Boston', layer: 'public', shape: 'diamond' },
+  bosPublic: { name: 'Public restroom', color: '#6b7280', textColor: '#ffffff', dataVar: 'bosPublicLocations', layer: 'public', shape: 'diamond' },
   // Statewide public restrooms (parks, trailheads, small towns). Same treatment as the
   // city sets, but NOT group:'metro' — 60% of these are rural, so tying them to a metro
   // would hide most of them behind the city zoom/jump behaviour.
-  nyPublic: { name: 'Public restroom (NY)', color: '#6b7280', textColor: '#ffffff', dataVar: 'nyPublicLocations', layer: 'public', shape: 'diamond' },
+  nyPublic: { name: 'Public restroom', color: '#6b7280', textColor: '#ffffff', dataVar: 'nyPublicLocations', layer: 'public', shape: 'diamond' },
   /* Nationwide public restrooms — parks, plazas, trailheads, municipal facilities. ONE registry
    * entry for all ten region files, because every region file appends to the same global array
    * rather than declaring its own. Ten entries would put ten identical "Public restroom" rows in
@@ -98,6 +104,14 @@ function chainHasData(key){
   return !!dv && Array.isArray(window[dv]) && window[dv].length > 0;
 }
 
+/* THE public-restroom predicate. Every behaviour that treats a public restroom differently from
+ * a store routes through this one test, so the four data sets (NYC, Boston, NY state,
+ * nationwide) cannot drift apart again: popup choice, question list, drawer bucket, zoom gate
+ * and foot-mode visibility all ask the same question of the same flag. */
+function isPublicRestroomChain(key){
+  return !!(CHAIN_REGISTRY[key] && CHAIN_REGISTRY[key].layer === 'public');
+}
+
 function chainFor(loc){
   return CHAIN_REGISTRY[(loc && loc.chain) || DEFAULT_CHAIN_KEY] || CHAIN_REGISTRY[DEFAULT_CHAIN_KEY];
 }
@@ -116,23 +130,46 @@ const locationsById = {};
 seedLocations.forEach(loc => { locationsById[loc.id] = loc; });
 perfMark('location data merged (' + seedLocations.length + ' locations)');
 
-// Total location count shown in the menu (hamburger) drawer footer, above the version —
-// total first, then a breakdown: pit stops and each covered metro separately.
-(function(){
+// Total location count shown in the menu (hamburger) drawer footer, above the version.
+/* A FUNCTION now, for two reasons that arrived together with the nationwide data:
+ *
+ * 1. "Pit stops" was everything-not-metro, which was true while non-metro meant gas stations.
+ *    With 61,788 public restrooms outside the metro group, that line would have read
+ *    "Pit stops: 90,000" — off by a factor of three, in the one place the app states its own
+ *    coverage. Public restrooms get their own line, counted by the same bucket the drawer's
+ *    group switches use, so the numbers and the switches can never describe different worlds.
+ *
+ * 2. Region files arrive AFTER startup. A count computed once at parse time goes stale the
+ *    moment the first region loads, so ingestPublicRegion re-calls this. The per-metro café
+ *    lines survive via each chain's metro tag — public restrooms no longer carry one. */
+function updateDrawerLocCount(){
   const el = document.getElementById('drawerLocCount');
   if(!el) return;
-  const pit = seedLocations.filter(l => groupOf(l.chain || DEFAULT_CHAIN_KEY) !== 'metro').length;
-  const byCity = {};
+  /* Three lines, no per-city breakdown. The NYC/Boston lines earned their place while those
+   * cities held the app's only public restrooms; with restrooms moved to their own line, the
+   * city numbers shrank to café counts — trivia in the one place the app states its coverage,
+   * and an implicit claim that two cities are special in a nationwide app. City cafés roll into
+   * one line; the registry's per-chain metro tags stay, so a breakdown can return if metro
+   * coverage ever becomes a story worth telling again. */
+  let pit = 0, pub = 0, cafe = 0;
   seedLocations.forEach(l => {
-    const c = CHAIN_REGISTRY[l.chain || DEFAULT_CHAIN_KEY];
-    if(c && c.group === 'metro'){ const m = c.metro || 'Other'; byCity[m] = (byCity[m] || 0) + 1; }
+    const key = l.chain || DEFAULT_CHAIN_KEY;
+    const bucket = chainBucket(key);
+    if(bucket === 'public'){ pub++; return; }
+    if(bucket === 'city'){ cafe++; return; }
+    pit++;
   });
-  // Also drawer content, also text-only. These are counts; a road sign beside a number adds noise.
   const lines = [`Pit stops: ${pit.toLocaleString()}`,
-    ...Object.keys(byCity).map(m => `${escapeHtml(m)}: ${byCity[m].toLocaleString()}`)];
+    `Public restrooms: ${pub.toLocaleString()}`,
+    `City caf\u00e9s: ${cafe.toLocaleString()}`];
   el.innerHTML = `${seedLocations.length.toLocaleString()} locations mapped` +
     `<span class="d-count-breakdown">${lines.join('<br>')}</span>`;
-})();
+}
+/* Deferred to the next tick ON PURPOSE. chainBucket reads TRAVEL_CENTER_KEYS, a `const`
+ * declared a few hundred lines below — function declarations hoist but consts do not, so a
+ * synchronous call here dies in the temporal dead zone and takes the whole script with it.
+ * setTimeout(0) runs after the full script has evaluated, when every const exists. */
+setTimeout(updateDrawerLocCount, 0);
 
 // Theme: defaults to the phone's system light/dark setting, but a manual toggle overrides it
 function applyTheme(theme){
@@ -431,7 +468,7 @@ function ratingConfidenceHtml(count){
  * onboarding panel, and the FAQ — which is exactly why they drifted apart (July 14 / July 21 /
  * actually July 30). Set this ONE value on each release; everything that shows a date reads it.
  * Format is YYYY-MM-DD so it sorts and can't be misread. */
-const BUILD_DATE = '2026-07-30';
+const BUILD_DATE = '2026-08-02';
 
 // "2026-07-30" -> "July 30, 2026" for prose. Parsed as UTC parts rather than new Date(str) so it
 // can't shift a day backwards for users west of GMT.
@@ -581,8 +618,12 @@ function pickVisitQuestions(loc, myVote){
   const meta = myVote.amenityMeta || {};
   // Metro locations (Dunkin, Starbucks, public restrooms, …) get bathroom questions only —
   // store/gas-station features (EV charging, air pump, showers, …) are never asked there.
-  const isMetro = chainFor(loc).group === 'metro';
-  const allKeys = (isMetro ? BATHROOM_AMENITIES : [...BATHROOM_AMENITIES, ...STORE_FEATURES]).map(a => a.key);
+  /* Bathroom-only questions anywhere there is no store: the metro cafés AND every public
+   * restroom set. Before this, the test was metro-only, so a visitor at a NY-state or
+   * nationwide public restroom was asked about EV charging and hot food at a park toilet
+   * block — questions that can never have a true answer there. */
+  const restroomOnly = chainFor(loc).group === 'metro' || isPublicRestroomChain(loc.chain);
+  const allKeys = (restroomOnly ? BATHROOM_AMENITIES : [...BATHROOM_AMENITIES, ...STORE_FEATURES]).map(a => a.key);
 
   const eligible = allKeys.filter(key => {
     // "Is there a public restroom?" is targeted, not universal — see restroomDoubted.
@@ -1938,11 +1979,24 @@ function accessBadge(loc, force){
      *    them. "Probably" would be a lie: plenty are a pull-off with a bench and a bin. Someone
      *    leaving the interstate on that promise is the exact failure this app exists to prevent,
      *    so this one stays hedged. */
+    /* Facility hedge FIRST — the metroInfo early-return below it made this dead code for the
+     * nationwide set, whose records all carry metroInfo.
+     *
+     * Scoped to REST AREAS, because 'polygon' means opposite things in the two datasets that
+     * use it. For a rest area it marks an untagged polygon that may be a pull-off with a bench
+     * — doubt. For a nationwide public restroom it marks a drawn toilet BUILDING — a way tagged
+     * amenity=toilets, which is stronger evidence than a bare node, not weaker. Hedging those
+     * 30,000 records with "may be a pull-off only" would have cast doubt on exactly the
+     * best-mapped entries. 'portable' is honest for any dataset: a chemical unit is a chemical
+     * unit wherever it stands. */
+    const facility = (loc && loc.meta && loc.meta.facility) || '';
+    if(loc && loc.chain === 'restarea'
+       && (facility === 'bare' || facility === 'polygon' || facility === 'picnic'))
+      return `<div class="access-badge access-unknown">${ico('help')} Unconfirmed — may be a pull-off only</div>`;
+    if(facility === 'portable')
+      return `<div class="access-badge access-unknown">${ico('help')} Portable unit — basic facilities</div>`;
     if(loc && loc.metroInfo)
       return `<div class="access-badge access-unknown">${ico('help')} Access unknown</div>`;
-    const facility = (loc && loc.meta && loc.meta.facility) || '';
-    if(facility === 'bare' || facility === 'polygon' || facility === 'picnic')
-      return `<div class="access-badge access-unknown">${ico('help')} Unconfirmed — may be a pull-off only</div>`;
     return `<div class="access-badge access-unknown">${ico('help')} Probably — nobody's confirmed yet</div>`;
   }
   return force ? `<div class="access-badge access-public">${ico('check')} Public restroom</div>` : '';
@@ -1960,7 +2014,13 @@ function metroPopupHtml(loc, agg, myVote){
   const raw = (loc.metroInfo && loc.metroInfo.hoursRaw) || '';
   const hoursLine = raw
     ? `<div class="hours-line">${ico('clock')} ${escapeHtml(raw)}</div>`
-    : `<div class="hours-line">${ico('clock')} Hours not listed yet — know them? Tap Report below to send them in.</div>`;
+    : `<div class="hours-line">${ico('clock')} Hours unknown — know them? Report hours below.</div>`;
+  /* The same community hours flow the pit-stop popup has, not the old "tap Report below"
+   * detour into the problem-report form. Hours sent that way arrived as free text in a
+   * moderation queue; this path feeds the hourReports pipeline, where two travelers agreeing
+   * makes it official with no admin in the loop. The handler already attaches by element id
+   * for every popup, so sharing the markup is the entire change. */
+  const hoursReport = hoursReportBlockHtml(loc, raw);
   const recency = agg ? relativeTimeFromNow(agg.lastRatedAt || agg.lastUpdated) : '';
   const recencyLine = recency ? `<div class="hours-line">${ico('pencil')} Last rated ${recency}${ratedByHtml(agg)}</div>` : '';
   const seasonalLine = seasonalNoteHtml(loc);
@@ -1977,6 +2037,7 @@ function metroPopupHtml(loc, agg, myVote){
     ${(loc.metroInfo && loc.metroInfo.fee) ? `<div class="hours-line">${loc.metroInfo.fee === 'free' ? `${ico('check')} Free to use` : `${ico('help')} Paid / fee`}</div>` : ''}
     ${(loc.metroInfo && loc.metroInfo.disposal) ? `<div class="hours-line">${ico('restroom')} Basic facilities (portable / chemical unit)</div>` : ''}
     ${hoursLine}
+    ${hoursReport}
     ${seasonalLine}
     ${restroomDoubtLine}
     ${recencyLine}
@@ -2031,7 +2092,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.27.4';
+const BUILD = 'v2.28.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -2064,8 +2125,43 @@ function plate(label){
   return `<div class="plate"><span>${label}</span><i></i></div>`;
 }
 
+/* The community hours-report flow, shared by BOTH popups.
+ *
+ * It lived inline in the pit-stop popup only, which meant routing public restrooms to the
+ * restroom popup would have removed the one crowdsourcing flow they need most — a park
+ * restroom's hours are exactly the blank this exists to fill, and the screenshot that
+ * prompted this work showed it doing that job at a NY public restroom. Offered only where
+ * hours are unknown; correcting wrong hours stays in Report-a-problem. */
+function hoursReportBlockHtml(loc, hoursText){
+  if(hoursText || !isLoggedIn()) return '';
+  return `
+    <button type="button" class="btn btn-secondary hours-report-toggle" id="hours-report-toggle-${loc.id}" style="margin:6px 0;width:100%;">${ico('clock')} Report hours</button>
+    <div class="hours-report-section" id="hours-report-section-${loc.id}" style="display:none;background:#141619;border:1px solid #2a2e35;border-radius:10px;padding:10px;margin-bottom:6px;">
+      <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:#f6f8fa;">${isMapAdmin() ? "You're an admin — the hours you set are applied to the map right away." : "What hours is this store open? Two travelers agreeing makes it official."}</div>
+      <div id="hours-mode-${loc.id}">
+        <button type="button" data-mode="24" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">${ico('clock')} Open 24 hours</button>
+        <button type="button" data-mode="same" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">${ico('clock')} Same hours every day</button>
+        <button type="button" data-mode="sunday" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">${ico('calendar')} Sunday is different</button>
+      </div>
+      <div id="hours-same-${loc.id}" style="display:none;margin-top:8px;align-items:center;gap:10px;color:#f6f8fa;font-size:13px;">
+        <label>Open <select id="hr-open-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></label>
+        <label>Close <select id="hr-close-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></label>
+      </div>
+      <div id="hours-sunday-${loc.id}" style="display:none;margin-top:8px;color:#f6f8fa;font-size:13px;">
+        <div style="display:flex;align-items:center;gap:6px;margin:4px 0;"><span style="width:60px;">Mon–Sat</span><select id="hr-ms-o-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select> – <select id="hr-ms-c-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></div>
+        <div style="display:flex;align-items:center;gap:6px;margin:4px 0;"><span style="width:60px;">Sunday</span><select id="hr-su-o-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select> – <select id="hr-su-c-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></div>
+      </div>
+      <button type="button" class="btn btn-amber hours-submit" id="hours-submit-${loc.id}" style="display:none;margin-top:8px;">Send hours</button>
+      <div class="save-note" id="hours-note-${loc.id}" style="margin-top:6px;"></div>
+    </div>`;
+}
+
 function popupHtml(loc, agg, myVote){
-  if(chainFor(loc).group === 'metro') return metroPopupHtml(loc, agg, myVote);
+  /* The "metro" popup is really the RESTROOM popup: leads with access, shows hours as text,
+   * omits the store sections. It is the right popup for every public restroom, not only the two
+   * metro sets — before this test widened, a park restroom in Albany or Denver rendered the
+   * pit-stop popup, complete with store-feature framing built for gas stations. */
+  if(chainFor(loc).group === 'metro' || isPublicRestroomChain(loc.chain)) return metroPopupHtml(loc, agg, myVote);
   const shareUrl = `${location.origin}${location.pathname}?loc=${encodeURIComponent(loc.id)}`;
   const hoursText = formatHrsDisplay(loc);
   const openStatus = isLocationOpenNow(loc);
@@ -2106,26 +2202,7 @@ function popupHtml(loc, agg, myVote){
   const chain = chainFor(loc);
   // Report hours is offered ONLY where hours are unknown — it fills blanks. Correcting wrong
   // hours stays in the Report-a-problem flow ("Wrong hours").
-  const hoursReportHtml = (hoursText || !isLoggedIn()) ? '' : `
-    <button type="button" class="btn btn-secondary hours-report-toggle" id="hours-report-toggle-${loc.id}" style="margin:6px 0;width:100%;">${ico('clock')} Report hours</button>
-    <div class="hours-report-section" id="hours-report-section-${loc.id}" style="display:none;background:#141619;border:1px solid #2a2e35;border-radius:10px;padding:10px;margin-bottom:6px;">
-      <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:#f6f8fa;">${isMapAdmin() ? "You're an admin — the hours you set are applied to the map right away." : "What hours is this store open? Two travelers agreeing makes it official."}</div>
-      <div id="hours-mode-${loc.id}">
-        <button type="button" data-mode="24" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">${ico('clock')} Open 24 hours</button>
-        <button type="button" data-mode="same" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">${ico('clock')} Same hours every day</button>
-        <button type="button" data-mode="sunday" style="display:block;width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:8px;font-size:14px;cursor:pointer;">${ico('calendar')} Sunday is different</button>
-      </div>
-      <div id="hours-same-${loc.id}" style="display:none;margin-top:8px;align-items:center;gap:10px;color:#f6f8fa;font-size:13px;">
-        <label>Open <select id="hr-open-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></label>
-        <label>Close <select id="hr-close-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></label>
-      </div>
-      <div id="hours-sunday-${loc.id}" style="display:none;margin-top:8px;color:#f6f8fa;font-size:13px;">
-        <div style="display:flex;align-items:center;gap:6px;margin:4px 0;"><span style="width:60px;">Mon–Sat</span><select id="hr-ms-o-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select> – <select id="hr-ms-c-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></div>
-        <div style="display:flex;align-items:center;gap:6px;margin:4px 0;"><span style="width:60px;">Sunday</span><select id="hr-su-o-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select> – <select id="hr-su-c-${loc.id}" style="font-size:16px;background:#1b1e23;color:#f6f8fa;border:1px solid #2a2e35;border-radius:6px;padding:4px 6px;">${halfHourOptions()}</select></div>
-      </div>
-      <button type="button" class="btn btn-amber hours-submit" id="hours-submit-${loc.id}" style="display:none;margin-top:8px;">Send hours</button>
-      <div class="save-note" id="hours-note-${loc.id}" style="margin-top:6px;"></div>
-    </div>`
+  const hoursReportHtml = hoursReportBlockHtml(loc, hoursText);
   return `<div class="popup-inner" data-locid="${loc.id}">
     <div class="popup-head-row">
       <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${chain.name}</div>
@@ -3773,7 +3850,6 @@ function getVerifiedPosition(){
         lastKnownPos = { lat: pos.coords.latitude, lng: pos.coords.longitude,
                          accuracy: (typeof pos.coords.accuracy === 'number' ? pos.coords.accuracy : null),
                          ts: Date.now() };
-        maybeAutoSetTravelMode(lastKnownPos.lat, lastKnownPos.lng);
         resolve(lastKnownPos);
       },
       () => resolve(null),
@@ -4103,7 +4179,7 @@ document.getElementById('onboardingClose').addEventListener('click', () => {
   localStorage.setItem('onboardingSeen', '1');
   document.getElementById('onboardingOverlay').classList.remove('show');
 });
-// Onboarding road/foot choice — sets the travel mode's starting state (later refined by location).
+// Onboarding road/foot choice — picks driving vs walking directions; the map is unaffected.
 document.querySelectorAll('.onboardingModeBtn').forEach(btn => {
   btn.addEventListener('click', () => {
     travelMode = (btn.dataset.mode === 'foot') ? 'foot' : 'road';
@@ -4500,52 +4576,12 @@ function saveTravelMode(){ localStorage.setItem('travelMode', travelMode); }
 function groupOf(key){ return (CHAIN_REGISTRY[key] && CHAIN_REGISTRY[key].group) || 'pitstop'; }
 function metroKeys(){ return Object.keys(CHAIN_REGISTRY).filter(k => CHAIN_REGISTRY[k].group === 'metro'); }
 
-// The one city whose options show in the Metros tree. Picked via the jump pills (or auto-set
-// from location); other cities' pins/checkbox states are untouched, just not shown.
-let selectedMetro = localStorage.getItem('selectedMetro') || null;
-function setSelectedMetro(city, manual){
-  selectedMetro = city;
-  if(manual) localStorage.setItem('selectedMetro', city);
-}
-
-// Metro boundaries for location auto-detect. Each entry is a bounding box for a covered metro
-// AREA (use the metro area, not just city limits). Empty until a metro is added with its bounds,
-// so auto-detect is inert today. A polygon test can replace the bbox later if more precision is
-// needed.
-const METRO_BOUNDS = {
-  NYC: { minLat: 40.49, maxLat: 40.92, minLng: -74.27, maxLng: -73.68 },
-  Boston: { minLat: 42.22, maxLat: 42.45, minLng: -71.21, maxLng: -70.92 },
-};
-function insideAnyMetro(lat, lng){
-  return metroAt(lat, lng) !== null;
-}
-// Which covered metro (if any) contains this point — returns the city name or null.
-function metroAt(lat, lng){
-  for(const city of Object.keys(METRO_BOUNDS)){
-    const b = METRO_BOUNDS[city];
-    if(lat >= b.minLat && lat <= b.maxLat && lng >= b.minLng && lng <= b.maxLng) return city;
-  }
-  return null;
-}
-// Auto-set travel mode from location: when the user is inside a covered metro and hasn't chosen a
-// mode themselves, switch to "on foot" (which adds the city layer on top of pit stops — nothing
-// disappears). Runs at most once per session, never overrides a manual choice, and never
-// force-reverts to road when they leave. It only sets the starting state, as agreed.
-let autoModeApplied = false;
-function maybeAutoSetTravelMode(lat, lng){
-  if(metroKeys().length === 0) return;                          // no city layer exists yet
-  const city = metroAt(lat, lng);
-  if(!city) return;                                             // only act inside a covered metro
-  // Auto-select the metro you're standing in so the drawer's tree and pill match your city.
-  // A manually pinned city (tapped pill, saved to localStorage) always wins over location.
-  if(!localStorage.getItem('selectedMetro') && selectedMetro !== city){
-    setSelectedMetro(city, false);
-    renderLayers();
-  }
-  // Auto-switching travel mode was removed: now that mode only affects driving vs walking
-  // directions, silently flipping it based on someone's surroundings would change their
-  // navigation without asking. The setting is explicit.
-}
+/* selectedMetro / METRO_BOUNDS / metroAt / insideAnyMetro / maybeAutoSetTravelMode /
+ * metroCenter and the city-jump pills were removed together: the Metros tree they fed is long
+ * gone, auto mode-switching had already been removed, and two covered-city buttons in a
+ * nationwide app advertised NYC and Boston as though they were the coverage. The stored
+ * selectedMetro localStorage key is left in place — one entry, clearing it tells nobody
+ * anything. */
 
 // Account sync for travel mode (3c). Signed-in users get their choice persisted to their own
 // settings doc so it follows them across devices. Signed-out users keep the localStorage value.
@@ -4634,55 +4670,19 @@ function renderLayers(){
   const sel = document.getElementById('travelModeSelect');
   if(sel && sel.value !== travelMode) sel.value = travelMode;
 
-  // "On foot" shows city locations only — the pills both jump the map AND pick which city's
-  // options appear in the Metros tree below (only the chosen city is shown, never all of them).
-  const cov = document.getElementById('travelModeCoverage');
-  const cities = [...new Set(metros.map(k => CHAIN_REGISTRY[k].metro || 'Other'))];
-  if(!cities.includes(selectedMetro)) selectedMetro = cities[0];
-  if(cov){
-    if(travelMode === 'foot'){
-      cov.innerHTML = `🏙️ Covered — tap to jump: ` +
-        cities.map(c => `<button type="button" class="d-city-jump${c === selectedMetro ? ' sel' : ''}" data-city="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join(' ');
-      cov.style.display = '';
-    } else {
-      cov.style.display = 'none';
-    }
-  }
-
-  // (The per-city Metros tree was removed — metro chains are location-based now: they appear
-  // in the key's "In this area" list when you're zoomed into a covered city, and are always
-  // reachable in the drawer's All places list.)
+  /* The "Covered — tap to jump" pills are gone: two buttons, NYC and Boston, presented as the
+   * app's coverage — no longer true with public restrooms in all 51 jurisdictions. On foot now
+   * means walkable restrooms anywhere. (The per-city Metros tree went earlier for the same
+   * underlying reason.) */
 }
 
-// Mode dropdown — everyone. Picks road ⟷ foot, which shows/hides the city layer.
-// A manual pick counts as an explicit choice (auto-detect defers) and syncs to the account.
+// Mode dropdown — everyone. Road ⟷ foot picks DRIVING vs WALKING directions, nothing else;
+// the map shows the same pins either way. A manual pick syncs to the account.
 document.getElementById('travelModeSelect')?.addEventListener('change', (e) => {
   travelMode = (e.target.value === 'foot') ? 'foot' : 'road';
   localStorage.setItem('travelModeChosen', '1');
   saveTravelMode(); saveTravelModeToAccount(); renderLayers(); applyFilters();
 });
-
-// City jump: tapping a covered city centers the map there at street level and closes the drawer.
-// Center comes from METRO_BOUNDS when defined, else the average of that metro's locations.
-function metroCenter(city){
-  const b = METRO_BOUNDS[city];
-  if(b) return [(b.minLat + b.maxLat) / 2, (b.minLng + b.maxLng) / 2];
-  const keys = metroKeys().filter(k => (CHAIN_REGISTRY[k].metro || 'Other') === city);
-  const locs = seedLocations.filter(l => keys.includes(l.chain));
-  if(!locs.length) return null;
-  return [locs.reduce((s,l)=>s+l.lat,0)/locs.length, locs.reduce((s,l)=>s+l.lng,0)/locs.length];
-}
-document.getElementById('travelModeCoverage')?.addEventListener('click', (e) => {
-  const btn = e.target.closest('.d-city-jump');
-  if(!btn) return;
-  setSelectedMetro(btn.dataset.city, true);   // this city's options now fill the Metros tree
-  renderLayers();
-  const c = metroCenter(btn.dataset.city);
-  if(!c) return;
-  map.setView(c, Math.max(METRO_MIN_ZOOM + 1, 13), {animate: true});
-  document.getElementById('drawerClose')?.click();
-});
-
 
 // ============================================================
 // Chain key — the map key IS the chain filter
@@ -4701,9 +4701,14 @@ document.getElementById('travelModeCoverage')?.addEventListener('click', (e) => 
 function chainRenderableNow(key){
   if(!chainHasData(key)) return false;
   const g = groupOf(key);
-  if(travelMode === 'foot' && g !== 'metro') return false;
+  /* Travel mode does NOT filter the map. It briefly did — On foot hid every drive-to chain —
+   * but hiding real open restrooms from someone because of how they arrived is the app working
+   * against its one job: a person walking past a Casey's still needs to know its bathroom is
+   * there. Mode now does exactly what its name says and nothing else: buildNavUrl requests
+   * walking or driving directions. (An older comment already stated this design; the filtering
+   * here contradicted it.) Zoom gates are density control and stay. */
   if(g === 'metro' && map.getZoom() < METRO_MIN_ZOOM) return false;
-  if(key === 'restarea' && map.getZoom() < REST_MIN_ZOOM) return false;
+  if((key === 'restarea' || isPublicRestroomChain(key)) && map.getZoom() < REST_MIN_ZOOM) return false;
   return true;
 }
 
@@ -4775,7 +4780,10 @@ function chainKeyRowHtml(keys, readOnly){
 // (TRAVEL_CENTER_KEYS is defined once, near CHAIN_REGISTRY, and shared with the achievements.)
 function chainBucket(key){
   if(groupOf(key) === 'metro') return 'city';
-  if(key === 'restarea' || key === 'nyPublic' || key === 'usPublic') return 'public';
+  /* layer:'public' rather than a hand-kept key list — nycPublic and bosPublic were reachable
+   * only via their metro group before, so dropping that group from them without this change
+   * would have silently filed 2,500 public restrooms under "Gas & convenience". */
+  if(key === 'restarea' || isPublicRestroomChain(key)) return 'public';
   if(TRAVEL_CENTER_KEYS.has(key)) return 'travel';
   return 'gas';
 }
@@ -4812,7 +4820,8 @@ function renderChainKey(){
   // Login state is part of the signature: signing in must flip legend → switches immediately.
   // Zoom and travel mode change the empty-state wording, so they belong in the signature —
   // otherwise the advice goes stale while the user zooms.
-  const emptyCtx = areaKeys.length ? '' : ('|z' + map.getZoom() + '|' + travelMode);
+  // Zoom still shapes the empty-state advice; travel mode no longer changes what renders.
+  const emptyCtx = areaKeys.length ? '' : ('|z' + map.getZoom());
   const sig = areaKeys.join(',') + '|' + allKeys.join(',') + '|' +
               [...disabledChains].sort().join(',') + '|' + (readOnly ? 'ro' : 'rw') + emptyCtx;
   if(sig === _chainKeySig) return;
@@ -4862,16 +4871,13 @@ function chainKeyEmptyHtml(inView){
 
   const z = map.getZoom();
   const zoomBlocked = [];
-  if(present.some(k => groupOf(k) === 'metro') && z < METRO_MIN_ZOOM) zoomBlocked.push('city restrooms');
+  // The metro group holds only the city café chains now that public restrooms left it.
+  if(present.some(k => groupOf(k) === 'metro') && z < METRO_MIN_ZOOM) zoomBlocked.push('city caf\u00e9s');
   if(present.some(k => chainBucket(k) === 'public') && z < REST_MIN_ZOOM) zoomBlocked.push('public restrooms');
-  if(zoomBlocked.length && !(travelMode === 'foot' && zoomBlocked[0] !== 'city restrooms')){
+  if(zoomBlocked.length){
     return msg('🔍 Zoom in to see ' + zoomBlocked.join(' and ') + ' around here.');
   }
 
-  // On foot, pit stops are hidden by design — so a viewport full of them looks empty.
-  if(travelMode === 'foot'){
-    return msg('Only gas &amp; convenience stops are mapped here. Switch to 🚗 On the road in the menu to see them.');
-  }
   return msg('Nothing mapped at this zoom yet — try zooming out, or tap 📍 We Missed One?');
 }
 
@@ -5066,6 +5072,7 @@ function ingestPublicRegion(entry){
   // thousand new pins fill in progressively instead of freezing the map.
   applyFilters();
   renderChainKey();
+  updateDrawerLocCount();   // the footer count claims coverage — keep it true as regions land
   perfMark(`public region ${entry.region} ingested (${added.length} locations)`);
 }
 
@@ -5701,7 +5708,6 @@ whereAmIBtn.addEventListener('click',()=>{
     const lat=pos.coords.latitude, lng=pos.coords.longitude;
     lastKnownPos={lat,lng,ts:Date.now()};
     currentListPosition=lastKnownPos;
-    maybeAutoSetTravelMode(lat,lng);
     setUserLocationMarker(lat,lng);
     map.setView([lat,lng],16,{animate:true});
     whereAmIBtn.disabled=false;

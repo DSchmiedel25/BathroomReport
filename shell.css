@@ -636,21 +636,13 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 #onboardingInfoBtn:active{ background:var(--shell-chrome2); }
 
 /* Coverage note under the Getting around selector */
-#appDrawer .d-coverage-note{ font-size:.78rem; opacity:.7; margin-top:6px; line-height:1.4; }
 
 /* Location-count breakdown under the drawer footer total */
 #appDrawer .d-count-breakdown{ display:block; font-weight:400; font-size:.78rem; opacity:.75; margin-top:3px; line-height:1.5; }
 
 /* Tap-to-jump city pills in the coverage note */
-#appDrawer .d-city-jump{
-  display:inline-block; padding:3px 12px; margin:2px 2px 0 0; border-radius:999px;
-  border:1px solid var(--accent); background:transparent; color:var(--accent);
-  font-weight:700; font-size:.8rem; cursor:pointer;
-}
-#appDrawer .d-city-jump:active{ background:color-mix(in srgb, var(--accent) 14%, transparent); }
 
 /* Selected city pill */
-#appDrawer .d-city-jump.sel{ background:var(--accent); color:#fff; }
 
 /* ===================================================================
    UNIFIED DRAWER VERTICAL RHYTHM — one spacing system for every row.
@@ -700,7 +692,6 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 }
 /* Collapse bodies + rows flush and evenly indented. */
 #appDrawer #chainFilterBody{ margin:0 !important; padding:0 0 6px !important; }
-#appDrawer .d-coverage-note{ margin:0 20px 12px !important; }
 
 /* ---------- Below-header stat strip (most-recent + this-week, centered) ---------- */
 #appShell #statPillRow, #statPillRow{
