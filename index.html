@@ -127,7 +127,7 @@
 <div id="mapWrap">
 <div id="topLeftControls">
 <div id="chainKey">
-<button id="chainKeyPill" aria-expanded="false" aria-controls="chainKeyPanel">📍 Places <span id="chainKeyCount"></span> <span id="chainKeyArrow">▾</span></button>
+<button id="chainKeyPill" aria-expanded="false" aria-controls="chainKeyPanel"><svg class="ico" aria-hidden="true"><use href="#i-filter"></use></svg> Filter <span id="chainKeyCount"></span> <span id="chainKeyArrow" aria-hidden="true">▾</span></button>
 <div id="chainKeyPanel">
 <div class="ck-head" id="chainKeyAreaHead">In this area</div>
 <div class="ck-scrollwrap" id="chainKeyScrollWrap"><div id="chainKeyAreaList"></div></div>
@@ -135,17 +135,23 @@
 </div>
 </div>
 </div>
-<button id="listViewToggle">📋 List</button>
+<button id="listViewToggle" aria-label="List of closest bathrooms"><svg class="ico" aria-hidden="true"><use href="#i-list"></use></svg></button>
 <div id="map"></div>
 <button id="whereAmIBtn" aria-label="Show my current location on the map"><svg class="map-control-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path><circle cx="12" cy="12" r="8"></circle></svg><span>Where Am I?</span></button>
-<button id="locateBtn" aria-label="Find the closest bathroom by driving distance">🚽 Bathroom Now</button>
+<button id="locateBtn" aria-label="Find the closest bathroom by driving distance">Find me the closest bathroom</button>
 <div id="nearestInfo"></div>
-<button id="missingBtn">📍 We Missed One?</button>
+<button id="missingBtn"><svg class="ico" aria-hidden="true"><use href="#i-plus"></use></svg> Add a place</button>
+<!-- Location leads. Standing outside the place is the common case, and one tap beats typing an
+     address on a phone — the old panel made typing the teal primary and put "use my location"
+     in a blue button that appeared nowhere else in the app while being the loudest thing on it. -->
 <div id="missingPanel">
-<div class="rating-label" style="color:#b5750f;font-size:15px;">What'd we miss?</div>
-<input type="text" id="missingInput" maxlength="120" placeholder="Address or cross streets" style="width:100%;margin-bottom:8px;" />
-<button class="btn btn-amber tip-submit" id="missingSubmit" style="width:100%;margin-bottom:8px;">Send it in</button>
-<button id="missingUseLocationBtn" type="button">📍 Use my location instead</button>
+<div class="mp-plate"><span>Add a place</span><i></i></div>
+<p class="mp-h">Found a bathroom we don't have?</p>
+<p class="mp-sub">Tell us where and we'll check it out.</p>
+<button id="missingUseLocationBtn" class="mp-primary" type="button"><svg class="ico" aria-hidden="true"><use href="#i-locate"></use></svg> Use my current location</button>
+<div class="mp-or"><i></i><span>or type it</span><i></i></div>
+<input type="text" id="missingInput" maxlength="120" placeholder="Address or cross streets" class="mp-field" />
+<button class="mp-ghost" id="missingSubmit"><svg class="ico" aria-hidden="true"><use href="#i-send"></use></svg> Send it in</button>
 <div class="save-note" id="missingNote"></div>
 </div>
 <div id="onboardingOverlay">
@@ -241,6 +247,12 @@
      and plenty of these places sell pizza or taquitos instead. -->
 <symbol id="i-hotfood" viewBox="0 0 24 24"><path d="M3 17.4h18"/><path d="M4.6 17.4a7.4 7.4 0 0114.8 0"/><path d="M12 10v-1.6"/><path d="M8.4 5.6c0-1 1-1.2 1-2.2M12 5c0-1.2 1-1.4 1-2.4M15.6 5.6c0-1 1-1.2 1-2.2"/></symbol>
 <symbol id="i-bag" viewBox="0 0 24 24"><path d="M4.6 7.6h14.8l-1.1 12a1.8 1.8 0 01-1.8 1.6H7.5a1.8 1.8 0 01-1.8-1.6z"/><path d="M8.8 10V6.4a3.2 3.2 0 016.4 0V10"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M8.4 6.4h11.2M8.4 12h11.2M8.4 17.6h11.2"/><path d="M4.4 6.4h.01M4.4 12h.01M4.4 17.6h.01"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-filter" viewBox="0 0 24 24"><path d="M3.6 5.6h16.8l-6.6 7.6v6l-3.6 2v-8z"/></symbol>
+<symbol id="i-locate" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3L10.5 13.5M21 3l-6.6 18-3.9-7.5L3 9.6z"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
 <symbol id="i-warning" viewBox="0 0 24 24"><path d="M10.3 4.3L2.6 17.4A2 2 0 004.3 20.4h15.4a2 2 0 001.7-3L13.7 4.3a2 2 0 00-3.4 0z"/><path d="M12 9.4v4.2M12 17.2h.01"/></symbol>
 <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9.2 18.2h5.6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9c.6.5.9 1.1.9 1.8v.5h5.2v-.5c0-.7.3-1.3.9-1.8A6 6 0 0012 3z"/></symbol>
 </defs></svg>
@@ -408,7 +420,7 @@ This is tracked on this device only. Log in to sync it across devices.
   <span class="d-shop-label">Gift shop</span>
   <span class="d-shop-sub">Signature Collection &middot; numbered Collector Series</span>
 </a>
-&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.25.1">v2.25.1 · 2026-08-01</span></div>
+&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.26.2">v2.26.2 · 2026-08-01</span></div>
 </nav>
 <!-- Community banner (logged-out) -->
 <div id="communityBanner">

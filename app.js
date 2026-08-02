@@ -1732,7 +1732,7 @@ async function loadWeeklyRecap(){
       if(ratings === 0 && tips === 0){
         el.textContent = '';
       } else {
-        el.textContent = `📈 This week: ${ratings} new rating${ratings===1?'':'s'}, ${tips} new tip${tips===1?'':'s'}`;
+        el.textContent = `This week: ${ratings} new rating${ratings===1?'':'s'}, ${tips} new tip${tips===1?'':'s'}`;
       }
       refreshStatTicker();
     }
@@ -1904,7 +1904,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.25.1';
+const BUILD = 'v2.26.2';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -3454,12 +3454,31 @@ async function updateMostRecentBadge(){
     }
     if(!rec || !rec.locId){ el.textContent = ''; refreshStatTicker(); return; }
     const loc = locationsById[rec.locId];
-    const name = (loc && loc.n) || 'a bathroom';
-    /* Credit the rater when the entry carries a handle. Entries written before this shipped have
-     * none and simply read as they always did. textContent, so no escaping question arises. */
-    const who = typeof rec.username === 'string' && rec.username.trim()
-      ? ' by ' + rec.username.trim().slice(0, 40) : '';
-    el.textContent = `🕐 Most recently rated: ${name}${who} — ${relativeTimeFromNow(rec.ts)}`;
+    /* Brand and town, not the street.
+     *
+     * This read the location NAME, which for most records is a street — "Watervliet Shaker Rd,
+     * Colonie" tells a stranger nothing. A chain they recognise in a town they know does, and it
+     * is the pairing that says whether this is worth a tap. City/state come from the record where
+     * present, otherwise from the address, which is formatted "123 Main St, Albany, NY 12205". */
+    const chainName = loc && CHAIN_REGISTRY[loc.chain] ? CHAIN_REGISTRY[loc.chain].name : null;
+    const place = (() => {
+      if(!loc) return '';
+      const city = loc.city ?? (loc.address && loc.address.city);
+      const st = loc.state ?? (loc.address && loc.address.state);
+      if(city && st) return `${city}, ${st}`;
+      const parts = String(loc.addr || '').split(',').map(x => x.trim()).filter(Boolean);
+      // "…, Albany, NY 12205" -> "Albany, NY". Drop any trailing ZIP.
+      if(parts.length >= 3) return `${parts[parts.length - 2]}, ${parts[parts.length - 1].replace(/\s*\d{5}(-\d{4})?$/, '')}`;
+      return '';
+    })();
+    const headline = [chainName || (loc && loc.n) || 'a bathroom', place].filter(Boolean).join(' · ');
+    /* innerHTML, so the arrow can be an svg. The arrow appears ONLY when the tap actually goes
+     * somewhere — the marker has to be on the map for zoomToMarker to work — so it is a promise
+     * rather than decoration. escapeHtml because a location name is data, not markup. */
+    const tappable = !!(loc && markers[loc.id]);
+    el.innerHTML = `Just rated: ${escapeHtml(headline)} — ${relativeTimeFromNow(rec.ts)}`
+      + (tappable ? ` ${ico('arrow')}` : '');
+    el.classList.toggle('is-tappable', tappable);
     _mostRecentLoaded = true;   // lock only after a real, successful write
     if(loc && markers[loc.id]) el.onclick = () => zoomToMarker(markers[loc.id]);
     refreshStatTicker();
@@ -5538,14 +5557,14 @@ missingUseLocationBtn.addEventListener('click', () => {
     return;
   }
   missingUseLocationBtn.disabled = true;
-  missingUseLocationBtn.textContent = '📍 Getting your location...';
+  missingUseLocationBtn.innerHTML = `${ico('locate')} Getting your location…`;
   navigator.geolocation.getCurrentPosition((pos) => {
     capturedMissingCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-    missingUseLocationBtn.textContent = '✅ Location attached';
+    missingUseLocationBtn.innerHTML = `${ico('check')} Location attached`;
     missingInput.placeholder = 'Optional — add a note (e.g. "behind the gas pumps")';
     missingUseLocationBtn.disabled = false;
   }, () => {
-    missingUseLocationBtn.textContent = '📍 Use my current location instead';
+    missingUseLocationBtn.innerHTML = `${ico('locate')} Use my current location`;
     missingUseLocationBtn.disabled = false;
     missingNote.style.color = '#c62828';
     missingNote.textContent = 'Could not get your location — check permissions.';
@@ -5560,7 +5579,7 @@ async function submitMissingLocation(){
     return;
   }
   missingSubmit.disabled = true;
-  missingSubmit.textContent = '...';
+  missingSubmit.innerHTML = 'Sending…';
   const finalDescription = description || '(no description — location only)';
   const ok = await logMissingLocation(finalDescription, capturedMissingCoords);
   missingNote.style.color = ok ? '#2f6b3c' : '#c62828';
@@ -5569,14 +5588,14 @@ async function submitMissingLocation(){
     missingInput.value = '';
     missingInput.placeholder = 'Address or cross streets';
     capturedMissingCoords = null;
-    missingUseLocationBtn.textContent = '📍 Use my current location instead';
+    missingUseLocationBtn.innerHTML = `${ico('locate')} Use my current location`;
     setTimeout(() => {
       missingPanel.classList.remove('show');
       missingNote.textContent = '';
     }, 1500);
   }
   missingSubmit.disabled = false;
-  missingSubmit.textContent = 'Send';
+  missingSubmit.innerHTML = `${ico('send')} Send it in`;
 }
 
 missingSubmit.addEventListener('click', submitMissingLocation);

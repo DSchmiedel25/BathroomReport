@@ -284,21 +284,14 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
   #missingBtn{
     cursor:pointer;
 }
-  #missingPanel{
-    background:#fffaf0;border-radius:10px;padding:14px 16px;
-    box-shadow:0 4px 16px rgba(0,0,0,.5);display:none;border:2px solid var(--amber);
-}
+  #missingPanel{ display:none; }
   #missingPanel.show{display:block;
 }
   #missingPanel .tip-input-row{display:flex;gap:6px;
 }
-  #missingPanel input{
-    flex:1;font-size:16px;padding:8px;border:1px solid #ccc;border-radius:6px;min-width:0;
-}
-  #missingUseLocationBtn{
-    display:block;width:100%;margin-top:0;background:#1e88e5;color:#fff;border:none;
-    font-size:12px;font-weight:700;padding:8px;border-radius:6px;cursor:pointer;
-}
+  /* The old blue #1e88e5 rule lived here. It was an ID selector, so it beat the new .mp-primary
+     class no matter what order the file was in — the panel would have kept the exact button the
+     overhaul set out to remove. Styling now comes from .mp-primary alone. */
   #onboardingOverlay{
     position:fixed;
     inset:0;
@@ -956,12 +949,6 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
   .status-maybe .status-word{ color:var(--popup-muted); }
   .status-hours{ color:var(--popup-muted); font-size:13px; }
 
-  /* Rating line. "early score" survives as small caps rather than a bordered chip — it is an
-     honesty signal, not decoration, and a 4.0 from one rating genuinely is not a 4.0 from forty.
-     Same information, less furniture. */
-  .rating-line{ display:flex; align-items:baseline; gap:7px; flex-wrap:wrap; font-size:13px; margin:2px 0 0; }
-  .rating-line b{ font-family:var(--font-display); font-weight:600; font-size:16px; color:var(--popup-text); }
-  .rating-meta{ color:var(--popup-muted); font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
 
   /* Quiet secondary actions beneath the one primary button. Directions is what most people came
      for; Share and Report were competing with it at equal weight. */
@@ -1208,3 +1195,69 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
   @media (prefers-reduced-motion: reduce){ .dp-progress i{ transition:none; } }
   /* The card's own bottom padding has to clear both the flip strip and the seam. */
   #flipFront.passport-datapage{ padding-bottom:60px; }
+
+  /* ============================================================
+     Map chrome — layout B2, and the Add a place panel (v2.26)
+     ============================================================ */
+  /* #locateBtn's geometry and type live in shell.css, which sets them with !important — it was
+     already full-width there, so layout B was the shipped layout all along. A second rule here
+     without !important would lose and read as if it worked. */
+  /* Locate and List need no repositioning: shell.css already pins them top-right at 12px and
+     70px with !important, which is the B2 layout. A rule here without !important would lose
+     anyway — it was dead code that read as if it did something. */
+  #listViewToggle .ico{ width:20px; height:20px; }
+  #missingBtn .ico, #chainKeyPill .ico{ width:15px; height:15px; }
+  #missingBtn, #chainKeyPill{ display:inline-flex; align-items:center; gap:7px; }
+
+  /* ---- Add a place ----
+     Was a cream card with an amber heading and a blue button in a navy app — three palettes in
+     one panel, and the blue one was the SECONDARY action while being the loudest thing on it. */
+  #missingPanel{
+    background:var(--charcoal); background-image:var(--grain);
+    border:1px solid var(--panel-border); border-radius:16px; padding:16px;
+    box-shadow:0 -10px 34px rgba(0,0,0,.4); color:var(--cream);
+}
+  .mp-plate{ display:flex; align-items:center; gap:9px; margin:0 0 10px; }
+  .mp-plate span{
+    font-family:var(--font-display); font-weight:600; font-size:9.5px;
+    letter-spacing:.16em; text-transform:uppercase; color:var(--accent); white-space:nowrap;
+}
+  .mp-plate i{ flex:1; height:1px; background:var(--accent); opacity:.26; }
+  .mp-h{ font-family:var(--font-display); font-weight:600; font-size:18px; margin:0 0 4px; }
+  .mp-sub{ font-size:12.5px; color:var(--muted); line-height:1.45; margin:0 0 14px; }
+
+  /* Location is the primary: one tap, and it is what someone standing outside the place wants. */
+  .mp-primary{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    width:100%; min-height:50px; border:0; border-radius:12px;
+    background:var(--accent); color:var(--accent-ink);
+    font:inherit; font-size:14px; font-weight:800; letter-spacing:.02em; cursor:pointer;
+}
+  .mp-or{ display:flex; align-items:center; gap:10px; margin:12px 0; }
+  .mp-or i{ flex:1; height:1px; background:var(--panel-border); }
+  .mp-or span{
+    color:var(--muted); font-size:10.5px; letter-spacing:.12em;
+    text-transform:uppercase; font-weight:800;
+}
+  .mp-field{
+    width:100%; min-height:46px; padding:12px 14px; font:inherit; font-size:14px;
+    background:rgba(127,127,127,.08); color:var(--cream);
+    border:1px solid var(--panel-border); border-radius:12px;
+}
+  .mp-field::placeholder{ color:var(--muted); }
+  .mp-ghost{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    width:100%; min-height:46px; margin-top:8px;
+    background:none; color:var(--cream);
+    border:1px solid var(--panel-border); border-radius:12px;
+    font:inherit; font-size:13.5px; font-weight:600; cursor:pointer;
+}
+  .mp-primary:focus-visible, .mp-ghost:focus-visible, .mp-field:focus-visible{
+    outline:3px solid var(--accent); outline-offset:2px;
+}
+  .mp-ghost:hover{ border-color:var(--accent); }
+
+  /* The recent pill goes somewhere; the weekly one does not. Only the tappable state gets the
+     arrow and the pointer, so the affordance is honest. */
+  #mostRecentBadge.is-tappable{ cursor:pointer; }
+  #mostRecentBadge .ico{ width:14px; height:14px; color:var(--accent); vertical-align:-.15em; }

@@ -649,6 +649,26 @@ service cloud.firestore {
 
 
     // ============================================================
+    //  Recovery email (server-written, owner-readable)
+    // ============================================================
+    /* Holds a real email address, whether it has been verified, and the hash of a pending
+     * verification token. Every write goes through a Cloud Function using the Admin SDK, which
+     * bypasses these rules entirely — so `allow write: if false` costs nothing and closes the
+     * door on a client setting verified:true directly, which would defeat the confirmation step
+     * and let somebody attach an address they do not own.
+     *
+     * Owner-readable so the account panel can show "confirmed" or "check your inbox" without a
+     * round trip. Deliberately NOT admin-readable: moderating reports and tips never requires
+     * knowing anyone's email address, and the fewer places it can be read from, the better.
+     * The token is stored hashed precisely because this document IS readable. */
+    match /recovery/{uid} {
+      allow get:   if signedIn() && uid == request.auth.uid;
+      allow list:  if false;
+      allow write: if false;
+    }
+
+
+    // ============================================================
     //  Moderation blocklist
     // ============================================================
     // The app may check one known document id, but cannot download the whole list.

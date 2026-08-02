@@ -10,6 +10,9 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
   import {
     initializeAppCheck, ReCaptchaV3Provider
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
+  import {
+    getFunctions, httpsCallable
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDMu-9NYeqvBD4Mbp2jctoAF89raE7p8UM",
@@ -56,11 +59,13 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 
   const db = getFirestore(fbApp);
   const auth = getAuth(fbApp);
+  const functions = getFunctions(fbApp);
 
   // Expose just what the rest of the (non-module) page script needs
   window.__fb = {
     db, doc, getDoc, setDoc, increment, arrayUnion, collection, addDoc, query, where, getDocs, deleteDoc,
-    auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile
+    auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile,
+    functions, httpsCallable
   };
 
   // Track login state globally — the rest of the page (non-module script) reads window.__currentUser

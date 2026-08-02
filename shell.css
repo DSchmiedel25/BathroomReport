@@ -111,10 +111,12 @@ button, input, select, textarea{ font-family:inherit; }
   width:46px !important; height:46px !important; border-radius:14px !important;
   background:var(--shell-chrome) !important; border:1px solid var(--shell-line) !important;
   color:var(--shell-ink) !important; box-shadow:var(--shell-shadow) !important;
-  font-size:0 !important;                                /* hide the "List" text, show icon */
   padding:0 !important; display:grid !important; place-items:center !important;
 }
-#listViewToggle::before{ content:"📋"; font-size:20px; line-height:1; display:block; }
+/* The clipboard was drawn by a ::before with the button at font-size:0. With a real <svg> inside,
+   that would have kept rendering the emoji at 20px while the icon sat in a zero-size box — the
+   old mark and the new one at once. */
+#listViewToggle .ico{ width:20px !important; height:20px !important; }
 
 /* ---------- Legend + Chains: bottom-left stack ---------- */
 #topLeftControls{
@@ -135,7 +137,11 @@ button, input, select, textarea{ font-family:inherit; }
   z-index:650 !important; width:auto !important;
   background:var(--accent) !important; color:var(--accent-ink) !important;
   border:0 !important; border-radius:18px !important;
-  padding:15px 18px !important; font-size:17px !important; font-weight:900 !important;
+  /* Approved: Overpass 800 at 13.5px, +0.08em, caps. The label is 24 capitals plus tracking, so
+     17px/900 overflows a 320px phone — and these carry !important, which would have silently
+     beaten the values set in styles.css. Set here so there is one source of truth. */
+  padding:15px 18px !important; font-size:13.5px !important; font-weight:800 !important;
+  letter-spacing:.08em !important; text-transform:uppercase !important;
   letter-spacing:-.01em !important; text-align:left !important;
   box-shadow:0 8px 26px color-mix(in srgb, var(--accent) 45%, transparent) !important;
 }
