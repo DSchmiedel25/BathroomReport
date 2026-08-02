@@ -137,12 +137,22 @@ button, input, select, textarea{ font-family:inherit; }
   z-index:650 !important; width:auto !important;
   background:var(--accent) !important; color:var(--accent-ink) !important;
   border:0 !important; border-radius:18px !important;
-  /* Approved: Overpass 800 at 13.5px, +0.08em, caps. The label is 24 capitals plus tracking, so
-     17px/900 overflows a 320px phone — and these carry !important, which would have silently
-     beaten the values set in styles.css. Set here so there is one source of truth. */
-  padding:15px 18px !important; font-size:13.5px !important; font-weight:800 !important;
-  letter-spacing:.08em !important; text-transform:uppercase !important;
-  letter-spacing:-.01em !important; text-align:left !important;
+  /* Overpass 800, 15px, caps, centred.
+   *
+   * Three things were fighting here. letter-spacing was declared twice — the second (-.01em)
+   * won and pulled the capitals TIGHTER than the default, the opposite of what caps need. And
+   * text-align:left sat inside a centred flex box, so the label rendered left of centre.
+   *
+   * The uneven padding is deliberate, not a typo. Capitals have no descenders, so the space a
+   * font reserves below the baseline stays empty and a mathematically centred line reads high.
+   *
+   * The extra goes on TOP, which is counter-intuitive: align-items:center centres the text in the
+   * CONTENT box, and content box = button minus padding. Padding added at the bottom shrinks that
+   * box from below and pushes the text UP. This shipped the wrong way round once — 3px more on
+   * top is what actually lowers the line. */
+  padding:20px 18px 16px !important; font-size:16px !important; font-weight:800 !important;
+  letter-spacing:.06em !important; text-transform:uppercase !important; text-align:center !important;
+  display:flex !important; align-items:center !important; justify-content:center !important;
   box-shadow:0 8px 26px color-mix(in srgb, var(--accent) 45%, transparent) !important;
 }
 #locateBtn:active{ background:var(--accent-deep) !important; }
