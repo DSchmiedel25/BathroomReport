@@ -1240,7 +1240,10 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
     text-transform:uppercase; font-weight:800;
 }
   .mp-field{
-    width:100%; min-height:46px; padding:12px 14px; font:inherit; font-size:14px;
+    /* 16px is not a style choice. iOS Safari zooms the whole page when a focused input is under
+       16px, and there is no way back out — the map ends up scaled and the panel off-screen. The
+       rule this replaced set 16px for that reason; dropping to 14px brought the zoom back. */
+    width:100%; min-height:46px; padding:12px 14px; font:inherit; font-size:16px;
     background:rgba(127,127,127,.08); color:var(--cream);
     border:1px solid var(--panel-border); border-radius:12px;
 }

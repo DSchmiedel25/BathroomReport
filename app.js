@@ -1904,7 +1904,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.26.2';
+const BUILD = 'v2.26.4';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -5418,6 +5418,10 @@ async function filterOutHardOoo(candidates){
 let userMarker=null;
 const whereAmIBtn=document.getElementById('whereAmIBtn');
 const locateBtn=document.getElementById('locateBtn'),nearestInfo=document.getElementById('nearestInfo');
+/* The button's resting label, in one place. It is reset after every outcome — success, denial,
+ * timeout, error — and each of those reset it to its own hardcoded string, so changing the markup
+ * silently lasted until the first tap. */
+const LOCATE_LABEL = 'Find me the closest bathroom';
 
 function setUserLocationMarker(lat, lng){
   if(userMarker) map.removeLayer(userMarker);
@@ -5479,7 +5483,7 @@ function showBathroomNowResult(result,fallback=false){
 locateBtn.addEventListener('click',()=>{
   if(suppressNextLocateClick)return;
   if(!navigator.geolocation){nearestInfo.style.display='block';nearestInfo.textContent="Your browser doesn't support location.";return;}
-  locateBtn.disabled=true;locateBtn.textContent='🚽 Finding bathroom…';nearestInfo.style.display='none';
+  locateBtn.disabled=true;locateBtn.textContent='Finding the closest…';nearestInfo.style.display='none';
   navigator.geolocation.getCurrentPosition(async pos=>{
     const user={lat:pos.coords.latitude,lng:pos.coords.longitude};lastKnownPos={...user,ts:Date.now()};currentListPosition=lastKnownPos;
     setUserLocationMarker(user.lat,user.lng);
@@ -5510,7 +5514,7 @@ locateBtn.addEventListener('click',()=>{
     }
     let candidates=eligible.map(loc=>({loc,d:milesBetween(user.lat,user.lng,loc.lat,loc.lng)})).sort((a,b)=>a.d-b.d).slice(0,10).map(x=>x.loc);
     if(!candidates.length){
-      locateBtn.disabled=false;locateBtn.textContent='🚽 Bathroom Now';
+      locateBtn.disabled=false;locateBtn.textContent=LOCATE_LABEL;
       nearestInfo.style.display='block';
       nearestInfo.textContent='No open bathrooms found nearby right now.';
       return;
@@ -5521,7 +5525,7 @@ locateBtn.addEventListener('click',()=>{
     // flagged (extremely unlikely), we keep the original list rather than dead-end.
     candidates = await filterOutHardOoo(candidates);
     if(!candidates.length){
-      locateBtn.disabled=false;locateBtn.textContent='🚽 Bathroom Now';
+      locateBtn.disabled=false;locateBtn.textContent=LOCATE_LABEL;
       nearestInfo.style.display='block';
       nearestInfo.textContent='No open bathrooms found nearby right now.';
       return;
@@ -5532,8 +5536,8 @@ locateBtn.addEventListener('click',()=>{
       if(!options.length)throw new Error('No routes');showBathroomNowResult(options[0],false);
     }catch(e){
       const loc=candidates[0];showBathroomNowResult({loc,distanceMiles:milesBetween(user.lat,user.lng,loc.lat,loc.lng),durationMinutes:null},true);
-    }finally{locateBtn.disabled=false;locateBtn.textContent='🚽 Bathroom Now';}
-  },err=>{locateBtn.disabled=false;locateBtn.textContent='🚽 Bathroom Now';nearestInfo.style.display='block';nearestInfo.textContent=err.code===1?'Location access was denied. Enable location permission for this site to use Bathroom Now.':'Could not get your location. Check your connection and location settings.';},{enableHighAccuracy:true,timeout:10000});
+    }finally{locateBtn.disabled=false;locateBtn.textContent=LOCATE_LABEL;}
+  },err=>{locateBtn.disabled=false;locateBtn.textContent=LOCATE_LABEL;nearestInfo.style.display='block';nearestInfo.textContent=err.code===1?'Location access was denied. Enable location permission for this site to use Bathroom Now.':'Could not get your location. Check your connection and location settings.';},{enableHighAccuracy:true,timeout:10000});
 });
 
 // Missing-location reporting — logs straight to Firestore (visible in FlushPanel), no email needed
