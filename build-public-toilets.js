@@ -216,8 +216,37 @@ function main() {
     const recs = byRegion[key] || [];
     if (!recs.length) { console.log(`  ${key.padEnd(14)} (empty — no file written)`); continue; }
 
-    // bbox computed from the data rather than hardcoded, so it can never drift from what the
-    // file actually contains — this is what the viewport check will load against.
+    /* Occupied GRID CELLS, not rectangles.
+     *
+     * Rectangles cannot describe a state that is not a rectangle. California's box reaches
+     * 114.15W because of its southeast corner, so it swallowed Las Vegas — a Nevada viewport
+     * matched California and pulled 2.9 MB from the wrong side of the border. Per-state boxes
+     * fixed the worst case (Reno matching Pacific across the ocean) but not that one, because
+     * the box is a true bound of the data; it is the SHAPE that is wrong.
+     *
+     * A cell is listed only if the file holds a record inside it, so a match means data is
+     * genuinely there, never merely nearby.
+     *
+     * Quarter degree is measured, not guessed. Across twelve city viewports:
+     *      1°     1004 cells    6 KB   2.61 MB avg   1.33 regions matched
+     *      0.5°   2842 cells   19 KB   2.38 MB avg   1.17
+     *      0.25°  6474 cells   44 KB   2.16 MB avg   1.08   <-- chosen
+     *      0.1°  13902 cells  109 KB   2.16 MB avg   1.08
+     * Below a quarter degree the match rate stops improving and only the manifest grows. Above
+     * it, cells straddle borders: at 1° an Albany viewport matched New England and a Boise one
+     * matched Pacific, each pulling a whole extra region for records a state away. */
+    const GRID = 0.25;
+    // Resolution-general packing: offset both axes positive, then fold into one integer. The
+    // row stride must be derived from GRID, not hardcoded, or a finer grid silently collides.
+    const LAT_OFF = Math.ceil(90 / GRID), LNG_OFF = Math.ceil(180 / GRID);
+    const STRIDE = Math.round(360 / GRID) + 2;
+    const cellSet = new Set();
+    for (const r of recs) {
+      cellSet.add((Math.floor(r.lat / GRID) + LAT_OFF) * STRIDE + (Math.floor(r.lng / GRID) + LNG_OFF));
+    }
+    const cells = [...cellSet].sort((a, b) => a - b);
+
+    // Region-wide extent kept for display and debugging only — the loader uses `cells`.
     let s = 90, w = 180, n = -90, e = -180;
     for (const r of recs) {
       if (r.lat < s) s = r.lat; if (r.lat > n) n = r.lat;
@@ -230,13 +259,26 @@ function main() {
       + '\n);\n';
     if (!DRY) fs.writeFileSync(file, body);
 
-    manifest.push({ region: key, label: meta.label, file, count: recs.length, bbox: [s, w, n, e] });
-    console.log(`  ${key.padEnd(14)} ${String(recs.length).padStart(6)} records  ${(body.length / 1048576).toFixed(2)} MB`);
+    manifest.push({
+      region: key, label: meta.label, file,
+      count: recs.length,
+      bytes: body.length,
+      bbox: [Number(s.toFixed(4)), Number(w.toFixed(4)), Number(n.toFixed(4)), Number(e.toFixed(4))],
+      grid: GRID,
+      cells,
+    });
+    console.log(`  ${key.padEnd(14)} ${String(recs.length).padStart(6)} records  ${(body.length / 1048576).toFixed(2)} MB  ${cells.length} cell(s)`);
   }
 
   if (!DRY) {
+    /* One region per line rather than JSON.stringify(x, null, 2). Pretty-printing puts every
+     * cell integer on its own line, which doubled the manifest from 46 KB to 91 KB — and this
+     * is the one file that loads on EVERY page view, whether or not anyone opens the layer.
+     * Per-line keeps it diffable without paying for it. */
     fs.writeFileSync('public-toilets-manifest.js',
-      'window.publicToiletManifest = ' + JSON.stringify(manifest, null, 2) + ';\n');
+      'window.publicToiletManifest = [\n'
+      + manifest.map(m => JSON.stringify(m)).join(',\n')
+      + '\n];\n');
   }
 
   const total = manifest.reduce((a, m) => a + m.count, 0);
