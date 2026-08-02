@@ -243,7 +243,7 @@ service cloud.firestore {
         && ratingOrAbsent('store')
         && ratingOrAbsent('bathroom')
         && knownAmenityMap('amenities',
-             ['restroomType','accessible','changing','hasRestroom'])
+             ['restroomType','genderSplit','accessible','changing','hasRestroom'])
         && knownAmenityMap('storeFeatures',
              ['evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'])
         // amenityMeta holds per-key not-sure counters, shaped { key: { notSure: n } }, so its
@@ -500,8 +500,9 @@ service cloud.firestore {
     match /amenityOverrides/{storeId} {
       allow read: if true;
       allow create: if isAdmin()
-        && request.resource.data.keys().hasOnly(['restroomType','accessible','changing','hasRestroom','evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'])
+        && request.resource.data.keys().hasOnly(['restroomType','genderSplit','accessible','changing','hasRestroom','evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'])
         && amenityValueOrAbsent('restroomType')
+        && amenityValueOrAbsent('genderSplit')
         && amenityValueOrAbsent('accessible')
         && amenityValueOrAbsent('changing')
         && amenityValueOrAbsent('hasRestroom')
@@ -515,8 +516,9 @@ service cloud.firestore {
       // Merge updates: validate only what this write changes, so a legacy field
       // riding along untouched can never block an admin edit.
       allow update: if isAdmin()
-        && touchedKeys().hasOnly(['restroomType','accessible','changing','hasRestroom','evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'])
+        && touchedKeys().hasOnly(['restroomType','genderSplit','accessible','changing','hasRestroom','evCharging','airPump','shower','indoorSeating','wifi','grabAndGo','hotFood'])
         && touchedIsAmenityValue('restroomType')
+        && touchedIsAmenityValue('genderSplit')
         && touchedIsAmenityValue('accessible')
         && touchedIsAmenityValue('changing')
         && touchedIsAmenityValue('hasRestroom')

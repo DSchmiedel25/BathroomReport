@@ -513,7 +513,11 @@ const AMENITY_TIER = {
   hasRestroom: 4,                                               // CRITICAL — asked first where doubted
   accessible: 3, changing: 3,                                   // HIGH
   indoorSeating: 2, wifi: 2, restroomType: 2, grabAndGo: 2, hotFood: 2, evCharging: 2, // MEDIUM
-  airPump: 1, shower: 1                                         // LOW
+  /* Below restroomType on purpose. Stall count is what tells someone whether they can lock the
+   * door behind them; gendered signage is useful context but rarely changes the decision, and
+   * only four questions are served per visit — a second MEDIUM here would crowd out changing
+   * tables or accessibility. */
+  airPump: 1, shower: 1, genderSplit: 1                         // LOW
 };
 const QUESTIONS_PER_VISIT = 4;
 
@@ -593,12 +597,29 @@ function pickVisitQuestions(loc, myVote){
 }
 
 const BATHROOM_AMENITIES = [
-  {key:'restroomType', label:'Restroom setup', states:['unknown','single','multiple'],
+  /* Two questions, because "single vs multiple" was silently answering two of them at once.
+   * Stall count and gendered separation are independent: a place can be one unisex room with
+   * one toilet, one unisex room with stalls, two single-occupancy rooms marked Men and Women,
+   * or two multi-stall rooms. The old states ('Single' / "Men's & women's") straddled both
+   * axes, so two of those four layouts had no correct answer, and a reader learned nothing
+   * about the thing that actually matters for washing up: whether you can lock the door.
+   *
+   * restroomType keeps its key and its stored values, so no migration — 'single' meant one
+   * lockable room under either wording. It now asks ONLY about stalls. genderSplit is new and
+   * deliberately boolean, which means its values ('yes'/'no') are already inside the value
+   * enum in firestore.rules and COUNTED_ANSWERS in functions/index.js — only the key
+   * allowlists needed touching, in the three places check 15 enforces. */
+  {key:'restroomType', label:'Restroom setup',
+    question:'One toilet, or multiple stalls?',
+    states:['unknown','single','multiple'],
     stateLabels:{
       unknown:'Not sure',
-      single:'Single',
-      multiple:"Men's & women's"
+      single:'Single stall',
+      multiple:'Multiple stalls'
     }},
+  {key:'genderSplit', label:"Separate men's & women's",
+    question:"Separate men's and women's rooms?",
+    stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-restroom"></use></svg>'}},
   {key:'accessible', label:'Wheelchair accessible', stateIcons:{yes:'♿️'}},
   {key:'changing', label:'Changing table', stateIcons:{yes:'<svg class="ico" aria-hidden="true"><use href="#i-changing"></use></svg>'}},
   /* Asked ONLY where the operator's own data doesn't list a public restroom (see
@@ -688,7 +709,13 @@ async function saveAmenityOverride(locId, key, val){
 // Admin-only panel: each feature with Yes / No / — (clear). Only rendered when isMapAdmin().
 function adminAmenityPanelHtml(loc){
   const ov = amenityOverrideCache[loc.id] || {};
-  const feats = [...BATHROOM_AMENITIES.filter(a => a.key !== 'restroomType'), ...STORE_FEATURES];
+  /* restroomType is excluded because it is multi-state and this panel only emits yes/no/clear.
+   * hasRestroom is excluded because it is not an amenity an admin should be toggling: its job is
+   * the confirmed-NO case that prunes a pin off the map, and that belongs to the report queue in
+   * FlushPanel, where the claim arrives with a reporter attached and a moderation trail. It was
+   * also never in ADMIN_AMENITY_KEYS, so the panel was rendering a control the rest of the admin
+   * path did not recognise. */
+  const feats = [...BATHROOM_AMENITIES.filter(a => a.key !== 'restroomType' && a.key !== 'hasRestroom'), ...STORE_FEATURES];
   const rows = feats.map(a => {
     const cur = ov[a.key] || '';
     const btn = (val, label) => `<button type="button" class="admin-am-btn" data-key="${a.key}" data-val="${val}" style="padding:3px 9px;margin-left:4px;border-radius:6px;border:1px solid ${cur===val?'#2ea1aa':'#2a2e35'};background:${cur===val?'#0e2f33':'#1b1e23'};color:#f6f8fa;font-size:12px;cursor:pointer;">${label}</button>`;
@@ -840,6 +867,40 @@ function communitySummaryHtml(loc){
        + communityConfirmedBadges(loc, STORE_FEATURES, sSummary);
 }
 function communitySectionHasContent(loc){ return communitySummaryHtml(loc) !== ''; }
+
+/* The two READ-ONLY feature blocks, extracted so both the signed-in and signed-out popup
+ * branches can render the identical markup (same element ids, so attachAmenityHandlers
+ * refreshes them either way).
+ *
+ * These were inside the isLoggedIn() branch, which meant a logged-out visitor saw only the
+ * sign-in hint — no "Confirmed by visitors", no OSM bathroom features. Since the pitch is
+ * "no account needed", that is what most first-time visitors saw: changing tables and
+ * restroom type were in the data and confirmed, and simply never rendered for them.
+ * aggregates/ and amenityOverrides/ are both `allow read: if true`, and fetchCommunityDoc()
+ * on popupopen was never auth-gated, so the data was already arriving — only the markup
+ * was withheld. Writing still requires sign-in; nothing below is a write path. */
+function communityBlockHtml(loc){
+  return `<div class="community-section${communitySectionHasContent(loc) ? '' : ' is-empty'}" id="community-section-${loc.id}">
+      ${plate('Confirmed by visitors')}
+      <div class="feature-badges" id="community-summary-${loc.id}">${communitySummaryHtml(loc)}</div>
+    </div>`;
+}
+function osmFeatureBlockHtml(loc){
+  return `<div class="feature-summary osm-bathroom-section${osmBathroomHasContent(loc) ? '' : ' is-empty'}">${plate('Bathroom features')}<div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>`;
+}
+/* Tips are `allow read: if true` as well. Logged-out visitors get the list without the
+ * compose row — "need a key, buzzer required" is exactly the kind of thing worth seeing
+ * before you drive somewhere, and it costs nothing to show. */
+function tipsSectionHtml(loc, canWrite){
+  return `<div class="tips-section">
+      ${plate('Tips')}
+      <ul class="tips-list" id="tips-list-${loc.id}"><li style="color:#999;">Loading…</li></ul>
+      ${canWrite ? `<div class="tip-input-row">
+        <input type="text" class="tip-input" id="tip-input-${loc.id}" maxlength="${MAX_TIP_LENGTH}" placeholder="e.g. need a key, buzzer required" />
+        <button class="btn btn-amber tip-submit" id="tip-submit-${loc.id}">Add</button>
+      </div>` : ''}
+    </div>`;
+}
 
 function amenitySummaryHtml(summary, loc){
   // OSM-verified bathroom badges only — community confirmations now live in the unified
@@ -1875,20 +1936,13 @@ function metroPopupHtml(loc, agg, myVote){
     ${isLoggedIn() ? `<div class="rating-col single-rating" id="rating-section-${loc.id}">
       ${ratingSectionInnerHtml(loc, agg, myVote)}
     </div>
-    <div class="community-section${communitySectionHasContent(loc) ? '' : ' is-empty'}" id="community-section-${loc.id}">
-      ${plate('Confirmed by visitors')}
-      <div class="feature-badges" id="community-summary-${loc.id}">${communitySummaryHtml(loc)}</div>
-    </div>
-    <div class="tips-section">
-      ${plate('Tips')}
-      <ul class="tips-list" id="tips-list-${loc.id}"><li style="color:#999;">Loading…</li></ul>
-      <div class="tip-input-row">
-        <input type="text" class="tip-input" id="tip-input-${loc.id}" maxlength="${MAX_TIP_LENGTH}" placeholder="e.g. need a key, buzzer required" />
-        <button class="btn btn-amber tip-submit" id="tip-submit-${loc.id}">Add</button>
-      </div>
-    </div>
+    ${communityBlockHtml(loc)}
+    ${tipsSectionHtml(loc, true)}
     ${amenityEditorHtml(loc.id, myVote)}
-    <div class="feature-summary osm-bathroom-section${osmBathroomHasContent(loc) ? '' : ' is-empty'}">${plate('Bathroom features')}<div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>` : `<div class="popup-signin-hint">${ico('lock')} Sign in to rate this bathroom, add tips, or report an issue.</div>`}
+    ${osmFeatureBlockHtml(loc)}` : `${communityBlockHtml(loc)}
+    ${osmFeatureBlockHtml(loc)}
+    ${tipsSectionHtml(loc, false)}
+    <div class="popup-signin-hint">${ico('lock')} Sign in to rate this bathroom, add tips, or report an issue.</div>`}
   </div>`;
 }
 
@@ -2039,21 +2093,14 @@ function popupHtml(loc, agg, myVote){
     ${isLoggedIn() ? `<div class="rating-col single-rating" id="rating-section-${loc.id}">
       ${ratingSectionInnerHtml(loc, agg, myVote)}
     </div>
-    <div class="community-section${communitySectionHasContent(loc) ? '' : ' is-empty'}" id="community-section-${loc.id}">
-      ${plate('Confirmed by visitors')}
-      <div class="feature-badges" id="community-summary-${loc.id}">${communitySummaryHtml(loc)}</div>
-    </div>
-    <div class="tips-section">
-      ${plate('Tips')}
-      <ul class="tips-list" id="tips-list-${loc.id}"><li style="color:#999;">Loading…</li></ul>
-      <div class="tip-input-row">
-        <input type="text" class="tip-input" id="tip-input-${loc.id}" maxlength="${MAX_TIP_LENGTH}" placeholder="e.g. need a key, buzzer required" />
-        <button class="btn btn-amber tip-submit" id="tip-submit-${loc.id}">Add</button>
-      </div>
-    </div>
+    ${communityBlockHtml(loc)}
+    ${tipsSectionHtml(loc, true)}
     ${amenityEditorHtml(loc.id, myVote)}
-    <div class="feature-summary osm-bathroom-section${osmBathroomHasContent(loc) ? '' : ' is-empty'}">${plate('Bathroom features')}<div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>
-` : `<div class="popup-signin-hint">${ico('lock')} Sign in to rate this bathroom, add tips, or report an issue.</div>`}
+    ${osmFeatureBlockHtml(loc)}
+` : `${communityBlockHtml(loc)}
+    ${osmFeatureBlockHtml(loc)}
+    ${tipsSectionHtml(loc, false)}
+    <div class="popup-signin-hint">${ico('lock')} Sign in to rate this bathroom, add tips, or report an issue.</div>`}
   </div>`;
 }
 
@@ -3834,7 +3881,10 @@ function renderTipsList(loc, tips){
   const listEl = document.getElementById('tips-list-' + loc.id);
   if(!listEl) return;
   if(!tips || tips.length === 0){
-    listEl.innerHTML = '<li style="color:#999;">No tips yet — be the first!</li>';
+    // "Be the first" is an invitation to do something a signed-out visitor has no control for.
+    listEl.innerHTML = isLoggedIn()
+      ? '<li style="color:#999;">No tips yet — be the first!</li>'
+      : '<li style="color:#999;">No tips yet.</li>';
     return;
   }
   listEl.innerHTML = tips.map(t => `<li><svg class="ico" aria-hidden="true"><use href="#i-bulb"></use></svg> ${escapeHtml(t)}</li>`).join('');
@@ -3863,11 +3913,16 @@ async function attachTipHandlers(loc){
   const listEl = document.getElementById('tips-list-' + loc.id);
   const inputEl = document.getElementById('tip-input-' + loc.id);
   const submitEl = document.getElementById('tip-submit-' + loc.id);
-  if(!listEl || !inputEl || !submitEl) return;
+  /* Only the LIST is required now. Logged-out popups render the tips list without the compose
+   * row, so requiring the input and button here would have left them stuck on "Loading…" —
+   * the same withheld-read problem as the feature blocks, one layer down. */
+  if(!listEl) return;
 
   // Load existing tips fresh each time the popup opens
   const tips = await loadTips(loc.id);
   renderTipsList(loc, tips);
+
+  if(!inputEl || !submitEl) return;   // read-only (signed-out) popup — nothing to bind
 
   // Avoid stacking duplicate listeners if the popup is reopened
   if(submitEl.dataset.bound === '1') return;
