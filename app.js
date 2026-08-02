@@ -531,7 +531,7 @@ function isBathroomKey(key){ return BATHROOM_AMENITIES.some(a => a.key === key);
 //  - community-confirmed (live votes >= threshold, or baked conf) → settled
 //  - gas that OSM knows → settled (the gas exception: trusted, never asked)
 // OSM-verified NON-gas amenities are NOT settled — they stay askable so visitors can promote
-// them from teal (verified) to amber (confirmed by visitors).
+// them from teal (verified, no star) to a starred green/red answer badge (confirmed by visitors).
 function amenitySettled(loc, key, summary){
   const conf = (loc && loc.conf) || {};
   const osm  = (loc && loc.osm) || {};
@@ -876,7 +876,23 @@ function communityConfirmedBadges(loc, featureDefs, summary, skip){
       const st = confirmedState(a, x);
       return st ? `<span class="feature-badge community">${amenityAnswerIcon(a, st)} ${escapeHtml(amenityStateLabel(a, st))} <svg class="ico ico-fill" aria-hidden="true"><use href="#i-star"></use></svg></span>` : '';
     }
-    if(!(isConfirmedYes(x) || conf[a.key])) return '';
+    if(!(isConfirmedYes(x) || conf[a.key])){
+      /* A confirmed NO is a real answer and was being thrown away here — three people agreeing
+       * there is no changing table produced exactly the same empty string as nobody having
+       * answered at all. For a parent, "confirmed: no changing table" is the whole point of
+       * checking before driving over, and the same holds for showers at a truck stop.
+       *
+       * Ordered after the positive checks on purpose: an admin override or a baked confirmation
+       * (conf[a.key]) is authoritative and wins over community votes, so a negative can never
+       * contradict one. accessible and hasRestroom never reach this branch — both are in the
+       * caller's `skip` list, the first because it has its own prominent badge and the second
+       * because a confirmed no prunes the pin entirely, which makes a badge on it a
+       * contradiction. */
+      if(isConfirmedNo(x)){
+        return `<span class="feature-badge community-no">${AMENITY_ANSWER_ICONS.no} ${escapeHtml(a.label)}: No <svg class="ico ico-fill" aria-hidden="true"><use href="#i-star"></use></svg></span>`;
+      }
+      return '';
+    }
     return `<span class="feature-badge community">${amenityAnswerIcon(a, 'yes')} ${a.label} <svg class="ico ico-fill" aria-hidden="true"><use href="#i-star"></use></svg></span>`;
   }).join('');
 }

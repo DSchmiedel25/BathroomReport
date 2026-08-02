@@ -562,12 +562,33 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 /* When the store summary has nothing confirmed/verified, hide the whole section (JS adds .is-empty). */
 .store-section.is-empty{ display:none; }
 
-/* ---------- Community-confirmed feature badge (⭐, warm color) ----------
-   Visitor-confirmed features are the gold standard: a warm amber badge with a trailing star,
-   distinct from the quieter teal OSM-"verified" badge (which has no star). */
+/* ---------- Community-confirmed feature badges (⭐) ----------
+   Colour carries the ANSWER; the trailing star carries the SOURCE.
+
+   These were amber for yes, on the theory that colour marked provenance — teal for
+   OSM-verified, amber for the better visitor-confirmed tier. That broke the moment a confirmed
+   NO needed a badge: red is a valence colour, and next to it amber stopped reading as "best
+   source" and started reading as "yes" by contrast alone. One axis had to give.
+
+   So valence moved to colour and provenance moved to the star, which was already doing that job
+   unambiguously — every visitor-confirmed badge carries one and no OSM badge does. Teal without
+   a star still means verified from OpenStreetMap. */
 .feature-badge.community{
-  background:color-mix(in srgb, #f59e0b 20%, transparent) !important;
-  border:1px solid color-mix(in srgb, #f59e0b 60%, transparent) !important;
+  background:color-mix(in srgb, #4caf50 16%, transparent) !important;
+  border:1px solid color-mix(in srgb, #4caf50 50%, transparent) !important;
+  color:var(--popup-text) !important;
+  font-weight:700;
+}
+
+/* A confirmed absence is the same class of fact as a confirmed presence — same star, same
+   weight, same opacity — so it keeps the badge shape and swaps only the hue. It was set to
+   opacity:.9, which was wrong: a dimmed badge reads as tentative, and "we are not sure" is
+   precisely what this is not. It took three people agreeing to get here.
+   Colour is not the only channel: the circle-slash mark and the trailing "No" both carry it,
+   which matters for the ~8% of men who cannot separate this red from the green above. */
+.feature-badge.community-no{
+  background:color-mix(in srgb, #e53935 16%, transparent) !important;
+  border:1px solid color-mix(in srgb, #e53935 50%, transparent) !important;
   color:var(--popup-text) !important;
   font-weight:700;
 }
