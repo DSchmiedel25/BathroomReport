@@ -33,8 +33,16 @@ const KEEP_PIT      = ARGS.has('--keep-pit');
 const KEEP_SEASONAL = ARGS.has('--keep-seasonal');
 const DRY           = ARGS.has('--dry');
 
-/* US Census divisions. Chosen over the four census REGIONS because South would have been
- * roughly a third of the country in one file, which defeats the point of splitting. */
+/* US Census divisions, with ONE deliberate departure: California is its own region.
+ *
+ * Straight census divisions put CA in Pacific alongside AK, HI, OR and WA, which measured at
+ * 3.0 MB with only Alaska and California counted — Oregon, Washington and Hawaii would have
+ * pushed it past 5 MB, making it larger than the next three regions combined. California alone
+ * is 14.6% of every toilet node in the country, a mix of a very active OSM community and a lot
+ * of state and federal park land.
+ *
+ * Splitting it costs one extra file and buys two evenly-sized ones. Nothing downstream cares
+ * how many regions there are — the manifest is generated, and the loader reads it. */
 const REGIONS = {
   newengland:   { label: 'New England',        states: ['CT','ME','MA','NH','RI','VT'] },
   midatlantic:  { label: 'Mid-Atlantic',       states: ['NJ','NY','PA'] },
@@ -44,7 +52,8 @@ const REGIONS = {
   eastsouth:    { label: 'East South Central', states: ['AL','KY','MS','TN'] },
   westsouth:    { label: 'West South Central', states: ['AR','LA','OK','TX'] },
   mountain:     { label: 'Mountain',           states: ['AZ','CO','ID','MT','NV','NM','UT','WY'] },
-  pacific:      { label: 'Pacific',            states: ['AK','CA','HI','OR','WA'] },
+  california:   { label: 'California',         states: ['CA'] },
+  pacific:      { label: 'Pacific',            states: ['AK','HI','OR','WA'] },
 };
 const REGION_OF = {};
 for (const [key, r] of Object.entries(REGIONS)) for (const st of r.states) REGION_OF[st] = key;
@@ -85,6 +94,21 @@ function accessAllowed(tags) {
   return !['private', 'customers', 'permit', 'no'].includes(a);
 }
 
+/* OSM disposal values arrive misspelled often enough to matter: the six states sampled carried
+ * `valut`, `vaut` and a capitalised `Composting` alongside the correct spellings. Those slip
+ * past an exact-match filter, so a vault toilet typed by someone in a hurry survives a filter
+ * written to exclude vault toilets. Normalise before comparing. */
+const DISPOSAL_ALIASES = { valut: 'vault', vaut: 'vault', composting: 'composting' };
+function disposalOf(tags) {
+  const raw = String(tags['toilets:disposal'] || '').toLowerCase().trim();
+  return DISPOSAL_ALIASES[raw] || raw;
+}
+
+/* Backcountry facility types — a pit, vault, composting or bucket toilet at a trailhead is a
+ * real toilet and a terrible search result for someone in a car in a city, which is the exact
+ * failure the rest-area hedging already guards against. */
+const BACKCOUNTRY = new Set(['pitlatrine', 'vault', 'composting', 'bucket']);
+
 function toRecord(el, state) {
   const tags = el.tags || {};
   const lat = el.lat != null ? el.lat : (el.center && el.center.lat);
@@ -92,8 +116,8 @@ function toRecord(el, state) {
   if (lat == null || lng == null) { DROP.noCoords++; return null; }
   if (!accessAllowed(tags)) { DROP.access++; return null; }
 
-  const disposal = (tags['toilets:disposal'] || '').toLowerCase();
-  if (!KEEP_PIT && disposal === 'pitlatrine') { DROP.pit++; return null; }
+  const disposal = disposalOf(tags);
+  if (!KEEP_PIT && BACKCOUNTRY.has(disposal)) { DROP.pit++; return null; }
   if (!KEEP_SEASONAL && (tags.seasonal || '').toLowerCase() === 'yes') { DROP.seasonal++; return null; }
 
   const srcId = `${el.type}/${el.id}`;
@@ -131,6 +155,17 @@ function toRecord(el, state) {
       srcId,
       state,
       facility,
+      /* Carried but NOT yet displayed. OSM answers the men's/women's question for about 14% of
+       * nodes — unisex=yes is "one shared restroom", male=yes AND female=yes is "separate" —
+       * which would seed genderSplit on thousands of locations instead of waiting for three
+       * votes each. Displaying it needs osmVerifiedBadges to handle multi-state amenities,
+       * which it cannot: it renders `icon + label` with no state, so a multi-state key would
+       * surface as a badge reading "Restroom rooms" — true everywhere, informative nowhere.
+       * That is a change to how EVERY osm badge renders on every chain, so it ships on its own.
+       * Storing the answer now costs a few bytes and means no re-import when it does. */
+      ...(String(tags.unisex).toLowerCase() === 'yes' ? { osmGender: 'single' }
+        : (String(tags.male).toLowerCase() === 'yes' && String(tags.female).toLowerCase() === 'yes') ? { osmGender: 'multiple' }
+        : {}),
       dataSource: 'openstreetmap_overpass',
       lastVerified: new Date().toISOString().slice(0, 10),
     },
