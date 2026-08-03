@@ -332,7 +332,7 @@ map.on('popupclose', () => {
   document.getElementById('locateBtn').style.display = '';
   // Restoring this unconditionally would undo the signed-out gate every time a popup closed.
   document.getElementById('missingBtn').style.display = isLoggedIn() ? '' : 'none';
-  document.getElementById('topLeftControls').style.display = '';
+  document.getElementById('topLeftControls').style.display = isLoggedIn() ? '' : 'none';
   document.getElementById('openNowToggle').style.display = '';
   document.getElementById('listViewToggle').style.display = '';
   document.getElementById('passportToggle').style.display = '';
@@ -2099,7 +2099,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.29.2';
+const BUILD = 'v2.29.3';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -5354,6 +5354,21 @@ function applyAuthVisibility(){
    * controls that could not change anything on the map — worse than absent. */
   const chains = document.getElementById('allChains');
   if(chains) chains.style.display = loggedIn ? '' : 'none';
+
+  /* The map's Filter pill is the same filter in its other surface, so it goes too. It carried a
+   * "Sign in to filter by place" note inside the panel, which meant a logged-out visitor could
+   * open a control, read that it does nothing, and close it again — the pill occupied the top
+   * left of the map to deliver a refusal. */
+  const topLeft = document.getElementById('topLeftControls');
+  if(topLeft) topLeft.style.display = loggedIn ? '' : 'none';
+  if(!loggedIn){
+    // 'open', not 'show' — that is the class the pill's own handler toggles. Collapse the arrow
+    // too, so signing back in doesn't reveal a pill claiming to be open over a closed panel.
+    document.getElementById('chainKeyPanel')?.classList.remove('open');
+    document.getElementById('chainKeyPill')?.setAttribute('aria-expanded', 'false');
+    const arrow = document.getElementById('chainKeyArrow');
+    if(arrow) arrow.textContent = '\u25be';
+  }
 
   // NB: a class, not style.display — `#appDrawer .d-items button` sets `display:flex !important`,
   // which an inline style can't beat. The .is-hidden rule carries !important to match.
