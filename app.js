@@ -161,7 +161,7 @@ function updateDrawerLocCount(){
   });
   const lines = [`Pit stops: ${pit.toLocaleString()}`,
     `Public restrooms: ${pub.toLocaleString()}`,
-    `City caf\u00e9s: ${cafe.toLocaleString()}`];
+    `Coffee shops: ${cafe.toLocaleString()}`];
   el.innerHTML = `${seedLocations.length.toLocaleString()} locations mapped` +
     `<span class="d-count-breakdown">${lines.join('<br>')}</span>`;
 }
@@ -2449,7 +2449,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.36.4';
+const BUILD = 'v2.36.6';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -5268,7 +5268,12 @@ const CK_GROUPS = [
   { id: 'gas',    label: 'Gas & convenience' },
   { id: 'travel', label: 'Travel centers' },
   { id: 'public', label: 'Public restrooms' },
-  { id: 'city',   label: 'City & metro' }
+  /* "Coffee shops", not "City & metro". The group holds exactly seven things — Dunkin',
+   * Starbucks, Caffè Nero, Tatte, Pavement, Flour and Gregorys — and every one of them is a
+   * coffee shop or a bakery-café. "City & metro" described the internal reason they were
+   * grouped (they came from the two metro datasets) rather than what they ARE, which is the
+   * only thing the person reading the row cares about. */
+  { id: 'city',   label: 'Coffee shops' }
 ];
 
 // Rebuilds are cheap but not free — skip the DOM write when nothing changed (same chains,
@@ -5314,9 +5319,10 @@ function renderChainKey(){
 
     if(readOnly){
       const mappedRO = keys.reduce((n, k) => n + ((window[CHAIN_REGISTRY[k].dataVar] || []).length), 0);
+      const shownRO = groupKeysByName(keys).size;
       return `<div class="d-toggle ck-grouprow d-gated">` +
              `<span class="ss-main"><span class="ss-lab">${escapeHtml(g.label)}</span>` +
-             `<span class="ss-desc">${mappedRO.toLocaleString()} mapped</span></span>` +
+             `<span class="ss-desc">${mappedRO.toLocaleString()} mapped &middot; ${shownRO} chain${shownRO === 1 ? '' : 's'}</span></span>` +
              `<span class="d-switch"><b></b></span></div>`;
     }
     /* Reuses the settings switch rather than the map key's checkmark: a checkmark reads as
@@ -5326,7 +5332,14 @@ function renderChainKey(){
      * turning it off costs you; "20,380 mapped · 23 chains" does, and it is the difference
      * between a switch you can reason about and one you flip to find out. */
     const mapped = keys.reduce((n, k) => n + ((window[CHAIN_REGISTRY[k].dataVar] || []).length), 0);
-    const sub = `${mapped.toLocaleString()} mapped &middot; ${keys.length} chain${keys.length === 1 ? '' : 's'}`;
+    /* Count what the next screen actually LISTS, which is names, not registry keys.
+     *
+     * groupKeysByName merges chains sharing a display name — the NYC and Boston copies of
+     * Dunkin' and Starbucks are separate keys, and the four public-restroom sets all render as
+     * "Public restroom". So the row promised 9 chains and opened onto 7 rows, and 5 onto 2.
+     * A count that disagrees with the list one tap away is worse than no count. */
+    const shown = groupKeysByName(keys).size;
+    const sub = `${mapped.toLocaleString()} mapped &middot; ${shown} chain${shown === 1 ? '' : 's'}`;
     /* TWO hit areas in one row, the way a phone's own settings do it: the switch turns the whole
      * group on or off, and anything else opens the list of chains inside it. A row that only
      * navigated would bury the common action one level down; a row that only toggled would
