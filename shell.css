@@ -1002,8 +1002,12 @@ html[data-theme="light"]{
   --ss-tile-bg:rgba(0,0,0,.045);
 }
 
+/* Slides in from the LEFT, where the hamburger is. A panel opened by a control in the top-left
+   that arrives from the bottom edge has no relationship to the thing that summoned it — and the
+   sub-screens already push from the right, so a bottom-up parent left the stack moving on two
+   axes at once. Left in, right for anything deeper: one consistent grammar. */
 .ss{position:fixed;inset:0;z-index:1200;background:var(--ss-bg);
-  transform:translateY(100%);transition:transform .3s cubic-bezier(.22,1,.36,1)}
+  transform:translateX(-100%);transition:transform .3s cubic-bezier(.22,1,.36,1)}
 .ss[hidden]{display:none}
 .ss.ss-in{transform:none}
 .ss.ss-drag{transition:none}
@@ -1012,10 +1016,10 @@ html[data-theme="light"]{
    close handler to it, but given no size rather than deleted, which would break that binding. */
 .ss-scrim{display:none}
 .ss-panel{height:100%;display:flex;flex-direction:column}
-.ss-grab{padding:var(--ss-s2) 0 var(--ss-s1);display:flex;justify-content:center;flex:none;
-  cursor:grab;touch-action:none}
-.ss-grab i{display:block;width:38px;height:4px;border-radius:999px;background:var(--ss-line)}
-.ss-grab:active{cursor:grabbing}
+/* The grabber went with the bottom sheet: a horizontal bar saying "push me down" on a panel
+   that arrives from the left is pointing at the wrong edge. Kept in the DOM because the drag
+   handler binds to it, but given no size. */
+.ss-grab{display:none}
 
 .ss-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
   padding:0 var(--ss-s4) calc(env(safe-area-inset-bottom) + var(--ss-s8))}
@@ -1256,3 +1260,14 @@ html[data-theme="light"] .ss-body .d-toggle .d-switch{background:#d6dde3}
 .ss-screen #ssChainsList .ck-off .ck-mark{opacity:0}
 .ss-screen #ssChainsList .ck-off .ck-name{color:var(--ss-ink3)}
 .ss-screen #ssChainsList .ck-legend{cursor:default}
+
+/* An .acct-note with no text still has vertical padding, so two empty ones sat between the
+   Account card and the About heading as a gap nobody could explain. :empty only matches when
+   there is no whitespace either, which is why the rule has to be paired with the fact that
+   these are populated by textContent rather than by markup. */
+.ss-body .acct-note:empty,
+.ss-screen .acct-note:empty{display:none !important;padding:0 !important}
+
+/* Used by controls kept for their handlers but removed from the layout. */
+.ss-offscreen{position:absolute !important;width:1px !important;height:1px !important;
+  padding:0 !important;margin:-1px !important;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}

@@ -2432,7 +2432,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.36.1';
+const BUILD = 'v2.36.3';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -5355,6 +5355,9 @@ function onChainKeyGroupTap(e){
   saveDisabledChains();
   renderChainKey();
   applyFilters();
+  /* The row on the previous screen states the count, so it has to follow a group toggle —
+   * otherwise backing out shows a number that contradicts the switches just changed. */
+  if(typeof ssSyncValues === 'function') ssSyncValues();
   // Turning the public-restroom layer on is the trigger for its first download — without this
   // nothing would arrive until the next pan, so the toggle would look broken for a moment.
   if(typeof maybeLoadPublicRegions === 'function') maybeLoadPublicRegions();
@@ -5383,6 +5386,9 @@ function onChainKeyRowTap(e){
   saveDisabledChains();
   renderChainKey();
   applyFilters();
+  /* The row on the previous screen states the count, so it has to follow a group toggle —
+   * otherwise backing out shows a number that contradicts the switches just changed. */
+  if(typeof ssSyncValues === 'function') ssSyncValues();
   // Turning the public-restroom layer on is the trigger for its first download — without this
   // nothing would arrive until the next pan, so the toggle would look broken for a moment.
   if(typeof maybeLoadPublicRegions === 'function') maybeLoadPublicRegions();
@@ -5808,8 +5814,12 @@ function ssSyncIdentity(){
    * account, and a password change for a password that does not exist — three rows that can
    * only disappoint, above the one row that actually helps. They and their headings now travel
    * with the session. */
-  ['ssPlateYou','ssPassportRow','ssPlateRecovery','acctEmailRow','acctEmailNote',
-   'ssPlateSecurity','acctPasswordRow','acctPasswordNote','ssPlateSession'].forEach(id => {
+  /* ssPlateYou / ssPlateSecurity / ssPlateSession are gone from the markup: the first because
+   * the identity row absorbed the passport, the other two because they were empty headings
+   * padding a gap above About. Left in this list they would be harmless (the loop guards on
+   * null) but misleading — a reader would look for sections that no longer exist. */
+  ['ssPlateRecovery','acctEmailRow','acctEmailNote',
+   'acctPasswordRow','acctPasswordNote'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.hidden = !inA;
   });
@@ -5906,9 +5916,15 @@ function openSettingsSheet(){
   requestAnimationFrame(() => sheet.classList.add('ss-in'));
   document.getElementById('ssClose')?.focus({ preventScroll:true });
 }
-function closeSettingsSheet(){
+/* `after` runs once the panel is actually hidden, not when the close is requested.
+ *
+ * The passport is a bottom sheet at z-index 1500 covering only the lower part of the screen,
+ * and this panel takes 300ms to leave. Opening one immediately after asking the other to close
+ * put both on screen at once, with settings visible above and behind the passport — two panels
+ * arguing about which one you are looking at. */
+function closeSettingsSheet(after){
   const sheet = document.getElementById('settingsSheet');
-  if(!sheet || sheet.hidden) return;
+  if(!sheet || sheet.hidden){ if(after) after(); return; }
   const panel = sheet.querySelector('.ss-panel');
   sheet.classList.remove('ss-in');
   sheet.setAttribute('aria-hidden', 'true');
@@ -5934,10 +5950,14 @@ function closeSettingsSheet(){
   if(ssLastFocus && document.contains(ssLastFocus)) ssLastFocus.focus({ preventScroll:true });
   ssLastFocus = null;
   const token = ++ssCloseToken;
+  let ran = false;
   const done = () => {
     if(token !== ssCloseToken) return;      // superseded by a reopen
+    if(ran) return;                          // transitionend AND the backstop both fire
+    ran = true;
     sheet.hidden = true;
     panel.removeEventListener('transitionend', done);
+    if(after) after();
   };
   panel.addEventListener('transitionend', done);
   /* A backstop, because transitionend never fires if the transition was suppressed — reduced
@@ -5946,44 +5966,57 @@ function closeSettingsSheet(){
   setTimeout(done, 400);
 }
 
-/* Swipe down to dismiss. The grabber is the visible target but the whole header area drags,
- * because a 38px bar is a small thing to hit with a thumb on the move. */
+/* Swipe LEFT to dismiss, matching the edge the panel arrives from. This was a downward drag on
+ * the grabber when the panel was a bottom sheet; leaving it vertical would mean the panel came
+ * from one edge and was pushed back toward another.
+ *
+ * The whole panel drags rather than a handle, because a left-edge panel has no grabber to aim
+ * at — and a horizontal drag cannot be confused with the vertical scroll of the list inside it,
+ * which is what made a handle necessary before. */
 (function(){
   const sheet = document.getElementById('settingsSheet');
   if(!sheet) return;
   const panel = sheet.querySelector('.ss-panel');
-  const handle = document.getElementById('ssGrab');
-  if(!panel || !handle) return;
-  let startY = null, dy = 0;
+  if(!panel) return;
+  let startX = null, startY = null, dx = 0, axis = null;
 
-  const start = e => { startY = e.touches ? e.touches[0].clientY : e.clientY; dy = 0;
-    sheet.classList.add('ss-drag'); };
+  const start = e => {
+    const t = e.touches ? e.touches[0] : e;
+    startX = t.clientX; startY = t.clientY; dx = 0; axis = null;
+  };
   const move = e => {
-    if(startY == null) return;
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
-    // Downward only. Dragging up would lift the sheet off its edge, which it has no room for.
-    dy = Math.max(0, y - startY);
-    panel.style.transform = `translateY(${dy}px)`;
+    if(startX == null) return;
+    const t = e.touches ? e.touches[0] : e;
+    const mx = t.clientX - startX, my = t.clientY - startY;
+    /* Decide the axis once, on the first meaningful movement, and stick to it. Without this a
+     * mostly-vertical scroll with a little sideways drift would start dragging the panel and
+     * fight the list underneath. */
+    if(axis === null){
+      if(Math.abs(mx) < 8 && Math.abs(my) < 8) return;
+      axis = Math.abs(mx) > Math.abs(my) ? 'x' : 'y';
+      if(axis === 'x') sheet.classList.add('ss-drag');
+    }
+    if(axis !== 'x') return;                 // vertical: leave the scroll alone
+    dx = Math.min(0, mx);                    // leftward only; it has nowhere to go right
+    panel.style.transform = `translateX(${dx}px)`;
     if(e.cancelable) e.preventDefault();
   };
   const end = () => {
-    if(startY == null) return;
+    if(startX == null) return;
+    const wasX = axis === 'x';
     sheet.classList.remove('ss-drag');
-    const far = dy > Math.min(120, panel.offsetHeight * 0.25);
-    startY = null;
-    /* Past a quarter of the sheet's height it closes; short of that it springs back. A fixed
-     * pixel threshold alone would make a tall sheet feel sticky and a short one twitchy. */
-    if(far){ closeSettingsSheet(); }
+    startX = null; startY = null; axis = null;
+    if(!wasX) return;
+    /* Past a quarter of the panel's width it closes; short of that it springs back. Scaled
+     * rather than a fixed pixel count so it feels the same on a small phone and a tablet. */
+    if(Math.abs(dx) > Math.min(140, panel.offsetWidth * 0.25)){ closeSettingsSheet(); }
     else { panel.style.transform = ''; }
   };
 
-  handle.addEventListener('touchstart', start, {passive:true});
-  handle.addEventListener('touchmove', move, {passive:false});
-  handle.addEventListener('touchend', end);
-  handle.addEventListener('touchcancel', end);
-  handle.addEventListener('mousedown', start);
-  window.addEventListener('mousemove', e => { if(startY != null) move(e); });
-  window.addEventListener('mouseup', end);
+  panel.addEventListener('touchstart', start, {passive:true});
+  panel.addEventListener('touchmove', move, {passive:false});
+  panel.addEventListener('touchend', end);
+  panel.addEventListener('touchcancel', end);
 })();
 
 /* The drawer closes itself: 'openSettings' is in the NAVIGATES allowlist in index.html, which is
@@ -6145,9 +6178,16 @@ function ssSyncValues(){
   if(lv) lv.textContent = stripPicks().map(k => STRIP_FACTS[k] ? STRIP_FACTS[k].label : '').filter(Boolean).join(' · ');
   const pv = document.getElementById('ssPlacesVal');
   if(pv){
-    const total = Object.keys(CHAIN_REGISTRY).filter(chainHasData).length;
-    const off = [...disabledChains].filter(k => CHAIN_REGISTRY[k]).length;
-    pv.textContent = off ? (total - off) + ' of ' + total : 'All';
+    /* Every chain that has data, everywhere — not the four types, and not what happens to be in
+     * the viewport. This row answers "how much of the map am I showing", and the honest unit is
+     * the thing you can actually switch off: a chain. Turning a whole type off moves this by
+     * however many chains it held, which is the point.
+     *
+     * The bug was never the unit. It was that nothing recomputed this after a toggle, so the
+     * number stayed at whatever it read when the panel opened. */
+    const all = Object.keys(CHAIN_REGISTRY).filter(chainHasData);
+    const on = all.filter(k => !disabledChains.has(k));
+    pv.textContent = on.length === all.length ? 'All ' + all.length : on.length + ' of ' + all.length;
   }
 }
 
@@ -6284,23 +6324,17 @@ document.getElementById('ssScrim')?.addEventListener('click', closeSettingsSheet
 document.addEventListener('keydown', e => {
   if(e.key === 'Escape' && !document.getElementById('settingsSheet')?.hidden) closeSettingsSheet();
 });
-/* The account block opens the same panel the sign-in row does — it is the one place to manage
- * the account, reached either by tapping your own name or by the explicit row below. */
-document.getElementById('ssAcctRow')?.addEventListener('click', () => {
-  closeSettingsSheet();
-  openAccountPanel('account');
-});
+/* The identity block and the passport row were merged: both opened the passport, so there was
+ * no reason for two. The single row is wired below. */
 document.getElementById('ssPassportRow')?.addEventListener('click', () => {
-  closeSettingsSheet();
-  openAccountPanel('passport');
+  closeSettingsSheet(() => openAccountPanel('passport'));
 });
 /* Rows that take you somewhere close the sheet behind them — the same rule the drawer's
  * NAVIGATES allowlist encoded. Switches and disclosures deliberately do not, so toggling a
  * filter or opening All places leaves you where you are. */
 document.getElementById('infoBtn')?.addEventListener('click', () => closeSettingsSheet());
 document.getElementById('ssSignIn')?.addEventListener('click', () => {
-  closeSettingsSheet();
-  openAccountPanel('account');
+  closeSettingsSheet(() => openAccountPanel('account'));
 });
 /* Delegates to the existing logOutBtn rather than calling logOutAccount() directly: that handler
  * also resets the leaderboard cache, refreshes the account UI and reloads ratings. A second

@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bathroom Report | Find. Rate. Share. Improve.</title>
+<meta name="description" content="Find. Rate. Share. Improve. Clean, open public bathrooms at convenience stores and travel stops nationwide, rated by the community.">
+<link rel="canonical" href="https://bathroomreport.app/">
+<meta property="og:title" content="Bathroom Report | Find. Rate. Share. Improve.">
+<meta property="og:description" content="Find. Rate. Share. Improve. The community-powered bathroom finder.">
+<meta property="og:image" content="https://bathroomreport.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Bathroom Report — find, rate, share, improve.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://bathroomreport.app/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BathroomReport">
+<meta name="twitter:description" content="Find the best bathrooms. Rated by the community.">
+<meta name="twitter:image" content="https://bathroomreport.app/og.png">
+<link rel="icon" href="icon-512.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2ea1aa">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js" crossorigin="anonymous"></script>
+<!-- Vendored 2026-07-30 from unpkg: leaflet-doubletapdrag@0.1.2 and
+     leaflet-doubletapdragzoom@0.3.2. They were loaded UNVERSIONED from unpkg, which resolves to
+     "latest" — so a breaking release by someone else would have taken the map's one-handed zoom
+     down with no deploy from us, and there would have been nothing in this repo to explain it.
+     Self-hosting also means they are same-origin, so the service worker can finally cache them:
+     the map plugins were the one part of the shell that could never work offline. -->
+<script src="leaflet-doubletapdrag.js" defer></script>
+<script src="leaflet-doubletapdragzoom.js" defer></script>
+<script type="module" src="firebase.js"></script>
+<script defer src="stewarts-locations.js"></script>
+<script defer src="cumberland-farms-locations.js"></script>
+<script defer src="wawa-locations.js"></script>
+<script defer src="fastrac-locations.js"></script>
+<script defer src="alltownfresh-locations.js"></script>
+<script defer src="byrne-dairy-locations.js"></script>
+<script defer src="parkers-locations.js"></script>
+<script defer src="sheetz-locations.js"></script>
+<script defer src="racetrac-locations.js"></script>
+<script defer src="pilot-locations.js"></script>
+<script defer src="maverik-locations.js"></script>
+<script defer src="quiktrip-locations.js"></script>
+<script defer src="loves-locations.js"></script>
+<script defer src="bucees-locations.js"></script>
+<script defer src="caseys-locations.js"></script>
+<script defer src="kwiktrip-locations.js"></script>
+<script defer src="royalfarms-locations.js"></script>
+<script defer src="rutters-locations.js"></script>
+<script defer src="speedway-locations.js"></script>
+<!-- Expansion chains: files 404 harmlessly until uploaded; each must set the global noted in app.js's CHAIN_REGISTRY dataVar -->
+<script defer src="circle-k-locations.js"></script>
+<script defer src="travelcenters-locations.js"></script>
+<script defer src="holiday-locations.js"></script>
+<script defer src="jacksons-locations.js"></script>
+<script defer src="plaid-pantry-locations.js"></script>
+<script defer src="getgo-locations.js"></script>
+<script defer src="quickchek-locations.js"></script>
+<script defer src="town-pump-locations.js"></script>
+<script defer src="restarea-locations.js"></script>
+<script defer src="nyc-dunkin-locations.js"></script>
+<script defer src="nyc-starbucks-locations.js"></script>
+<script defer src="nyc-gregorys-locations.js"></script>
+<script defer src="bos-tatte-locations.js"></script>
+<script defer src="bos-dunkin-locations.js"></script>
+<script defer src="bos-starbucks-locations.js"></script>
+<script defer src="bos-pavement-locations.js"></script>
+<script defer src="bos-flour-locations.js"></script>
+<script defer src="bos-nero-locations.js"></script>
+<script defer src="bos-public-locations.js"></script>
+<script defer src="nyc-public-locations.js"></script>
+<script defer src="ny-public-locations.js"></script>
+<!-- Nationwide public restrooms. ONLY the manifest loads here (46 KB): file names, counts and
+     occupied grid cells for ten regions. The region files themselves total 18 MB and are
+     fetched at runtime by maybeLoadPublicRegions() when the layer is on AND the viewport is
+     over one. Adding them here would more than double what every visitor downloads before the
+     map draws, for a layer most never open. -->
+<script defer src="public-toilets-manifest.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Overpass:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="shell.css">
+  <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "xrq6arvfpv");
+</script>
+     <meta name="msvalidate.01" content="048B75B5EE2E807AD38A9CA62AEC4762" />
+</head>
+<body>
+<div id="installBanner">
+<div class="icon">📲</div>
+<div class="msg" id="installMsg">Add this to your home screen for one-tap access.</div>
+<button id="installNow" hidden>Install</button>
+<button class="closeBtn" id="installClose" aria-label="Dismiss install prompt">✕</button>
+</div>
+<div id="header">
+<div id="headerTopRow">
+<button id="menuBtn" aria-label="Menu">☰</button>
+<div id="headerBrand">
+<img id="headerIcon" src="logo.png" alt="Bathroom Report logo">
+<h1>BATHROOM <span class="wm-accent">REPORT</span></h1>
+</div>
+<div id="headerActions">
+<button id="accountToggle">👤 Log In</button>
+</div>
+</div>
+<span id="chainBadge">🚽 Regional convenience-store bathrooms</span>
+<div id="statPillRow">
+<span class="stat-pill" id="openNowBadge"></span>
+<span class="stat-pill" id="weeklyRecap"></span>
+<span class="stat-pill" id="mostRecentBadge"></span>
+<span class="stat-pill" id="totalCoverageBadge"></span>
+<span class="stat-pill" id="mostReviewedBadge"></span>
+<span class="stat-pill" id="highestRatedBadge"></span>
+<span class="stat-pill" id="nearestBathroomBadge"></span>
+<span class="stat-pill" id="topRatedNearbyBadge"></span>
+<span class="stat-pill" id="closingSoonBadge"></span>
+<span class="stat-pill" id="accessibleNearbyBadge"></span>
+</div>
+</div>
+<div id="mapWrap">
+<div id="topLeftControls">
+<div id="chainKey">
+<button id="chainKeyPill" aria-expanded="false" aria-controls="chainKeyPanel"><svg class="ico" aria-hidden="true"><use href="#i-filter"></use></svg> Filter <span id="chainKeyCount"></span> <span id="chainKeyArrow" aria-hidden="true">▾</span></button>
+<div id="chainKeyPanel">
+<div class="ck-head" id="chainKeyAreaHead">In this area</div>
+<div class="ck-scrollwrap" id="chainKeyScrollWrap"><div id="chainKeyAreaList"></div></div>
+<div class="ck-signin-note" id="chainKeySigninNote" hidden>Sign in to filter by place</div>
+</div>
+</div>
+</div>
+<button id="listViewToggle" aria-label="List of closest bathrooms"><svg class="ico" aria-hidden="true"><use href="#i-list"></use></svg></button>
+<div id="map"></div>
+<button id="whereAmIBtn" aria-label="Show my current location on the map"><svg class="map-control-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path><circle cx="12" cy="12" r="8"></circle></svg><span>Where Am I?</span></button>
+<button id="locateBtn" aria-label="Find the closest bathroom">Find me the closest bathroom</button>
+<div id="nearestInfo"></div>
+<button id="missingBtn"><svg class="ico" aria-hidden="true"><use href="#i-plus"></use></svg> Add a place</button>
+<!-- Location leads. Standing outside the place is the common case, and one tap beats typing an
+     address on a phone — the old panel made typing the teal primary and put "use my location"
+     in a blue button that appeared nowhere else in the app while being the loudest thing on it. -->
+<div id="missingPanel">
+<button class="mp-close" id="missingClose" aria-label="Close">&#10005;</button>
+<div class="mp-plate"><span>Add a place</span><i></i></div>
+<p class="mp-h">Found a bathroom we don't have?</p>
+<p class="mp-sub">Tell us where and we'll check it out.</p>
+<button id="missingUseLocationBtn" class="mp-primary" type="button"><svg class="ico" aria-hidden="true"><use href="#i-locate"></use></svg> Use my current location</button>
+<div class="mp-or"><i></i><span>or type it</span><i></i></div>
+<input type="text" id="missingInput" maxlength="120" placeholder="Address or cross streets" class="mp-field" />
+<button class="mp-ghost" id="missingSubmit"><svg class="ico" aria-hidden="true"><use href="#i-send"></use></svg> Send it in</button>
+<div class="save-note" id="missingNote"></div>
+</div>
+<div id="onboardingOverlay">
+<div id="onboardingCard" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
+<div id="onboardingScroll">
+<h2 id="onboardingTitle">🚽 Welcome to Bathroom Report</h2>
+<p class="onboardingTagline">Find a clean, open bathroom, and help the next person.</p>
+<div class="onboardingGrid" aria-label="Quick tour">
+<div class="onboardingTip">
+<span aria-hidden="true">📍</span>
+<div><b>Find a bathroom</b><small>Tap any pin for hours, ratings, and directions.</small></div>
+</div>
+<div class="onboardingTip">
+<span aria-hidden="true">🚽</span>
+<div><b>Bathroom Now</b><small>One tap to the closest open bathroom.</small></div>
+</div>
+<div class="onboardingTip">
+<span aria-hidden="true">👤</span>
+<div><b>Optional account</b><small>Sign in to rate bathrooms, add tips, filter places, set your maps app, and build your Passport.</small></div>
+</div>
+</div>
+<details id="onboardingMore">
+<summary>More tips &amp; important info</summary>
+<div class="onboardingMoreBody">
+<p>Use List to see the bathrooms closest to you. Directions open in your device's default maps app. Sign in to choose Apple Maps, Google Maps, or Waze.</p>
+<p>Hours are shown when we have them. A spot with unknown hours still appears. It's never marked closed on a guess.</p>
+<p>Share a pin, or report wrong info from its popup.</p>
+<p>An account is optional. Sign in to rate and add tips, filter which places show on the map, set your preferred directions app, switch appearance, and sync your Passport and achievements across devices.</p>
+<p class="onboardingDisclaimer">Bathroom Report is an independent, community-created project and isn't affiliated with or endorsed by any business listed.</p>
+<p class="onboardingUpdated">Location data updated: August 2, 2026</p>
+</div>
+</details>
+</div>
+<div id="onboardingMode" style="display:none">
+<div class="onboardingModeQ">How are you getting around?</div>
+<div class="onboardingModeBtns">
+<button type="button" class="btn onboardingModeBtn" data-mode="road">🛣️ On the road</button>
+<button type="button" class="btn onboardingModeBtn" data-mode="foot">🚶 On foot</button>
+</div>
+<small class="onboardingModeHint">Directions open in walking or driving mode. Switch anytime in the menu.</small>
+</div>
+<div id="onboardingActions">
+<button id="onboardingClose" class="btn btn-amber">Got it!</button>
+</div>
+</div>
+</div>
+<div id="listViewPanel">
+<div id="listViewHeader">
+<span>All Locations</span>
+<button id="listViewClose" aria-label="Close list">✕</button>
+</div>
+<div id="listViewItems"></div>
+</div>
+</div>
+<!-- ============================================================================
+     Icon sprite — one stroke set, inherits currentColor.
+     Replaces the sixteen unrelated emoji the popup used to carry. Emoji are rendered by the OS,
+     so their weight, palette and perspective are all outside our control and differ between iOS
+     and Android; ♿ arriving as a blue-and-white badge beside a flat teal card is what made the
+     card read as assembled rather than designed.
+     One 24px grid, 1.75 stroke, round caps. No network request, scales cleanly, and colour comes
+     from the surrounding text so every icon follows the theme automatically.
+     Recognition beats invention here: each shape stays close to the convention people already
+     read, especially the accessibility mark.
+     ============================================================================ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.6 8.4l-2.1 5.1-5.1 2.1 2.1-5.1z"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a4.5 4.5 0 006.4 0l2.6-2.6a4.5 4.5 0 00-6.4-6.4L11.4 5.3"/><path d="M14 11a4.5 4.5 0 00-6.4 0L5 13.6a4.5 4.5 0 006.4 6.4l1.2-1.2"/></symbol>
+<symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h11l-1.7 3.4L16 11H5z"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.2V12l3.2 2"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.6h17M8.4 3v3.6M15.6 3v3.6"/></symbol>
+<symbol id="i-fuel" viewBox="0 0 24 24"><path d="M4 20.5V5.2A2.2 2.2 0 016.2 3h5.6A2.2 2.2 0 0114 5.2v15.3"/><path d="M2.8 20.5h12.4"/><path d="M6.6 8.4h4.8"/><path d="M14 9.4h2.6a2 2 0 012 2v5.1a1.7 1.7 0 003.4 0V8.6l-2.4-2.4"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.4" width="15" height="10.1" rx="2.4"/><path d="M8.2 10.4V7.6a3.8 3.8 0 017.6 0v2.8"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21.2s7-5.6 7-11.1A7 7 0 005 10.1c0 5.5 7 11.1 7 11.1z"/><circle cx="12" cy="9.8" r="2.6"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M16.4 3.9l3.7 3.7L8.3 19.4l-4.6.9.9-4.6z"/><path d="M14.2 6.1l3.7 3.7"/></symbol>
+<symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></symbol>
+<symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 114.3 2.1c-.9.8-1.9 1.3-1.9 2.6"/><path d="M12 17.1h.01"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M4.6 12.6l4.8 4.8L19.4 7.4"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.4l2.7 5.5 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.8l6-.9z"/></symbol>
+<symbol id="i-restroom" viewBox="0 0 24 24"><circle cx="7.4" cy="4.2" r="1.8"/><path d="M7.4 7.6h0a2.4 2.4 0 012.4 2.4v4.2H8.6v6.4H6.2v-6.4H5V10a2.4 2.4 0 012.4-2.4z"/><circle cx="16.6" cy="4.2" r="1.8"/><path d="M16.6 7.6a2.4 2.4 0 012.4 2.2l.8 4.6h-1.6l-.4 6.2h-2.4l-.4-6.2h-1.6l.8-4.6a2.4 2.4 0 012.4-2.2z"/></symbol>
+<!-- Amenity marks. Same 24px grid and 1.75 stroke as the set above, so a badge row reads as one
+     family instead of a chair from Apple beside a compass from us. -->
+<symbol id="i-changing" viewBox="0 0 24 24"><path d="M3 13.4h18v2.2a1.6 1.6 0 01-1.6 1.6H4.6A1.6 1.6 0 013 15.6z"/><path d="M5.6 17.2V21M18.4 17.2V21"/><circle cx="8.6" cy="8.4" r="1.5"/><path d="M11 11.4l-1-2.1h-1.4M12.4 8.9h2.8"/></symbol>
+<symbol id="i-ev" viewBox="0 0 24 24"><rect x="4" y="3.4" width="10" height="17.2" rx="2"/><path d="M6.6 7.6h4.8"/><path d="M9.6 11.4l-1.6 3h2.6l-1.6 3"/><path d="M14 12h3.4a2 2 0 012 2v3.1a1.6 1.6 0 003.2 0V9.6l-2.2-2.2"/></symbol>
+<!-- Air: a tyre, tread ticks and all. The first attempt hung a gauge needle off a circle and
+     landed almost exactly on the Mars glyph; the ticks are what keep this reading as a tyre. -->
+<symbol id="i-air" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="3.6"/><path d="M12 3.4v2.4M12 18.2v2.4M3.4 12h2.4M18.2 12h2.4"/><path d="M5.9 5.9l1.7 1.7M16.4 16.4l1.7 1.7M18.1 5.9l-1.7 1.7M7.6 16.4l-1.7 1.7"/></symbol>
+<symbol id="i-shower" viewBox="0 0 24 24"><path d="M4.4 10.6h11.2a5.6 5.6 0 00-11.2 0z"/><path d="M10 10.6V6.2a2.6 2.6 0 012.6-2.6h4.8a2.2 2.2 0 012.2 2.2v3"/><path d="M6.6 14.4v1.4M10 14.4v3M13.4 14.4v1.4M8.3 18.6v1.6M11.7 20.2v.6"/></symbol>
+<symbol id="i-seating" viewBox="0 0 24 24"><path d="M6.6 12.6V5.4a1.8 1.8 0 011.8-1.8h2.4a1.8 1.8 0 011.8 1.8v7.2"/><path d="M5 12.6h14a1.4 1.4 0 011.4 1.6l-.5 3.2H4.1l-.5-3.2A1.4 1.4 0 015 12.6z"/><path d="M5.4 17.4L4.8 21M18.6 17.4l.6 3.6"/></symbol>
+<symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2.6 9.2a13.4 13.4 0 0118.8 0"/><path d="M6 12.6a8.6 8.6 0 0112 0"/><path d="M9.4 16a3.8 3.8 0 015.2 0"/><path d="M12 19.4h.01"/></symbol>
+<symbol id="i-grabgo" viewBox="0 0 24 24"><path d="M6.2 8.4h11.6l-1.3 11.2a1.6 1.6 0 01-1.6 1.4H9.1a1.6 1.6 0 01-1.6-1.4z"/><path d="M5 8.4h14"/><path d="M13.4 8.4l1.6-5.4h2.2"/><path d="M8.8 12.4h6.4"/></symbol>
+<!-- Hot food is a covered dish, not a burger: a burger is one meal, the amenity is the category,
+     and plenty of these places sell pizza or taquitos instead. -->
+<symbol id="i-hotfood" viewBox="0 0 24 24"><path d="M3 17.4h18"/><path d="M4.6 17.4a7.4 7.4 0 0114.8 0"/><path d="M12 10v-1.6"/><path d="M8.4 5.6c0-1 1-1.2 1-2.2M12 5c0-1.2 1-1.4 1-2.4M15.6 5.6c0-1 1-1.2 1-2.2"/></symbol>
+<symbol id="i-bag" viewBox="0 0 24 24"><path d="M4.6 7.6h14.8l-1.1 12a1.8 1.8 0 01-1.8 1.6H7.5a1.8 1.8 0 01-1.8-1.6z"/><path d="M8.8 10V6.4a3.2 3.2 0 016.4 0V10"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M8.4 6.4h11.2M8.4 12h11.2M8.4 17.6h11.2"/><path d="M4.4 6.4h.01M4.4 12h.01M4.4 17.6h.01"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-filter" viewBox="0 0 24 24"><path d="M3.6 5.6h16.8l-6.6 7.6v6l-3.6 2v-8z"/></symbol>
+<symbol id="i-locate" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3L10.5 13.5M21 3l-6.6 18-3.9-7.5L3 9.6z"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+<symbol id="i-warning" viewBox="0 0 24 24"><path d="M10.3 4.3L2.6 17.4A2 2 0 004.3 20.4h15.4a2 2 0 001.7-3L13.7 4.3a2 2 0 00-3.4 0z"/><path d="M12 9.4v4.2M12 17.2h.01"/></symbol>
+<symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9.2 18.2h5.6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9c.6.5.9 1.1.9 1.8v.5h5.2v-.5c0-.7.3-1.3.9-1.8A6 6 0 0012 3z"/></symbol>
+</defs></svg>
+<div id="accountPanel" role="dialog" aria-modal="true" aria-labelledby="accountHeaderTitle">
+<div id="accountHeader">
+<span id="accountHeaderTitle">👤 Account</span>
+<button id="accountClose" aria-label="Close account panel">✕</button>
+</div>
+<div class="acct-body" style="padding:4px 16px 16px;overflow-y:auto;">
+<div id="loggedOutView">
+<p style="color:var(--cream);font-size:13px;margin:0 0 12px;">
+You can <b>FIND</b> without an account. Sign in to <b>RATE</b>, <b>SHARE</b>, and
+<b>IMPROVE</b>, so your name and history follow you across devices.
+</p>
+<div class="rating-label" style="color:var(--cream);">Username</div>
+<input type="text" id="authUsername" maxlength="20" placeholder="letters, numbers, underscore" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
+<div class="rating-label" style="color:var(--cream);">Password</div>
+<input type="password" id="authPassword" placeholder="at least 6 characters" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
+<div class="rating-label" style="color:var(--cream);">Email <span style="opacity:.7;font-weight:400;">(new accounts)</span></div>
+<input type="email" id="authEmail" autocomplete="email" inputmode="email" maxlength="254" placeholder="so you can reset a forgotten password" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
+<p style="background:#1e2a33;border:1px solid #2ea1aa;border-radius:6px;padding:8px 10px;color:#bcd7dd;font-size:12px;margin:0 0 12px;">
+📧 Used only to reset your password. We'll send a link to confirm it. Not shown publicly, not used for anything else. Logging in? Leave it blank.
+</p>
+<button class="btn btn-amber" id="authSignUpBtn" style="width:100%;margin-bottom:8px;">Sign Up (new account)</button>
+<button class="btn btn-secondary" id="authLogInBtn" style="width:100%;">Log In (existing account)</button>
+<button class="btn btn-secondary" id="authForgotBtn" style="width:100%;margin-top:8px;font-size:13px;">Forgot your password?</button>
+<button id="onboardingInfoBtn" class="btn btn-secondary" style="width:100%;margin-top:8px;">ℹ️ How it works</button>
+<div class="save-note" id="authNote" style="height:auto;margin-top:8px;"></div>
+</div>
+<div id="loggedInView" style="display:none;">
+
+<!-- Account and Passport are one panel now. The flip card is the identity: the data page faces
+     out, settings live on the back. The avatar/name block and the three-number stats strip that
+     used to sit here are gone — the front of the card says both, in bigger type. -->
+<div class="flip-scene" id="flipScene">
+  <div class="flip-card" id="flipCard">
+
+    <div class="flip-face passport-datapage" id="flipFront">
+      <div class="dp-top">
+        <div class="dp-id">
+          <div class="dp-kind">Bathroom Report &middot; Holder</div>
+          <div class="dp-name" id="dpName"></div>
+          <div class="dp-fields">
+            <div class="dp-f"><b>Issued</b><span id="dpIssued">—</span></div>
+            <div class="dp-f"><b>Stamps</b><span id="dpStamps">—</span></div>
+            <div class="dp-f"><b>Rated</b><span id="dpRated">—</span></div>
+          </div>
+        </div>
+        <div class="dp-seal" aria-hidden="true">BATH<br>ROOM<br>RPT</div>
+      </div>
+      <div class="dp-progress" id="dpProgress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Stamps collected"><i id="dpProgressFill"></i></div>
+      <button class="flip-btn" id="flipToBack" aria-expanded="false" aria-controls="flipCard">&#8635; Flip for your stats</button>
+          </div>
+
+    <!-- The reverse of the card.
+         The flip used to hide Email / Change password / Theme — settings behind a gesture, which
+         is why they moved to the settings sheet. What belongs on the back of a passport is the
+         record it keeps: where you have been and what you have done. Nothing here is a control,
+         so nothing important is hidden by the turn. -->
+    <div class="flip-face flip-back" id="flipBack">
+      <div class="pb-title">Your record</div>
+      <div class="pb-grid">
+        <div class="pb-stat"><b id="pbRated">0</b><span>Bathrooms rated</span></div>
+        <div class="pb-stat"><b id="pbStates">0</b><span>States</span></div>
+        <div class="pb-stat"><b id="pbCities">0</b><span>Towns &amp; cities</span></div>
+        <div class="pb-stat"><b id="pbChains">0</b><span>Chains visited</span></div>
+        <div class="pb-stat"><b id="pbStreak">0</b><span>Longest streak</span></div>
+        <div class="pb-stat"><b id="pbMiles">0</b><span>Miles apart</span></div>
+      </div>
+      <div class="pb-line" id="pbNote"></div>
+      <button class="flip-btn" id="flipToFront">&#8635; Flip back</button>
+    </div>
+
+  </div>
+</div>
+
+<p id="passportSyncNote" style="color:var(--muted);font-size:11.5px;margin:0 0 8px;display:none;">
+This is tracked on this device only. Log in to sync it across devices.
+</p>
+<div id="bathroomPassportBody"></div>
+<div id="achievementsSection">
+<div id="achievementsList"></div>
+</div>
+
+<button class="acct-signout" id="logOutBtn">Log out</button>
+</div>
+</div>
+</div>
+<!-- To add a chain: <script src="<chain>-locations.js"></script> here, then register it in app.js's CHAIN_REGISTRY -->
+<!-- Menu drawer (Stage 1 chrome) -->
+
+<!-- ============================================================
+     Settings sheet — one home for everything about you and your map.
+
+     Replaces two hiding places: the drawer's scattered controls, and the BACK of the passport
+     flip card, which held email, password and theme behind a "flip for account" gesture almost
+     nobody performs. Same discoverability failure as content below a popup's scroll line.
+
+     Two tabs, split by what a setting AFFECTS: the map you look at, versus the account you own.
+     The strip picker lands on the tab that opens by default because it is a feature nobody is
+     looking for yet.
+
+     Every control here is MOVED, not rebuilt — the element ids are the originals, so every
+     existing handler in app.js keeps working untouched.
+     ============================================================ -->
+<!-- ============================================================
+     Settings — full screen, grouped into cards.
+
+     Every control below keeps the id and the classes it had, so every handler already bound in
+     app.js fires unchanged. What altered is the shell around them: the page is no longer a
+     bottom sheet, the flat row list is grouped into cards, and each row carries an icon tile.
+     The two <select> elements and the All places disclosure are deliberately UNCHANGED here —
+     they become sub-screens in the next step, and doing both at once would make a regression
+     impossible to attribute.
+     ============================================================ -->
+<div id="settingsSheet" class="ss" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="ssTitle">
+  <div class="ss-scrim" id="ssScrim"></div>
+  <div class="ss-panel" role="document">
+    <div class="ss-grab" id="ssGrab" aria-hidden="true"><i></i></div>
+
+    <div class="ss-body">
+      <div class="ss-head">
+        <div class="ss-brand">
+          <img src="logo.png" alt="" width="44" height="44">
+          <span><b>BATHROOM <i>REPORT</i></b><small>FIND. RATE. SHARE. IMPROVE.</small></span>
+        </div>
+        <button class="ss-x" id="ssClose" aria-label="Close settings">&#10005;</button>
+      </div>
+      <h2 id="ssTitle" class="ss-title">Settings</h2>
+
+      <!-- you -->
+      <div class="ss-card">
+        <!-- ONE row for the person, not two.
+             The name row and the passport row both opened the passport panel, so the card asked
+             you to choose between two doors into the same place. The identity block IS the
+             passport link now — name, what syncs, and the stamp count — and the separate row is
+             gone. Account and security live in their own section below, which is where someone
+             looking for a password goes anyway. -->
+        <button class="ss-acct" id="ssPassportRow">
+          <span class="ss-avatar" id="ssAvatar" aria-hidden="true">?</span>
+          <span class="ss-who">
+            <span class="ss-name" id="ssName">Not signed in</span>
+            <span class="ss-sub" id="ssSub">Sign in to sync across devices</span>
+          </span>
+          <span class="ss-val" id="ssStamp" hidden></span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        
+      </div>
+
+      <div class="ss-sec">Map &amp; navigation</div>
+      <div class="ss-card">
+        <button class="ss-row" data-ss-go="ssScreenPlaces">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.4" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Places on the map</span></span>
+          <span class="ss-val" id="ssPlacesVal"></span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <button class="ss-row" id="travelModePref" data-ss-go="ssScreenAround" style="display:none">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M21 3L3 10.5l7.5 3L14 21 21 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Getting around</span></span>
+          <span class="ss-val" id="ssAroundVal">On the road</span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <button class="ss-row" data-ss-go="ssScreenLayout">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2.4" stroke="currentColor" stroke-width="2"/><path d="M3 10h18M9 10v9M15 10v9" stroke="currentColor" stroke-width="2"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Location card</span>
+            <span class="ss-desc">What shows at a glance</span></span>
+          <span class="ss-val" id="ssLayoutVal"></span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <button class="ss-row" id="navAppPref" data-ss-go="ssScreenNav">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M9 4L3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 4v13M15 6.5v13" stroke="currentColor" stroke-width="2"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Directions app</span></span>
+          <span class="ss-val" id="ssNavVal">Apple Maps</span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <div class="ss-sec">App preferences</div>
+      <div class="ss-card">
+        <button id="themeToggle" class="d-toggle">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M20 14.5A8.5 8.5 0 019.5 4a8.5 8.5 0 1010.5 10.5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
+          <span class="ss-lab">Dark mode</span><span class="d-switch"><b></b></span>
+        </button>
+        <button id="openNowToggle" class="d-toggle" aria-pressed="true">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.6" stroke="currentColor" stroke-width="2"/><path d="M8 12.2l2.6 2.6L16 9.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="ss-lab">Hide confirmed closed</span><span class="d-switch"><b></b></span>
+        </button>
+        <button id="accessibleToggle" class="d-toggle">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="5" r="2" stroke="currentColor" stroke-width="2"/><path d="M9 9h4l1 5h3M11 10v5l-2 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="ss-lab">Hide confirmed step-only</span><span class="d-switch"><b></b></span>
+        </button>
+        <div class="d-gate-note" id="prefsGateNote" hidden>Sign in to change these</div>
+      </div>
+
+      <div class="ss-sec" id="ssPlateRecovery">Account</div>
+      <div class="ss-card">
+        <button class="ss-row" id="acctEmailRow">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2.4" stroke="currentColor" stroke-width="2"/><path d="M3.6 6.5L12 13l8.4-6.5" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Email</span>
+            <span class="ss-desc" id="acctEmailValue">Loading&hellip;</span></span>
+          <span class="acct-chip none" id="acctEmailChip">Not set</span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="acct-note" id="acctEmailNote"></div>
+        <button class="ss-row" id="acctPasswordRow">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="4.5" y="10" width="15" height="10" rx="2.4" stroke="currentColor" stroke-width="2"/><path d="M8 10V7.5a4 4 0 018 0V10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Change password</span>
+            <span class="ss-desc">We&rsquo;ll email you a link</span></span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="acct-note" id="acctPasswordNote"></div>
+        <button class="ss-row" id="ssSignOut" hidden>
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M14 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2h6a2 2 0 002-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 12h10m0 0l-3-3m3 3l-3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab ss-danger">Sign out</span></span>
+        </button>
+        <button class="ss-row" id="ssSignIn">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M10 8V6a2 2 0 012-2h6a2 2 0 012 2v12a2 2 0 01-2 2h-6a2 2 0 01-2-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M14 12H4m0 0l3-3m-3 3l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Sign in or create an account</span>
+            <span class="ss-desc">Syncs your ratings and settings across devices</span></span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <div class="ss-sec">About</div>
+      <div class="ss-card">
+        <button class="ss-row" id="infoBtn" title="FAQ and how it works">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="7" y="4" width="10" height="8" rx="2" stroke="currentColor" stroke-width="2"/><path d="M9 12v3a3 3 0 003 3 3 3 0 003-3v-3M12 18v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">How it works</span>
+            <span class="ss-desc">What the ratings mean and where the data comes from</span></span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <a href="https://bathroomreport-shop.fourthwall.com/?utm_source=bathroomreport.app&amp;utm_medium=website&amp;utm_campaign=main_menu"
+           target="_blank" rel="noopener noreferrer" class="ss-row ss-shop">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 8h12l-1 12H7L6 8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8V6a3 3 0 016 0v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Support this project</span>
+            <span class="ss-desc">Gift shop &middot; Signature Collection</span></span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </a>
+      </div>
+
+      <!-- FIND. RATE. SHARE. IMPROVE. as the labels for the numbers that were already here. -->
+      <div class="ss-creed" id="ssCreed"></div>
+
+      <div class="ss-foot">
+        <span class="d-count" id="drawerLocCount"></span>
+        <span id="ssVersion">Bathroom Report</span> <span class="d-version" data-version="v2.36.3">v2.36.3 · 2026-08-03</span><br>
+        &copy; 2025&ndash;2026 Bathroom Report. Independent and community-created.
+        Not affiliated with any business listed.
+      </div>
+    </div>
+
+    <!-- ============================================================
+         Sub-screens. Each is a sibling of the root, slid in over it.
+
+         The two choice screens do NOT replace the <select> elements — those stay in the DOM,
+         visually hidden, and a pick sets .value and dispatches a real 'change' event. Every
+         handler already bound in app.js therefore fires exactly as before: no rewiring, no
+         second code path to keep in step, and the account sync keeps working untouched.
+         ============================================================ -->
+    <div class="ss-screen" id="ssScreenPlaces" hidden>
+      <div class="ss-nav">
+        <button class="ss-back" data-ss-back>
+          <svg viewBox="0 0 9 15" fill="none" aria-hidden="true"><path d="M8 1L1 7.5 8 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Settings
+        </button>
+        <h2 class="ss-nav-title">Places</h2>
+      </div>
+      <p class="ss-hint">Which kinds of stop appear on the map. Turning one off hides it everywhere, including from Bathroom Now.</p>
+      <div class="ss-card">
+        <div id="allChains" class="d-section">
+          <!-- The disclosure head is gone: this screen IS the disclosure, so a row that says
+               "All places" above the four types was a heading pretending to be a control. The
+               element stays for the handler that still binds to it, but out of the layout. -->
+          <button type="button" id="allChainsToggle" class="d-collapse-head ss-offscreen" aria-expanded="true" aria-controls="chainKeyAllList" tabindex="-1" aria-hidden="true">All places <span id="allChainsArrow" class="d-collapse-arrow" aria-hidden="true">&#9662;</span></button>
+          <div id="chainKeyAllList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- One screen serving all four groups: the title and the list are filled from whichever
+         group was tapped. Four near-identical screens would be four places for the same list to
+         drift out of step. -->
+    <div class="ss-screen" id="ssScreenChains" hidden>
+      <div class="ss-nav">
+        <button class="ss-back" data-ss-back>
+          <svg viewBox="0 0 9 15" fill="none" aria-hidden="true"><path d="M8 1L1 7.5 8 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Places
+        </button>
+        <h2 class="ss-nav-title" id="ssChainsTitle">Chains</h2>
+      </div>
+      <p class="ss-hint" id="ssChainsHint"></p>
+      <div class="ss-card" id="ssChainsList"></div>
+    </div>
+
+    <div class="ss-screen" id="ssScreenAround" hidden>
+      <div class="ss-nav">
+        <button class="ss-back" data-ss-back>
+          <svg viewBox="0 0 9 15" fill="none" aria-hidden="true"><path d="M8 1L1 7.5 8 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Settings
+        </button>
+        <h2 class="ss-nav-title">Getting around</h2>
+      </div>
+      <p class="ss-hint">Only changes whether directions open in walking or driving mode. The same places show on the map either way.</p>
+      <div class="ss-card">
+        <button class="ss-row ss-opt" data-ss-set="travelModeSelect" data-ss-val="road">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 17V9.5L7 5h10l2 4.5V17M5 17h14M5 17v2.5M19 17v2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="13.5" r="1.2" fill="currentColor"/><circle cx="16" cy="13.5" r="1.2" fill="currentColor"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">On the road</span><span class="ss-desc">Driving directions</span></span>
+          <svg class="ss-tick" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="ss-row ss-opt" data-ss-set="travelModeSelect" data-ss-val="foot">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="13" cy="4.6" r="2" stroke="currentColor" stroke-width="1.8"/><path d="M13 8c-1.6 0-2.6 1-3 2.4L9 14l2.6 1.4L11 21M14.6 11.6l2.4 1.6.8 3M9.6 15.6L7 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">On foot</span><span class="ss-desc">Walking directions</span></span>
+          <svg class="ss-tick" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="ss-screen" id="ssScreenNav" hidden>
+      <div class="ss-nav">
+        <button class="ss-back" data-ss-back>
+          <svg viewBox="0 0 9 15" fill="none" aria-hidden="true"><path d="M8 1L1 7.5 8 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Settings
+        </button>
+        <h2 class="ss-nav-title">Directions app</h2>
+      </div>
+      <p class="ss-hint">Where &ldquo;Get directions&rdquo; opens.</p>
+      <div class="ss-card">
+        <button class="ss-row ss-opt" data-ss-set="navAppSelect" data-ss-val="apple">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M9 4L3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 4v13M15 6.5v13" stroke="currentColor" stroke-width="1.8"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Apple Maps</span></span>
+          <svg class="ss-tick" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="ss-row ss-opt" data-ss-set="navAppSelect" data-ss-val="google">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10" r="2.6" stroke="currentColor" stroke-width="1.8"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Google Maps</span></span>
+          <svg class="ss-tick" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="ss-row ss-opt" data-ss-set="navAppSelect" data-ss-val="waze">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="11" r="7.5" stroke="currentColor" stroke-width="1.8"/><circle cx="9.5" cy="10" r="1" fill="currentColor"/><circle cx="14.5" cy="10" r="1" fill="currentColor"/><path d="M9.4 13.6a3.4 3.4 0 005.2 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Waze</span><span class="ss-desc">Always opens driving directions</span></span>
+          <svg class="ss-tick" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+
+    <div class="ss-screen" id="ssScreenLayout" hidden>
+      <div class="ss-nav">
+        <button class="ss-back" data-ss-back>
+          <svg viewBox="0 0 9 15" fill="none" aria-hidden="true"><path d="M8 1L1 7.5 8 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Settings
+        </button>
+        <h2 class="ss-nav-title">Location card</h2>
+      </div>
+      <!-- The preview is the point: you are editing something you cannot see from here, so it
+           has to be shown, and it has to change as you edit. -->
+      <div class="ss-card ss-preview-card">
+        <div class="ss-preview-cap">Preview</div>
+        <div id="ssLayoutPreview"></div>
+      </div>
+      <div class="ss-sec">Showing at a glance</div>
+      <p class="ss-hint">Up to three, in this order. Drag the handle to reorder. They sit at the top of every location, before any scrolling.</p>
+      <div class="ss-card" id="ssLayoutPicked"></div>
+      <div class="ss-sec">Available</div>
+      <div class="ss-card" id="ssLayoutPool"></div>
+      <p class="ss-hint" id="ssLayoutNote">Tap to add. Adding a fourth replaces the one at the bottom.</p>
+    </div>
+
+    <!-- The selects themselves: kept, hidden, and still the single source of truth. -->
+    <div class="ss-sr-only" aria-hidden="true">
+      <select id="travelModeSelect" tabindex="-1"><option value="road">On the road</option><option value="foot">On foot</option></select>
+      <select id="navAppSelect" tabindex="-1"><option value="apple">Apple Maps</option><option value="google">Google Maps</option><option value="waze">Waze</option></select>
+    </div>
+  </div>
+</div>
+
+<!-- The hamburger drawer is gone. Its last rows — Passport, Settings, How it works — plus the
+     shop and the footer counts all moved into the settings sheet, which #menuBtn now opens
+     directly. Two slide-out panels holding the same things was one navigation surface too many,
+     and the drawer was the one people had to learn twice: once to find it, once to discover
+     that the real settings were somewhere else. -->
+<!-- Community banner (logged-out) -->
+<div id="communityBanner">
+<span>✨</span>
+<div class="cb-txt"><b>Ratings &amp; hours are community powered.</b><small>Sign in to help the next person.</small></div>
+<a href="#" id="learnMoreLink">Learn More</a>
+<button class="cb-close" id="cbClose" aria-label="Dismiss">✕</button>
+</div>
+<!-- How Bathroom Report works (= About = Learn More) -->
+<div id="howItWorks" class="hiw-overlay">
+<div class="hiw-card">
+<div class="hiw-head"><h2>How Bathroom Report works</h2><button id="howItWorksClose" aria-label="Close">✕</button></div>
+<div class="hiw-body">
+<section><h3>What this is</h3><p>Bathroom Report helps you find a clean, open public bathroom fast, at convenience stores, travel stops, and other reliable spots. It’s community-powered and growing nationwide. The whole idea in four words: <b class="tag-verb">FIND. RATE. SHARE. IMPROVE.</b></p></section>
+<section><h3><span class="tag-verb">FIND</span></h3><p>Open the map, tap Bathroom Now for the closest option, or use the key to see which places are around you. Hours show when we have them. A spot with unknown hours still appears, and we never mark a place closed on a guess. <b>No account needed</b> for any of this.</p></section>
+<section><h3><span class="tag-verb">RATE</span></h3><p>Ratings come from people who’ve actually been there, because you can only rate <b>when you’re on-site</b>. They cover the bathroom itself, so you know what to expect before you go. Something broken? Flag it right from the pin.</p></section>
+<section><h3><span class="tag-verb">SHARE</span></h3><p>Get directions, share a spot with a friend, leave a tip (“need a key,” “buzzer required”), or report wrong info, all from a pin. Signed out, directions open in your device’s default maps app. Spotted a place we don’t have? Send it in with We Missed One?</p></section>
+<section><h3><span class="tag-verb">IMPROVE</span></h3><p>Confirm a store’s hours, answer quick amenity questions, and build your Passport as you go. Every location is reviewed before it goes on the map, and whole data sources get rejected. One national chain claimed restrooms at 16,000 sites with no evidence behind it, so none of them are here. Nothing is <b>bulk-imported unchecked</b>, and your reports are how it keeps getting better.</p></section>
+<!-- Symbol key. The icons are drawn rather than emoji now, so the shapes carry no built-in
+     meaning the way ♿ or ⛽ did — a legend is what makes replacing them safe. Built from the same
+     sprite as the popups, so it cannot drift from what it explains. -->
+<section><h3>What the symbols mean</h3>
+<div class="legend">
+<span class="legend-emoji" aria-hidden="true">♿</span><b>Step-free access to the restroom</b>
+<svg class="ico" aria-hidden="true"><use href="#i-fuel"></use></svg><b>Fuel on site</b>
+<svg class="ico" aria-hidden="true"><use href="#i-lock"></use></svg><b>Key, code, or asking staff</b>
+<svg class="ico" aria-hidden="true"><use href="#i-clock"></use></svg><b>Opening hours</b>
+<svg class="ico" aria-hidden="true"><use href="#i-calendar"></use></svg><b>Hours change with the season</b>
+<svg class="ico" aria-hidden="true"><use href="#i-pin"></use></svg><b>Pin is approximate</b>
+<svg class="ico ico-fill" aria-hidden="true"><use href="#i-star"></use></svg><b>Confirmed by more than one visitor</b>
+<svg class="ico" aria-hidden="true"><use href="#i-help"></use></svg><b>Nobody has told us yet</b>
+<svg class="ico" aria-hidden="true"><use href="#i-flag"></use></svg><b>Report something wrong</b>
+</div>
+<p>A green dot means open now, red means closed, grey means we don't have the hours. We never mark a place closed on a guess.</p>
+</section>
+<section><h3>Accounts &amp; privacy</h3><p>Signing in is optional. The whole map works without an account. Sign in to rate, add tips, build your Passport, filter places, choose your default directions app, and switch appearance, all synced across your devices. Like most sites, Bathroom Report also uses basic analytics to understand overall usage; it doesn’t identify you personally.</p></section>
+<section><h3>Not affiliated</h3><p>Bathroom Report is an independent, community-created project. It isn’t affiliated with or endorsed by any business listed. &copy; 2025&ndash;2026 Bathroom Report. All rights reserved. Map data &copy; OpenStreetMap contributors.</p></section>
+<section class="hiw-support">
+  <h3>Keep Bathroom Report free</h3>
+
+  <p>
+    Bathroom Report is independent (no ads, no investors), just me keeping
+    the map accurate and the servers running.
+  </p>
+
+  <p class="hiw-support-note">
+    Every donation or purchase helps fund better location data, new features,
+    and the continued growth of BathroomReport.app.
+  </p>
+
+  <div class="hiw-support-actions">
+    <a
+      href="https://cash.app/$BathroomReport"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="hiw-btn hiw-btn-donate"
+      aria-label="Support Bathroom Report through Cash App"
+    >
+      <img src="icon-cashapp.png" class="hiw-btn-icon" alt="">
+      <span>Donate</span>
+    </a>
+
+    <a
+      href="https://bathroomreport-shop.fourthwall.com/?utm_source=bathroomreport.app&utm_medium=website&utm_campaign=support_section"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="hiw-btn hiw-btn-shop"
+      aria-label="Shop Bathroom Report merchandise"
+    >
+      <svg class="ico hiw-shop-icon" aria-hidden="true"><use href="#i-bag"></use></svg>
+      <span>Shop the Store</span>
+    </a>
+  </div>
+
+  <p class="hiw-store-caption">
+    <b>No ads, ever.</b> Store sales and tips keep this app running. Shop the Signature Collection and numbered Collector Series.
+  </p>
+</section><section><h3>Contact</h3><p>Questions, corrections, or ideas? Email <a href="mailto:dave@bathroomreport.app">dave@bathroomreport.app</a>.</p></section>
+<section><h3>Follow us</h3><div class="hiw-social-row"><a href="https://x.com/Bathroom_Report" target="_blank" rel="noopener" aria-label="Follow Bathroom Report on X"><img src="icon-x.png" alt="Follow on X"></a></div></section>
+<section class="hiw-faq"><h3>FAQ</h3>
+<p><b>Do I need an account?</b> No. The map, directions, and Bathroom Now all work signed out. An account adds rating, tips, and Passport, plus place filtering and a saved directions-app preference.</p>
+<p><b>Why can’t I rate this bathroom?</b> You need to be on-site (within about a third of a mile), so ratings come from real visits.</p>
+<p><b>The hours are wrong, or it’s closed.</b> Report it from the pin and we’ll review it.</p>
+<p><b>I don’t see a store I know is there.</b> We add locations by hand, so send it in and we’ll add it.</p>
+<p><b>Is this affiliated with these businesses?</b> No. It’s an independent, community-created project.</p></section>
+<p class="hiw-updated">Location data last updated: August 2, 2026</p>
+</div>
+</div>
+</div>
+<script>
+(function(){
+  /* The hamburger opens the settings sheet. openSettingsSheet lives in app.js, which loads after
+     this inline block, so the call is looked up at CLICK time rather than captured here — the
+     function is guaranteed to exist by the time anyone can tap, and referencing it now would
+     capture undefined forever.
+
+     The drawer's open/close pair, its scrim, its close button and its NAVIGATES allowlist all
+     went with the drawer. The sheet closes itself via its own scrim, its X, Escape and the
+     swipe-down gesture, so nothing here needs to know which rows navigate. */
+  var m=document.getElementById('menuBtn');
+  if(m)m.addEventListener('click',function(){
+    if(typeof openSettingsSheet==='function') openSettingsSheet();
+  });
+  var cb=document.getElementById('cbClose');if(cb)cb.addEventListener('click',function(){document.getElementById('communityBanner').style.display='none';});
+  var hiw=document.getElementById('howItWorks');
+  function openHiw(e){if(e)e.preventDefault();hiw.classList.add('show');}
+  function closeHiw(){hiw.classList.remove('show');}
+  var lm=document.getElementById('learnMoreLink');if(lm)lm.addEventListener('click',openHiw);
+  var ib=document.getElementById('infoBtn');if(ib)ib.addEventListener('click',openHiw);
+  var hc=document.getElementById('howItWorksClose');if(hc)hc.addEventListener('click',closeHiw);
+  if(hiw)hiw.addEventListener('click',function(e){if(e.target===hiw)closeHiw();});
+})();
+</script>
+<script defer src="app.js"></script>
+</body>
+</html>
