@@ -423,6 +423,13 @@ This is tracked on this device only. Log in to sync it across devices.
           <span class="ss-val" id="ssAroundVal">On the road</span>
           <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
+        <button class="ss-row" data-ss-go="ssScreenLayout">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2.4" stroke="currentColor" stroke-width="2"/><path d="M3 10h18M9 10v9M15 10v9" stroke="currentColor" stroke-width="2"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Location card</span>
+            <span class="ss-desc">What shows at a glance</span></span>
+          <span class="ss-val" id="ssLayoutVal"></span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
         <button class="ss-row" id="navAppPref" data-ss-go="ssScreenNav">
           <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M9 4L3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 4v13M15 6.5v13" stroke="currentColor" stroke-width="2"/></svg></span>
           <span class="ss-main"><span class="ss-lab">Directions app</span></span>
@@ -501,7 +508,7 @@ This is tracked on this device only. Log in to sync it across devices.
 
       <div class="ss-foot">
         <span class="d-count" id="drawerLocCount"></span>
-        <span id="ssVersion">Bathroom Report</span> <span class="d-version" data-version="v2.33.0">v2.33.0 · 2026-08-03</span><br>
+        <span id="ssVersion">Bathroom Report</span> <span class="d-version" data-version="v2.34.0">v2.34.0 · 2026-08-03</span><br>
         &copy; 2025&ndash;2026 Bathroom Report. Independent and community-created.
         Not affiliated with any business listed.
       </div>
@@ -578,6 +585,28 @@ This is tracked on this device only. Log in to sync it across devices.
           <svg class="ss-tick" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </div>
+    </div>
+
+
+    <div class="ss-screen" id="ssScreenLayout" hidden>
+      <div class="ss-nav">
+        <button class="ss-back" data-ss-back>
+          <svg viewBox="0 0 9 15" fill="none" aria-hidden="true"><path d="M8 1L1 7.5 8 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Settings
+        </button>
+        <h2 class="ss-nav-title">Location card</h2>
+      </div>
+      <!-- The preview is the point: you are editing something you cannot see from here, so it
+           has to be shown, and it has to change as you edit. -->
+      <div class="ss-card ss-preview-card">
+        <div class="ss-preview-cap">Preview</div>
+        <div id="ssLayoutPreview"></div>
+      </div>
+      <div class="ss-sec">Showing at a glance</div>
+      <p class="ss-hint">Up to three, in this order. Drag the handle to reorder. They sit at the top of every location, before any scrolling.</p>
+      <div class="ss-card" id="ssLayoutPicked"></div>
+      <div class="ss-sec">Available</div>
+      <div class="ss-card" id="ssLayoutPool"></div>
+      <p class="ss-hint" id="ssLayoutNote">Tap to add. Adding a fourth replaces the one at the bottom.</p>
     </div>
 
     <!-- The selects themselves: kept, hidden, and still the single source of truth. -->

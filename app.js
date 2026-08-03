@@ -1623,6 +1623,8 @@ window.addEventListener('authStateReady', () => {
   if(typeof loadAllRatings === 'function') loadAllRatings();
   if(typeof updateAccountUI === 'function') updateAccountUI();
   if(typeof loadTravelModeFromAccount === 'function') loadTravelModeFromAccount();
+  // Same moment, same precedence: a synced preference wins over whatever this device had.
+  if(typeof loadStripPicksFromAccount === 'function') loadStripPicksFromAccount();
 });
 
 // Shared (public) aggregate — visible to everyone who opens this map
@@ -2160,6 +2162,57 @@ function stripPicks(){
   return STRIP_DEFAULT;
 }
 
+/* Save + sync, mirroring travelMode exactly: localStorage is the source of truth so the strip
+ * works signed out, and the account copy follows you across devices when signed in.
+ *
+ * The account write is best-effort and silent on failure — which matters right now, because the
+ * DEPLOYED rules still cap settings/{uid} to travelMode alone. Until firestore.rules is pushed,
+ * this write is rejected and the local pref carries on working. That is the correct failure:
+ * the feature degrades to per-device rather than breaking. */
+function saveStripPicks(picks){
+  const clean = (picks || []).filter(k => STRIP_FACTS[k]).slice(0, 3);
+  try{ localStorage.setItem('br_strip_picks', JSON.stringify(clean)); }catch(e){}
+  saveStripPicksToAccount(clean);
+  return clean;
+}
+async function saveStripPicksToAccount(picks){
+  if(!isLoggedIn()) return;
+  try{
+    const {db, doc, setDoc} = await fb();
+    await setDoc(doc(db, 'settings', getEffectiveId()), { stripPicks: picks }, { merge: true });
+  }catch(e){ /* ignore — local pref is already saved */ }
+}
+async function loadStripPicksFromAccount(){
+  if(!isLoggedIn()) return;
+  try{
+    const {db, doc, getDoc} = await fb();
+    const snap = await getDoc(doc(db, 'settings', getEffectiveId()));
+    if(!snap.exists()) return;
+    const raw = snap.data().stripPicks;
+    if(!Array.isArray(raw) || !raw.length) return;
+    const clean = raw.filter(k => STRIP_FACTS[k]).slice(0, 3);
+    if(!clean.length) return;
+    // The synced choice wins on login, then is mirrored locally — same precedence as travelMode.
+    try{ localStorage.setItem('br_strip_picks', JSON.stringify(clean)); }catch(e){}
+    if(typeof applyFilters === 'function') refreshOpenPopupStrip();
+  }catch(e){}
+}
+
+/* An open popup shows a strip built from the OLD picks until it is reopened. Rebuilding just
+ * that node is cheaper and less disruptive than closing and reopening the popup under someone. */
+function refreshOpenPopupStrip(){
+  document.querySelectorAll('.popup-inner[data-locid]').forEach(inner => {
+    const id = inner.dataset.locid;
+    const loc = locationsById[id];
+    const old = inner.querySelector('.answer-strip');
+    if(!loc || !old) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = stripHtml(loc, ratingsCache[id]);
+    const fresh = tmp.firstElementChild;
+    if(fresh) old.replaceWith(fresh);
+  });
+}
+
 function stripHtml(loc, agg){
   const picks = stripPicks();
   const cells = picks.map(k => {
@@ -2271,7 +2324,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.33.0';
+const BUILD = 'v2.34.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -5809,6 +5862,66 @@ function ssPopScreen(){
   setTimeout(done, 400);          // transitions can be suppressed; never leave it half-open
 }
 
+/* ---------- Location card screen ----------
+ * Order matters here in a way it does not on the other screens, so this is a LIST with a drag
+ * handle rather than a set of chips. Pointer events, not HTML5 drag-and-drop: dragstart never
+ * fires on touch, so the native API would work on a laptop and be dead on a phone.
+ *
+ * The list does not re-render mid-drag — rows are translated and the array commits once on
+ * release. Re-rendering on every move rebuilds the node under the finger and drops the pointer
+ * capture, which is how drag lists come apart on mobile.
+ */
+const SS_GRIP = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4.5h12M2 8h12M2 11.5h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+let ssLayoutPicks = null;      // working copy while the screen is open
+
+/* A representative location so the preview shows real shapes rather than every cell blank.
+ * Prefers one the person can actually see — a strip previewed from a location with no data at
+ * all would teach nothing about the choice being made. */
+function ssPreviewLoc(){
+  const best = seedLocations.find(l => ratingsCache[l.id] && ratingsCache[l.id].bathroomCount)
+    || seedLocations[0];
+  return best || null;
+}
+
+function ssRenderLayout(){
+  const prev = document.getElementById('ssLayoutPreview');
+  const list = document.getElementById('ssLayoutPicked');
+  const pool = document.getElementById('ssLayoutPool');
+  if(!prev || !list || !pool) return;
+  if(!ssLayoutPicks) ssLayoutPicks = stripPicks().slice();
+
+  const loc = ssPreviewLoc();
+  prev.innerHTML = loc
+    ? stripHtml(loc, ratingsCache[loc.id])
+    : '<div class="answer-strip is-empty"><span>No locations loaded yet</span></div>';
+
+  list.innerHTML = ssLayoutPicks.map((k, i) =>
+    `<div class="ss-row ss-drag-row" data-ss-row="${k}">
+       <span class="ss-ord">${i + 1}</span>
+       <span class="ss-main"><span class="ss-lab">${escapeHtml(STRIP_FACTS[k].label)}</span></span>
+       <button class="ss-grip" data-ss-grip="${k}" aria-label="Reorder ${escapeHtml(STRIP_FACTS[k].label)}, position ${i + 1} of ${ssLayoutPicks.length}. Use arrow keys to move.">${SS_GRIP}</button>
+       <button class="ss-rm" data-ss-rm="${k}" aria-label="Remove ${escapeHtml(STRIP_FACTS[k].label)}">&minus;</button>
+     </div>`).join('')
+    || '<div class="ss-row"><span class="ss-main"><span class="ss-lab ss-muted">Nothing selected yet</span></span></div>';
+
+  pool.innerHTML = Object.keys(STRIP_FACTS).filter(k => ssLayoutPicks.indexOf(k) < 0).map(k =>
+    `<div class="ss-row">
+       <span class="ss-main"><span class="ss-lab">${escapeHtml(STRIP_FACTS[k].label)}</span></span>
+       <button class="ss-add" data-ss-add="${k}" aria-label="Add ${escapeHtml(STRIP_FACTS[k].label)}">+</button>
+     </div>`).join('')
+    || '<div class="ss-row"><span class="ss-main"><span class="ss-lab ss-muted">All of them are showing</span></span></div>';
+}
+
+/* Committed on every change rather than on leaving the screen: there is no Save button, so
+ * "back" must not be the thing that persists — someone who swipes away or closes the app
+ * mid-edit should keep what they chose, not lose it. */
+function ssCommitLayout(){
+  ssLayoutPicks = saveStripPicks(ssLayoutPicks);
+  ssRenderLayout();
+  ssSyncValues();
+  refreshOpenPopupStrip();
+}
+
 /* Every sub-screen reflects live state on entry, because it can be opened at any time and the
  * value may have changed since it was last seen — from another device, or from the map. */
 function ssSyncScreen(id){
@@ -5821,6 +5934,7 @@ function ssSyncScreen(id){
     });
   }
   if(id === 'ssScreenPlaces' && typeof renderChainKey === 'function') renderChainKey();
+  if(id === 'ssScreenLayout'){ ssLayoutPicks = stripPicks().slice(); ssRenderLayout(); }
 }
 
 /* The root rows carry the current value, so you can read every setting without opening one. */
@@ -5831,6 +5945,8 @@ function ssSyncValues(){
   const n = document.getElementById('navAppSelect');
   const nv = document.getElementById('ssNavVal');
   if(n && nv) nv.textContent = n.options[n.selectedIndex] ? n.options[n.selectedIndex].text : '';
+  const lv = document.getElementById('ssLayoutVal');
+  if(lv) lv.textContent = stripPicks().map(k => STRIP_FACTS[k] ? STRIP_FACTS[k].label : '').filter(Boolean).join(' · ');
   const pv = document.getElementById('ssPlacesVal');
   if(pv){
     const total = Object.keys(CHAIN_REGISTRY).filter(chainHasData).length;
@@ -5858,6 +5974,97 @@ document.addEventListener('click', (e) => {
     setTimeout(() => { if(ssStack.length) history.back(); }, 180);
   }
 });
+
+/* Add / remove / drag for the Location card screen. Delegated from the screen node so the rows
+ * can be re-rendered freely without rebinding anything. */
+(function(){
+  const list = () => document.getElementById('ssLayoutPicked');
+  let rows = [], el = null, from = 0, to = 0, startY = 0, rowH = 0;
+
+  document.addEventListener('click', (e) => {
+    const add = e.target.closest('[data-ss-add]');
+    const rm  = e.target.closest('[data-ss-rm]');
+    const note = document.getElementById('ssLayoutNote');
+    if(add){
+      if(!ssLayoutPicks) ssLayoutPicks = stripPicks().slice();
+      if(ssLayoutPicks.length === 3){
+        const gone = ssLayoutPicks.pop();          // the bottom one, which is what the hint promises
+        if(note) note.textContent = 'Replaced ' + STRIP_FACTS[gone].label + ' — three is the limit.';
+      } else if(note){ note.textContent = 'Tap to add. Adding a fourth replaces the one at the bottom.'; }
+      ssLayoutPicks.push(add.dataset.ssAdd);
+      ssCommitLayout();
+      return;
+    }
+    if(rm){
+      if(!ssLayoutPicks) ssLayoutPicks = stripPicks().slice();
+      ssLayoutPicks = ssLayoutPicks.filter(k => k !== rm.dataset.ssRm);
+      ssCommitLayout();
+    }
+  });
+
+  document.addEventListener('pointerdown', (e) => {
+    const g = e.target.closest('[data-ss-grip]');
+    if(!g || !list()) return;
+    e.preventDefault();                              // or the screen scrolls with the finger
+    rows = [...list().querySelectorAll('.ss-drag-row')];
+    el = rows.find(r => r.dataset.ssRow === g.dataset.ssGrip);
+    if(!el) return;
+    from = to = rows.indexOf(el);
+    rowH = el.offsetHeight; startY = e.clientY;
+    list().classList.add('is-dragging');
+    el.classList.add('is-drag');
+    if(g.setPointerCapture) g.setPointerCapture(e.pointerId);
+  });
+  document.addEventListener('pointermove', (e) => {
+    if(!el) return;
+    e.preventDefault();
+    const dy = e.clientY - startY;
+    el.style.transform = 'translateY(' + dy + 'px)';
+    /* Rounding at the midpoint swaps as the boundary is crossed, rather than waiting until the
+     * neighbouring row is fully cleared. */
+    const next = Math.max(0, Math.min(rows.length - 1, from + Math.round(dy / rowH)));
+    if(next !== to){
+      to = next;
+      rows.forEach((r, i) => {
+        if(r === el) return;
+        let shift = 0;
+        if(from < to && i > from && i <= to) shift = -rowH;
+        else if(from > to && i >= to && i < from) shift = rowH;
+        r.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+      });
+    }
+  });
+  const endDrag = () => {
+    if(!el) return;
+    if(list()) list().classList.remove('is-dragging');
+    rows.forEach(r => { r.style.transform = ''; r.classList.remove('is-drag'); });
+    if(to !== from && ssLayoutPicks){
+      const [moved] = ssLayoutPicks.splice(from, 1);
+      ssLayoutPicks.splice(to, 0, moved);
+    }
+    el = null;
+    ssCommitLayout();                                // commit once, at the end
+  };
+  document.addEventListener('pointerup', endDrag);
+  document.addEventListener('pointercancel', endDrag);
+
+  /* Keyboard equivalent. A handle you can focus but not use is worse than no handle, and this
+   * is the one list in settings where order is the whole point. */
+  document.addEventListener('keydown', (e) => {
+    const g = e.target.closest && e.target.closest('[data-ss-grip]');
+    if(!g || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    e.preventDefault();
+    if(!ssLayoutPicks) ssLayoutPicks = stripPicks().slice();
+    const i = ssLayoutPicks.indexOf(g.dataset.ssGrip);
+    const j = e.key === 'ArrowUp' ? i - 1 : i + 1;
+    if(i < 0 || j < 0 || j >= ssLayoutPicks.length) return;
+    const t = ssLayoutPicks[i]; ssLayoutPicks[i] = ssLayoutPicks[j]; ssLayoutPicks[j] = t;
+    ssCommitLayout();
+    // Focus follows the row, or the next press moves whatever landed here instead.
+    const moved = document.querySelector('[data-ss-grip="' + g.dataset.ssGrip + '"]');
+    if(moved) moved.focus();
+  });
+})();
 
 window.addEventListener('popstate', () => {
   if(ssStack.length) ssPopScreen();

@@ -1170,3 +1170,27 @@ html[data-theme="light"] .ss-body .d-toggle .d-switch{background:#d6dde3}
 /* Inside Places the list is always open — the screen IS the disclosure. */
 .ss-screen #chainKeyAllList{display:block !important}
 .ss-screen #chainKeyAllList .ck-row{padding-left:var(--ss-pad);padding-right:var(--ss-pad)}
+
+/* ---------- Location card screen ---------- */
+.ss-preview-card{padding:var(--ss-s4);margin-bottom:var(--ss-s2)}
+.ss-preview-cap{font-family:var(--font-display);font-size:var(--ss-t-micro);font-weight:600;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ss-ink3);margin-bottom:var(--ss-s3)}
+.ss-ord{width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--accent-ink);
+  display:grid;place-items:center;font-family:var(--font-display);font-size:var(--ss-t-micro);
+  font-weight:600;flex:none}
+.ss-grip{width:32px;height:32px;border-radius:8px;background:none;border:0;color:var(--ss-ink3);
+  flex:none;display:grid;place-items:center;cursor:grab;touch-action:none;padding:0}
+.ss-grip:active{cursor:grabbing}
+.ss-grip:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.ss-grip svg{width:16px;height:16px}
+.ss-rm,.ss-add{width:28px;height:28px;border-radius:8px;border:0;flex:none;cursor:pointer;
+  display:grid;place-items:center;font-family:inherit;font-size:16px;line-height:1;
+  background:var(--ss-tile-bg);color:var(--ss-ink2)}
+.ss-add{background:rgba(46,161,170,.16);color:var(--accent)}
+.ss-muted{color:var(--ss-ink3)}
+/* The dragged row lifts; the others slide. Transitions are disabled on the dragged row alone so
+   it tracks the finger exactly while its neighbours still animate. */
+#ssLayoutPicked .ss-drag-row{transition:transform .16s cubic-bezier(.22,1,.36,1)}
+#ssLayoutPicked.is-dragging .ss-drag-row.is-drag{transition:none;background:var(--ss-card2);
+  border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:3}
+#ssLayoutPicked .ss-drag-row.is-drag::before{display:none}

@@ -433,9 +433,21 @@ service cloud.firestore {
     // values, so a client can't stash arbitrary data here.
     match /settings/{uid} {
       allow read:  if signedIn() && uid == request.auth.uid;
+      /* stripPicks joins travelMode: up to three keys naming which facts show at the top of a
+       * location card. Bounded on every axis a client could abuse — at most 3 entries, each a
+       * short string — because this is a document the owner writes directly and an unbounded
+       * list here is an unbounded document. The VALUES are not enumerated on purpose: the app's
+       * fact list grows, and a rule that has to be redeployed to add a strip option would be a
+       * rule that silently blocks the feature until someone remembers. An unknown key is
+       * dropped client-side at read time, so a bad value costs nothing. */
       allow write: if signedIn() && uid == request.auth.uid
-        && request.resource.data.keys().hasOnly(['travelMode'])
-        && request.resource.data.travelMode in ['road', 'foot'];
+        && request.resource.data.keys().hasOnly(['travelMode', 'stripPicks'])
+        && (!('travelMode' in request.resource.data)
+            || request.resource.data.travelMode in ['road', 'foot'])
+        && (!('stripPicks' in request.resource.data) || (
+             request.resource.data.stripPicks is list
+             && request.resource.data.stripPicks.size() <= 3
+           ));
     }
 
 
