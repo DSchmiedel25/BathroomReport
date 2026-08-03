@@ -1,0 +1,169 @@
+HAND-MAINTAINED DATA — SPATIAL ANOMALY TRIAGE
+Generated 2026-08-03 by the overlap scan. These pairs sit inside 30m in
+files that are edited by hand or by scrapers, so nothing here was auto-removed: a pair can be a
+genuine shared plaza, a rebrand, or a geocoding error, and only a human can tell which.
+Review in FlushPanel; delete or correct the wrong half.
+
+  dist  A (chain / id / name)                          B (chain / id / name)
+
+      0m  bosPublic / node__4757958029           Public restroom          bosPublic / node__11298934608          Public restroom
+    0.2m  bosPublic / way__29609611              Public restroom          bosPublic / node__7828065685+node__7828065686 Public restroom
+    0.5m  stewarts / stewarts-atp-11             Stewart's Shops          quickChek / quickchek-atp-40           QuickChek
+    0.5m  bosPublic / node__9325763791+node__11298934641 Public restroom          bosPublic / node__11298934293          Public restroom
+    0.6m  pilotFlyingJ / pilot-0159              Pilot                    caseys / caseys-atp2-4044              Casey's
+    0.6m  nycPublic / node__11955796822          Public restroom          nycPublic / node__11955796823          Public restroom
+    0.9m  nycPublic / way__249771226             Public restroom          nycPublic / node__4608826376+node__4608826377 Public restroom
+    0.9m  nycPublic / node__11721625336          Public restroom          nycPublic / node__11721625337          Public restroom
+      1m  nycPublic / way__250372852             Public restroom          nycPublic / node__3528538753           Public restroom
+    1.3m  bosPublic / node__9325763790+node__9325763792 Public restroom          bosPublic / node__11298934293          Public restroom
+    1.5m  nycPublic / way__248547533             Public restroom          nycPublic / node__5396699396           Public restroom
+    1.7m  nycPublic / node__10659606023          Public restroom          nycPublic / node__10659606024          Public restroom
+    1.8m  bosPublic / node__9325763790+node__9325763792 Public restroom          bosPublic / node__9325763791+node__11298934641 Public restroom
+    1.9m  nycPublic / node__10659606022          Public restroom          nycPublic / node__10659606023          Public restroom
+    2.1m  pilotFlyingJ / pilot-0154              Pilot                    caseys / caseys-atp2-4216              Casey's
+    2.2m  nycPublic / node__10659606024          Public restroom          nycPublic / node__10659606025          Public restroom
+    2.9m  nycPublic / way__280559340             Public restroom          nycPublic / node__6240167489+node__6240167490 Public restroom
+    3.1m  bosPublic / node__9325763791+node__11298934641 Public restroom          bosPublic / node__11298934292          Public restroom
+    3.3m  nycPublic / way__284841241             Public restroom          nycPublic / node__10565317422          Public restroom
+    3.4m  nycPublic / node__13740052377          Public restroom          nycPublic / node__13740052386          Public restroom
+    3.6m  nycPublic / node__10659606022          Public restroom          nycPublic / node__10659606024          Public restroom
+    3.6m  bosPublic / node__11298934292          Public restroom          bosPublic / node__11298934293          Public restroom
+    3.9m  nycPublic / way__1449458136            Public restroom          nycPublic / node__4879541821           Public restroom
+    3.9m  nycPublic / node__10659606023          Public restroom          nycPublic / node__10659606025          Public restroom
+    4.3m  pilotFlyingJ / pilot-0181              Pilot                    caseys / caseys-atp2-4212              Casey's
+    4.9m  bosPublic / node__9325763790+node__9325763792 Public restroom          bosPublic / node__11298934292          Public restroom
+      5m  nycPublic / node__9026893654           Public restroom          nycPublic / node__13740286729          Public restroom
+    5.8m  nycPublic / node__10659606022          Public restroom          nycPublic / node__10659606025          Public restroom
+      6m  bosPublic / node__1249710188+node__8989135920 Public restroom          bosPublic / node__8989135917           Public restroom
+    6.1m  nycDunkin / node__13752938491          Dunkin'                  nycPublic / node__4402407256           Public restroom
+    6.3m  nycPublic / way__276512457             Park Headquarters        nycPublic / node__10013648720          Public restroom
+    6.3m  bosPublic / node__4971417648+node__4971417650 Public restroom          bosPublic / node__4971417651           Public restroom
+    6.4m  pilotFlyingJ / pilot-0326              Pilot                    caseys / caseys-atp2-4211              Casey's
+    6.6m  circleK / circlek-springfield-adlaistevensondr Adlai Stevenson Dr, Sp   circleK / circlek-springfield-stevensondr-2 STEVENSON DR, SPRINGFI
+    6.7m  nycPublic / node__11607138399          Public restroom          nycPublic / node__11644432591          Public restroom
+    6.8m  restarea / restarea-821                Missouri Welcome Cente   restarea / restarea-822                Hayti Rest Area (North
+    6.9m  restarea / restarea-559                Rest Area                restarea / restarea-1352               Montana State Rest Are
+    7.4m  pilotFlyingJ / pilot-0112              Pilot                    caseys / caseys-atp2-4218              Casey's
+    7.7m  nycPublic / node__11950946594          Public restroom          nycPublic / node__12900415471          Public restroom
+    7.8m  loves / loves-way-1067719938           Love's Travel Stop       loves / loves-way-1255421843           Love's
+    8.1m  nycStarbucks / node__12228222776       Starbucks                nycPublic / node__12228226552          Public restroom
+    8.5m  nycDunkin / node__9039944447           Dunkin'                  nycDunkin / node__11047931240          Dunkin'
+    8.6m  maverik / maverik-kg-63                Kum & Go                 caseys / caseys-atp-752                Casey's
+    8.6m  nycPublic / way__284841274             Public restroom          nycPublic / node__10565292123          Public restroom
+    8.8m  bosPublic / node__4971417632           Public restroom          bosPublic / node__4971417633+node__4971417634 Public restroom
+    9.1m  restarea / restarea-88                 Wiley's Well Rest Area   restarea / restarea-1361               Wiley's Well Rest Area
+    9.5m  pilotFlyingJ / pilot-osm-358412835713  Pilot Convenience Stor   caseys / caseys-atp2-4230              Casey's
+    9.5m  nycPublic / node__1251856987           Public restroom          nycPublic / node__11822433532          Public restroom
+    9.5m  nycPublic / node__13232117765          Public restroom          nycPublic / node__13235181762          Public restroom
+    9.5m  nycPublic / node__13232117766          Public restroom          nycPublic / node__13235181761          Public restroom
+     10m  nycPublic / way__904169967             Public restroom          nycPublic / way__904169969             Public restroom
+     10m  bosStarbucks / node__4971417653        Starbucks                bosPublic / node__4971417651           Public restroom
+   10.2m  nyPublic / node__12326861055           Public restroom          nyPublic / node__12326861054           Public restroom
+   10.6m  maverik / maverik-kg-13                Kum & Go                 caseys / caseys-atp-394                Casey's
+   10.7m  nyPublic / node__10971312748           Public restroom          nyPublic / node__10971312747           Public restroom
+   10.9m  nyPublic / way__1303161710             Public restroom          nyPublic / way__1303161177             Public restroom
+   10.9m  nyPublic / node__13393923304           Public restroom          nyPublic / node__13393941267           Public restroom
+   11.1m  nyPublic / node__1445883030            Public restroom          nyPublic / node__1445883032            Public restroom
+   11.5m  restarea / restarea-1303               Troutville Safety Rest   restarea / restarea-1373               Virginia Rest Area Mil
+   11.5m  nyPublic / node__12214259978           Public restroom          nyPublic / node__12214259977           Public restroom
+   11.5m  nyPublic / node__10937742263           Public restroom          nyPublic / node__12277148097           Public restroom
+   12.2m  nycPublic / way__1388531100            Public restroom          nycPublic / way__1388531101            Public restroom
+   12.7m  restarea / restarea-398                Rest Area                restarea / restarea-1345               Rest Area
+   12.9m  nycPublic / node__322546340            Public restroom          nycPublic / node__1740891617           Public restroom
+     13m  nyPublic / node__6796127285            Public restroom          nyPublic / node__6796103980            Public restroom
+   13.1m  nycPublic / node__4918770514           Public restroom          nycPublic / node__4918770515           Public restroom
+   13.4m  circleK / circlek-glendale-wbellrd     W Bell Rd, Glendale      circleK / circlek-glendale-wbellrd-2   W BELL RD, GLENDALE
+   13.9m  nyPublic / node__9143220817            Public restroom          nyPublic / node__2483018372            Public restroom
+   14.3m  circleK / circlek-durham-enc54         E NC 54, DURHAM          circleK / circlek-durham-wnchwy54      W NC HWY 54, DURHAM
+   14.4m  nycPublic / node__3091301751           Public restroom          nycPublic / node__3091301752           Public restroom
+   14.4m  bosStarbucks / node__4971417653        Starbucks                bosPublic / node__4971417648+node__4971417650 Public restroom
+   14.8m  nyPublic / node__1445883044            Public restroom          nyPublic / node__1445883045            Public restroom
+   14.9m  nycPublic / way__279652202             Public restroom          nycPublic / node__11057333419+node__11057333420 Public restroom
+     15m  nycPublic / node__1241238072           Public restroom          nycPublic / node__11899409296          Public restroom
+   15.1m  nycDunkin / node__2557326696           Dunkin'                  nycDunkin / node__12923101577          Dunkin'
+   15.1m  nyPublic / node__10937763305           Public restroom          nyPublic / node__12277148091           Public restroom
+   15.4m  caseys / caseys-atp-793                Casey's                  speedway / speedway-atp-24             Speedway
+   15.4m  nycStarbucks / node__5906974191        Starbucks                nycPublic / node__5906974190           Public restroom
+   15.4m  nycPublic / node__7613283051           Public restroom          nycPublic / node__7613306280           Public restroom
+   15.5m  nyPublic / node__1324269727            Public restroom          nyPublic / node__10186185586           Public restroom
+   15.6m  quiktrip / qt-0202                     QuikTrip                 kwiktrip / kwiktrip-1487               Kwik Trip
+   15.6m  bosStarbucks / node__5380551122        Starbucks                bosPublic / node__5380552621           Public restroom
+   15.7m  nyPublic / node__1445883027            Public restroom          nyPublic / node__1445883030            Public restroom
+     16m  bosDunkin / node__10202888657          Dunkin'                  bosPublic / node__4971417656+node__4971417657 Public restroom
+   16.1m  nycPublic / node__12925573384          Public restroom          nycPublic / node__12925573390          Public restroom
+   16.2m  loves / loves-atp-168                  Love's Travel Stop       restarea / restarea-1504               Elmer Graham Plaza
+   16.3m  bosDunkin / node__5380524226           Dunkin'                  bosPublic / node__14015821801          Public restroom
+   16.3m  nyPublic / node__10683367983           Public restroom          nyPublic / node__10683367982           Public restroom
+   16.5m  restarea / restarea-12                 Anton Chico Rest Area    restarea / restarea-1334               Anton Chico Rest Area 
+   16.6m  nyPublic / node__4992760808            Public restroom          nyPublic / node__4992760807            Public restroom
+   17.1m  bosStarbucks / node__6959341019        Starbucks                bosPublic / node__13958681731          Public restroom
+   17.2m  nyPublic / node__10937742268           Public restroom          nyPublic / node__10937759052           Public restroom
+   17.3m  bosDunkin / gp__ChIJqwAxASd644kRVWV7nWdgBIY Dunkin'                  bosPublic / node__9162362338           Public restroom
+     18m  circleK / circlek-slidell-votersrd     VOTERS RD, SLIDELL       circleK / circlek-slidell-votersrd-2   VOTERS RD, SLIDELL
+   18.4m  pilotFlyingJ / pilot-0036              Pilot                    loves / loves-way-225364454            Love's Travel Stop
+   18.4m  circleK / circlek-southaven-goodmanrde-2 GOODMAN RD E, SOUTHAVE   circleK / circlek-southaven-goodmanrde-3 GOODMAN RD E, SOUTHAVE
+   18.5m  nyPublic / node__13011712774           Public restroom          nyPublic / node__13011712775           Public restroom
+   18.7m  nycPublic / node__7613283050           Public restroom          nycPublic / node__7613306279           Public restroom
+     19m  nyPublic / node__12277148087           Public restroom          nyPublic / node__12277148086           Public restroom
+   19.2m  bosPublic / node__4454593493           Public restroom          bosPublic / node__6474458891           Public restroom
+   19.5m  nycDunkin / node__5810913535           Dunkin'                  nycPublic / node__4109992398           Public restroom
+   19.7m  restarea / restarea-1267               Rest Area                restarea / restarea-1383               Rest Area
+   19.7m  nycPublic / node__6107146407           Public restroom          nycPublic / node__7117458774           Public restroom
+   19.7m  nyPublic / node__9049492086            Public restroom          nyPublic / node__702338668             Public restroom
+   19.7m  nyPublic / node__4320062688            Public restroom          nyPublic / node__4320062687            Public restroom
+   19.8m  pilotFlyingJ / pilot-0205              Pilot                    loves / loves-way-1236820577           Love's Travel Stop
+     20m  nycPublic / node__11048744578          Public restroom          nycPublic / node__12117376827+node__12117376864 Public restroom
+   20.2m  circleK / circlek-jacksonville-pineygreenrd PINEY GREEN RD, JACKSO   circleK / circlek-midwaypark-pineygreenrd PINEY GREEN RD, MIDWAY
+   20.4m  nyPublic / node__1445886151            Public restroom          nyPublic / node__1445886152            Public restroom
+   20.5m  maverik / maverik-kg-14                Kum & Go                 caseys / caseys-atp-635                Casey's
+   20.6m  bosPublic / node__10181497448          Public restroom          bosPublic / node__10181518755          Public restroom
+   20.9m  maverik / maverik-kg-64                Kum & Go                 caseys / caseys-atp2-5220              Casey's
+   20.9m  nycPublic / node__10151594924          Public restroom          nycPublic / node__10151594925          Public restroom
+   21.1m  nyPublic / way__977054235              Public restroom          nyPublic / way__978523524              Public restroom
+   21.3m  bosNero / node__9162362339             Caffè Nero               bosPublic / node__9162362341           Public restroom
+   21.4m  circleK / circlek-boston-wbroadway     W BROADWAY, BOSTON       bosDunkin / gp__ChIJW6xnGQB744kRrvHZaqkcw5o Dunkin'
+   21.6m  nyPublic / node__12277148098           Public restroom          nyPublic / node__12277148099           Public restroom
+   21.7m  nyPublic / way__358698263              Public restroom          nyPublic / way__358698262              Public restroom
+   21.9m  nycStarbucks / node__5906982490        Starbucks                nycPublic / node__11117453551          Public restroom
+   22.4m  nycDunkin / node__2603955340           Dunkin'                  nycPublic / node__2603955356           Famous Famiglia
+   22.4m  nyPublic / node__12277153101           Public restroom          nyPublic / node__12277148100           Public restroom
+   22.5m  nyPublic / node__10128531147           Public restroom          nyPublic / node__10128531146           Public restroom
+   22.7m  circleK / circlek-normal-nmain-2       N MAIN, NORMAL           circleK / circlek-normal-wmainst       W. Main St., Normal
+   22.9m  restarea / restarea-516                Conecuh County Rest Ar   restarea / restarea-1321               Rest Area
+   22.9m  nycPublic / node__7117458773           Public restroom          nycPublic / node__11470070969          Public restroom
+   23.2m  circleK / circlek-phoenix-ebroadwayrd-2 E BROADWAY RD, PHOENIX   circleK / circlek-phoenix-ebroadwayrd-3 E BROADWAY RD, PHOENIX
+   23.2m  restarea / restarea-34                 KY Welcome Center        restarea / restarea-1260               KY Welcome Center
+   23.6m  nyPublic / node__1445886199            Public restroom          nyPublic / node__1445886200            Public restroom
+   24.6m  nycStarbucks / node__7093921956        Starbucks                nycPublic / node__10216105384+node__10216105385 Public restroom
+   24.6m  bosStarbucks / node__3487861640        Starbucks                bosPublic / node__4971417637+node__4971417638 Public restroom
+   24.6m  nyPublic / node__1445883027            Public restroom          nyPublic / node__1445883032            Public restroom
+   24.8m  restarea / restarea-264                Rest Area                restarea / restarea-1264               Rest Area
+   24.9m  nyPublic / node__12277148095           Public restroom          nyPublic / node__10937742279           Public restroom
+     25m  nycPublic / node__6442303498           Public restroom          nycPublic / node__6442303692           Public restroom
+   25.6m  circleK / circlek-deltona-elkcamblvd-3 ELKCAM BLVD, DELTONA     circleK / circlek-deltona-howlandblvd  HOWLAND BLVD, DELTONA
+   25.8m  nycPublic / node__3720682054           Public restroom          nycPublic / node__9411185887           Public restroom
+   25.9m  circleK / circlek-slidell-gauseblvde   GAUSE BLVD E, SLIDELL    circleK / circlek-slidell-hwy11n       HWY 11 N, SLIDELL
+   26.4m  nyPublic / node__12277148089           Public restroom          nyPublic / node__12277148090           Public restroom
+   26.5m  nyPublic / node__10937763306           Public restroom          nyPublic / node__12277148085           Public restroom
+   26.9m  bosStarbucks / node__13912921162       Starbucks                bosPublic / node__9162362338           Public restroom
+   27.3m  pilotFlyingJ / pilot-0115              Pilot                    caseys / caseys-atp2-4204              Casey's
+   27.3m  pilotFlyingJ / pilot-osm-359801840171  Pilot Convenience Stor   caseys / caseys-atp2-4215              Casey's
+   27.3m  nyPublic / node__8983506584            Public restroom          nyPublic / node__8983506598            Public restroom
+   27.9m  bosDunkin / gp__ChIJGZqvYnZ644kRzkq5NN3Zl5U Dunkin'                  bosPublic / node__7823802577+node__7823802578 Public restroom
+     28m  circleK / circlek-gainesville-nw39thave-2 NW 39TH AVE, GAINESVIL   circleK / circlek-gainesville-nw39thave-3 NW 39TH AVE, GAINESVIL
+   28.3m  nyPublic / way__1421998930             Public restroom          nyPublic / node__8518935955            Public restroom
+   28.4m  nycStarbucks / node__5906982490        Starbucks                nycPublic / node__5906982491           Public restroom
+   28.6m  circleK / circlek-boston-wbroadway     W BROADWAY, BOSTON       bosStarbucks / node__4722603141        Starbucks
+   28.6m  bosPublic / node__1769091056+node__7771246826 Public restroom          bosPublic / node__12223866918          Public restroom
+   28.6m  nyPublic / node__8983518898            Public restroom          nyPublic / node__8983506613            Public restroom
+   28.8m  bosDunkin / gp__ChIJqwAxASd644kRVWV7nWdgBIY Dunkin'                  bosPublic / node__9162362341           Public restroom
+     29m  nycPublic / node__4927559122           Public restroom          nycPublic / node__4927559123           Public restroom
+   29.1m  nyPublic / node__8983506613            Public restroom          nyPublic / node__8983506573            Public restroom
+   29.6m  nycStarbucks / node__2603955361        Starbucks                nycPublic / node__11721625336          Public restroom
+   29.8m  maverik / maverik-kg-32                Kum & Go                 caseys / caseys-atp-750                Casey's
+   29.8m  restarea / restarea-264                Rest Area                restarea / restarea-1052               North Carolina Welcome
+   29.8m  nycPublic / node__2324423000           Public restroom          nycPublic / node__11822433532          Public restroom
+   29.8m  bosStarbucks / node__3487861641        Starbucks                bosPublic / node__4971417656+node__4971417657 Public restroom
+     30m  nyPublic / node__1445883025            Public restroom          nyPublic / node__1445883027            Public restroom
+
+total: 159 pair(s)  (116 same-chain, 43 cross-chain)

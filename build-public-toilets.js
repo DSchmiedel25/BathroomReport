@@ -172,6 +172,132 @@ function toRecord(el, state) {
   };
 }
 
+/* ============================================================================
+ * Spatial dedup — added after a full-corpus overlap scan of the first build.
+ *
+ * Exact-srcId dedup was never going to be enough, for three reasons the scan
+ * quantified:
+ *   - OSM maps facilities PER ROOM: a men's node and a women's node two metres
+ *     apart (sometimes at identical coordinates) are one building wearing two
+ *     pins. 3,819 self-pairs sat under five metres.
+ *   - 1,458 records were the toilets AT rest areas the restarea dataset already
+ *     covers — the fetch cannot know that, only a cross-file check can.
+ *   - 143 matched the hand-built NYC/Boston/NY sets under different OSM ids,
+ *     and a few dozen were toilet nodes inside gas stations another chain pin
+ *     already represents.
+ * ==========================================================================*/
+const EARTH = 6371000, rad = d => d * Math.PI / 180;
+function metres(a, b) {
+  const dLa = rad(b.lat - a.lat), dLo = rad(b.lng - a.lng);
+  const h = Math.sin(dLa/2)**2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLo/2)**2;
+  return 2 * EARTH * Math.asin(Math.sqrt(h));
+}
+/* ~110m buckets so neighbour checks stay O(n) over 90k records. */
+function gridOf(recs) {
+  const g = new Map();
+  recs.forEach((r, i) => {
+    const k = Math.round(r.lat * 1000) + '_' + Math.round(r.lng * 1000);
+    (g.get(k) || g.set(k, []).get(k)).push(i);
+  });
+  return (r) => {
+    const la = Math.round(r.lat * 1000), lo = Math.round(r.lng * 1000), out = [];
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+      const c = g.get((la+a) + '_' + (lo+b)); if (c) out.push(...c);
+    }
+    return out;
+  };
+}
+
+/* Cross-file exclusion zones, read from the location files sitting in the same
+ * directory. Thresholds come from the measured distance distributions, not
+ * guesswork:
+ *   restarea 120m — rest areas are LARGE; the scan found overlaps spread
+ *     evenly out to 120m (511 under 30m, 532 at 30-60m, 415 at 60-120m) and
+ *     then falling off a cliff, which is the facility's physical footprint
+ *     ending. The restarea record already implies toilets.
+ *   legacy public 30m — same restroom, different survey.
+ *   stores 25m — inside-the-building nodes; wider would start eating genuine
+ *     main-street public toilets that happen to neighbour a store. */
+const EXCLUDE_ZONES = [
+  { label: 'restarea',      files: ['restarea-locations.js'],                                             radius: 120 },
+  { label: 'legacyPublic',  files: ['ny-public-locations.js','nyc-public-locations.js','bos-public-locations.js'], radius: 30 },
+];
+const STORE_RADIUS = 25;
+
+function loadExclusionPoints() {
+  const zones = [];
+  for (const z of EXCLUDE_ZONES) {
+    const pts = [];
+    for (const f of z.files) if (fs.existsSync(f)) pts.push(...loadWindowFile(f));
+    zones.push({ ...z, pts, near: gridOf(pts) });
+  }
+  // every other chain's file = a store; skip our own outputs and the exclusion files above
+  const own = new Set(['public-toilets-manifest.js', ...Object.keys(REGIONS).map(k => `public-${k}-locations.js`)]);
+  const excl = new Set(EXCLUDE_ZONES.flatMap(z => z.files));
+  const storePts = [];
+  for (const f of fs.readdirSync('.')) {
+    if (!/-locations\.js$/.test(f) || f === 'compact-locations.js') continue;
+    if (own.has(f) || excl.has(f)) continue;
+    try { storePts.push(...loadWindowFile(f)); } catch (e) { /* tool scripts etc. */ }
+  }
+  zones.push({ label: 'insideStore', pts: storePts, near: gridOf(storePts), radius: STORE_RADIUS });
+  return zones;
+}
+
+/* Same-facility merge: union-find over pairs under 10m. Ten metres is the knee
+ * in the measured distribution — under it live the per-room pairs and
+ * node-inside-building double-mappings; above it, campgrounds genuinely have
+ * two toilet blocks and both deserve pins. The survivor is the record carrying
+ * the most information, and the others do not vanish: their srcIds ride along
+ * in meta.mergedSrcIds, their yes-flags fold in, and a male-room + female-room
+ * pair becomes the one thing the pair PROVES — meta.osmGender = 'multiple',
+ * seeding the exact question the app just learned to ask. */
+const MERGE_RADIUS = 10;
+function richness(r) {
+  let n = 0;
+  if (r.n && r.n !== 'Public restroom') n += 4;
+  if (r.metroInfo && r.metroInfo.hoursRaw) n += 3;
+  if (r.osm && r.osm.accessible) n += 2;
+  if (r.osm && r.osm.changing) n += 2;
+  if (r.metroInfo && r.metroInfo.fee) n += 1;
+  if (r.meta.srcId.startsWith('way/')) n += 1;   // a drawn building beats a bare node
+  return n;
+}
+function mergeSameFacility(recs, rawTagsBySrc) {
+  const near = gridOf(recs);
+  const parent = recs.map((_, i) => i);
+  const find = x => parent[x] === x ? x : (parent[x] = find(parent[x]));
+  for (let i = 0; i < recs.length; i++)
+    for (const j of near(recs[i]))
+      if (j > i && metres(recs[i], recs[j]) < MERGE_RADIUS) parent[find(i)] = find(j);
+  const clusters = new Map();
+  recs.forEach((r, i) => { const root = find(i); (clusters.get(root) || clusters.set(root, []).get(root)).push(r); });
+  const out = [];
+  let merged = 0, genderSeeded = 0;
+  for (const members of clusters.values()) {
+    if (members.length === 1) { out.push(members[0]); continue; }
+    members.sort((a, b) => richness(b) - richness(a));
+    const keep = members[0];
+    let male = false, female = false, unisex = false;
+    for (const m of members) {
+      const t = rawTagsBySrc.get(m.meta.srcId) || {};
+      if (String(t.male).toLowerCase() === 'yes') male = true;
+      if (String(t.female).toLowerCase() === 'yes') female = true;
+      if (String(t.unisex).toLowerCase() === 'yes') unisex = true;
+      if (m === keep) continue;
+      if (m.osm.accessible) keep.osm.accessible = 1;
+      if (m.osm.changing) keep.osm.changing = 1;
+      if (!keep.metroInfo.hoursRaw && m.metroInfo.hoursRaw) keep.metroInfo.hoursRaw = m.metroInfo.hoursRaw;
+      merged++;
+    }
+    if (male && female) { if (keep.meta.osmGender !== 'multiple') genderSeeded++; keep.meta.osmGender = 'multiple'; }
+    else if (unisex && !keep.meta.osmGender) keep.meta.osmGender = 'single';
+    keep.meta.mergedSrcIds = members.filter(m => m !== keep).map(m => m.meta.srcId);
+    out.push(keep);
+  }
+  return { out, merged, genderSeeded };
+}
+
 function main() {
   if (!fs.existsSync(OSM_DIR)) { console.error(`missing ${OSM_DIR}/`); process.exit(1); }
 
@@ -187,6 +313,10 @@ function main() {
 
   const byRegion = {};
   const seenGlobal = new Set();
+  /* Raw tags kept per srcId so the merge step can read male/female/unisex — the compact record
+   * deliberately drops tags it has no field for, and the merge is the one consumer that needs
+   * them back. */
+  const rawTagsBySrc = new Map();
 
   for (const f of files.sort()) {
     const state = f.slice(-7, -5);
@@ -204,11 +334,41 @@ function main() {
       if (shipped.has(rec.meta.srcId)) { DROP.duplicateExisting++; continue; }
       if (seenGlobal.has(rec.meta.srcId)) { DROP.duplicateInternal++; continue; }
       seenGlobal.add(rec.meta.srcId);
+      rawTagsBySrc.set(rec.meta.srcId, el.tags || {});
       (byRegion[region] = byRegion[region] || []).push(rec);
       kept++;
     }
     console.log(`  ${state}  ${String(kept).padStart(6)} kept  → ${region}`);
   }
+
+  /* ---- spatial pass: cross-file exclusion, then same-facility merge ---- */
+  const zones = loadExclusionPoints();
+  console.log('\nspatial dedup');
+  for (const z of zones) console.log(`  ${z.label.padEnd(13)} ${String(z.pts.length).padStart(6)} exclusion point(s), radius ${z.radius}m`);
+  DROP.nearRestarea = 0; DROP.nearLegacyPublic = 0; DROP.insideStore = 0; DROP.mergedSameFacility = 0;
+  let genderSeededTotal = 0;
+  for (const key of Object.keys(byRegion)) {
+    let recs = byRegion[key];
+    recs = recs.filter(r => {
+      for (const z of zones) {
+        for (const idx of z.near(r)) {
+          if (metres(r, z.pts[idx]) < z.radius) {
+            if (z.label === 'restarea') DROP.nearRestarea++;
+            else if (z.label === 'legacyPublic') DROP.nearLegacyPublic++;
+            else DROP.insideStore++;
+            return false;
+          }
+        }
+      }
+      return true;
+    });
+    const m = mergeSameFacility(recs, rawTagsBySrc);
+    DROP.mergedSameFacility += m.merged;
+    genderSeededTotal += m.genderSeeded;
+    byRegion[key] = m.out;
+  }
+  console.log(`  merged same-facility duplicates: ${DROP.mergedSameFacility}` );
+  console.log(`  gender answers seeded by male+female room pairs: ${genderSeededTotal}`);
 
   console.log('\nregion files');
   const manifest = [];
