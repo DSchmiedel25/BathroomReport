@@ -2166,6 +2166,22 @@ const STRIP_FACTS = {
                meta: String(agg.bathroomCount), tone: '' };
     }
   },
+  safe: {
+    label: 'Feels safe',
+    read(loc, agg){
+      /* Its own count, not the overall one. Somebody who has rated a place four times overall
+       * and answered the safety question once should see "1" here — a number borrowed from a
+       * different question would overstate how much anyone actually knows about this. */
+      const sum = (agg && agg.safeSum) || 0, count = (agg && agg.safeCount) || 0;
+      if(!count) return null;
+      const avg = sum / count;
+      /* Tone at the low end only. A 4.6 does not need colouring — the number says it — but
+       * somebody scanning for a reason NOT to stop should not have to read the digits to find
+       * one, and that is the whole job of this row. */
+      return { v: avgStr(sum, count) + '\u2605', meta: String(count),
+               tone: avg <= 2.5 ? 'bad' : (avg >= 4 ? 'ok' : '') };
+    }
+  },
   stalls: {
     /* Community-only, permanently. OSM records no usable stall count: capacity appears on 76 of
      * 74,456 imported records and toilets:num_chambers on 15, and toilets:position describes
@@ -2275,7 +2291,11 @@ function stripYesNo(loc, key, field){
  * Open and Accessible lead because they populate. Overall keeps the third slot despite being
  * vote-only: it is the number people came for, and a strip with no rating on it reads as a
  * different app. Stalls stays available and never default. */
-const STRIP_DEFAULT = ['hours', 'accessible', 'overall'];
+/* Safety replaces Accessible in the default three. Accessible is better covered today (9.3% vs
+ * nothing, since safety starts empty), but it is also already stated by its own badge lower on
+ * the card, whereas a safety score appears nowhere else. Overall and Open stay: Open is the
+ * best-covered fact on the map at 23%, and Overall is the number people came for. */
+const STRIP_DEFAULT = ['hours', 'overall', 'safe'];
 function stripPicks(){
   try{
     const raw = JSON.parse(localStorage.getItem('br_strip_picks') || 'null');
@@ -2449,7 +2469,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.36.6';
+const BUILD = 'v2.37.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
