@@ -46,9 +46,12 @@ function declsFor(selector) {
 }
 
 // ---- 1 + 2: every drawer row must be a flex row on the same left gutter ----
-console.log('\ndrawer row geometry');
-const ROWS = ['#appDrawer .d-items button', '#appDrawer .d-collapse-head',
-              '#appDrawer .d-shop-link',    '#appDrawer .d-section-label'];
+/* Repointed from the drawer to the SHEET, which replaced it. Left aimed at #appDrawer these
+ * checks reported "0 drawer rows" and passed while guarding nothing at all — a green tick for an
+ * element that no longer exists is worse than no check, because it reads as coverage. */
+console.log('\nmenu row geometry');
+const ROWS = ['.ss-row', '.ss-body .d-toggle',
+              '.ss-body .d-collapse-head', '.ss-body .d-section-label'];
 const geo = ROWS.map(sel => {
   const d = declsFor(sel);
   const padLeft = (d.padding || '').replace('!important', '').trim().split(/\s+/);
@@ -59,19 +62,27 @@ const geo = ROWS.map(sel => {
     left: padLeft.length >= 2 ? padLeft[1] : padLeft[0] || '',
   };
 });
-for (const g of geo) {
-  if (g.display !== 'flex') fail(`${g.sel} is "${g.display || 'block'}", not flex — .d-ico cannot size and gap will not apply`);
-  if (g.gap !== '10px')     fail(`${g.sel} gap is "${g.gap || 'none'}", expected 10px`);
-}
-const lefts = [...new Set(geo.map(g => g.left))];
-if (lefts.length > 1) fail('drawer rows disagree on left padding: ' + geo.map(g => `${g.sel}=${g.left}`).join(', '));
-else pass('all ' + geo.length + ' row types: flex, gap 10px, left padding ' + lefts[0]);
+/* Resolve var() before comparing. The rules are tokenised now, so a literal string compare
+ * reported every row as broken while the computed geometry was in fact identical — a check that
+ * fails on correct code trains you to ignore it, which is worse than not having it. */
+const TOKENS = Object.fromEntries(
+  [...css.matchAll(/--([\w-]+)\s*:\s*([^;}]+)[;}]/g)].map(m => [m[1], m[2].trim()]));
+const resolve = (v) => {
+  let out = String(v || ''), guard = 0;
+  while (/var\(--/.test(out) && guard++ < 6) {
+    out = out.replace(/var\(--([\w-]+)(?:,[^)]*)?\)/g, (_, k) => TOKENS[k] || '');
+  }
+  return out.trim();
+};
+const WANT = { gap: '12px', left: '16px' };
+const bad = geo.filter(g => g.display !== 'flex' || resolve(g.gap) !== WANT.gap || resolve(g.left) !== WANT.left);
+if (bad.length) bad.forEach(b => fail(`${b.sel}: display=${b.display || '-'} gap=${resolve(b.gap) || '-'} left=${resolve(b.left) || '-'} (want flex / ${WANT.gap} / ${WANT.left})`));
+else pass(`all ${ROWS.length} row types: flex, gap ${WANT.gap}, left padding ${WANT.left}`);
 
-// ---- 2b: every icon must be in the slot, not inline in the label ----
 console.log('\nicon slot');
-const items = html.slice(html.indexOf('<div class="d-items">'), html.indexOf('</nav>', html.indexOf('<div class="d-items">')));
+const items = html.slice(html.indexOf('<div class="ss-body">'), html.indexOf('<div class="ss-foot">'));
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
-const rowRe = /<(button|div|a)[^>]*(?:class="[^"]*(?:d-collapse-head|d-section-label|d-shop-link|d-toggle)[^"]*"|id="(?:passportToggle|infoBtn)")[^>]*>([\s\S]*?)<\/\1>/g;
+const rowRe = /<(button|div|a)[^>]*class="[^"]*(?:ss-row|ss-shop|d-collapse-head|d-section-label|d-toggle)[^"]*"[^>]*>([\s\S]*?)<\/\1>/g;
 let r, checked = 0, stray = 0;
 while ((r = rowRe.exec(items))) {
   checked++;
@@ -79,11 +90,11 @@ while ((r = rowRe.exec(items))) {
                     .replace(/<[^>]*>/g, '').replace(/[▾▸]/g, '').trim();
   if (EMOJI.test(label)) { fail('emoji outside .d-ico in row: ' + JSON.stringify(label.slice(0, 40))); stray++; }
 }
-if (!stray) pass(checked + ' drawer rows, every emoji inside a .d-ico slot');
+if (!stray) pass(checked + ' menu rows, every emoji inside a .d-ico slot');
 
 // ---- 3: stale selectors — absolute positioning on a drawer child ----
 console.log('\nstale selectors');
-const drawerIds = [...items.matchAll(/id="([^"]+)"/g)].map(m => '#' + m[1]);
+const drawerIds = [...items.matchAll(/id="([^"]+)"/g)].map(m => '#' + m[1]);   // sheet ids now
 let staleFound = 0;
 for (const id of drawerIds) {
   const d = declsFor(id);
@@ -91,9 +102,20 @@ for (const id of drawerIds) {
   const bad = [];
   if ((d.position || '').includes('absolute')) bad.push('position:absolute');
   if ((d.justifyContent || d['justify-content'] || '').includes('center')) bad.push('justify-content:center');
-  if (bad.length) { fail(`${id} is a drawer row but still has ${bad.join(' + ')} from an earlier layout`); staleFound++; }
+  if (bad.length) { fail(`${id} is a menu row but still has ${bad.join(' + ')} from an earlier layout`); staleFound++; }
 }
-if (!staleFound) pass(drawerIds.length + ' drawer ids carry no leftover positioning rules');
+if (!staleFound) pass(drawerIds.length + ' menu ids carry no leftover positioning rules');
+
+// ---- 3b: the menu must be reachable ----
+/* With the drawer deleted the sheet is the ONLY route to every setting, the passport and the
+ * FAQ. If #menuBtn ever stops opening it, the app has no menu at all — a failure no other check
+ * here would notice, because every individual control would still be present and correct. */
+console.log('\nmenu reachable');
+if (!/getElementById\('menuBtn'\)/.test(html)) fail('#menuBtn is never looked up');
+else if (!/openSettingsSheet\s*\(/.test(html)) fail('#menuBtn does not open the settings sheet');
+else pass('#menuBtn opens the settings sheet');
+if (/id="appDrawer"/.test(html)) fail('the drawer markup is back — two menus again');
+else pass('no drawer markup remains');
 
 // ---- 4: constants duplicated across files ----
 console.log('\nduplicated constants');
