@@ -2092,7 +2092,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.28.2';
+const BUILD = 'v2.28.3';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -5013,11 +5013,18 @@ function viewportCells(g){
   const south = b.getSouth() - latPad, north = b.getNorth() + latPad;
   const west = b.getWest() - lngPad,  east = b.getEast() + lngPad;
   /* A zoomed-out view can span the continent, and walking every quarter-degree cell in it would
-   * be tens of thousands of iterations on every pan. Past a few hundred cells the answer is
-   * always "yes, some region matches" anyway, so bail — nothing loads until the view is tight
-   * enough to mean something. Roughly: a large metro loads, a whole state does not. */
+   * be tens of thousands of iterations on every pan, so wide views bail.
+   *
+   * The cap is 2,500 because it must clear REST_MIN_ZOOM on every screen. The layer renders
+   * from zoom 8, so the loader has to be willing to load there too — and a desktop window at
+   * zoom 8 is 2,172 padded cells. The original cap of 400 opened a dead band (zoom 8 anywhere,
+   * 8–9 on desktop) where pins were permitted but data was silently never fetched: Tampa and
+   * LA at metro zoom showed nothing, with no error and no request. Measured cells by zoom,
+   * desktop/phone: z8 2172/612 · z9 568/166 · z10 155/49. Above the cap now means genuinely
+   * continental (z7 desktop is ~8,700), where the zoom gate hides the layer anyway. 2,500 Set
+   * inserts per settled pan is trivial. */
   const cellSpan = ((north - south) / g + 1) * ((east - west) / g + 1);
-  if(cellSpan > 400) return null;
+  if(cellSpan > 2500) return null;
   const out = new Set();
   for(let la = Math.floor(south / g); la <= Math.floor(north / g); la++)
     for(let ln = Math.floor(west / g); ln <= Math.floor(east / g); ln++)
