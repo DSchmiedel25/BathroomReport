@@ -78,15 +78,41 @@ const COUNTED_ANSWERS = new Set(['yes', 'no', 'single', 'multiple']);
  * or out of order gives the same answer, because the answer is a function of stored state rather
  * than of the event that woke us up. It costs one query per vote write, which at this app's
  * volume is the right trade for a total that cannot drift. */
+/* The three rating dimensions. `bathroom` is the original overall score and keeps its field
+ * names exactly — every existing aggregate, every baked file and the whole client read
+ * bathroomSum/bathroomCount, and renaming it would orphan all of it.
+ *
+ * safe is new. Both dimensions carry a recent-observation window as well as a running total,
+ * because a sum cannot be un-summed and an average with no age attached is the specific way a
+ * rating lies: "4.2 stars" reads as current whether the last vote was Tuesday or two years ago.
+ * The window is what lets the client say WHEN. */
+const RATING_TYPES = ['bathroom', 'safe'];
+/* Bounded on purpose. Ten entries is enough for any recency weighting to be stable, and it caps
+ * the document: without a limit a busy location would grow an unbounded array inside an
+ * aggregate every client reads on every popup. */
+const RECENT_MAX = 10;
+
 function reduceVotes(docs) {
   const out = { bathroomSum: 0, bathroomCount: 0, amen: {}, lastRatedAt: 0, lastRatedBy: null };
+  for (const t of RATING_TYPES) {
+    if (t !== 'bathroom') { out[t + 'Sum'] = 0; out[t + 'Count'] = 0; }
+    out[t + 'Recent'] = [];     // {v, t} pairs, newest last, trimmed below
+  }
   for (const v of docs) {
     if (!v) continue;
+    const votedAt = typeof v.ratedAt === 'number' ? v.ratedAt
+                  : (typeof v.lastUpdated === 'number' ? v.lastUpdated : 0);
+    /* safe uses the same shape and the same validation as the overall score — an integer 1..5 —
+     * so one loop covers both and a future dimension is one array entry. */
+    for (const t of RATING_TYPES) {
+      const val = v[t];
+      if (typeof val !== 'number' || !Number.isInteger(val) || val < 1 || val > 5) continue;
+      out[t + 'Sum'] += val;
+      out[t + 'Count'] += 1;
+      if (votedAt) out[t + 'Recent'].push({ v: val, t: votedAt });
+    }
     if (typeof v.bathroom === 'number' && v.bathroom > 0 && Number.isInteger(v.bathroom) && v.bathroom <= 5) {
-      out.bathroomSum += v.bathroom;
-      out.bathroomCount += 1;
-      const t = typeof v.ratedAt === 'number' ? v.ratedAt
-              : (typeof v.lastUpdated === 'number' ? v.lastUpdated : 0);
+      const t = votedAt;
       if (t > out.lastRatedAt) {
         out.lastRatedAt = t;
         out.lastRatedBy = (typeof v.username === 'string' && v.username) ? v.username.slice(0, 40) : null;
@@ -104,6 +130,12 @@ function reduceVotes(docs) {
         cell[sv] = (cell[sv] || 0) + 1;
       }
     }
+  }
+  /* Newest first, capped. Sorting here rather than trusting document order: reduceVotes reads
+   * an unordered query, so "recent" would otherwise mean "whatever Firestore returned first". */
+  for (const t of RATING_TYPES) {
+    out[t + 'Recent'].sort((a, b) => b.t - a.t);
+    out[t + 'Recent'] = out[t + 'Recent'].slice(0, RECENT_MAX);
   }
   return out;
 }
@@ -138,6 +170,17 @@ exports.recomputeBathroomAggregate = onDocumentWritten('votes/{voteId}', async (
       bathroomCount:  totals.bathroomCount,
       amen:           totals.amen,
     };
+    /* The two new dimensions and all three recency windows. Written unconditionally, including
+     * as empty, so a location whose last safety rating is deleted has the field zeroed rather
+     * than keeping a stale total — the same reason lastRatedAt is deleted rather than omitted
+     * a few lines down. */
+    for (const t of RATING_TYPES) {
+      if (t !== 'bathroom') {
+        patch[t + 'Sum'] = totals[t + 'Sum'];
+        patch[t + 'Count'] = totals[t + 'Count'];
+      }
+      patch[t + 'Recent'] = totals[t + 'Recent'];
+    }
 
     /* lastRatedAt/By come from the votes too, so they no longer depend on which event fired.
      *
@@ -155,6 +198,10 @@ exports.recomputeBathroomAggregate = onDocumentWritten('votes/{voteId}', async (
      * already stored and leave the timestamp alone when the recomputation agrees with it. */
     const changed = cur.bathroomSum !== totals.bathroomSum
       || cur.bathroomCount !== totals.bathroomCount
+      /* The new dimension must be part of this or lastUpdated stops moving when only a safety
+       * rating changes — and anything downstream keyed on it would go stale silently. */
+      || RATING_TYPES.some(t => (t !== 'bathroom' && (cur[t + 'Sum'] !== totals[t + 'Sum'] || cur[t + 'Count'] !== totals[t + 'Count']))
+           || JSON.stringify(cur[t + 'Recent'] || []) !== JSON.stringify(totals[t + 'Recent'] || []))
       || (cur.lastRatedAt || 0) !== (totals.lastRatedAt || 0)
       || (cur.lastRatedBy || null) !== (totals.lastRatedBy || null)
       || JSON.stringify(cur.amen || {}) !== JSON.stringify(totals.amen || {});
