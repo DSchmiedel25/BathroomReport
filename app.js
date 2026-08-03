@@ -2098,7 +2098,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.29.0';
+const BUILD = 'v2.29.1';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -3679,7 +3679,13 @@ async function updateMostRecentBadge(){
      * somewhere — the marker has to be on the map for zoomToMarker to work — so it is a promise
      * rather than decoration. escapeHtml because a location name is data, not markup. */
     const tappable = !!(loc && markers[loc.id]);
-    el.innerHTML = `Just rated: ${escapeHtml(headline)} — ${relativeTimeFromNow(rec.ts)}`
+    /* Attribution, restored. The handle rides in the activity doc already being read, so this
+     * costs nothing — and it was lost, not removed on purpose: the "brand and town" rewrite above
+     * replaced this whole line and the credit went with it. Same helper the popup uses, so the
+     * escaping, the 40-char cap and the "render nothing when absent" behaviour cannot drift
+     * between the two places a name appears. */
+    el.innerHTML = `Just rated: ${escapeHtml(headline)}${ratedByHtml({ lastRatedBy: rec.username })}`
+      + ` — ${relativeTimeFromNow(rec.ts)}`
       + (tappable ? ` ${ico('arrow')}` : '');
     el.classList.toggle('is-tappable', tappable);
     _mostRecentLoaded = true;   // lock only after a real, successful write
