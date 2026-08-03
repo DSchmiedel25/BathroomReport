@@ -2012,8 +2012,14 @@ function metroPopupHtml(loc, agg, myVote){
   const shareUrl = `${location.origin}${location.pathname}?loc=${encodeURIComponent(loc.id)}`;
   const chain = chainFor(loc);
   const raw = (loc.metroInfo && loc.metroInfo.hoursRaw) || '';
-  const hoursLine = raw
-    ? `<div class="hours-line">${ico('clock')} ${escapeHtml(raw)}</div>`
+  /* A solar window is shown by name — "Sunrise to sunset" — rather than as the raw tag text or
+   * as a clock time. The parser knows the actual minute and uses it for the open/closed verdict,
+   * but printing "8:13 PM" would assert a fixed closing time that shifts daily. Everything else
+   * still shows its own tag text unchanged. */
+  const solarLabel = osmSolarLabel(loc);
+  const hoursText = solarLabel || raw;
+  const hoursLine = hoursText
+    ? `<div class="hours-line">${ico('clock')} ${escapeHtml(hoursText)}</div>`
     : `<div class="hours-line">${ico('clock')} Hours unknown — know them? Report hours below.</div>`;
   /* The same community hours flow the pit-stop popup has, not the old "tap Report below"
    * detour into the problem-report form. Hours sent that way arrived as free text in a
@@ -2092,7 +2098,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.28.3';
+const BUILD = 'v2.29.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -4274,7 +4280,55 @@ function todayHrsString(loc){
     const v = loc.hours[HRS_DAY_KEYS[new Date().getDay()]];
     return (v === undefined || v === null) ? null : v;
   }
+  if(loc && loc.hrs != null && String(loc.hrs) !== '') return loc.hrs;
+  /* Public-restroom records keep their hours as OSM opening_hours text in metroInfo.hoursRaw.
+   * Nothing read it, so 790 pins that stated their hours plainly — 232 of them "24/7" — were
+   * unknown to every open-now path. hours-osm.js turns that text into this same canonical
+   * vocabulary, so the verdict, the list row and Bathroom Now's ranking all light up with no
+   * further change. Values it cannot safely read return null and stay unknown. */
+  const raw = loc && loc.metroInfo && loc.metroInfo.hoursRaw;
+  if(raw && window.OsmHours) return osmHrsForToday(loc, raw);
   return (loc && loc.hrs != null) ? loc.hrs : null;
+}
+
+/* Memoised wrapper around the OSM parser.
+ *
+ * todayHrsString runs inside applyFilters, which walks every marker on the map. Re-parsing a rule
+ * list — and recomputing sunrise — on each of those passes would put real text processing in the
+ * one loop that has to stay cheap. The answer only changes when the day changes or when a
+ * position fix arrives, so both are part of the cache key. */
+function osmHrsForToday(loc, raw){
+  // Solar words are generated from the device clock rather than read from the record, so they
+  // need a position fix AND proximity before they can be trusted. See hours-osm.js.
+  const solarOk = !!lastKnownPos && openNowConfident(loc);
+  const key = new Date().toDateString() + '|' + (solarOk ? '1' : '0');
+  if(loc._osmHrs && loc._osmHrs.key === key) return loc._osmHrs.val;
+  let val = null, label = null;
+  try{
+    const d = window.OsmHours.todayDetail(raw, {
+      lat: Number(loc.lat), lng: Number(loc.lng), solarOk: solarOk
+    });
+    val = d.value;
+    label = d.label;
+  }catch(e){
+    // A single malformed value must not take down the filter pass for every other pin.
+    console.warn('opening_hours parse failed for', loc.id, e && e.message);
+    val = null;
+  }
+  loc._osmHrs = { key: key, val: val, label: label };
+  return val;
+}
+
+/* Display text for a solar window, e.g. "Sunrise to sunset".
+ *
+ * The computed minute is real and decides open vs closed, but showing "8:13 PM" would state a
+ * closing time that does not exist: it moves daily, and by more than three hours across the year.
+ * Someone reading it at the trailhead would plan against a number that is wrong tomorrow. */
+function osmSolarLabel(loc){
+  const raw = loc && loc.metroInfo && loc.metroInfo.hoursRaw;
+  if(!raw || !window.OsmHours) return null;
+  osmHrsForToday(loc, raw);            // populates/refreshes the cache for today
+  return (loc._osmHrs && loc._osmHrs.label) || null;
 }
 
 /* How far away a location can be before we stop claiming to know whether it's open.
@@ -4348,6 +4402,9 @@ function formatHrsDisplay(loc){
   if(!hrs) return null;
   if(hrs === 'closed') return 'Closed today';
   if(hrs === '24') return 'Open 24 hours';
+  // A solar window names its endpoints instead of printing a clock time that shifts every day.
+  const solar = osmSolarLabel(loc);
+  if(solar) return solar;
   const parts = hrs.split('-');
   if(parts.length !== 2) return null;
   const open = parseInt(parts[0], 10);
