@@ -2079,6 +2079,11 @@ const STRIP_FACTS = {
     }
   },
   stalls: {
+    /* Community-only, permanently. OSM records no usable stall count: capacity appears on 76 of
+     * 74,456 imported records and toilets:num_chambers on 15, and toilets:position describes
+     * seated-vs-urinal rather than how many. Useful once voted — it is the privacy question,
+     * whether you can lock the door behind you — but it can never be seeded, so it is available
+     * and never a default. */
     label: 'Stalls',
     read(loc){
       const st = confirmedState(BATHROOM_AMENITIES.find(a => a.key === 'restroomType'),
@@ -2090,10 +2095,22 @@ const STRIP_FACTS = {
   rooms: {
     label: 'Rooms',
     read(loc){
+      /* Community answer first — three people who were there outrank a tag. */
       const st = confirmedState(BATHROOM_AMENITIES.find(a => a.key === 'genderSplit'),
                                 (amenityCache[loc.id] || {}).genderSplit);
-      if(!st) return null;
-      return { v: st === 'single' ? 'Shared' : 'M/W', meta: '\u2605', tone: '' };
+      if(st) return { v: st === 'single' ? 'Shared' : 'M/W', meta: '\u2605', tone: '' };
+      /* Then the OSM seed. meta.osmGender was written by build-public-toilets.js from unisex=yes
+       * (shared) and male=yes AND female=yes (separate), and stores the same 'single'/'multiple'
+       * values genderSplit votes do — 7,782 answers that shipped with the data and were read
+       * nowhere. Marked 'osm' rather than with a star, because the star means people confirmed
+       * it and this did not. A lone male=yes or female=yes is deliberately NOT seeded: 5,168
+       * records have exactly one, which usually means the other room simply was not mapped, and
+       * guessing "separate" from half a pair would be inventing an answer. */
+      const seed = loc.meta && loc.meta.osmGender;
+      if(seed === 'single' || seed === 'multiple'){
+        return { v: seed === 'single' ? 'Shared' : 'M/W', meta: 'osm', tone: '' };
+      }
+      return null;
     }
   },
   changing: { label: 'Changing', read: (loc) => stripYesNo(loc, 'changing') },
@@ -2150,7 +2167,27 @@ function stripYesNo(loc, key, field){
  * Defaults are the three most decision-relevant facts that ACTUALLY EXIST today. Unknown keys
  * are dropped rather than rendered blank, so a stored preference naming a fact that was later
  * removed degrades to a shorter strip instead of an empty cell. */
-const STRIP_DEFAULT = ['overall', 'stalls', 'changing'];
+/* Chosen by measured coverage, not by what sounds most useful.
+ *
+ * The first draft was overall / stalls / changing, and two of those three are the emptiest
+ * fields on the map: Overall needs a rating (community-only), Stalls needs three people to
+ * agree on a multi-state question that OSM has no tag for at all — capacity appears on 76 of
+ * 74,456 imported records. A new visitor would have opened a random location and seen one
+ * populated cell at best, which teaches that the strip is broken rather than that the data is
+ * thin.
+ *
+ * Coverage across all 84,079 locations today:
+ *      Open        19,577  23.3%   baked hours
+ *      Accessible   7,792   9.3%   conf + osm + legacy wheelchair
+ *      Rooms        7,782   9.3%   osm seed
+ *      Fee          5,365   6.4%   imported
+ *      Changing     1,405   1.7%
+ *      Overall / Stalls / Showers  0%  — no source but votes
+ *
+ * Open and Accessible lead because they populate. Overall keeps the third slot despite being
+ * vote-only: it is the number people came for, and a strip with no rating on it reads as a
+ * different app. Stalls stays available and never default. */
+const STRIP_DEFAULT = ['hours', 'accessible', 'overall'];
 function stripPicks(){
   try{
     const raw = JSON.parse(localStorage.getItem('br_strip_picks') || 'null');
@@ -2324,7 +2361,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.34.0';
+const BUILD = 'v2.34.1';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
