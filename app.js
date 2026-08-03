@@ -1872,13 +1872,30 @@ function countTipsWritten(){
  * purpose; summed here because to a reader they are one thing — corrections made. */
 function countImprovements(){
   const size = (key) => { try{ return new Set(JSON.parse(localStorage.getItem(key) || '[]')).size; }catch(e){ return 0; } };
-  const reported = (() => {
-    try{
-      const raw = JSON.parse(localStorage.getItem(REPORTED_KEY) || '{}');
-      return Array.isArray(raw) ? new Set(raw).size : Object.keys(raw).length;
-    }catch(e){ return 0; }
-  })();
-  return size('br_hours_reported') + reported + size('br_locations_added');
+  /* br_reports_made, not reportedLocations. The latter is the open-report UI hint and now
+   * expires after 30 days; reading it here would make the footer's IMPROVE total shrink over
+   * time for someone who had done nothing at all.
+   *
+   * Anyone upgrading has a populated reportedLocations and an empty lifetime store, so the
+   * lifetime store is seeded from it once rather than starting everyone back at zero. */
+  seedLifetimeReports();
+  return size('br_hours_reported') + size('br_reports_made') + size('br_locations_added');
+}
+
+/* One-time migration for anyone who reported before the lifetime store existed. Keyed like the
+ * schema purge above so it runs once, not on every load. */
+function seedLifetimeReports(){
+  try{
+    if(localStorage.getItem('br_reports_seeded') === '1') return;
+    const raw = JSON.parse(localStorage.getItem(REPORTED_KEY) || '{}');
+    const ids = Array.isArray(raw) ? raw : Object.keys(raw);
+    if(ids.length){
+      const set = new Set(JSON.parse(localStorage.getItem('br_reports_made') || '[]'));
+      ids.forEach(id => set.add(id));
+      localStorage.setItem('br_reports_made', JSON.stringify([...set]));
+    }
+    localStorage.setItem('br_reports_seeded', '1');
+  }catch(e){}
 }
 
 function markLocationAdded(locId){
@@ -2432,7 +2449,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.36.3';
+const BUILD = 'v2.36.4';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -2771,10 +2788,17 @@ const REPORTED_KEY = 'reportedLocations';
  * the next time they open that popup and the create is refused as a real duplicate.
  *
  * Keyed by schema version rather than app version so it runs exactly once, not on every release. */
-const REPORTED_SCHEMA = 2;
+/* Bumped to 3 to clear flags written before the TTL existed. Those entries have no expiry
+ * recorded against them in any meaningful sense — they were written by a build that intended
+ * them to be permanent — so ageing them out individually would keep them for another 30 days
+ * from whenever they happened to be written. One purge is cleaner, and the seed above preserves
+ * them in the lifetime count first. */
+const REPORTED_SCHEMA = 3;
 (function purgeStaleReportFlags(){
   try{
     if(Number(localStorage.getItem('reportedLocationsSchema')) === REPORTED_SCHEMA) return;
+    // Preserve the contribution history before discarding the open-report hints.
+    if(typeof seedLifetimeReports === 'function') seedLifetimeReports();
     localStorage.removeItem(REPORTED_KEY);
     localStorage.setItem('reportedLocationsSchema', String(REPORTED_SCHEMA));
   }catch(e){ /* private mode — nothing was stored to begin with */ }
@@ -2783,13 +2807,43 @@ const REPORTED_SCHEMA = 2;
 function reportedLocal(){
   try{ return JSON.parse(localStorage.getItem(REPORTED_KEY) || '{}') || {}; }catch(e){ return {}; }
 }
-function hasReportedLocally(locId){ return !!reportedLocal()[locId]; }
+/* Reports go stale. The flag answers "do I have an OPEN report here", and nothing ever cleared
+ * it — so a location reported once said "Reported" forever, and the person could never flag it
+ * again when the problem came back. The timestamp was already being written and never read.
+ *
+ * Thirty days: long enough that a report still in the queue keeps its state, short enough that
+ * a location whose problem returned months later can be reported again. The flag has no
+ * authority either way — if a duplicate really is open, the server refuses the create and the
+ * popup puts the pending state back, which is what the purge comment above already relies on. */
+const REPORT_FLAG_TTL = 30 * 24 * 60 * 60 * 1000;
+function hasReportedLocally(locId){
+  const at = reportedLocal()[locId];
+  if(!at) return false;
+  if(typeof at === 'number' && Date.now() - at > REPORT_FLAG_TTL){
+    markReportedLocally(locId, false);      // expire lazily, on the read that noticed
+    return false;
+  }
+  return true;
+}
 function markReportedLocally(locId, on){
   try{
     const m = reportedLocal();
     if(on) m[locId] = Date.now(); else delete m[locId];
     localStorage.setItem(REPORTED_KEY, JSON.stringify(m));
+    /* Counted separately and permanently. The store above is "what is open right now" and has to
+     * expire; the creed's IMPROVE number is "what have I ever contributed" and must not. Reusing
+     * one store for both meant the footer total would quietly fall as flags aged out — someone
+     * would watch their contribution count go DOWN for doing nothing. */
+    if(on) bumpLifetimeReports(locId);
   }catch(e){ /* private mode / quota — the server limit still holds, so this is cosmetic */ }
+}
+function bumpLifetimeReports(locId){
+  try{
+    const k = 'br_reports_made';
+    const set = new Set(JSON.parse(localStorage.getItem(k) || '[]'));
+    set.add(locId);
+    localStorage.setItem(k, JSON.stringify([...set]));
+  }catch(e){}
 }
 
 /* Is this person muted from reporting right now?
