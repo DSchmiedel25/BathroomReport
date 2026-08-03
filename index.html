@@ -392,21 +392,22 @@ This is tracked on this device only. Log in to sync it across devices.
 
       <!-- you -->
       <div class="ss-card">
-        <button class="ss-acct" id="ssAcctRow">
+        <!-- ONE row for the person, not two.
+             The name row and the passport row both opened the passport panel, so the card asked
+             you to choose between two doors into the same place. The identity block IS the
+             passport link now — name, what syncs, and the stamp count — and the separate row is
+             gone. Account and security live in their own section below, which is where someone
+             looking for a password goes anyway. -->
+        <button class="ss-acct" id="ssPassportRow">
           <span class="ss-avatar" id="ssAvatar" aria-hidden="true">?</span>
           <span class="ss-who">
             <span class="ss-name" id="ssName">Not signed in</span>
             <span class="ss-sub" id="ssSub">Sign in to sync across devices</span>
           </span>
-          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        </button>
-        <button class="ss-row" id="ssPassportRow">
-          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2.4" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="9.6" r="2.6" stroke="currentColor" stroke-width="2"/><path d="M8 16.8c.9-1.6 2.3-2.4 4-2.4s3.1.8 4 2.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
-          <span class="ss-main"><span class="ss-lab">Your passport</span>
-            <span class="ss-desc" id="ssPassportSub">Stamps, ratings and achievements</span></span>
           <span class="ss-val" id="ssStamp" hidden></span>
           <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
+        
       </div>
 
       <div class="ss-sec">Map &amp; navigation</div>
@@ -483,8 +484,6 @@ This is tracked on this device only. Log in to sync it across devices.
           <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
       </div>
-      <div class="ss-sec" id="ssPlateSecurity" hidden></div>
-      <div class="ss-sec" id="ssPlateSession" hidden></div>
 
       <div class="ss-sec">About</div>
       <div class="ss-card">
@@ -508,7 +507,7 @@ This is tracked on this device only. Log in to sync it across devices.
 
       <div class="ss-foot">
         <span class="d-count" id="drawerLocCount"></span>
-        <span id="ssVersion">Bathroom Report</span> <span class="d-version" data-version="v2.36.1">v2.36.1 · 2026-08-03</span><br>
+        <span id="ssVersion">Bathroom Report</span> <span class="d-version" data-version="v2.36.3">v2.36.3 · 2026-08-03</span><br>
         &copy; 2025&ndash;2026 Bathroom Report. Independent and community-created.
         Not affiliated with any business listed.
       </div>
@@ -532,7 +531,10 @@ This is tracked on this device only. Log in to sync it across devices.
       <p class="ss-hint">Which kinds of stop appear on the map. Turning one off hides it everywhere, including from Bathroom Now.</p>
       <div class="ss-card">
         <div id="allChains" class="d-section">
-          <button type="button" id="allChainsToggle" class="d-collapse-head" aria-expanded="true" aria-controls="chainKeyAllList" hidden>All places <span id="allChainsArrow" class="d-collapse-arrow" aria-hidden="true">&#9662;</span></button>
+          <!-- The disclosure head is gone: this screen IS the disclosure, so a row that says
+               "All places" above the four types was a heading pretending to be a control. The
+               element stays for the handler that still binds to it, but out of the layout. -->
+          <button type="button" id="allChainsToggle" class="d-collapse-head ss-offscreen" aria-expanded="true" aria-controls="chainKeyAllList" tabindex="-1" aria-hidden="true">All places <span id="allChainsArrow" class="d-collapse-arrow" aria-hidden="true">&#9662;</span></button>
           <div id="chainKeyAllList"></div>
         </div>
       </div>
