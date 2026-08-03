@@ -1137,27 +1137,84 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
 
      Two heights, not one: the faces hold different amounts, so a shared height would mean either
      dead space under the front or a cramped back. The container animates between them. */
-  /* The card is ONE-SIDED now.
-     The flip is gone: its back face held email, password and theme behind a gesture nobody
-     performed, and those live in the settings sheet instead.
+  /* The flip, rebuilt.
+     The old version measured each face in JS and wrote a pixel height onto the scene on every
+     open and every turn — which is why deleting that JS made the card collapse to nothing.
 
-     What this rewrite has to undo is subtle. The scene's height was set imperatively by JS on
-     every open, and both faces were position:absolute — so with that JS removed the scene had no
-     height, the absolutely-positioned front had nothing to size it, and the passport card would
-     have rendered as a zero-height sliver. Static flow and auto height is the fix, and it is
-     simpler than what it replaces: the card measures itself, at any content length, for free. */
+     CSS grid removes the need entirely: both faces occupy the SAME grid cell, so the scene is
+     automatically as tall as the taller face, at any content length, with no measuring and no
+     resize listener. The card can now grow a row of stats without anyone updating a constant. */
   :root{ --cardH-front:180px; }
 
-  .flip-scene{ margin-bottom:16px; }
-  .flip-card{ position:relative; width:100%; }
-  .flip-face{ position:static; border-radius:14px; overflow:hidden; }
+  .flip-scene{ perspective:1400px; margin-bottom:16px; }
+  .flip-card{
+    position:relative; width:100%; display:grid;
+    transform-style:preserve-3d; transition:transform .5s cubic-bezier(.4,0,.2,1);
+}
+  .flip-scene.flipped .flip-card{ transform:rotateY(180deg); }
+
+  /* Same cell, so the container sizes to whichever face is taller. The hidden one is made inert
+     by JS as well: backface-visibility hides it from the eye but leaves it in the tab order and
+     the accessibility tree, so a screen reader would otherwise read both sides of the card. */
+  .flip-face{
+    grid-area:1 / 1; min-width:0;
+    backface-visibility:hidden; -webkit-backface-visibility:hidden;
+    border-radius:14px; overflow:hidden; position:relative;
+}
+  .flip-back{ transform:rotateY(180deg); }
 
   #flipFront.passport-datapage{
     margin-bottom:0; min-height:var(--cardH-front);
-    padding:20px; 
+    padding:20px 20px 54px;
     display:flex; flex-direction:column; justify-content:space-between;
 }
   #flipFront .dp-top, #flipFront .dp-fields{ flex:none; }
+
+  /* ---- the reverse: a record, not a settings drawer ---- */
+  .flip-back{
+    background:var(--panel-bg, rgba(255,255,255,.02));
+    border:1px solid var(--panel-border);
+    padding:18px 18px 54px;
+}
+  .pb-title{
+    font-family:var(--font-display); font-size:11px; font-weight:600; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:14px;
+}
+  .pb-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px 8px; }
+  .pb-stat{ min-width:0; }
+  .pb-stat b{
+    display:block; font-family:var(--font-display); font-size:22px; font-weight:700;
+    line-height:1; color:var(--accent); font-variant-numeric:tabular-nums;
+}
+  .pb-stat span{
+    display:block; font-size:10px; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+    color:var(--muted); margin-top:5px; line-height:1.25;
+}
+  .pb-line{ font-size:11.5px; color:var(--muted); margin-top:16px; line-height:1.45; min-height:16px; }
+
+  /* The invitation. A flip nobody knows about is a page nobody reads, so it is a full-width bar
+     that says what is on the other side rather than an icon in a corner. */
+  .flip-btn{
+    position:absolute; left:0; right:0; bottom:0;
+    display:flex; align-items:center; justify-content:center; gap:7px;
+    min-height:44px; padding:12px; border:0; cursor:pointer;
+    background:rgba(4,33,31,.15); color:#04211f;
+    font-family:var(--font-display); font-size:11px; font-weight:600;
+    letter-spacing:.14em; text-transform:uppercase;
+}
+  .flip-back .flip-btn{ background:rgba(127,127,127,.10); color:var(--muted); }
+  .flip-btn:focus-visible{ outline:3px solid #04211f; outline-offset:-3px; }
+  .flip-back .flip-btn:focus-visible{ outline-color:var(--accent); }
+
+  /* Reduced motion gets the same two faces without the turn. */
+  @media (prefers-reduced-motion: reduce){
+    .flip-card{ transition:none; transform-style:flat; }
+    .flip-scene.flipped .flip-card{ transform:none; }
+    .flip-face{ backface-visibility:visible; transition:opacity .15s linear; }
+    .flip-back{ transform:none; opacity:0; }
+    .flip-scene.flipped #flipFront{ opacity:0; }
+    .flip-scene.flipped .flip-back{ opacity:1; }
+}
 
   /* Progress as a seam on the card, sitting directly above the flip strip.
      The block that used to sit below the card repeated STAMPS 4/35 from the card itself, and

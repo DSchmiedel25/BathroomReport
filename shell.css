@@ -968,67 +968,174 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
   background-repeat:repeat;
 }
 
+/* The 86 #appDrawer rules above are now dead — the drawer markup is gone. They are LEFT IN
+   deliberately: an automated purge in this audit matched rules by their preceding comment and
+   silently deleted live ones, which is exactly the class of regression this pass exists to
+   prevent. Dead CSS costs ~19KB uncompressed and nothing at runtime, since none of it can
+   match. Removing it is a separate, individually-reviewed change. */
+
 /* ============================================================
-   Settings sheet
-   One home for everything about you and your map, replacing the drawer's scattered controls
-   and the passport's flip-back face. Two tabs split by what a setting AFFECTS — the map you
-   look at, versus the account you own.
+   SETTINGS — full-screen, card-grouped
+   Replaces the bottom sheet. Two scales and nothing outside them: spacing is 4px x n, and every
+   surface is one measured step up from the one below.
+
+   The accent marks exactly two things — a switch that is ON, and a value you have chosen.
+   Row icons are ink, not accent: twelve teal tiles competing with teal headings meant the accent
+   marked nothing at all.
    ============================================================ */
-.ss{position:fixed;inset:0;z-index:1200;display:flex;align-items:flex-end;justify-content:center}
+:root{
+  --ss-s1:4px; --ss-s2:8px; --ss-s3:12px; --ss-s4:16px; --ss-s5:20px; --ss-s6:24px; --ss-s8:32px;
+  --ss-nudge:2px;                         /* caption under a label — a hairline, not a step */
+  --ss-bg:#0a1520; --ss-card:#111e2b; --ss-card2:#16242f; --ss-line:rgba(255,255,255,.06);
+  --ss-ink:#eef3f7; --ss-ink2:#9fb0bf; --ss-ink3:#6b7f90;
+  --ss-tile-bg:rgba(255,255,255,.05);
+  --ss-t-title:32px; --ss-t-brand:19px; --ss-t-lead:16px; --ss-t-body:14px;
+  --ss-t-cap:12px; --ss-t-eyebrow:11px; --ss-t-micro:10px;
+  /* Row geometry declared once; the divider inset is DERIVED so it cannot drift out of line
+     with the labels it sits under. */
+  --ss-pad:var(--ss-s4); --ss-tile:34px; --ss-gap:var(--ss-s3);
+  --ss-divider:calc(var(--ss-pad) + var(--ss-tile) + var(--ss-gap));
+}
+html[data-theme="light"]{
+  --ss-bg:#f1f4f6; --ss-card:#ffffff; --ss-card2:#f4f7f9; --ss-line:rgba(0,0,0,.08);
+  --ss-ink:#0b192a; --ss-ink2:#54677a; --ss-ink3:#7c8c9c;
+  --ss-tile-bg:rgba(0,0,0,.045);
+}
+
+.ss{position:fixed;inset:0;z-index:1200;background:var(--ss-bg);
+  transform:translateY(100%);transition:transform .3s cubic-bezier(.22,1,.36,1)}
 .ss[hidden]{display:none}
-.ss-scrim{position:absolute;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
-.ss-panel{position:relative;width:100%;max-width:520px;max-height:92vh;display:flex;flex-direction:column;
-  background:var(--shell-chrome);border:1px solid var(--shell-line);border-radius:18px 18px 0 0;
-  box-shadow:var(--shell-shadow);animation:ssUp .22s cubic-bezier(.2,.8,.3,1)}
-@keyframes ssUp{from{transform:translateY(14px);opacity:.6}to{transform:none;opacity:1}}
-@media (prefers-reduced-motion:reduce){.ss-panel{animation:none}}
-@media (min-width:560px){.ss{align-items:center}.ss-panel{border-radius:18px}}
+.ss.ss-in{transform:none}
+.ss.ss-drag{transition:none}
+@media (prefers-reduced-motion:reduce){ .ss{transition:none} }
+/* Full-screen now, so the scrim has nothing to dim — kept in the DOM because app.js binds a
+   close handler to it, but given no size rather than deleted, which would break that binding. */
+.ss-scrim{display:none}
+.ss-panel{height:100%;display:flex;flex-direction:column}
+.ss-grab{padding:var(--ss-s2) 0 var(--ss-s1);display:flex;justify-content:center;flex:none;
+  cursor:grab;touch-action:none}
+.ss-grab i{display:block;width:38px;height:4px;border-radius:999px;background:var(--ss-line)}
+.ss-grab:active{cursor:grabbing}
 
-.ss-top{display:flex;align-items:center;gap:11px;padding:14px 14px 13px;
-  border-bottom:1px solid var(--shell-line);flex:none}
-.ss-avatar{width:38px;height:38px;border-radius:50%;background:var(--accent);color:var(--accent-ink);
-  display:grid;place-items:center;font-weight:800;font-size:14px;flex:none}
-.ss-who{min-width:0;flex:1}
-.ss-name{font-size:14.5px;font-weight:800;display:block;line-height:1.2;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ss-sub{font-size:11px;color:var(--shell-muted);display:block;margin-top:1px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ss-stamp{font-size:10px;font-weight:800;padding:4px 8px;border-radius:20px;flex:none;
-  background:rgba(46,161,170,.15);border:1px solid rgba(46,161,170,.45);color:#7fd4da}
-.ss-x{background:none;border:0;color:var(--shell-muted);font-size:17px;cursor:pointer;
-  padding:6px 2px 6px 8px;flex:none;font-family:inherit}
-.ss-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.ss-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:0 var(--ss-s4) calc(env(safe-area-inset-bottom) + var(--ss-s8))}
 
-.ss-tabs{display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid var(--shell-line);flex:none}
-.ss-tabs button{flex:1;font-family:inherit;font-size:12px;font-weight:800;padding:9px 4px;border-radius:9px;
-  cursor:pointer;background:var(--shell-chrome2);color:var(--shell-muted);border:1px solid var(--shell-line)}
-.ss-tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.ss-tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ss-head{display:flex;align-items:flex-start;gap:var(--ss-s3);padding:var(--ss-s3) 0 0}
+.ss-brand{display:flex;align-items:center;gap:var(--ss-s3);flex:1;min-width:0}
+.ss-brand img{width:44px;height:44px;flex:none}
+.ss-brand b{display:block;font-family:var(--font-display);font-size:var(--ss-t-brand);font-weight:700;line-height:1.1}
+.ss-brand b i{font-style:normal;color:var(--accent)}
+.ss-brand small{display:block;font-family:var(--font-display);font-size:var(--ss-t-micro);font-weight:600;
+  letter-spacing:.14em;color:var(--ss-ink3);margin-top:var(--ss-s1)}
+.ss-x{background:none;border:0;color:var(--ss-ink3);font-size:18px;cursor:pointer;
+  padding:var(--ss-s2);flex:none;font-family:inherit;line-height:1}
+.ss-title{font-family:var(--font-display);font-size:var(--ss-t-title);font-weight:600;
+  letter-spacing:-.01em;margin:var(--ss-s5) 0 var(--ss-s4);color:var(--ss-ink)}
 
-.ss-body{overflow-y:auto;flex:1;padding-bottom:4px}
-.ss-plate{font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
-  color:var(--shell-muted);padding:15px 14px 6px;display:flex;align-items:center;gap:8px}
-.ss-plate i{flex:1;height:1px;background:var(--shell-line);display:block}
-.ss-row{display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;background:none;border:0;
-  border-top:1px solid var(--shell-line);font-family:inherit;text-align:left;
-  color:var(--shell-ink);cursor:pointer}
+.ss-sec{font-family:var(--font-display);font-size:var(--ss-t-eyebrow);font-weight:600;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ss-ink3);
+  padding:var(--ss-s6) var(--ss-s1) var(--ss-s2)}
+.ss-sec[hidden]{display:none !important}
+
+.ss-card{background:var(--ss-card);border-radius:14px;overflow:hidden}
+
+/* Every row shape shares one geometry: the account block, the standard rows, the toggles that
+   came from the drawer, and the two select sections. */
+.ss-row,.ss-body .d-toggle,.ss-body .d-collapse-head,.ss-body .d-section-label{
+  display:flex !important;align-items:center;gap:var(--ss-gap);width:100% !important;
+  padding:var(--ss-s3) var(--ss-pad) !important;min-height:56px;margin:0 !important;
+  background:none !important;border:0 !important;box-shadow:none !important;border-radius:0 !important;
+  font-family:inherit;text-align:left !important;color:var(--ss-ink) !important;cursor:pointer;
+  position:relative;text-transform:none;letter-spacing:0;font-size:var(--ss-t-lead);font-weight:600;
+}
+.ss-row:active,.ss-body .d-toggle:active,.ss-body .d-collapse-head:active{background:var(--ss-card2) !important}
+.ss-row[hidden]{display:none !important}
+.ss-row.is-hidden{display:none !important}
+/* Dividers inset to the label, never to the card edge. */
+.ss-row + .ss-row::before,.ss-acct + .ss-row::before,
+.ss-body .d-toggle + .d-toggle::before,
+.ss-body .d-section + .d-section::before{
+  content:'';position:absolute;top:0;left:var(--ss-divider);right:0;height:1px;background:var(--ss-line)}
+.ss-body .d-section{padding:0 !important;margin:0 !important;border:0 !important;position:relative}
+.ss-body .d-toggle.d-gated{opacity:.45;cursor:default}
+
+.ss-tile{width:var(--ss-tile);height:var(--ss-tile);border-radius:9px;background:var(--ss-tile-bg);
+  display:grid;place-items:center;flex:none;color:var(--ss-ink2)}
+.ss-tile svg{width:18px;height:18px;stroke:currentColor}
 .ss-main{flex:1;min-width:0}
-.ss-lab{font-size:13.5px;font-weight:700;display:block}
-.ss-desc{font-size:11px;color:var(--shell-muted);display:block;margin-top:2px;line-height:1.35}
-.ss-go{color:var(--shell-muted);font-size:16px;flex:none}
+.ss-lab{flex:1;min-width:0;font-size:var(--ss-t-lead);font-weight:600;color:var(--ss-ink)}
+.ss-main .ss-lab{display:block;flex:none}
+.ss-desc{display:block;font-size:var(--ss-t-cap);font-weight:400;color:var(--ss-ink2);
+  margin-top:var(--ss-nudge);line-height:1.35}
+.ss-val{font-size:var(--ss-t-body);color:var(--ss-ink2);flex:none}
+.ss-val[hidden]{display:none}
+.ss-chev{width:7px;height:12px;flex:none;color:var(--ss-ink3)}
 .ss-danger{color:#f08a86}
-.ss-gate{font-size:11px;color:var(--shell-muted);padding:8px 14px 0}
-.ss-foot{padding:13px 14px;border-top:1px solid var(--shell-line);font-size:10.5px;
-  color:var(--shell-muted);line-height:1.5;flex:none}
+.ss-shop{text-decoration:none}
 
-/* Controls MOVED here keep their original ids and handlers; these rules re-dress them for the
-   sheet's row rhythm without the drawer's chrome. */
-.ss-body .d-section{padding:0;margin:0;border:0;background:none}
-.ss-body .d-section-label{font-size:13.5px;font-weight:700;color:var(--shell-ink);
-  padding:12px 14px 0;text-transform:none;letter-spacing:0}
-.ss-body .nav-pref-select{margin:6px 14px 12px;width:calc(100% - 28px)}
-.ss-body .d-toggle{border-top:1px solid var(--shell-line);padding:12px 14px;margin:0;width:100%}
-.ss-body #allChains{border-top:1px solid var(--shell-line)}
-.ss-body .d-collapse-head{padding:12px 14px}
-.ss-body .acct-row{border-top:1px solid var(--shell-line);width:100%}
+.ss-acct{display:flex;align-items:center;gap:var(--ss-s4);padding:var(--ss-s4);width:100%;
+  background:none;border:0;font-family:inherit;text-align:left;color:var(--ss-ink);cursor:pointer}
+.ss-avatar{width:52px;height:52px;border-radius:50%;background:var(--accent);color:var(--accent-ink);
+  display:grid;place-items:center;font-family:var(--font-display);font-weight:600;
+  font-size:var(--ss-t-brand);flex:none}
+.ss-who{flex:1;min-width:0}
+.ss-name{display:block;font-family:var(--font-display);font-size:var(--ss-t-brand);font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ss-sub{display:block;font-size:var(--ss-t-body);color:var(--ss-ink2);margin-top:var(--ss-nudge);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* iOS-style switch, replacing the drawer's smaller one. Same markup, same .on class. */
+.ss-body .d-toggle .d-switch{margin-left:auto;width:50px;height:30px;border-radius:999px;
+  background:#26333f;border:0;position:relative;flex:none;transition:background .18s}
+.ss-body .d-toggle .d-switch b{position:absolute;top:3px;left:3px;width:24px;height:24px;
+  border-radius:50%;background:#fff;transition:transform .18s}
+.ss-body .d-toggle.on .d-switch{background:var(--accent)}
+.ss-body .d-toggle.on .d-switch b{transform:translateX(20px)}
+html[data-theme="light"] .ss-body .d-toggle .d-switch{background:#d6dde3}
+
+/* Selects keep their element and their handlers; only the dressing changes. They become
+   sub-screens in the next step. */
+.ss-body .nav-pref-select{
+  margin:0 var(--ss-pad) var(--ss-s3) !important;width:calc(100% - var(--ss-pad) * 2) !important;
+  appearance:none;-webkit-appearance:none;background:var(--ss-card2);color:var(--ss-ink);
+  border:1px solid var(--ss-line);border-radius:9px;
+  padding:var(--ss-s3) 34px var(--ss-s3) var(--ss-s3);font-family:inherit;
+  font-size:var(--ss-t-body);font-weight:600;
+  background-image:linear-gradient(45deg,transparent 50%,var(--ss-ink3) 50%),
+                   linear-gradient(135deg,var(--ss-ink3) 50%,transparent 50%);
+  background-position:calc(100% - 18px) calc(50% + 2px), calc(100% - 13px) calc(50% + 2px);
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.ss-body .nav-pref-select:focus{outline:none;border-color:var(--accent)}
+
+.ss-body .d-collapse-arrow{margin-left:auto !important;transition:transform .16s;color:var(--ss-ink3)}
+.ss-body #chainKeyAllList{overflow:hidden;background:transparent}
+.ss-body #chainKeyAllList.collapsed{display:none}
+.ss-body #chainKeyAllList .ck-row{padding-left:var(--ss-divider);padding-right:var(--ss-pad)}
+.ss-body .ck-grouprow{width:100% !important}
+.ss-body .ck-grouprow > span:first-child{margin-right:auto}
+
+.ss-body .acct-note{font-size:var(--ss-t-cap);color:var(--ss-ink2);padding:0 var(--ss-pad) var(--ss-s3)}
 .ss-body .acct-note:empty{display:none}
+.ss-body .acct-chip{font-size:var(--ss-t-micro);font-weight:800;padding:var(--ss-s1) var(--ss-s2);
+  border-radius:20px;flex:none;background:rgba(46,161,170,.15);border:1px solid rgba(46,161,170,.45);color:#7fd4da}
+.ss-body .acct-chip.none{background:rgba(229,57,53,.13);border-color:rgba(229,57,53,.35);color:#f08a86}
+.ss-body .d-gate-note{font-size:var(--ss-t-cap);color:var(--ss-ink3);padding:0 var(--ss-pad) var(--ss-s3)}
+.ss-body .d-gate-note[hidden]{display:none}
+
+/* FIND. RATE. SHARE. IMPROVE. — the tagline as the labels for the numbers already in the footer. */
+.ss-creed{display:flex;background:var(--ss-card);border-radius:14px;margin-top:var(--ss-s6);overflow:hidden}
+.ss-creed-item{flex:1;padding:var(--ss-s4) var(--ss-s2);text-align:center;position:relative;min-width:0}
+.ss-creed-item + .ss-creed-item::before{content:'';position:absolute;left:0;top:var(--ss-s4);
+  bottom:var(--ss-s4);width:1px;background:var(--ss-line)}
+.ss-creed-item b{display:block;font-family:var(--font-display);font-size:var(--ss-t-brand);
+  font-weight:600;line-height:1;font-variant-numeric:tabular-nums;color:var(--ss-ink)}
+.ss-creed-item span{display:block;font-family:var(--font-display);font-size:var(--ss-t-micro);
+  font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-top:var(--ss-s2)}
+.ss-creed-item em{display:block;font-style:normal;font-size:var(--ss-t-micro);color:var(--ss-ink3);
+  margin-top:var(--ss-s1);line-height:1.3}
+
+.ss-foot{text-align:center;font-size:var(--ss-t-micro);color:var(--ss-ink3);
+  line-height:1.7;padding:var(--ss-s5) var(--ss-s3) 0}
+.ss-foot .d-count{display:block;color:var(--ss-ink2);font-weight:700;margin-bottom:var(--ss-s1)}
+.ss-foot .d-count-breakdown{display:block;font-weight:400;margin-top:var(--ss-s1)}
+@media (min-width:560px){ .ss-body{max-width:460px;margin:0 auto;width:100%} }

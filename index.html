@@ -311,7 +311,27 @@ You can <b>FIND</b> without an account. Sign in to <b>RATE</b>, <b>SHARE</b>, an
         <div class="dp-seal" aria-hidden="true">BATH<br>ROOM<br>RPT</div>
       </div>
       <div class="dp-progress" id="dpProgress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Stamps collected"><i id="dpProgressFill"></i></div>
+      <button class="flip-btn" id="flipToBack" aria-expanded="false" aria-controls="flipCard">&#8635; Flip for your stats</button>
           </div>
+
+    <!-- The reverse of the card.
+         The flip used to hide Email / Change password / Theme — settings behind a gesture, which
+         is why they moved to the settings sheet. What belongs on the back of a passport is the
+         record it keeps: where you have been and what you have done. Nothing here is a control,
+         so nothing important is hidden by the turn. -->
+    <div class="flip-face flip-back" id="flipBack">
+      <div class="pb-title">Your record</div>
+      <div class="pb-grid">
+        <div class="pb-stat"><b id="pbRated">0</b><span>Bathrooms rated</span></div>
+        <div class="pb-stat"><b id="pbStates">0</b><span>States</span></div>
+        <div class="pb-stat"><b id="pbCities">0</b><span>Towns &amp; cities</span></div>
+        <div class="pb-stat"><b id="pbChains">0</b><span>Chains visited</span></div>
+        <div class="pb-stat"><b id="pbStreak">0</b><span>Longest streak</span></div>
+        <div class="pb-stat"><b id="pbMiles">0</b><span>Miles apart</span></div>
+      </div>
+      <div class="pb-line" id="pbNote"></div>
+      <button class="flip-btn" id="flipToFront">&#8635; Flip back</button>
+    </div>
 
   </div>
 </div>
@@ -330,7 +350,6 @@ This is tracked on this device only. Log in to sync it across devices.
 </div>
 <!-- To add a chain: <script src="<chain>-locations.js"></script> here, then register it in app.js's CHAIN_REGISTRY -->
 <!-- Menu drawer (Stage 1 chrome) -->
-<div id="drawerScrim"></div>
 
 <!-- ============================================================
      Settings sheet — one home for everything about you and your map.
@@ -346,160 +365,166 @@ This is tracked on this device only. Log in to sync it across devices.
      Every control here is MOVED, not rebuilt — the element ids are the originals, so every
      existing handler in app.js keeps working untouched.
      ============================================================ -->
+<!-- ============================================================
+     Settings — full screen, grouped into cards.
+
+     Every control below keeps the id and the classes it had, so every handler already bound in
+     app.js fires unchanged. What altered is the shell around them: the page is no longer a
+     bottom sheet, the flat row list is grouped into cards, and each row carries an icon tile.
+     The two <select> elements and the All places disclosure are deliberately UNCHANGED here —
+     they become sub-screens in the next step, and doing both at once would make a regression
+     impossible to attribute.
+     ============================================================ -->
 <div id="settingsSheet" class="ss" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="ssTitle">
   <div class="ss-scrim" id="ssScrim"></div>
   <div class="ss-panel" role="document">
-
-    <div class="ss-top">
-      <div class="ss-avatar" id="ssAvatar" aria-hidden="true">?</div>
-      <div class="ss-who">
-        <span class="ss-name" id="ssName">Not signed in</span>
-        <span class="ss-sub" id="ssSub">Sign in to sync across devices</span>
-      </div>
-      <span class="ss-stamp" id="ssStamp" hidden></span>
-      <button class="ss-x" id="ssClose" aria-label="Close settings">&#10005;</button>
-    </div>
-    <h2 id="ssTitle" class="ss-sr">Settings</h2>
-
-    <div class="ss-tabs" role="tablist">
-      <button role="tab" id="ssTabSee" aria-selected="true"  aria-controls="ssPaneSee">What you see</button>
-      <button role="tab" id="ssTabAcct" aria-selected="false" aria-controls="ssPaneAcct">Your account</button>
-    </div>
+    <div class="ss-grab" id="ssGrab" aria-hidden="true"><i></i></div>
 
     <div class="ss-body">
-      <!-- ===================== WHAT YOU SEE ===================== -->
-      <div id="ssPaneSee" role="tabpanel" aria-labelledby="ssTabSee">
-        <div class="ss-plate"><span>Map</span><i></i></div>
-        <div id="ssSlotChains"></div>
-        <div id="ssSlotOpenNow"></div>
-        <div id="ssSlotAccessible"></div>
-        <div class="ss-gate" id="ssGateNote" hidden>Sign in to change these</div>
-
-        <div class="ss-plate"><span>Getting around</span><i></i></div>
-        <div id="ssSlotTravel"></div>
-        <div id="ssSlotNavApp"></div>
-
-        <div class="ss-plate"><span>Appearance</span><i></i></div>
-        <div id="ssSlotTheme"></div>
+      <div class="ss-head">
+        <div class="ss-brand">
+          <img src="logo.png" alt="" width="44" height="44">
+          <span><b>BATHROOM <i>REPORT</i></b><small>FIND. RATE. SHARE. IMPROVE.</small></span>
+        </div>
+        <button class="ss-x" id="ssClose" aria-label="Close settings">&#10005;</button>
       </div>
+      <h2 id="ssTitle" class="ss-title">Settings</h2>
 
-      <!-- ===================== YOUR ACCOUNT ===================== -->
-      <div id="ssPaneAcct" role="tabpanel" aria-labelledby="ssTabAcct" hidden>
-        <div class="ss-plate"><span>You</span><i></i></div>
+      <!-- you -->
+      <div class="ss-card">
+        <button class="ss-acct" id="ssAcctRow">
+          <span class="ss-avatar" id="ssAvatar" aria-hidden="true">?</span>
+          <span class="ss-who">
+            <span class="ss-name" id="ssName">Not signed in</span>
+            <span class="ss-sub" id="ssSub">Sign in to sync across devices</span>
+          </span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
         <button class="ss-row" id="ssPassportRow">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2.4" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="9.6" r="2.6" stroke="currentColor" stroke-width="2"/><path d="M8 16.8c.9-1.6 2.3-2.4 4-2.4s3.1.8 4 2.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
           <span class="ss-main"><span class="ss-lab">Your passport</span>
             <span class="ss-desc" id="ssPassportSub">Stamps, ratings and achievements</span></span>
-          <span class="ss-go" aria-hidden="true">&rsaquo;</span>
+          <span class="ss-val" id="ssStamp" hidden></span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
+      </div>
 
-        <!-- These four came off the passport's deleted back face. They live here directly rather
-             than being moved in at runtime, because their old container no longer exists — but
-             they keep their original ids, so the handlers in app.js bind to them unchanged. -->
-        <div class="ss-plate"><span>Recovery</span><i></i></div>
+      <div class="ss-sec">Map &amp; navigation</div>
+      <div class="ss-card">
+        <div id="allChains" class="d-section">
+          <button type="button" id="allChainsToggle" class="d-collapse-head" aria-expanded="false" aria-controls="chainKeyAllList">
+            <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.4" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg></span>
+            <span class="ss-lab">Places on the map</span>
+            <span id="allChainsArrow" class="d-collapse-arrow" aria-hidden="true">&#9662;</span>
+          </button>
+          <div id="chainKeyAllList" class="collapsed"></div>
+        </div>
+        <div id="travelModePref" class="d-section" style="display:none">
+          <div class="d-section-label">
+            <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M21 3L3 10.5l7.5 3L14 21 21 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
+            <span class="ss-lab">Getting around</span>
+          </div>
+          <select id="travelModeSelect" class="nav-pref-select" aria-label="Getting around">
+            <option value="road">On the road</option>
+            <option value="foot">On foot</option>
+          </select>
+        </div>
+        <div id="navAppPref" class="d-section">
+          <div class="d-section-label">
+            <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M9 4L3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 4v13M15 6.5v13" stroke="currentColor" stroke-width="2"/></svg></span>
+            <span class="ss-lab">Directions app</span>
+          </div>
+          <select id="navAppSelect" class="nav-pref-select" aria-label="Preferred directions app">
+            <option value="apple">Apple Maps</option>
+            <option value="google">Google Maps</option>
+            <option value="waze">Waze</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="ss-sec">App preferences</div>
+      <div class="ss-card">
+        <button id="themeToggle" class="d-toggle">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M20 14.5A8.5 8.5 0 019.5 4a8.5 8.5 0 1010.5 10.5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
+          <span class="ss-lab">Dark mode</span><span class="d-switch"><b></b></span>
+        </button>
+        <button id="openNowToggle" class="d-toggle" aria-pressed="true">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.6" stroke="currentColor" stroke-width="2"/><path d="M8 12.2l2.6 2.6L16 9.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="ss-lab">Hide confirmed closed</span><span class="d-switch"><b></b></span>
+        </button>
+        <button id="accessibleToggle" class="d-toggle">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="5" r="2" stroke="currentColor" stroke-width="2"/><path d="M9 9h4l1 5h3M11 10v5l-2 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="ss-lab">Hide confirmed step-only</span><span class="d-switch"><b></b></span>
+        </button>
+        <div class="d-gate-note" id="prefsGateNote" hidden>Sign in to change these</div>
+      </div>
+
+      <div class="ss-sec" id="ssPlateRecovery">Account</div>
+      <div class="ss-card">
         <button class="ss-row" id="acctEmailRow">
-          <span class="ss-main">
-            <span class="ss-lab">Email</span>
-            <span class="ss-desc" id="acctEmailValue">Loading&hellip;</span>
-          </span>
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2.4" stroke="currentColor" stroke-width="2"/><path d="M3.6 6.5L12 13l8.4-6.5" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Email</span>
+            <span class="ss-desc" id="acctEmailValue">Loading&hellip;</span></span>
           <span class="acct-chip none" id="acctEmailChip">Not set</span>
-          <span class="ss-go" aria-hidden="true">&rsaquo;</span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
         <div class="acct-note" id="acctEmailNote"></div>
-
-        <div class="ss-plate"><span>Security</span><i></i></div>
         <button class="ss-row" id="acctPasswordRow">
-          <span class="ss-main">
-            <span class="ss-lab">Change password</span>
-            <span class="ss-desc">We&rsquo;ll email you a link</span>
-          </span>
-          <span class="ss-go" aria-hidden="true">&rsaquo;</span>
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="4.5" y="10" width="15" height="10" rx="2.4" stroke="currentColor" stroke-width="2"/><path d="M8 10V7.5a4 4 0 018 0V10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Change password</span>
+            <span class="ss-desc">We&rsquo;ll email you a link</span></span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
         <div class="acct-note" id="acctPasswordNote"></div>
-
-        <div class="ss-plate ss-plate-out"><span>Session</span><i></i></div>
         <button class="ss-row" id="ssSignOut" hidden>
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M14 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2h6a2 2 0 002-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 12h10m0 0l-3-3m3 3l-3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
           <span class="ss-main"><span class="ss-lab ss-danger">Sign out</span></span>
         </button>
         <button class="ss-row" id="ssSignIn">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M10 8V6a2 2 0 012-2h6a2 2 0 012 2v12a2 2 0 01-2 2h-6a2 2 0 01-2-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M14 12H4m0 0l3-3m-3 3l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
           <span class="ss-main"><span class="ss-lab">Sign in or create an account</span>
             <span class="ss-desc">Syncs your ratings and settings across devices</span></span>
-          <span class="ss-go" aria-hidden="true">&rsaquo;</span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
       </div>
-    </div>
+      <div class="ss-sec" id="ssPlateSecurity" hidden></div>
+      <div class="ss-sec" id="ssPlateSession" hidden></div>
 
-    <div class="ss-foot">
-      <span id="ssVersion">Bathroom Report</span><br>
-      Independent and community-created. Not affiliated with any business listed.
+      <div class="ss-sec">About</div>
+      <div class="ss-card">
+        <button class="ss-row" id="infoBtn" title="FAQ and how it works">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="7" y="4" width="10" height="8" rx="2" stroke="currentColor" stroke-width="2"/><path d="M9 12v3a3 3 0 003 3 3 3 0 003-3v-3M12 18v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">How it works</span>
+            <span class="ss-desc">What the ratings mean and where the data comes from</span></span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <a href="https://bathroomreport-shop.fourthwall.com/?utm_source=bathroomreport.app&amp;utm_medium=website&amp;utm_campaign=main_menu"
+           target="_blank" rel="noopener noreferrer" class="ss-row ss-shop">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 8h12l-1 12H7L6 8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8V6a3 3 0 016 0v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Support this project</span>
+            <span class="ss-desc">Gift shop &middot; Signature Collection</span></span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </a>
+      </div>
+
+      <!-- FIND. RATE. SHARE. IMPROVE. as the labels for the numbers that were already here. -->
+      <div class="ss-creed" id="ssCreed"></div>
+
+      <div class="ss-foot">
+        <span class="d-count" id="drawerLocCount"></span>
+        <span id="ssVersion">Bathroom Report</span> <span class="d-version" data-version="v2.31.0">v2.31.0 · 2026-08-03</span><br>
+        &copy; 2025&ndash;2026 Bathroom Report. Independent and community-created.
+        Not affiliated with any business listed.
+      </div>
     </div>
   </div>
 </div>
 
-<nav id="appDrawer" aria-label="Menu">
-<div class="d-brand"><img src="logo.png" alt=""><span class="d-brand-text"><b>BATHROOM <span class="wm-accent">REPORT</span></b><span class="d-tagline">FIND<i>.</i> RATE<i>.</i> SHARE<i>.</i> IMPROVE<i>.</i></span></span><button id="drawerClose" class="d-close" aria-label="Close menu" title="Close">✕</button></div>
-<div class="d-items">
-
-<!-- Grouped with the same placards the popups use. Seven items previously sat at one level, so
-     navigation, map settings and the gift shop all read as equally important. The groups say what
-     each thing is FOR, which is the information the flat list was missing. -->
-<button id="passportToggle">Passport</button>
-<!-- The settings entry point. Tapping your own name is the universally understood gesture for
-     "things about me", and it costs nothing to learn. -->
-<button id="openSettings">Settings</button>
-
-<div class="d-plate"><span>Map</span><i></i></div>
-
-<div id="travelModePref" class="d-section" style="display:none">
-<div class="d-section-label">Getting around</div>
-<select id="travelModeSelect" class="nav-pref-select" aria-label="Getting around">
-<option value="road">On the road</option>
-<option value="foot">On foot</option>
-</select>
-</div>
-
-<div id="allChains" class="d-section">
-<button type="button" id="allChainsToggle" class="d-collapse-head" aria-expanded="false" aria-controls="chainKeyAllList">All places <span id="allChainsArrow" class="d-collapse-arrow" aria-hidden="true">▾</span></button>
-<div id="chainKeyAllList" class="collapsed"></div>
-</div>
-
-<div class="d-plate"><span>Settings</span><i></i></div>
-
-<!-- Preferences was a collapsed box hiding three switches — including Appearance, which is the
-     one people come here to find. Flattened: the group heading already says what these are. -->
-<button id="openNowToggle" class="d-toggle" aria-pressed="true"><span>Hide confirmed closed</span><span class="d-switch"><b></b></span></button>
-<button id="accessibleToggle" class="d-toggle"><span>Hide confirmed step-only</span><span class="d-switch"><b></b></span></button>
-<button id="themeToggle" class="d-toggle"><span>Dark mode</span><span class="d-switch"><b></b></span></button>
-<div class="d-gate-note" id="prefsGateNote" hidden>Sign in to change these</div>
-
-<div id="navAppPref" class="d-section">
-<div class="d-section-label">Directions app</div>
-<select id="navAppSelect" class="nav-pref-select" aria-label="Preferred directions app">
-<option value="apple">Apple Maps</option>
-<option value="google">Google Maps</option>
-<option value="waze">Waze</option>
-</select>
-</div>
-
-<div class="d-plate"><span>About</span><i></i></div>
-<button id="infoBtn" title="FAQ and how it works">How it works</button>
-
-</div>
-<div class="d-foot">
-<!-- The one deliberately decorative thing in the drawer. Everything above it is a control, and
-     controls stay quiet; this is merchandise, so it gets to look like an object rather than a
-     menu row. An enamel badge — the same restroom-door plaque the placards borrow from, but
-     filled instead of a keyline, which is what makes it read as a thing rather than a heading. -->
-<a
-    href="https://bathroomreport-shop.fourthwall.com/?utm_source=bathroomreport.app&utm_medium=website&utm_campaign=main_menu"
-    target="_blank"
-    rel="noopener noreferrer"
-    class="d-shop-link d-shop-foot">
-  <svg class="ico" aria-hidden="true"><use href="#i-bag"></use></svg>
-  <span class="d-shop-label">Gift shop</span>
-  <span class="d-shop-sub">Signature Collection &middot; numbered Collector Series</span>
-</a>
-&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.29.0">v2.29.0 · 2026-08-03</span></div>
-</nav>
+<!-- The hamburger drawer is gone. Its last rows — Passport, Settings, How it works — plus the
+     shop and the footer counts all moved into the settings sheet, which #menuBtn now opens
+     directly. Two slide-out panels holding the same things was one navigation surface too many,
+     and the drawer was the one people had to learn twice: once to find it, once to discover
+     that the real settings were somewhere else. -->
 <!-- Community banner (logged-out) -->
 <div id="communityBanner">
 <span>✨</span>
@@ -590,23 +615,17 @@ This is tracked on this device only. Log in to sync it across devices.
 </div>
 <script>
 (function(){
-  var d=document.getElementById('appDrawer'),s=document.getElementById('drawerScrim'),m=document.getElementById('menuBtn');
-  var open=function(){d.classList.add('open');s.classList.add('open');},close=function(){d.classList.remove('open');s.classList.remove('open');};
-  if(m)m.addEventListener('click',open);
-  if(s)s.addEventListener('click',close);
-  var dc=document.getElementById('drawerClose');if(dc)dc.addEventListener('click',close);
-  /* Only buttons that take you somewhere close the drawer.
-   *
-   * This was 'button:not(#themeToggle)' — every button, with one hand-picked exception. That was
-   * already wrong for the two hide switches, and turning "All places" into a real button element (for
-   * keyboard access) made it match too, so opening the chain list slammed the drawer shut.
-   *
-   * An allowlist rather than a growing :not() chain: a switch or a disclosure should leave you
-   * where you are, and the next control added here should have to opt IN to closing. */
-  var NAVIGATES = ['passportToggle','infoBtn','openSettings'];   // drawerClose is wired separately, above
-  if(d)NAVIGATES.forEach(function(id){
-    var b=document.getElementById(id);
-    if(b)b.addEventListener('click',close);
+  /* The hamburger opens the settings sheet. openSettingsSheet lives in app.js, which loads after
+     this inline block, so the call is looked up at CLICK time rather than captured here — the
+     function is guaranteed to exist by the time anyone can tap, and referencing it now would
+     capture undefined forever.
+
+     The drawer's open/close pair, its scrim, its close button and its NAVIGATES allowlist all
+     went with the drawer. The sheet closes itself via its own scrim, its X, Escape and the
+     swipe-down gesture, so nothing here needs to know which rows navigate. */
+  var m=document.getElementById('menuBtn');
+  if(m)m.addEventListener('click',function(){
+    if(typeof openSettingsSheet==='function') openSettingsSheet();
   });
   var cb=document.getElementById('cbClose');if(cb)cb.addEventListener('click',function(){document.getElementById('communityBanner').style.display='none';});
   var hiw=document.getElementById('howItWorks');

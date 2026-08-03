@@ -317,7 +317,10 @@ map.on('popupopen', () => {
   document.getElementById('topLeftControls').style.display = 'none';
   document.getElementById('openNowToggle').style.display = 'none';
   document.getElementById('listViewToggle').style.display = 'none';
-  document.getElementById('passportToggle').style.display = 'none';
+  /* The passport entry is a sheet row now, not a drawer button. Guarded because these
+   * hide/show routines chain several unguarded lookups — one null throws and silently abandons
+   * every line after it. */
+  document.getElementById('ssPassportRow')?.style.setProperty('display', 'none');
   document.getElementById('whereAmIBtn').style.display = 'none';
 });
 map.on('popupclose', () => {
@@ -331,7 +334,7 @@ map.on('popupclose', () => {
   document.getElementById('topLeftControls').style.display = '';
   document.getElementById('openNowToggle').style.display = '';
   document.getElementById('listViewToggle').style.display = '';
-  document.getElementById('passportToggle').style.display = '';
+  document.getElementById('ssPassportRow')?.style.removeProperty('display');
   document.getElementById('whereAmIBtn').style.display = '';
 });
 
@@ -1765,6 +1768,7 @@ async function addTip(id, text){
       text, uid, ts: Date.now()
     });
     logActivity('tip', { locId: id, text });
+    markTipWritten(id);
     return true;
   }catch(e){
     console.error('addTip failed', id, e && (e.code || e.message));
@@ -1827,6 +1831,49 @@ async function saveHoursReport(locId, value, kind){
 }
 // Track the distinct stores this device has reported hours for — feeds the Hours Hero achievement
 // (client-trusted, like the other achievement stats).
+/* Tips you have written, kept the same way hours reported already are: a local set of location
+ * ids, deduped so writing three tips at one stop counts once.
+ *
+ * Local rather than a Firestore query on purpose — the alternative is reading every tip entry
+ * you own across 84,000 locations to display one number in a footer, and the tips collection has
+ * no per-user index. This mirrors how every other contribution stat in the app is derived, which
+ * also means it carries the same caveat: it is per-device until an account syncs it. */
+function markTipWritten(locId){
+  try{
+    const k = 'br_tips_written';
+    const set = new Set(JSON.parse(localStorage.getItem(k) || '[]'));
+    set.add(locId);
+    localStorage.setItem(k, JSON.stringify([...set]));
+  }catch(e){}
+}
+function countTipsWritten(){
+  try{ return new Set(JSON.parse(localStorage.getItem('br_tips_written') || '[]')).size; }
+  catch(e){ return 0; }
+}
+
+/* Everything you have done to FIX the map, as one running total: hours reported, problems
+ * flagged, and locations added. Three separate stores because each was built for its own
+ * purpose; summed here because to a reader they are one thing — corrections made. */
+function countImprovements(){
+  const size = (key) => { try{ return new Set(JSON.parse(localStorage.getItem(key) || '[]')).size; }catch(e){ return 0; } };
+  const reported = (() => {
+    try{
+      const raw = JSON.parse(localStorage.getItem(REPORTED_KEY) || '{}');
+      return Array.isArray(raw) ? new Set(raw).size : Object.keys(raw).length;
+    }catch(e){ return 0; }
+  })();
+  return size('br_hours_reported') + reported + size('br_locations_added');
+}
+
+function markLocationAdded(locId){
+  try{
+    const k = 'br_locations_added';
+    const set = new Set(JSON.parse(localStorage.getItem(k) || '[]'));
+    set.add(locId || ('pending-' + Date.now()));
+    localStorage.setItem(k, JSON.stringify([...set]));
+  }catch(e){}
+}
+
 function markHoursReported(locId){
   try{
     const k = 'br_hours_reported';
@@ -2089,7 +2136,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.29.0';
+const BUILD = 'v2.31.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -3310,7 +3357,11 @@ async function computeAchievementStats(){
     visitedCount: bathroomRatedCount, totalLocations: seedLocations.length,
     // Hours Hero: distinct stores this device has reported hours for (client-trusted, like the
     // other achievement stats). Populated by markHoursReported() on each successful report.
-    hoursAddedCount: (() => { try { return new Set(JSON.parse(localStorage.getItem('br_hours_reported') || '[]')).size; } catch(e){ return 0; } })()
+    hoursAddedCount: (() => { try { return new Set(JSON.parse(localStorage.getItem('br_hours_reported') || '[]')).size; } catch(e){ return 0; } })(),
+    // SHARE and IMPROVE in the footer creed. Derived here so the footer, the passport and any
+    // future achievement all read the same number rather than each computing its own.
+    tipsWrittenCount: countTipsWritten(),
+    improvementCount: countImprovements()
   };
 }
 
@@ -3438,6 +3489,29 @@ function renderBathroomPassport(stats, results){
   /* Published for the settings sheet's header chip. Computed here anyway, and reaching into this
    * function's locals from outside would be worse than handing the number over deliberately. */
   ssStampCount = unlockedCount;
+  ssCreedStats = {
+    rated: stats.bathroomRatedCount,
+    tips:  stats.tipsWrittenCount,
+    fixes: stats.improvementCount,
+  };
+  /* The card's reverse. Filled from the same stats object the front and the achievements use,
+   * so the two faces can never disagree about the same number. */
+  const setBack = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
+  setBack('pbRated',  stats.bathroomRatedCount);
+  setBack('pbStates', stats.stateCount);
+  setBack('pbCities', stats.cityCount);
+  setBack('pbChains', stats.chainCount);
+  setBack('pbStreak', stats.maxStreak);
+  setBack('pbMiles',  Math.round(stats.maxMilesApart));
+  const note = document.getElementById('pbNote');
+  if(note){
+    /* One line that reads like a sentence rather than a seventh tile — and it says nothing at
+     * all until there is something true to say, since "0 states, 0 miles" is a worse greeting
+     * for a new account than silence. */
+    note.textContent = stats.bathroomRatedCount === 0
+      ? 'Rate your first bathroom and it will show up here.'
+      : `${unlockedCount} of ${ACHIEVEMENT_DEFS.length} stamps collected.`;
+  }
   if(typeof ssSyncIdentity === 'function' && !document.getElementById('settingsSheet')?.hidden) ssSyncIdentity();
 
   /* Progress is stamps collected, not percent of the map.
@@ -3674,7 +3748,17 @@ async function updateMostRecentBadge(){
      * somewhere — the marker has to be on the map for zoomToMarker to work — so it is a promise
      * rather than decoration. escapeHtml because a location name is data, not markup. */
     const tappable = !!(loc && markers[loc.id]);
-    el.innerHTML = `Just rated: ${escapeHtml(headline)} — ${relativeTimeFromNow(rec.ts)}`
+    /* Credit the rater. logActivity has always written `username` onto the entry — its own
+     * comment says it does so "so the header ticker can credit them without a second read" —
+     * but nothing here ever read it back, so every rating in the ticker was anonymous while the
+     * handle sat unused on the document.
+     *
+     * Optional by design: entries written before sign-in existed, or by someone who never chose
+     * a handle, carry no username and simply read as they did before rather than showing a
+     * placeholder. */
+    const who = rec.username ? String(rec.username).slice(0, 40) : '';
+    const credit = who ? `${escapeHtml(who)} rated` : 'Just rated:';
+    el.innerHTML = `${credit} ${escapeHtml(headline)} — ${relativeTimeFromNow(rec.ts)}`
       + (tappable ? ` ${ico('arrow')}` : '');
     el.classList.toggle('is-tappable', tappable);
     _mostRecentLoaded = true;   // lock only after a real, successful write
@@ -5270,9 +5354,9 @@ document.getElementById('listViewClose').addEventListener('click',()=>{document.
 function applyAuthVisibility(){
   const loggedIn = isLoggedIn();
 
-  // NB: a class, not style.display — `#appDrawer .d-items button` sets `display:flex !important`,
-  // which an inline style can't beat. The .is-hidden rule carries !important to match.
-  const passport = document.getElementById('passportToggle');
+  // NB: a class, not style.display — the row's own rule sets display:flex, which an inline
+  // style cannot beat. The .is-hidden rule carries !important to match.
+  const passport = document.getElementById('ssPassportRow');
   if(passport) passport.classList.toggle('is-hidden', !loggedIn);
 
   ['openNowToggle', 'accessibleToggle', 'themeToggle'].forEach(id => {
@@ -5336,64 +5420,27 @@ function openAccountPanel(mode){
 
   if(isLoggedIn()){
     renderAccountSheet();
-    /* The flip-height call went with the flip: the card is one-sided now, so it measures itself
-     * and needs no scripted height. Leaving the call in would have thrown on every open. */
+    /* Always open on the front. Without this the card keeps whichever face it was left on, so
+     * reopening the passport could land you on the stats reverse with no explanation. No height
+     * call any more — the grid sizes both faces on its own. */
+    flipCardTo(false);
   }
 }
 
-/* ============================================================================
- *  Settings sheet
- * ============================================================================
- * Controls are MOVED into this sheet, never rebuilt. Every element keeps the id it had in the
- * drawer or on the passport's old back face, so every handler already bound in this file keeps
- * firing untouched — no duplicated logic, and nothing to keep in sync. A rebuilt copy of the
- * theme switch is exactly how the app ended up with two of them, one in the drawer and one on
- * the flip card, each having to notify the other.
- *
- * The move happens once, on first open rather than at parse time: the drawer and the passport
- * are built by other code paths, and reparenting a node before it exists silently does nothing.
- *
- * The account rows are NOT in this list: their old container (the flip-back) was deleted, so they
- * are authored directly into the sheet's markup instead — same ids, same handlers.
+/* ssMoveControls is gone. It reparented the map and preference controls out of the drawer on
+ * startup; with the drawer deleted there was nothing to move, and the function would have
+ * quietly succeeded at moving nothing. Those controls are authored directly into the sheet's
+ * markup now — same ids, same classes, same handlers.
  */
-let ssStampCount = null;   // set by renderBathroomPassport once it has counted
-const SS_MOVES = [
-  ['travelModePref',  'ssSlotTravel'],
-  ['navAppPref',      'ssSlotNavApp'],
-  ['allChains',       'ssSlotChains'],
-  ['openNowToggle',   'ssSlotOpenNow'],
-  ['accessibleToggle','ssSlotAccessible'],
-  ['themeToggle',     'ssSlotTheme'],
-];
-let ssMoved = false;
-function ssMoveControls(){
-  if(ssMoved) return;
-  let found = 0;
-  for(const [srcId, slotId] of SS_MOVES){
-    const el = document.getElementById(srcId), slot = document.getElementById(slotId);
-    if(el && slot){ slot.appendChild(el); found++; }
-  }
-  /* Only latch once everything arrived. A partial move on an early open would otherwise be
-   * permanent, leaving half the settings stranded in a drawer that no longer shows them. */
-  if(found === SS_MOVES.length) ssMoved = true;
-}
 
-function ssSetTab(which){
-  const seeTab = document.getElementById('ssTabSee'), acctTab = document.getElementById('ssTabAcct');
-  const see = document.getElementById('ssPaneSee'), acct = document.getElementById('ssPaneAcct');
-  if(!seeTab || !acctTab) return;
-  const onSee = which === 'see';
-  seeTab.setAttribute('aria-selected', String(onSee));
-  acctTab.setAttribute('aria-selected', String(!onSee));
-  see.hidden = !onSee;
-  acct.hidden = onSee;
-}
+/* ssSetTab is gone with the tabs. The sheet is one scroll now — see the ordering note in
+ * index.html — so there is no pane to show or hide and no selected state to track. */
 
 function ssSyncIdentity(){
   const name = document.getElementById('ssName'), sub = document.getElementById('ssSub');
   const av = document.getElementById('ssAvatar'), stamp = document.getElementById('ssStamp');
   const signOut = document.getElementById('ssSignOut'), signIn = document.getElementById('ssSignIn');
-  const gate = document.getElementById('ssGateNote');
+  const gate = document.getElementById('prefsGateNote');   // the drawer's own note, moved in
   const inA = isLoggedIn();
   const who = inA ? displayNameFor() : '';
   if(name) name.textContent = inA ? who : 'Not signed in';
@@ -5401,50 +5448,206 @@ function ssSyncIdentity(){
   if(av)   av.textContent   = inA ? (who.trim()[0] || '·').toUpperCase() : '·';
   if(signOut) signOut.hidden = !inA;
   if(signIn)  signIn.hidden  = inA;
-  // The drawer gate note moved with its switches; the sheet states the same rule in its own place.
+  /* Signed out, the account tab offered a passport with no stamps, a recovery email for no
+   * account, and a password change for a password that does not exist — three rows that can
+   * only disappoint, above the one row that actually helps. They and their headings now travel
+   * with the session. */
+  ['ssPlateYou','ssPassportRow','ssPlateRecovery','acctEmailRow','acctEmailNote',
+   'ssPlateSecurity','acctPasswordRow','acctPasswordNote','ssPlateSession'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.hidden = !inA;
+  });
+  /* The real gate note travelled in with the switches it explains, so there is one message, not
+   * a copy in each place that could drift from the other. */
   if(gate) gate.hidden = inA;
+  /* FIND. RATE. SHARE. IMPROVE. — the tagline labelling the numbers that were already in this
+   * footer. Rendered here rather than authored in markup because three of the four are the
+   * person's own totals and change as they use the app. */
+  const creed = document.getElementById('ssCreed');
+  if(creed){
+    const n = (x) => (x == null ? '—' : Number(x).toLocaleString());
+    const rows = [
+      [n(seedLocations.length), 'Find',    'on the map'],
+      [n(ssCreedStats.rated),   'Rate',    'you rated'],
+      [n(ssCreedStats.tips),    'Share',   'tips written'],
+      [n(ssCreedStats.fixes),   'Improve', 'reports made'],
+    ];
+    creed.innerHTML = rows.map(([v, w, d]) =>
+      `<div class="ss-creed-item"><b>${v}</b><span>${w}</span><em>${d}</em></div>`).join('');
+  }
   const v = document.getElementById('ssVersion');
   if(v) v.textContent = `Bathroom Report ${BUILD} · ${seedLocations.length.toLocaleString()} locations`;
   /* Only shown once the passport has actually been rendered and reported a count — the sheet
    * can be opened before that has ever happened, and an invented zero would read as "you have
    * earned nothing" rather than "not counted yet". */
+  /* The stamp count now rides on the passport row as its value, rather than as a chip in a
+   * header that no longer exists. Same element id, same guard: hidden until the passport has
+   * actually rendered and reported a count, because an invented zero reads as "you have earned
+   * nothing" rather than "not counted yet". */
   if(stamp){
     if(inA && ssStampCount != null){ stamp.hidden = false; stamp.textContent = ssStampCount + ' stamps'; }
     else stamp.hidden = true;
   }
 }
 
-function openSettingsSheet(tab){
+/* Open and close are asymmetric on purpose.
+ *
+ * Opening: unhide FIRST, then add .ss-in on the next frame. Both in one go and the browser
+ * computes only the final state — the element goes from display:none straight to its resting
+ * transform with nothing to interpolate, and the sheet blinks into place exactly as if there
+ * were no animation at all. The frame gap is what gives the transition a starting point.
+ *
+ * Closing: drop .ss-in, then hide only once the transition has finished, so the panel is seen
+ * travelling back to the edge it came from instead of vanishing mid-air. */
+/* ---- settings sheet state ----
+ * Declared here, together, because all three were previously introduced inside a block that was
+ * later deleted, leaving them as implicit globals. Two of the three still appeared to work;
+ * ssCloseToken did not, and failed in a way nothing would have reported: ++undefined is NaN, and
+ * NaN never equals itself, so the close guard `token !== ssCloseToken` was true on every call and
+ * the teardown returned early every single time. The sheet would have opened and never closed.
+ */
+let ssCloseToken = 0;                                  // invalidates in-flight teardowns
+let ssStampCount = null;                               // set by renderBathroomPassport
+let ssCreedStats = { rated:null, tips:null, fixes:null };  // ditto; null so an unrendered menu shows —
+
+/* aria-modal="true" is a PROMISE that focus cannot leave the sheet. Declaring it without
+ * trapping is worse than not declaring it: a screen reader tells the user the rest of the page
+ * is inert, and then Tab walks them straight out onto a map they were told was unavailable.
+ * The drawer this replaced made no such claim, so this is a defect introduced with the dialog
+ * role, not a pre-existing one. */
+const SS_FOCUSABLE = 'a[href],button:not([disabled]),select,input,[tabindex]:not([tabindex="-1"])';
+let ssLastFocus = null;
+
+function ssTrapTab(e){
+  if(e.key !== 'Tab') return;
+  const sheet = document.getElementById('settingsSheet');
+  if(!sheet || sheet.hidden) return;
+  const items = [...sheet.querySelectorAll(SS_FOCUSABLE)]
+    .filter(el => !el.hasAttribute('hidden') && el.offsetParent !== null);
+  if(!items.length) return;
+  const first = items[0], last = items[items.length - 1];
+  // Wrap at both ends, and catch the case where focus has escaped already.
+  if(e.shiftKey && (document.activeElement === first || !sheet.contains(document.activeElement))){
+    e.preventDefault(); last.focus();
+  } else if(!e.shiftKey && document.activeElement === last){
+    e.preventDefault(); first.focus();
+  }
+}
+
+function openSettingsSheet(){
   const sheet = document.getElementById('settingsSheet');
   if(!sheet) return;
-  ssMoveControls();
+  ssCloseToken++;                            // invalidate any in-flight teardown
+  ssLastFocus = document.activeElement;      // so Escape returns you where you were
+  document.addEventListener('keydown', ssTrapTab, true);
+  /* The map behind keeps scrolling under the sheet on iOS without this, which reads as the
+   * page coming apart underneath your thumb. */
+  document.body.style.overflow = 'hidden';
   ssSyncIdentity();
-  ssSetTab(tab || 'see');
   sheet.hidden = false;
   sheet.setAttribute('aria-hidden', 'false');
+  requestAnimationFrame(() => sheet.classList.add('ss-in'));
   document.getElementById('ssClose')?.focus({ preventScroll:true });
 }
 function closeSettingsSheet(){
   const sheet = document.getElementById('settingsSheet');
-  if(!sheet) return;
-  sheet.hidden = true;
+  if(!sheet || sheet.hidden) return;
+  const panel = sheet.querySelector('.ss-panel');
+  sheet.classList.remove('ss-in');
   sheet.setAttribute('aria-hidden', 'true');
+  panel.style.transform = '';          // clear any drag offset so the class drives the exit
+  /* Generation counter, because the teardown is asynchronous and the user is not.
+   *
+   * Close, then reopen inside 400ms, and the previous close's backstop timer still fires and
+   * hides the sheet the user just reopened — it looks like the app slamming the panel shut for
+   * no reason, and it is reachable with an ordinary double-tap. Every open bumps the token, and
+   * a teardown only acts if it still owns the current one. */
+  document.removeEventListener('keydown', ssTrapTab, true);
+  document.body.style.overflow = '';
+  /* Focus goes back to whatever opened the sheet — almost always the hamburger. Leaving it on a
+   * button that just slid off screen strands keyboard and screen-reader users at the top of the
+   * document with no idea where they are. */
+  if(ssLastFocus && document.contains(ssLastFocus)) ssLastFocus.focus({ preventScroll:true });
+  ssLastFocus = null;
+  const token = ++ssCloseToken;
+  const done = () => {
+    if(token !== ssCloseToken) return;      // superseded by a reopen
+    sheet.hidden = true;
+    panel.removeEventListener('transitionend', done);
+  };
+  panel.addEventListener('transitionend', done);
+  /* A backstop, because transitionend never fires if the transition was suppressed — reduced
+   * motion, or a browser that skips animations on a hidden tab. Without it the sheet would
+   * stay open forever in exactly the setups least able to report it. */
+  setTimeout(done, 400);
 }
+
+/* Swipe down to dismiss. The grabber is the visible target but the whole header area drags,
+ * because a 38px bar is a small thing to hit with a thumb on the move. */
+(function(){
+  const sheet = document.getElementById('settingsSheet');
+  if(!sheet) return;
+  const panel = sheet.querySelector('.ss-panel');
+  const handle = document.getElementById('ssGrab');
+  if(!panel || !handle) return;
+  let startY = null, dy = 0;
+
+  const start = e => { startY = e.touches ? e.touches[0].clientY : e.clientY; dy = 0;
+    sheet.classList.add('ss-drag'); };
+  const move = e => {
+    if(startY == null) return;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    // Downward only. Dragging up would lift the sheet off its edge, which it has no room for.
+    dy = Math.max(0, y - startY);
+    panel.style.transform = `translateY(${dy}px)`;
+    if(e.cancelable) e.preventDefault();
+  };
+  const end = () => {
+    if(startY == null) return;
+    sheet.classList.remove('ss-drag');
+    const far = dy > Math.min(120, panel.offsetHeight * 0.25);
+    startY = null;
+    /* Past a quarter of the sheet's height it closes; short of that it springs back. A fixed
+     * pixel threshold alone would make a tall sheet feel sticky and a short one twitchy. */
+    if(far){ closeSettingsSheet(); }
+    else { panel.style.transform = ''; }
+  };
+
+  handle.addEventListener('touchstart', start, {passive:true});
+  handle.addEventListener('touchmove', move, {passive:false});
+  handle.addEventListener('touchend', end);
+  handle.addEventListener('touchcancel', end);
+  handle.addEventListener('mousedown', start);
+  window.addEventListener('mousemove', e => { if(startY != null) move(e); });
+  window.addEventListener('mouseup', end);
+})();
 
 /* The drawer closes itself: 'openSettings' is in the NAVIGATES allowlist in index.html, which is
  * where that decision belongs — a control that takes you somewhere opts IN to closing. */
-document.getElementById('openSettings')?.addEventListener('click', () => openSettingsSheet('see'));
+/* Runs after the document has parsed, so both the source controls and the sheet's slots exist.
+ * Deferred by a tick rather than called inline for the same reason the drawer count is: this
+ * file is one long script and the elements below it are not there yet when this line runs. */
+/* #openSettings was a drawer row and went with the drawer. The hamburger opens the sheet now,
+ * wired in the inline block in index.html. */
 document.getElementById('ssClose')?.addEventListener('click', closeSettingsSheet);
 document.getElementById('ssScrim')?.addEventListener('click', closeSettingsSheet);
-document.getElementById('ssTabSee')?.addEventListener('click', () => ssSetTab('see'));
-document.getElementById('ssTabAcct')?.addEventListener('click', () => ssSetTab('acct'));
 document.addEventListener('keydown', e => {
   if(e.key === 'Escape' && !document.getElementById('settingsSheet')?.hidden) closeSettingsSheet();
+});
+/* The account block opens the same panel the sign-in row does — it is the one place to manage
+ * the account, reached either by tapping your own name or by the explicit row below. */
+document.getElementById('ssAcctRow')?.addEventListener('click', () => {
+  closeSettingsSheet();
+  openAccountPanel('account');
 });
 document.getElementById('ssPassportRow')?.addEventListener('click', () => {
   closeSettingsSheet();
   openAccountPanel('passport');
 });
+/* Rows that take you somewhere close the sheet behind them — the same rule the drawer's
+ * NAVIGATES allowlist encoded. Switches and disclosures deliberately do not, so toggling a
+ * filter or opening All places leaves you where you are. */
+document.getElementById('infoBtn')?.addEventListener('click', () => closeSettingsSheet());
 document.getElementById('ssSignIn')?.addEventListener('click', () => {
   closeSettingsSheet();
   openAccountPanel('account');
@@ -5457,7 +5660,8 @@ document.getElementById('ssSignOut')?.addEventListener('click', () => {
   document.getElementById('logOutBtn')?.click();
 });
 
-document.getElementById('passportToggle').addEventListener('click', () => openAccountPanel('passport'));
+/* The drawer's Passport button is gone; the sheet's row carries the same job and is wired
+ * above, alongside the other rows that navigate. */
 
 document.getElementById('accountToggle').addEventListener('click', () => openAccountPanel('account'));
 
@@ -5596,13 +5800,59 @@ function renderAccountSheet(){
   renderAccountRecovery();   // async; the chip shows its loading state meanwhile
 }
 
-/* The passport flip is gone. Its back face held email, password and theme behind a "flip for
- * account" gesture, which is a hiding place, not a home — the same failure as content below a
- * popup's scroll line. Those controls now live in the settings sheet, and the passport card is
- * one-sided again: purely the collectable object it was always meant to be.
+/* The passport flip.
  *
- * flipScene / flipFront / flipCard remain in the DOM; the CSS no longer rotates them and nothing
- * reads flipShowingBack(), so the card simply renders flat. */
+ * What the back holds has changed: it used to be Email / Change password / Theme, which meant
+ * real settings were hidden behind a gesture most people never perform. Those moved to the
+ * settings sheet, and the reverse now carries the card's own record — rated, states, towns,
+ * chains, streak, distance. Nothing on the back is a control, so the turn hides nothing anyone
+ * needs to find.
+ *
+ * No height measuring any more. The old version wrote a pixel height onto the scene on every
+ * open and every turn, which is why removing that code once made the card collapse to a sliver.
+ * Both faces now share a CSS grid cell, so the scene is as tall as the taller face for free.
+ *
+ * The hidden face is still made INERT: backface-visibility hides it visually but leaves it in
+ * the tab order and the accessibility tree, so a screen reader would read both sides. */
+const flipScene = document.getElementById('flipScene');
+const flipFront = document.getElementById('flipFront');
+const flipBack  = document.getElementById('flipBack');
+
+function flipShowingBack(){ return !!flipScene && flipScene.classList.contains('flipped'); }
+
+function flipSync(){
+  if(!flipScene || !flipFront || !flipBack) return;
+  const back = flipShowingBack();
+  const hidden = back ? flipFront : flipBack;
+  const shown  = back ? flipBack : flipFront;
+  hidden.setAttribute('inert', ''); hidden.setAttribute('aria-hidden', 'true');
+  shown.removeAttribute('inert'); shown.removeAttribute('aria-hidden');
+  const toBack = document.getElementById('flipToBack');
+  if(toBack) toBack.setAttribute('aria-expanded', String(back));
+  const title = document.getElementById('accountHeaderTitle');
+  if(title && isLoggedIn()) title.textContent = back ? 'Your record' : 'Bathroom Passport';
+}
+
+function flipCardTo(back){
+  if(!flipScene) return;
+  flipScene.classList.toggle('flipped', back);
+  flipSync();
+}
+
+function toggleFlip(){
+  const next = !flipShowingBack();
+  flipCardTo(next);
+  // Focus follows the face, or it stays on a button that just turned away.
+  const t = document.getElementById(next ? 'flipToFront' : 'flipToBack');
+  if(t) t.focus({ preventScroll:true });
+}
+
+document.getElementById('flipToBack')?.addEventListener('click', e => { e.stopPropagation(); toggleFlip(); });
+document.getElementById('flipToFront')?.addEventListener('click', e => { e.stopPropagation(); toggleFlip(); });
+/* Tapping the card turns it too — the bar is the signpost, not the only way in. The back holds
+ * no controls now, so there is nothing to exclude from this. */
+document.getElementById('flipCard')?.addEventListener('click', () => toggleFlip());
+flipSync();
 
 /* Add or change the recovery address. A prompt rather than an inline form: this is a rare,
  * one-line action, and a field that sits in the sheet permanently would be visual weight spent
@@ -5945,6 +6195,10 @@ async function submitMissingLocation(){
   missingNote.style.color = ok ? '#2f6b3c' : '#c62828';
   missingNote.textContent = ok ? 'Thanks — sent!' : 'Something went wrong, try again.';
   if(ok){
+    /* Counted only on a confirmed write, never on the attempt — the footer's IMPROVE number is a
+     * record of what you actually contributed, and a failed submit that still incremented it
+     * would quietly inflate every total from then on. */
+    markLocationAdded(finalDescription);
     missingInput.value = '';
     missingInput.placeholder = 'Address or cross streets';
     capturedMissingCoords = null;
