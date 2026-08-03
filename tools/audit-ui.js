@@ -214,13 +214,23 @@ console.log('\nadmin dataset coverage');
     else pass(`flushpanel loads all ${idxFiles.length} datasets`);
 
     // The one table that replaced three drifted hand-kept lists must cover every registry chain.
+    /* Except the generated ones. CHAIN_TABLE's third column is "the file to paste a new record
+     * into", which assumes a hand-maintained dataset. usPublic spans ten public-*-locations.js
+     * files written by build-public-toilets.js, and anything pasted into one is destroyed by
+     * the next build — offering it in Add Location would invite work that silently disappears.
+     * Listed here rather than silently skipped, so a future generated chain has to make the
+     * same decision on purpose. */
+    const GENERATED_CHAINS = new Set(['usPublic']);
     const appSrc = fs.readFileSync('app.js', 'utf8');
     const seg = appSrc.slice(appSrc.indexOf('const CHAIN_REGISTRY'), appSrc.indexOf('const DEFAULT_CHAIN_KEY'));
     const regKeys = [...seg.matchAll(/^\s{2}(\w+):\s*\{/gm)].map(m => m[1]);
     const tableKeys = new Set([...fp.matchAll(/\["[^"]*","(\w+)","[\w-]+-locations\.js"\]/g)].map(m => m[1]));
-    const absent = regKeys.filter(k => !tableKeys.has(k));
+    const absent = regKeys.filter(k => !tableKeys.has(k) && !GENERATED_CHAINS.has(k));
     if (absent.length) fail(`CHAIN_TABLE is missing registry key(s): ${absent.join(', ')}`);
-    else pass(`CHAIN_TABLE covers all ${regKeys.length} registry chains`);
+    else pass(`CHAIN_TABLE covers all ${regKeys.length - GENERATED_CHAINS.size} hand-maintained registry chains`
+      + ` (${GENERATED_CHAINS.size} generated chain(s) exempt)`);
+    const wrongly = [...GENERATED_CHAINS].filter(k => tableKeys.has(k));
+    if (wrongly.length) fail(`CHAIN_TABLE lists generated chain(s) whose files are rebuilt: ${wrongly.join(', ')}`);
 
     // And every filename it names must actually exist.
     const bad = [...fp.matchAll(/\["[^"]*","\w+","([\w-]+-locations\.js)"\]/g)]
