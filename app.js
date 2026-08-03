@@ -151,6 +151,13 @@ function updateDrawerLocCount(){
    * and an implicit claim that two cities are special in a nationwide app. City cafés roll into
    * one line; the registry's per-chain metro tags stay, so a breakdown can return if metro
    * coverage ever becomes a story worth telling again. */
+  /* Regions are fetched on demand, so seedLocations holds only what has been panned near. The
+   * footer is the one place the app states its coverage, and stating "28,074 locations mapped"
+   * when the data files ship 84,079 is simply wrong — it describes this session's download
+   * history rather than the map.
+   *
+   * The manifest already carries a per-region count, written by build-public-toilets.js, so the
+   * unloaded remainder is knowable without fetching anything. */
   let pit = 0, pub = 0, cafe = 0;
   seedLocations.forEach(l => {
     const key = l.chain || DEFAULT_CHAIN_KEY;
@@ -159,12 +166,29 @@ function updateDrawerLocCount(){
     if(bucket === 'city'){ cafe++; return; }
     pit++;
   });
+  pub += pendingPublicCount();
+  const total = pit + pub + cafe;
   const lines = [`Pit stops: ${pit.toLocaleString()}`,
     `Public restrooms: ${pub.toLocaleString()}`,
     `Coffee shops: ${cafe.toLocaleString()}`];
-  el.innerHTML = `${seedLocations.length.toLocaleString()} locations mapped` +
+  el.innerHTML = `${total.toLocaleString()} locations mapped` +
     `<span class="d-count-breakdown">${lines.join('<br>')}</span>`;
 }
+/* Records in regions that have not been downloaded in this session. Counted from the manifest
+ * rather than fetched — 18 MB of location files to make a footer accurate would be an absurd
+ * trade, and the number is baked at build time precisely so it can be read cheaply.
+ *
+ * A region already loaded is excluded, or its records would be counted twice: once in
+ * seedLocations and once here. */
+function pendingPublicCount(){
+  try{
+    const manifest = window.publicToiletManifest;
+    if(!Array.isArray(manifest)) return 0;
+    return manifest.reduce((n, e) =>
+      n + ((publicRegionState[e.region] === 'loaded') ? 0 : (e.count || 0)), 0);
+  }catch(e){ return 0; }
+}
+
 /* Deferred to the next tick ON PURPOSE. chainBucket reads TRAVEL_CENTER_KEYS, a `const`
  * declared a few hundred lines below — function declarations hoist but consts do not, so a
  * synchronous call here dies in the temporal dead zone and takes the whole script with it.
@@ -2498,7 +2522,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.38.0';
+const BUILD = 'v2.38.1';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -5996,7 +6020,8 @@ function ssSyncIdentity(){
   if(creed){
     const n = (x) => (x == null ? '—' : Number(x).toLocaleString());
     const rows = [
-      [n(seedLocations.length), 'Find',    'on the map'],
+      /* Same correction as the footer: what the app HOLDS, not what this session downloaded. */
+      [n(seedLocations.length + pendingPublicCount()), 'Find', 'on the map'],
       [n(ssCreedStats.rated),   'Rate',    'you rated'],
       [n(ssCreedStats.tips),    'Share',   'tips written'],
       [n(ssCreedStats.fixes),   'Improve', 'reports made'],
@@ -6005,7 +6030,11 @@ function ssSyncIdentity(){
       `<div class="ss-creed-item"><b>${v}</b><span>${w}</span><em>${d}</em></div>`).join('');
   }
   const v = document.getElementById('ssVersion');
-  if(v) v.textContent = `Bathroom Report ${BUILD} · ${seedLocations.length.toLocaleString()} locations`;
+  /* Name only. The version and date live in the .d-version span beside this one — which the
+   * build-consistency audit reads — and the location count is already the headline of the block
+   * directly above. Setting all three here printed the version twice and the count twice in a
+   * single line. */
+  if(v) v.textContent = 'Bathroom Report';
   /* Only shown once the passport has actually been rendered and reported a count — the sheet
    * can be opened before that has ever happened, and an invented zero would read as "you have
    * earned nothing" rather than "not counted yet". */
