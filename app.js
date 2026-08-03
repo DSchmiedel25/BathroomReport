@@ -433,7 +433,9 @@ function pinShapeStyle(chain, size){
 }
 
 function emptyAgg(){ return {bathroomSum:0, bathroomCount:0}; }
-function emptyVote(){ return {store:0, bathroom:0, amenities:{}, storeFeatures:{}, amenityMeta:{}}; }
+/* safe joins bathroom as a rating. Zero means unanswered, exactly as it does for the other,
+ * so nothing downstream needs a new "unset" convention. */
+function emptyVote(){ return {store:0, bathroom:0, safe:0, amenities:{}, storeFeatures:{}, amenityMeta:{}}; }
 // Resize a marker whose popup is OPEN without calling setIcon(): swapping the icon element
 // out from under an open popup can break/close it on some mobile browsers, so instead we
 // mutate the existing icon element's size in place. Keeps the selected pin in sync with the
@@ -1322,9 +1324,21 @@ const bathroomQuips = {
   4: ["Surprisingly civilized.", "I'd recommend it.", "First Class.", "Surprisingly clean.", "Certified clean."],
   5: ["A modern masterpiece.", "Hall of Fame.", "Royal Flush.", "Worth the stop.", "Peak restroom."]
 };
+/* Safety reads differently from the other two: the low end is somebody telling the next person
+ * not to stop, so it stays plain rather than playful. "Thoughts and prayers" is funny about a
+ * dirty toilet and not about feeling unsafe. */
+const safeQuips = {
+  1: ["Trust your instincts.", "Time to leave.", "Didn't feel safe.", "Keep driving.", "Hard pass."],
+  2: ["Stay alert.", "A little sketchy.", "Watch your surroundings.", "Not very comfortable.", "Better in daylight."],
+  3: ["Felt okay.", "Average vibes.", "Nothing unusual.", "No major concerns.", "About what you'd expect."],
+  4: ["Felt safe.", "Comfortable stop.", "Well maintained.", "I'd stop again.", "Good atmosphere."],
+  5: ["Safe and welcoming.", "Peace of mind.", "Couldn't ask for better.", "Top-tier stop.", "Exceptionally comfortable."]
+};
+const QUIP_SETS = { store: storeQuips, bathroom: bathroomQuips, safe: safeQuips };
 function quipFor(type, val){
   if(!val) return 'Tap to rate';
-  const options = (type === 'store' ? storeQuips : bathroomQuips)[val];
+  const set = QUIP_SETS[type];
+  const options = set && set[val];
   if(!options) return '';
   return options[Math.floor(Math.random() * options.length)];
 }
@@ -1966,6 +1980,43 @@ async function loadWeeklyRecap(){
 // The rating section content. In the OOO HARD phase the star rating is suppressed entirely and
 // replaced by the ⚠️ status + "It's working now" button. In soft/none phases the normal rating
 // shows; a quiet "Report out of order" link sits under the stars (soft phase also shows an FYI).
+/* ============================================================================
+ *  Rating dimensions — one control, asked one at a time
+ * ============================================================================
+ * Three separate star rows would be three things to ignore. Instead the existing rating block
+ * cycles: it asks whichever dimension this person has not answered here yet, with Skip to move
+ * on. Someone who stops three times answers all three and never sees a form.
+ *
+ * There is deliberately no separate cleanliness question. The overall bathroom rating already
+ * IS the cleanliness signal — its own quips say "Bring sanitizer" and "Certified clean" — so a
+ * second question would collect the same judgement twice and make both weaker by splitting the
+ * votes between them.
+ *
+ * What a split would have bought is decay: overall never goes stale, cleanliness does. That is
+ * solved instead by giving the overall rating an AGE, using the bathroomRecent window the
+ * aggregate already writes. Same honesty, one fewer thing to ask.
+ *
+ * Order: overall first because it is the number the app has always collected and the one most
+ * people will give; safe second because it changes slowly and one answer lasts.
+ */
+const RATING_DIMS = [
+  { key:'bathroom', plate:'Rate this bathroom', q:'How would you rate it overall?' },
+  { key:'safe',     plate:'Did you feel safe?', q:'Lighting, the walk to it, who else was around.' },
+];
+
+/* Which question to show. The first unanswered one, or — once all three are answered — the
+ * overall row as it has always looked, because at that point there is nothing to ask and a
+ * cycling control with nothing left to cycle to is just confusing. */
+function ratingDimFor(loc, myVote){
+  const skipped = ratingSkips[loc.id] || {};
+  const next = RATING_DIMS.find(d => !myVote[d.key] && !skipped[d.key]);
+  return next || RATING_DIMS[0];
+}
+/* Skips are per-location and per-session only, never persisted: someone who skips "did you feel
+ * safe" today should be asked again next month, because the answer may have changed and because
+ * a permanent skip is a decision nobody knowingly made. */
+const ratingSkips = {};
+
 function ratingSectionInnerHtml(loc, agg, myVote){
   const status = oooStatus(oooCache[loc.id]);
   if(status.phase === 'hard'){
@@ -1974,14 +2025,34 @@ function ratingSectionInnerHtml(loc, agg, myVote){
   const softNote = status.phase === 'soft'
     ? `<div class="ooo-soft-note">${ico('warning')} Reported out of order ${relativeTimeFromNow(status.since)} — might be working now.</div>`
     : '';
-  return `${plate('Rate this bathroom')}
-      <div class="rating-score-line"><span class="rating-score">${avgStr(agg.bathroomSum, agg.bathroomCount)}★</span> ${ratingConfidenceHtml(agg.bathroomCount)}</div>
-      <div class="rate-stack" id="ratestack-bathroom-${loc.id}">
-        ${starsHtml(loc.id,'bathroom',myVote.bathroom)}
-        <div class="star-quip" id="quip-bathroom-${loc.id}">${quipFor('bathroom', myVote.bathroom)}</div>
-        <div class="rate-flash" id="flash-bathroom-${loc.id}" aria-live="polite"></div>
+  const dim = ratingDimFor(loc, myVote);
+  const k = dim.key;
+  const answered = RATING_DIMS.filter(d => myVote[d.key]).length;
+  /* The score line only makes sense for a dimension that HAS a score. Overall always does;
+   * clean and safe show their own average once anyone has answered, and their count, so the
+   * number on screen is never detached from how many people stand behind it. */
+  const sum = agg[k + 'Sum'] || 0, count = agg[k + 'Count'] || 0;
+  const scoreLine = count
+    ? `<div class="rating-score-line"><span class="rating-score">${avgStr(sum, count)}★</span> ${ratingConfidenceHtml(count)}</div>`
+    : `<div class="rating-score-line rating-score-none">${k === 'bathroom' ? 'No ratings yet' : 'Nobody has answered this yet'}</div>`;
+  /* Skip is only offered while there is somewhere to skip TO. On the last unanswered dimension
+   * it would be a button that appears to do nothing. */
+  const remaining = RATING_DIMS.filter(d => !myVote[d.key] && !(ratingSkips[loc.id] || {})[d.key]).length;
+  const skipBtn = remaining > 1
+    ? `<button type="button" class="rate-skip" data-rate-skip="${k}" data-locid="${loc.id}">Skip</button>`
+    : '';
+  const progress = `<span class="rate-progress" aria-label="${answered} of 3 answered">${
+    RATING_DIMS.map(d => `<i class="${myVote[d.key] ? 'on' : ''}"></i>`).join('')}</span>`;
+
+  return `${plate(dim.plate)}
+      <div class="rate-head">${progress}${skipBtn}</div>
+      ${scoreLine}
+      <div class="rate-stack" id="ratestack-${k}-${loc.id}">
+        ${starsHtml(loc.id, k, myVote[k])}
+        <div class="star-quip" id="quip-${k}-${loc.id}">${myVote[k] ? quipFor(k, myVote[k]) : escapeHtml(dim.q)}</div>
+        <div class="rate-flash" id="flash-${k}-${loc.id}" aria-live="polite"></div>
       </div>
-      <div class="save-note" id="note-bathroom-${loc.id}"></div>
+      <div class="save-note" id="note-${k}-${loc.id}"></div>
       ${softNote}
       <button type="button" class="ooo-report-link" id="ooo-report-${loc.id}">${ico('warning')} Report out of order</button>`;
 }
@@ -2361,7 +2432,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.35.0';
+const BUILD = 'v2.36.1';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -4217,6 +4288,34 @@ function hideFlash(locId, type){
   el.classList.remove('show');
 }
 
+/* Redraw the rating block in place and rebind, so answering one dimension advances to the next
+ * without closing and reopening the popup under someone. Only this block is replaced — the rest
+ * of the card, including anything the person has scrolled to, stays exactly where it was. */
+function refreshRatingSection(loc){
+  const host = document.getElementById('rating-section-' + loc.id);
+  if(!host) return;
+  const agg = ratingsCache[loc.id] || { bathroomSum:0, bathroomCount:0 };
+  const myVote = myVoteCache[loc.id] || emptyVote();
+  host.innerHTML = ratingSectionInnerHtml(loc, agg, myVote);
+  attachStarHandlers(loc);
+  if(typeof wireOoo === 'function') wireOoo(loc);
+  /* The strip carries the overall score, so it has to follow a rating too — otherwise the
+   * number at the top of the card disagrees with the one just given. */
+  if(typeof refreshOpenPopupStrip === 'function') refreshOpenPopupStrip();
+}
+
+/* Skip is per-location and per-session. It advances the question without recording anything —
+ * there is deliberately no "no opinion" vote, because a skip is an absence of data, not data. */
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-rate-skip]');
+  if(!btn) return;
+  const id = btn.dataset.locid;
+  const loc = locationsById[id];
+  if(!loc) return;
+  (ratingSkips[id] = ratingSkips[id] || {})[btn.dataset.rateSkip] = true;
+  refreshRatingSection(loc);
+});
+
 function attachStarHandlers(loc){
   const popupEl = document.querySelector(`.popup-inner[data-locid="${loc.id}"]`);
   if(!popupEl) return;
@@ -4317,9 +4416,17 @@ function attachStarHandlers(loc){
           const qEl = document.getElementById('quip-' + type + '-' + loc.id);
           if(qEl) qEl.textContent = quipFor(type, rollback.vote);
         }
-        if(okVote) logActivity('rating', { sourceId: loc.id + '_' + getEffectiveId(), locId: loc.id });
+        /* Only the overall score is an "activity": the recap and the header ticker count
+         * ratings, and logging clean and safe there would treble the numbers a person sees for
+         * what was, to them, one visit. */
+        if(okVote && type === 'bathroom') logActivity('rating', { sourceId: loc.id + '_' + getEffectiveId(), locId: loc.id });
         if(note) note.textContent = okVote ? 'Saved ✓ — visible to everyone' : 'Save failed — nothing was recorded';
         if(okVote) maybeShowSupportPrompt();
+        /* Advance to the next question, after a beat so the tick and the saved note are seen.
+         * Redrawing instantly would make a successful save look like the control had reset. */
+        if(okVote && RATING_DIMS.some(d => d.key === type)){
+          setTimeout(() => refreshRatingSection(loc), 900);
+        }
 
         // refresh the label text with new average
         const labelEl = starGroup.parentElement.querySelector('.rating-label');

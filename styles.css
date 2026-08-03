@@ -1348,3 +1348,15 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
      of the map on day one, so it has to read as an invitation, not a broken row. */
   .answer-strip.is-empty{ justify-content:center; padding:11px 10px; }
   .answer-strip.is-empty span{ font-size:12px; font-weight:700; color:var(--accent); }
+
+  /* ---------- cycling rating control ---------- */
+  .rate-head{ display:flex; align-items:center; gap:10px; margin:2px 0 6px; }
+  /* Three dots, filled as each dimension is answered. Progress, not decoration: without it a
+     control that changes its question looks like it lost your answer. */
+  .rate-progress{ display:flex; gap:4px; }
+  .rate-progress i{ width:6px; height:6px; border-radius:50%; background:var(--popup-divider); display:block; }
+  .rate-progress i.on{ background:var(--accent); }
+  .rate-skip{ margin-left:auto; background:none; border:0; font-family:inherit; cursor:pointer;
+    font-size:12px; font-weight:700; color:var(--popup-muted); padding:4px 2px; }
+  .rate-skip:active{ color:var(--accent); }
+  .rating-score-none{ font-size:12px; color:var(--popup-muted); }

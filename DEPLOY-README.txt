@@ -1,36 +1,35 @@
-BathroomReport v2.29.0 — settings sheet (2026-08-03)
+BathroomReport v2.36.1 — safety rating
 
-Drop these five into the repo ROOT. No subfolders this time.
+REPO ROOT   app.js  index.html  shell.css  styles.css  sw.js  firestore.rules
+            tools/audit-ui.js   functions/index.js
 
-  app.js  index.html  shell.css  styles.css  sw.js
+FIREBASE — three pending rules changes:
+  1. genderSplit votes        (v2.28)
+  2. stripPicks account sync  (v2.34)
+  3. safe votes               (this build)
+  Console -> Firestore -> Rules -> paste -> Publish
+
+FUNCTIONS — required, not optional:
+  npx firebase-tools deploy --only functions
+  Without it, safety votes are written but never aggregated: the average
+  stays at zero while every write succeeds. Hard to spot after the fact.
 
 WHAT CHANGED
-  New Settings row in the drawer opens a two-tab sheet:
-    "What you see"  — All places, hide-closed, hide-step-only, travel mode,
-                      maps app, theme
-    "Your account"  — passport link, email, change password, sign out
-  Scrim tap, the X, and Escape all close it.
+  No separate cleanliness question. The overall bathroom rating already IS
+  the cleanliness signal — its own quips say "Bring sanitizer" and
+  "Certified clean" — so a second question would collect the same judgement
+  twice and weaken both by splitting the votes.
 
-  The passport flip is GONE. Its back face held email/password/theme behind a
-  "flip for account" gesture — those moved into the sheet, and the card is
-  one-sided again. styles.css is in this set because the flip CSS had to be
-  replaced: the scene's height used to be set by JS, so with that removed the
-  card would have rendered at zero height.
+  The rating block cycles between two questions now: overall, then
+  "Did you feel safe?". Skip moves on. Two dots show progress.
 
-  Controls were MOVED, not rebuilt — same element ids, same handlers. That also
-  collapsed the two competing theme controls (drawer switch + flip-card segment)
-  down to one.
+  Safety has its own quips, deliberately plainer than the bathroom ones —
+  the low end is somebody telling the next person not to stop, and
+  "Thoughts and prayers" is funny about a dirty toilet and not about
+  feeling unsafe.
 
-TEST AFTER UPLOAD
-  1. Footer reads v2.29.0 · 2026-08-03  (force-close the PWA if it does not)
-  2. Drawer -> Settings opens the sheet
-  3. On "What you see": All places expands, both hide switches work,
-     travel mode and maps app still save, theme flips
-  4. On "Your account": Passport opens full height (not a sliver),
-     email and change-password rows still work, sign out works
-  5. Escape and the scrim both close the sheet
-
-NOT INCLUDED
-  Nothing else changed. firestore.rules and functions/index.js are unchanged
-  since the last bundle — if you have not deployed those to Firebase yet,
-  genderSplit votes are still being rejected.
+STILL COLLECTED, NOT YET SHOWN
+  bathroomRecent / safeRecent (10 most recent {value, timestamp} per
+  location) are written by the function from day one. They are what will
+  let a rating show its AGE — "4.2 stars, most recent 3 days ago" — which
+  is the honest replacement for the cleanliness decay we dropped.

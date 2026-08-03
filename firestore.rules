@@ -242,6 +242,10 @@ service cloud.firestore {
       return strOrAbsent('locId')
         && ratingOrAbsent('store')
         && ratingOrAbsent('bathroom')
+        /* Same 1..5 integer shape as the scores above — safe differs from `bathroom` in how it
+         * is READ (it decays), not in what a client may write. Keeping the validator identical
+         * means there is one definition of a valid rating. */
+        && ratingOrAbsent('safe')
         && knownAmenityMap('amenities',
              ['restroomType','genderSplit','accessible','changing','hasRestroom'])
         && knownAmenityMap('storeFeatures',
@@ -278,7 +282,7 @@ service cloud.firestore {
       allow create: if ownedByCaller()
         && id == request.resource.data.locId + '_' + request.auth.uid
         && request.resource.data.keys().hasOnly([
-             'store','bathroom','amenities','storeFeatures','amenityMeta',
+             'store','bathroom','safe','amenities','storeFeatures','amenityMeta',
              'clientId','locId','lastUpdated','username','ratedAt','wasHiddenGem'
            ])
         && validVoteShape();
@@ -287,7 +291,7 @@ service cloud.firestore {
         // Allowlist what the write CHANGES (not the whole doc) so votes created
         // before these rules — possibly carrying retired fields — stay updatable.
         && touchedKeys().hasOnly([
-             'store','bathroom','amenities','storeFeatures','amenityMeta',
+             'store','bathroom','safe','amenities','storeFeatures','amenityMeta',
              'clientId','locId','lastUpdated','username','ratedAt','wasHiddenGem'
            ])
         && validVoteShape();
