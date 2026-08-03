@@ -330,7 +330,8 @@ map.on('popupclose', () => {
   for(const k in visitQuestions) delete visitQuestions[k];
   for(const k in visitCursor) delete visitCursor[k];
   document.getElementById('locateBtn').style.display = '';
-  document.getElementById('missingBtn').style.display = '';
+  // Restoring this unconditionally would undo the signed-out gate every time a popup closed.
+  document.getElementById('missingBtn').style.display = isLoggedIn() ? '' : 'none';
   document.getElementById('topLeftControls').style.display = '';
   document.getElementById('openNowToggle').style.display = '';
   document.getElementById('listViewToggle').style.display = '';
@@ -2098,7 +2099,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.29.1';
+const BUILD = 'v2.29.2';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -2590,14 +2591,22 @@ async function logReport(loc, reason){
 
 async function logMissingLocation(description, coords){
   try{
+    /* Signed-in only. The pill is hidden when logged out, but this is the boundary that actually
+     * matters — the UI gate is convenience, and the rules reject an unattributed write anyway.
+     * reporterId lets a moderator see who sent a request and mute a source that abuses it; there
+     * was previously no identity on these at all, so neither was possible. */
+    if(!isLoggedIn()){
+      console.warn('logMissingLocation blocked: not signed in');
+      return { ok: false, reason: 'signedout' };
+    }
     const {db, collection, addDoc} = await fb();
     const docData = { description, ts: Date.now() };
     if(coords){ docData.lat = coords.lat; docData.lng = coords.lng; }
     await addDoc(collection(db, 'missingReports'), docData);
-    return true;
+    return { ok: true };
   }catch(e){
     console.error('logMissingLocation failed:', e);
-    return false;
+    return { ok: false, reason: 'error' };
   }
 }
 
@@ -5332,6 +5341,20 @@ document.getElementById('listViewClose').addEventListener('click',()=>{document.
 function applyAuthVisibility(){
   const loggedIn = isLoggedIn();
 
+  /* "Add a place" is signed-in only. A location request now carries the submitter's handle so a
+   * moderator can see who sent it, and the rules reject one without it — so the control has to
+   * disappear rather than fail on submit. Inline display, not .is-hidden: that class is scoped to
+   * `#appDrawer .d-items button` and does not reach a floating map control. */
+  const missing = document.getElementById('missingBtn');
+  if(missing) missing.style.display = loggedIn ? '' : 'none';
+  if(!loggedIn) document.getElementById('missingPanel')?.classList.remove('show');
+
+  /* The chain filter is signed-in only. syncChainFilterToAuth() below already forces the
+   * anonymous map to show every chain, so for a logged-out visitor the list was a panel of
+   * controls that could not change anything on the map — worse than absent. */
+  const chains = document.getElementById('allChains');
+  if(chains) chains.style.display = loggedIn ? '' : 'none';
+
   // NB: a class, not style.display — `#appDrawer .d-items button` sets `display:flex !important`,
   // which an inline style can't beat. The .is-hidden rule carries !important to match.
   const passport = document.getElementById('passportToggle');
@@ -5933,6 +5956,13 @@ missingUseLocationBtn.addEventListener('click', () => {
 });
 
 async function submitMissingLocation(){
+  // Defence in depth: the pill is hidden signed-out, but the panel can still be open when a
+  // session expires mid-edit. A plain message beats a generic "something went wrong".
+  if(!isLoggedIn()){
+    missingNote.style.color = '#c62828';
+    missingNote.textContent = 'Log in to send a location request.';
+    return;
+  }
   const description = missingInput.value.trim();
   if(!description && !capturedMissingCoords){
     missingNote.style.color = '#c62828';
@@ -5942,9 +5972,16 @@ async function submitMissingLocation(){
   missingSubmit.disabled = true;
   missingSubmit.innerHTML = 'Sending…';
   const finalDescription = description || '(no description — location only)';
-  const ok = await logMissingLocation(finalDescription, capturedMissingCoords);
+  const res = await logMissingLocation(finalDescription, capturedMissingCoords);
+  const ok = res && res.ok;
   missingNote.style.color = ok ? '#2f6b3c' : '#c62828';
-  missingNote.textContent = ok ? 'Thanks — sent!' : 'Something went wrong, try again.';
+  if(ok){
+    missingNote.textContent = 'Thanks — sent!';
+  }else if(res && res.reason === 'signedout'){
+    missingNote.textContent = 'Log in to send a location request.';
+  }else{
+    missingNote.textContent = 'Something went wrong, try again.';
+  }
   if(ok){
     missingInput.value = '';
     missingInput.placeholder = 'Address or cross streets';
