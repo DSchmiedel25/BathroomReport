@@ -60,23 +60,40 @@ jobs:
       # Every *-locations.js must evaluate and define exactly one array global. A file that throws
       # here is one that would break the map on load — and it is how compact-locations.js silently
       # killed the nightly bake for weeks.
+      #
+      # One sanctioned exception: APPEND files. The ten public-*-locations.js region files all
+      # push onto a single shared window.usPublicLocations — a deliberate design, so the chain
+      # registry carries one entry instead of ten identical "Public restroom" rows. Under the
+      # strict rule the alphabetically-first region created the global and the other nine
+      # "defined 0 globals". An append file is recognised by its opening form
+      # (window.X = window.X || []).push( — and is held to its own guarantee instead: it must
+      # GROW the shared array. The collision case the strict rule exists for is still caught,
+      # because a second plain `window.caseysLocations = [...]` defines 0 new keys AND matches
+      # no append form, so it fails exactly as before.
       - name: Location data files load
         run: |
           node -e "
             const fs = require('fs');
             const g = {};
             let files = 0, bad = [];
-            for (const f of fs.readdirSync('.')) {
+            const APPEND_RE = /^\(window\.(\w+) = window\.\1 \|\| \[\]\)\.push\(/;
+            const count = () => Object.values(g).reduce((s, a) => s + (Array.isArray(a) ? a.length : 0), 0);
+            for (const f of fs.readdirSync('.').sort()) {
               if (!f.endsWith('-locations.js') || f === 'compact-locations.js') continue;
               files++;
-              const before = Object.keys(g).length;
-              try { new Function('window', fs.readFileSync(f, 'utf8'))(g); }
+              const src = fs.readFileSync(f, 'utf8');
+              const before = Object.keys(g).length, recsBefore = count();
+              try { new Function('window', src)(g); }
               catch (e) { bad.push(f + ': ' + e.message); continue; }
-              if (Object.keys(g).length !== before + 1) bad.push(f + ': defined ' + (Object.keys(g).length - before) + ' globals, expected 1');
+              const newKeys = Object.keys(g).length - before, grew = count() - recsBefore;
+              if (APPEND_RE.test(src)) {
+                if (newKeys > 1) bad.push(f + ': append file defined ' + newKeys + ' globals');
+                else if (grew < 1) bad.push(f + ': append file added no records');
+              } else if (newKeys !== 1) {
+                bad.push(f + ': defined ' + newKeys + ' globals, expected 1');
+              }
             }
-            let total = 0;
-            for (const a of Object.values(g)) if (Array.isArray(a)) total += a.length;
-            console.log(files + ' data files, ' + total + ' records');
+            console.log(files + ' data files, ' + count() + ' records');
             if (bad.length) { bad.forEach(b => console.error('::error::' + b)); process.exit(1); }
           "
 
