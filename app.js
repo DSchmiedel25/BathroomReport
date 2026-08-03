@@ -2361,7 +2361,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.34.1';
+const BUILD = 'v2.35.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -5152,15 +5152,33 @@ function renderChainKey(){
     const on = !keys.every(k => disabledChains.has(k));
 
     if(readOnly){
-      return `<div class="d-toggle ck-grouprow d-gated"><span>${escapeHtml(g.label)}</span>` +
+      const mappedRO = keys.reduce((n, k) => n + ((window[CHAIN_REGISTRY[k].dataVar] || []).length), 0);
+      return `<div class="d-toggle ck-grouprow d-gated">` +
+             `<span class="ss-main"><span class="ss-lab">${escapeHtml(g.label)}</span>` +
+             `<span class="ss-desc">${mappedRO.toLocaleString()} mapped</span></span>` +
              `<span class="d-switch"><b></b></span></div>`;
     }
-    // Reuses the drawer's own switch (same markup as Hide-closed and Appearance) rather than
-    // the map key's checkmark. A checkmark reads as "selected"; the question here is
-    // shown/hidden, and the drawer already has a control that says exactly that.
-    return `<button type="button" class="d-toggle ck-grouprow${on ? ' on' : ''}" data-groupkeys="${keys.join(',')}"` +
-      ` role="switch" aria-checked="${on}"><span>${escapeHtml(g.label)}</span>` +
-      `<span class="d-switch"><b></b></span></button>`;
+    /* Reuses the settings switch rather than the map key's checkmark: a checkmark reads as
+     * "selected", and the question here is shown or hidden.
+     *
+     * The count is the point of the row. "Gas & convenience" alone says nothing about what
+     * turning it off costs you; "20,380 mapped · 23 chains" does, and it is the difference
+     * between a switch you can reason about and one you flip to find out. */
+    const mapped = keys.reduce((n, k) => n + ((window[CHAIN_REGISTRY[k].dataVar] || []).length), 0);
+    const sub = `${mapped.toLocaleString()} mapped &middot; ${keys.length} chain${keys.length === 1 ? '' : 's'}`;
+    /* TWO hit areas in one row, the way a phone's own settings do it: the switch turns the whole
+     * group on or off, and anything else opens the list of chains inside it. A row that only
+     * navigated would bury the common action one level down; a row that only toggled would
+     * leave no way to reach an individual chain. */
+    return `<div class="d-toggle ck-grouprow${on ? ' on' : ''}" data-groupkeys="${keys.join(',')}" data-group="${g.id}">` +
+      `<button type="button" class="ck-groupopen" data-ss-chains="${g.id}" data-group-label="${escapeHtml(g.label)}">` +
+        `<span class="ss-main"><span class="ss-lab">${escapeHtml(g.label)}</span>` +
+        `<span class="ss-desc">${sub}</span></span>` +
+        `<svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>` +
+      `</button>` +
+      `<button type="button" class="ck-groupsw" data-groupkeys="${keys.join(',')}" role="switch" aria-checked="${on}"` +
+        ` aria-label="${escapeHtml(g.label)}, all ${keys.length} on the map"><span class="d-switch"><b></b></span></button>` +
+      `</div>`;
   }).join('');
 
   if(countEl) countEl.textContent = areaKeys.length ? String(areaKeys.length) : '';
@@ -5210,7 +5228,12 @@ function updateChainKeyScrollHint(){
  * per-place choices within it, which is what "turn this whole category on" should mean. */
 function onChainKeyGroupTap(e){
   if(!isLoggedIn()) return true;               // signed out these are a legend, not controls
-  const row = e.target.closest('.ck-grouprow');
+  /* Only the switch half toggles. Without this the whole row still fired, so opening the chain
+   * list would ALSO flip the entire group off on the way in — a destructive side effect of a
+   * navigation tap. */
+  const sw = e.target.closest('.ck-groupsw');
+  if(!sw) return true;
+  const row = sw;
   if(!row) return true;
   const keys = String(row.dataset.groupkeys || '').split(',').filter(k => CHAIN_REGISTRY[k]);
   if(!keys.length) return false;
@@ -5959,6 +5982,34 @@ function ssCommitLayout(){
   refreshOpenPopupStrip();
 }
 
+/* ---------- Chains within a group ----------
+ * Reuses chainKeyRowHtml, so the rows here are the same element, same data-chain attribute and
+ * same handler the map key uses. A parallel implementation would be a second place for the
+ * on/off state to be read and written, and those two drift. */
+let ssChainsGroup = null;
+
+function ssRenderChains(){
+  const list = document.getElementById('ssChainsList');
+  const title = document.getElementById('ssChainsTitle');
+  const hint = document.getElementById('ssChainsHint');
+  if(!list || !ssChainsGroup) return;
+  const g = CK_GROUPS.find(x => x.id === ssChainsGroup);
+  const keys = Object.keys(CHAIN_REGISTRY)
+    .filter(k => chainHasData(k) && chainBucket(k) === ssChainsGroup)
+    .sort((a, b) => CHAIN_REGISTRY[a].name.localeCompare(CHAIN_REGISTRY[b].name));
+  if(title) title.textContent = g ? g.label : 'Chains';
+  const on = keys.filter(k => !disabledChains.has(k)).length;
+  if(hint) hint.textContent = keys.length
+    ? `${on} of ${keys.length} showing. Turning the group off on the previous screen turns off all of them.`
+    : 'Nothing in this group yet.';
+  const readOnly = !isLoggedIn();
+  /* groupKeysByName so chains sharing a display name — the NYC and Boston copies of Dunkin,
+   * and the four public-restroom sets — appear once, exactly as they do in the map key. */
+  list.innerHTML = keys.length
+    ? [...groupKeysByName(keys).values()].map(ks => chainKeyRowHtml(ks, readOnly)).join('')
+    : '<div class="ss-row"><span class="ss-main"><span class="ss-lab ss-muted">Nothing here</span></span></div>';
+}
+
 /* Every sub-screen reflects live state on entry, because it can be opened at any time and the
  * value may have changed since it was last seen — from another device, or from the map. */
 function ssSyncScreen(id){
@@ -5972,6 +6023,7 @@ function ssSyncScreen(id){
   }
   if(id === 'ssScreenPlaces' && typeof renderChainKey === 'function') renderChainKey();
   if(id === 'ssScreenLayout'){ ssLayoutPicks = stripPicks().slice(); ssRenderLayout(); }
+  if(id === 'ssScreenChains') ssRenderChains();
 }
 
 /* The root rows carry the current value, so you can read every setting without opening one. */
@@ -5993,6 +6045,8 @@ function ssSyncValues(){
 }
 
 document.addEventListener('click', (e) => {
+  const chains = e.target.closest('[data-ss-chains]');
+  if(chains){ ssChainsGroup = chains.dataset.ssChains; ssShowScreen('ssScreenChains'); return; }
   const go = e.target.closest('[data-ss-go]');
   if(go){ ssShowScreen(go.dataset.ssGo); return; }
   if(e.target.closest('[data-ss-back]')){ history.back(); return; }
@@ -6102,6 +6156,17 @@ document.addEventListener('click', (e) => {
     if(moved) moved.focus();
   });
 })();
+
+/* The chain rows are the map key's own rows, so they get the map key's own handler. After it
+ * runs, both this screen and the Places screen behind it are re-rendered — the group switch and
+ * the "N of M showing" line are derived from the same state that just changed. */
+document.getElementById('ssChainsList')?.addEventListener('click', (e) => {
+  if(!e.target.closest('.ck-row')) return;
+  onChainKeyRowTap(e);
+  ssRenderChains();
+  if(typeof renderChainKey === 'function') renderChainKey();
+  ssSyncValues();
+});
 
 window.addEventListener('popstate', () => {
   if(ssStack.length) ssPopScreen();

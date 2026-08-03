@@ -508,7 +508,7 @@ This is tracked on this device only. Log in to sync it across devices.
 
       <div class="ss-foot">
         <span class="d-count" id="drawerLocCount"></span>
-        <span id="ssVersion">Bathroom Report</span> <span class="d-version" data-version="v2.34.1">v2.34.1 · 2026-08-03</span><br>
+        <span id="ssVersion">Bathroom Report</span> <span class="d-version" data-version="v2.35.0">v2.35.0 · 2026-08-03</span><br>
         &copy; 2025&ndash;2026 Bathroom Report. Independent and community-created.
         Not affiliated with any business listed.
       </div>
@@ -536,6 +536,20 @@ This is tracked on this device only. Log in to sync it across devices.
           <div id="chainKeyAllList"></div>
         </div>
       </div>
+    </div>
+
+    <!-- One screen serving all four groups: the title and the list are filled from whichever
+         group was tapped. Four near-identical screens would be four places for the same list to
+         drift out of step. -->
+    <div class="ss-screen" id="ssScreenChains" hidden>
+      <div class="ss-nav">
+        <button class="ss-back" data-ss-back>
+          <svg viewBox="0 0 9 15" fill="none" aria-hidden="true"><path d="M8 1L1 7.5 8 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Places
+        </button>
+        <h2 class="ss-nav-title" id="ssChainsTitle">Chains</h2>
+      </div>
+      <p class="ss-hint" id="ssChainsHint"></p>
+      <div class="ss-card" id="ssChainsList"></div>
     </div>
 
     <div class="ss-screen" id="ssScreenAround" hidden>

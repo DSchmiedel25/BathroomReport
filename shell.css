@@ -1041,23 +1041,24 @@ html[data-theme="light"]{
 
 /* Every row shape shares one geometry: the account block, the standard rows, the toggles that
    came from the drawer, and the two select sections. */
-.ss-row,.ss-body .d-toggle,.ss-body .d-collapse-head,.ss-body .d-section-label{
+.ss-row, .ss-body .d-toggle, .ss-screen .d-toggle, .ss-body .d-collapse-head, .ss-screen .d-collapse-head, .ss-body .d-section-label, .ss-screen .d-section-label{
   display:flex !important;align-items:center;gap:var(--ss-gap);width:100% !important;
   padding:var(--ss-s3) var(--ss-pad) !important;min-height:56px;margin:0 !important;
   background:none !important;border:0 !important;box-shadow:none !important;border-radius:0 !important;
   font-family:inherit;text-align:left !important;color:var(--ss-ink) !important;cursor:pointer;
   position:relative;text-transform:none;letter-spacing:0;font-size:var(--ss-t-lead);font-weight:600;
 }
-.ss-row:active,.ss-body .d-toggle:active,.ss-body .d-collapse-head:active{background:var(--ss-card2) !important}
+.ss-row:active, .ss-body .d-toggle:active, .ss-screen .d-toggle:active, .ss-body .d-collapse-head:active, .ss-screen .d-collapse-head:active{background:var(--ss-card2) !important}
 .ss-row[hidden]{display:none !important}
 .ss-row.is-hidden{display:none !important}
 /* Dividers inset to the label, never to the card edge. */
 .ss-row + .ss-row::before,.ss-acct + .ss-row::before,
 .ss-body .d-toggle + .d-toggle::before,
-.ss-body .d-section + .d-section::before{
+.ss-screen .d-toggle + .d-toggle::before,
+.ss-body .d-section + .d-section::before, .ss-screen .d-section + .d-section::before{
   content:'';position:absolute;top:0;left:var(--ss-divider);right:0;height:1px;background:var(--ss-line)}
-.ss-body .d-section{padding:0 !important;margin:0 !important;border:0 !important;position:relative}
-.ss-body .d-toggle.d-gated{opacity:.45;cursor:default}
+.ss-body .d-section, .ss-screen .d-section{padding:0 !important;margin:0 !important;border:0 !important;position:relative}
+.ss-body .d-toggle.d-gated, .ss-screen .d-toggle.d-gated{opacity:.45;cursor:default}
 
 .ss-tile{width:var(--ss-tile);height:var(--ss-tile);border-radius:9px;background:var(--ss-tile-bg);
   display:grid;place-items:center;flex:none;color:var(--ss-ink2)}
@@ -1085,17 +1086,17 @@ html[data-theme="light"]{
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* iOS-style switch, replacing the drawer's smaller one. Same markup, same .on class. */
-.ss-body .d-toggle .d-switch{margin-left:auto;width:50px;height:30px;border-radius:999px;
+.ss-body .d-toggle .d-switch, .ss-screen .d-toggle .d-switch{margin-left:auto;width:50px;height:30px;border-radius:999px;
   background:#26333f;border:0;position:relative;flex:none;transition:background .18s}
-.ss-body .d-toggle .d-switch b{position:absolute;top:3px;left:3px;width:24px;height:24px;
+.ss-body .d-toggle .d-switch b, .ss-screen .d-toggle .d-switch b{position:absolute;top:3px;left:3px;width:24px;height:24px;
   border-radius:50%;background:#fff;transition:transform .18s}
-.ss-body .d-toggle.on .d-switch{background:var(--accent)}
-.ss-body .d-toggle.on .d-switch b{transform:translateX(20px)}
+.ss-body .d-toggle.on .d-switch, .ss-screen .d-toggle.on .d-switch{background:var(--accent)}
+.ss-body .d-toggle.on .d-switch b, .ss-screen .d-toggle.on .d-switch b{transform:translateX(20px)}
 html[data-theme="light"] .ss-body .d-toggle .d-switch{background:#d6dde3}
 
 /* Selects keep their element and their handlers; only the dressing changes. They become
    sub-screens in the next step. */
-.ss-body .nav-pref-select{
+.ss-body .nav-pref-select, .ss-screen .nav-pref-select{
   margin:0 var(--ss-pad) var(--ss-s3) !important;width:calc(100% - var(--ss-pad) * 2) !important;
   appearance:none;-webkit-appearance:none;background:var(--ss-card2);color:var(--ss-ink);
   border:1px solid var(--ss-line);border-radius:9px;
@@ -1105,22 +1106,22 @@ html[data-theme="light"] .ss-body .d-toggle .d-switch{background:#d6dde3}
                    linear-gradient(135deg,var(--ss-ink3) 50%,transparent 50%);
   background-position:calc(100% - 18px) calc(50% + 2px), calc(100% - 13px) calc(50% + 2px);
   background-size:5px 5px,5px 5px;background-repeat:no-repeat}
-.ss-body .nav-pref-select:focus{outline:none;border-color:var(--accent)}
+.ss-body .nav-pref-select:focus, .ss-screen .nav-pref-select:focus{outline:none;border-color:var(--accent)}
 
-.ss-body .d-collapse-arrow{margin-left:auto !important;transition:transform .16s;color:var(--ss-ink3)}
-.ss-body #chainKeyAllList{overflow:hidden;background:transparent}
-.ss-body #chainKeyAllList.collapsed{display:none}
-.ss-body #chainKeyAllList .ck-row{padding-left:var(--ss-divider);padding-right:var(--ss-pad)}
-.ss-body .ck-grouprow{width:100% !important}
-.ss-body .ck-grouprow > span:first-child{margin-right:auto}
+.ss-body .d-collapse-arrow, .ss-screen .d-collapse-arrow{margin-left:auto !important;transition:transform .16s;color:var(--ss-ink3)}
+.ss-body #chainKeyAllList, .ss-screen #chainKeyAllList{overflow:hidden;background:transparent}
+.ss-body #chainKeyAllList.collapsed, .ss-screen #chainKeyAllList.collapsed{display:none}
+.ss-body #chainKeyAllList .ck-row, .ss-screen #chainKeyAllList .ck-row{padding-left:var(--ss-divider);padding-right:var(--ss-pad)}
+.ss-body .ck-grouprow, .ss-screen .ck-grouprow{width:100% !important}
+.ss-body .ck-grouprow > span:first-child, .ss-screen .ck-grouprow > span:first-child{margin-right:auto}
 
-.ss-body .acct-note{font-size:var(--ss-t-cap);color:var(--ss-ink2);padding:0 var(--ss-pad) var(--ss-s3)}
-.ss-body .acct-note:empty{display:none}
-.ss-body .acct-chip{font-size:var(--ss-t-micro);font-weight:800;padding:var(--ss-s1) var(--ss-s2);
+.ss-body .acct-note, .ss-screen .acct-note{font-size:var(--ss-t-cap);color:var(--ss-ink2);padding:0 var(--ss-pad) var(--ss-s3)}
+.ss-body .acct-note:empty, .ss-screen .acct-note:empty{display:none}
+.ss-body .acct-chip, .ss-screen .acct-chip{font-size:var(--ss-t-micro);font-weight:800;padding:var(--ss-s1) var(--ss-s2);
   border-radius:20px;flex:none;background:rgba(46,161,170,.15);border:1px solid rgba(46,161,170,.45);color:#7fd4da}
-.ss-body .acct-chip.none{background:rgba(229,57,53,.13);border-color:rgba(229,57,53,.35);color:#f08a86}
-.ss-body .d-gate-note{font-size:var(--ss-t-cap);color:var(--ss-ink3);padding:0 var(--ss-pad) var(--ss-s3)}
-.ss-body .d-gate-note[hidden]{display:none}
+.ss-body .acct-chip.none, .ss-screen .acct-chip.none{background:rgba(229,57,53,.13);border-color:rgba(229,57,53,.35);color:#f08a86}
+.ss-body .d-gate-note, .ss-screen .d-gate-note{font-size:var(--ss-t-cap);color:var(--ss-ink3);padding:0 var(--ss-pad) var(--ss-s3)}
+.ss-body .d-gate-note[hidden], .ss-screen .d-gate-note[hidden]{display:none}
 
 /* FIND. RATE. SHARE. IMPROVE. — the tagline as the labels for the numbers already in the footer. */
 .ss-creed{display:flex;background:var(--ss-card);border-radius:14px;margin-top:var(--ss-s6);overflow:hidden}
@@ -1194,3 +1195,64 @@ html[data-theme="light"] .ss-body .d-toggle .d-switch{background:#d6dde3}
 #ssLayoutPicked.is-dragging .ss-drag-row.is-drag{transition:none;background:var(--ss-card2);
   border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:3}
 #ssLayoutPicked .ss-drag-row.is-drag::before{display:none}
+
+/* ---------- Places screen: the chain-group rows ----------
+   These are rendered by renderChainKey into #chainKeyAllList, which also feeds the map key —
+   so the map-key pill styling reaches them and has to be overridden here rather than changed
+   at source. Inside settings they are ordinary rows with a switch. */
+.ss-screen .ck-grouprow{
+  display:flex !important; align-items:center; gap:var(--ss-gap);
+  width:100% !important; padding:var(--ss-s3) var(--ss-pad) !important; min-height:56px;
+  margin:0 !important; background:none !important; border:0 !important; border-radius:0 !important;
+  box-shadow:none !important; text-align:left !important; cursor:pointer;
+  font-family:inherit; font-size:var(--ss-t-lead); font-weight:600; color:var(--ss-ink) !important;
+  position:relative; white-space:normal;
+}
+.ss-screen .ck-grouprow + .ck-grouprow::before{
+  content:''; position:absolute; top:0; left:var(--ss-pad); right:0; height:1px; background:var(--ss-line);
+}
+.ss-screen .ck-grouprow:active{background:var(--ss-card2) !important}
+.ss-screen .ck-grouprow .ss-main{flex:1;min-width:0}
+.ss-screen .ck-grouprow.d-gated{opacity:.45;cursor:default}
+/* The per-chain rows are not shown on this screen — Places is about the four TYPES. The map
+   key still lists individual chains, which is where per-place control belongs. */
+.ss-screen #chainKeyAllList .ck-row{display:none}
+
+/* ---------- group row: navigate + toggle in one row ---------- */
+.ss-screen .ck-grouprow{padding:0 !important;gap:0}
+.ss-screen .ck-groupopen{
+  flex:1;min-width:0;display:flex;align-items:center;gap:var(--ss-gap);
+  padding:var(--ss-s3) var(--ss-s2) var(--ss-s3) var(--ss-pad);
+  background:none;border:0;font-family:inherit;text-align:left;color:var(--ss-ink);cursor:pointer;
+}
+.ss-screen .ck-groupopen:active{background:var(--ss-card2)}
+/* The switch gets its own generous target — 44px minimum, and padded away from the chevron so
+   a thumb aiming at one cannot land on the other. */
+.ss-screen .ck-groupsw{
+  background:none;border:0;padding:var(--ss-s3) var(--ss-pad) var(--ss-s3) var(--ss-s2);
+  cursor:pointer;flex:none;display:grid;place-items:center;min-width:44px;min-height:44px;
+}
+.ss-screen .ck-groupsw:active{background:var(--ss-card2)}
+.ss-screen .ck-groupsw .d-switch{margin-left:0}
+.ss-screen .ck-grouprow .ss-chev{margin-left:auto}
+
+/* ---------- per-chain rows inside a group ---------- */
+.ss-screen #ssChainsList .ck-row{
+  display:flex !important;align-items:center;gap:var(--ss-gap);width:100% !important;
+  padding:var(--ss-s3) var(--ss-pad) !important;min-height:52px;margin:0 !important;
+  background:none !important;border:0 !important;border-radius:0 !important;box-shadow:none !important;
+  font-family:inherit;font-size:var(--ss-t-lead);font-weight:600;color:var(--ss-ink) !important;
+  text-align:left !important;cursor:pointer;position:relative;
+}
+.ss-screen #ssChainsList .ck-row + .ck-row::before{
+  content:'';position:absolute;top:0;left:var(--ss-pad);right:0;height:1px;background:var(--ss-line);
+}
+.ss-screen #ssChainsList .ck-row:active{background:var(--ss-card2) !important}
+.ss-screen #ssChainsList .ck-dot{width:12px;height:12px;border-radius:50%;flex:none}
+.ss-screen #ssChainsList .ck-name{flex:1;min-width:0}
+/* A tick, shown only when the chain is on. The map key uses the same mark, so the two screens
+   agree about what "on" looks like. */
+.ss-screen #ssChainsList .ck-mark{color:var(--accent);font-size:16px;flex:none}
+.ss-screen #ssChainsList .ck-off .ck-mark{opacity:0}
+.ss-screen #ssChainsList .ck-off .ck-name{color:var(--ss-ink3)}
+.ss-screen #ssChainsList .ck-legend{cursor:default}
