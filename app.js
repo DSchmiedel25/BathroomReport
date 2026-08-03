@@ -187,11 +187,8 @@ function applyTheme(theme){
     btn.setAttribute('aria-pressed', String(isDark));
   }
   if(typeof setMapTilesForTheme === 'function') setMapTilesForTheme(theme);
-  // The account sheet has its own Light/Dark control; keep the two in step whichever is used.
-  const lt = document.getElementById('acctThemeLight');
-  const dk = document.getElementById('acctThemeDark');
-  if(lt) lt.setAttribute('aria-pressed', String(theme === 'light'));
-  if(dk) dk.setAttribute('aria-pressed', String(theme !== 'light'));
+  /* The second theme control (the account sheet's Light/Dark pair) is gone — one setting, one
+   * switch, nothing to mirror. */
 }
 document.getElementById('themeToggle').addEventListener('click', () => {
   if(!isLoggedIn()) return;                       // gated: anonymous keeps the default theme
@@ -330,9 +327,8 @@ map.on('popupclose', () => {
   for(const k in visitQuestions) delete visitQuestions[k];
   for(const k in visitCursor) delete visitCursor[k];
   document.getElementById('locateBtn').style.display = '';
-  // Restoring this unconditionally would undo the signed-out gate every time a popup closed.
-  document.getElementById('missingBtn').style.display = isLoggedIn() ? '' : 'none';
-  document.getElementById('topLeftControls').style.display = isLoggedIn() ? '' : 'none';
+  document.getElementById('missingBtn').style.display = '';
+  document.getElementById('topLeftControls').style.display = '';
   document.getElementById('openNowToggle').style.display = '';
   document.getElementById('listViewToggle').style.display = '';
   document.getElementById('passportToggle').style.display = '';
@@ -469,7 +465,7 @@ function ratingConfidenceHtml(count){
  * onboarding panel, and the FAQ — which is exactly why they drifted apart (July 14 / July 21 /
  * actually July 30). Set this ONE value on each release; everything that shows a date reads it.
  * Format is YYYY-MM-DD so it sorts and can't be misread. */
-const BUILD_DATE = '2026-08-02';
+const BUILD_DATE = '2026-08-03';
 
 // "2026-07-30" -> "July 30, 2026" for prose. Parsed as UTC parts rather than new Date(str) so it
 // can't shift a day backwards for users west of GMT.
@@ -2013,14 +2009,8 @@ function metroPopupHtml(loc, agg, myVote){
   const shareUrl = `${location.origin}${location.pathname}?loc=${encodeURIComponent(loc.id)}`;
   const chain = chainFor(loc);
   const raw = (loc.metroInfo && loc.metroInfo.hoursRaw) || '';
-  /* A solar window is shown by name — "Sunrise to sunset" — rather than as the raw tag text or
-   * as a clock time. The parser knows the actual minute and uses it for the open/closed verdict,
-   * but printing "8:13 PM" would assert a fixed closing time that shifts daily. Everything else
-   * still shows its own tag text unchanged. */
-  const solarLabel = osmSolarLabel(loc);
-  const hoursText = solarLabel || raw;
-  const hoursLine = hoursText
-    ? `<div class="hours-line">${ico('clock')} ${escapeHtml(hoursText)}</div>`
+  const hoursLine = raw
+    ? `<div class="hours-line">${ico('clock')} ${escapeHtml(raw)}</div>`
     : `<div class="hours-line">${ico('clock')} Hours unknown — know them? Report hours below.</div>`;
   /* The same community hours flow the pit-stop popup has, not the old "tap Report below"
    * detour into the problem-report form. Hours sent that way arrived as free text in a
@@ -2099,7 +2089,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.29.3';
+const BUILD = 'v2.29.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -2591,22 +2581,14 @@ async function logReport(loc, reason){
 
 async function logMissingLocation(description, coords){
   try{
-    /* Signed-in only. The pill is hidden when logged out, but this is the boundary that actually
-     * matters — the UI gate is convenience, and the rules reject an unattributed write anyway.
-     * reporterId lets a moderator see who sent a request and mute a source that abuses it; there
-     * was previously no identity on these at all, so neither was possible. */
-    if(!isLoggedIn()){
-      console.warn('logMissingLocation blocked: not signed in');
-      return { ok: false, reason: 'signedout' };
-    }
     const {db, collection, addDoc} = await fb();
     const docData = { description, ts: Date.now() };
     if(coords){ docData.lat = coords.lat; docData.lng = coords.lng; }
     await addDoc(collection(db, 'missingReports'), docData);
-    return { ok: true };
+    return true;
   }catch(e){
     console.error('logMissingLocation failed:', e);
-    return { ok: false, reason: 'error' };
+    return false;
   }
 }
 
@@ -3453,6 +3435,10 @@ function renderBathroomPassport(stats, results){
   if(!container) return;
   const pct = stats.totalLocations > 0 ? ((stats.visitedCount / stats.totalLocations) * 100).toFixed(1) : '0.0';
   const unlockedCount = Object.values(results).filter(r => r.unlocked).length;
+  /* Published for the settings sheet's header chip. Computed here anyway, and reaching into this
+   * function's locals from outside would be worse than handing the number over deliberately. */
+  ssStampCount = unlockedCount;
+  if(typeof ssSyncIdentity === 'function' && !document.getElementById('settingsSheet')?.hidden) ssSyncIdentity();
 
   /* Progress is stamps collected, not percent of the map.
    *
@@ -3688,13 +3674,7 @@ async function updateMostRecentBadge(){
      * somewhere — the marker has to be on the map for zoomToMarker to work — so it is a promise
      * rather than decoration. escapeHtml because a location name is data, not markup. */
     const tappable = !!(loc && markers[loc.id]);
-    /* Attribution, restored. The handle rides in the activity doc already being read, so this
-     * costs nothing — and it was lost, not removed on purpose: the "brand and town" rewrite above
-     * replaced this whole line and the credit went with it. Same helper the popup uses, so the
-     * escaping, the 40-char cap and the "render nothing when absent" behaviour cannot drift
-     * between the two places a name appears. */
-    el.innerHTML = `Just rated: ${escapeHtml(headline)}${ratedByHtml({ lastRatedBy: rec.username })}`
-      + ` — ${relativeTimeFromNow(rec.ts)}`
+    el.innerHTML = `Just rated: ${escapeHtml(headline)} — ${relativeTimeFromNow(rec.ts)}`
       + (tappable ? ` ${ico('arrow')}` : '');
     el.classList.toggle('is-tappable', tappable);
     _mostRecentLoaded = true;   // lock only after a real, successful write
@@ -4295,55 +4275,7 @@ function todayHrsString(loc){
     const v = loc.hours[HRS_DAY_KEYS[new Date().getDay()]];
     return (v === undefined || v === null) ? null : v;
   }
-  if(loc && loc.hrs != null && String(loc.hrs) !== '') return loc.hrs;
-  /* Public-restroom records keep their hours as OSM opening_hours text in metroInfo.hoursRaw.
-   * Nothing read it, so 790 pins that stated their hours plainly — 232 of them "24/7" — were
-   * unknown to every open-now path. hours-osm.js turns that text into this same canonical
-   * vocabulary, so the verdict, the list row and Bathroom Now's ranking all light up with no
-   * further change. Values it cannot safely read return null and stay unknown. */
-  const raw = loc && loc.metroInfo && loc.metroInfo.hoursRaw;
-  if(raw && window.OsmHours) return osmHrsForToday(loc, raw);
   return (loc && loc.hrs != null) ? loc.hrs : null;
-}
-
-/* Memoised wrapper around the OSM parser.
- *
- * todayHrsString runs inside applyFilters, which walks every marker on the map. Re-parsing a rule
- * list — and recomputing sunrise — on each of those passes would put real text processing in the
- * one loop that has to stay cheap. The answer only changes when the day changes or when a
- * position fix arrives, so both are part of the cache key. */
-function osmHrsForToday(loc, raw){
-  // Solar words are generated from the device clock rather than read from the record, so they
-  // need a position fix AND proximity before they can be trusted. See hours-osm.js.
-  const solarOk = !!lastKnownPos && openNowConfident(loc);
-  const key = new Date().toDateString() + '|' + (solarOk ? '1' : '0');
-  if(loc._osmHrs && loc._osmHrs.key === key) return loc._osmHrs.val;
-  let val = null, label = null;
-  try{
-    const d = window.OsmHours.todayDetail(raw, {
-      lat: Number(loc.lat), lng: Number(loc.lng), solarOk: solarOk
-    });
-    val = d.value;
-    label = d.label;
-  }catch(e){
-    // A single malformed value must not take down the filter pass for every other pin.
-    console.warn('opening_hours parse failed for', loc.id, e && e.message);
-    val = null;
-  }
-  loc._osmHrs = { key: key, val: val, label: label };
-  return val;
-}
-
-/* Display text for a solar window, e.g. "Sunrise to sunset".
- *
- * The computed minute is real and decides open vs closed, but showing "8:13 PM" would state a
- * closing time that does not exist: it moves daily, and by more than three hours across the year.
- * Someone reading it at the trailhead would plan against a number that is wrong tomorrow. */
-function osmSolarLabel(loc){
-  const raw = loc && loc.metroInfo && loc.metroInfo.hoursRaw;
-  if(!raw || !window.OsmHours) return null;
-  osmHrsForToday(loc, raw);            // populates/refreshes the cache for today
-  return (loc._osmHrs && loc._osmHrs.label) || null;
 }
 
 /* How far away a location can be before we stop claiming to know whether it's open.
@@ -4417,9 +4349,6 @@ function formatHrsDisplay(loc){
   if(!hrs) return null;
   if(hrs === 'closed') return 'Closed today';
   if(hrs === '24') return 'Open 24 hours';
-  // A solar window names its endpoints instead of printing a clock time that shifts every day.
-  const solar = osmSolarLabel(loc);
-  if(solar) return solar;
   const parts = hrs.split('-');
   if(parts.length !== 2) return null;
   const open = parseInt(parts[0], 10);
@@ -5341,35 +5270,6 @@ document.getElementById('listViewClose').addEventListener('click',()=>{document.
 function applyAuthVisibility(){
   const loggedIn = isLoggedIn();
 
-  /* "Add a place" is signed-in only. A location request now carries the submitter's handle so a
-   * moderator can see who sent it, and the rules reject one without it — so the control has to
-   * disappear rather than fail on submit. Inline display, not .is-hidden: that class is scoped to
-   * `#appDrawer .d-items button` and does not reach a floating map control. */
-  const missing = document.getElementById('missingBtn');
-  if(missing) missing.style.display = loggedIn ? '' : 'none';
-  if(!loggedIn) document.getElementById('missingPanel')?.classList.remove('show');
-
-  /* The chain filter is signed-in only. syncChainFilterToAuth() below already forces the
-   * anonymous map to show every chain, so for a logged-out visitor the list was a panel of
-   * controls that could not change anything on the map — worse than absent. */
-  const chains = document.getElementById('allChains');
-  if(chains) chains.style.display = loggedIn ? '' : 'none';
-
-  /* The map's Filter pill is the same filter in its other surface, so it goes too. It carried a
-   * "Sign in to filter by place" note inside the panel, which meant a logged-out visitor could
-   * open a control, read that it does nothing, and close it again — the pill occupied the top
-   * left of the map to deliver a refusal. */
-  const topLeft = document.getElementById('topLeftControls');
-  if(topLeft) topLeft.style.display = loggedIn ? '' : 'none';
-  if(!loggedIn){
-    // 'open', not 'show' — that is the class the pill's own handler toggles. Collapse the arrow
-    // too, so signing back in doesn't reveal a pill claiming to be open over a closed panel.
-    document.getElementById('chainKeyPanel')?.classList.remove('open');
-    document.getElementById('chainKeyPill')?.setAttribute('aria-expanded', 'false');
-    const arrow = document.getElementById('chainKeyArrow');
-    if(arrow) arrow.textContent = '\u25be';
-  }
-
   // NB: a class, not style.display — `#appDrawer .d-items button` sets `display:flex !important`,
   // which an inline style can't beat. The .is-hidden rule carries !important to match.
   const passport = document.getElementById('passportToggle');
@@ -5436,10 +5336,126 @@ function openAccountPanel(mode){
 
   if(isLoggedIn()){
     renderAccountSheet();
-    // Height has to be set once the panel is actually laid out, or the faces measure as zero.
-    requestAnimationFrame(() => flipCardTo(false));
+    /* The flip-height call went with the flip: the card is one-sided now, so it measures itself
+     * and needs no scripted height. Leaving the call in would have thrown on every open. */
   }
 }
+
+/* ============================================================================
+ *  Settings sheet
+ * ============================================================================
+ * Controls are MOVED into this sheet, never rebuilt. Every element keeps the id it had in the
+ * drawer or on the passport's old back face, so every handler already bound in this file keeps
+ * firing untouched — no duplicated logic, and nothing to keep in sync. A rebuilt copy of the
+ * theme switch is exactly how the app ended up with two of them, one in the drawer and one on
+ * the flip card, each having to notify the other.
+ *
+ * The move happens once, on first open rather than at parse time: the drawer and the passport
+ * are built by other code paths, and reparenting a node before it exists silently does nothing.
+ *
+ * The account rows are NOT in this list: their old container (the flip-back) was deleted, so they
+ * are authored directly into the sheet's markup instead — same ids, same handlers.
+ */
+let ssStampCount = null;   // set by renderBathroomPassport once it has counted
+const SS_MOVES = [
+  ['travelModePref',  'ssSlotTravel'],
+  ['navAppPref',      'ssSlotNavApp'],
+  ['allChains',       'ssSlotChains'],
+  ['openNowToggle',   'ssSlotOpenNow'],
+  ['accessibleToggle','ssSlotAccessible'],
+  ['themeToggle',     'ssSlotTheme'],
+];
+let ssMoved = false;
+function ssMoveControls(){
+  if(ssMoved) return;
+  let found = 0;
+  for(const [srcId, slotId] of SS_MOVES){
+    const el = document.getElementById(srcId), slot = document.getElementById(slotId);
+    if(el && slot){ slot.appendChild(el); found++; }
+  }
+  /* Only latch once everything arrived. A partial move on an early open would otherwise be
+   * permanent, leaving half the settings stranded in a drawer that no longer shows them. */
+  if(found === SS_MOVES.length) ssMoved = true;
+}
+
+function ssSetTab(which){
+  const seeTab = document.getElementById('ssTabSee'), acctTab = document.getElementById('ssTabAcct');
+  const see = document.getElementById('ssPaneSee'), acct = document.getElementById('ssPaneAcct');
+  if(!seeTab || !acctTab) return;
+  const onSee = which === 'see';
+  seeTab.setAttribute('aria-selected', String(onSee));
+  acctTab.setAttribute('aria-selected', String(!onSee));
+  see.hidden = !onSee;
+  acct.hidden = onSee;
+}
+
+function ssSyncIdentity(){
+  const name = document.getElementById('ssName'), sub = document.getElementById('ssSub');
+  const av = document.getElementById('ssAvatar'), stamp = document.getElementById('ssStamp');
+  const signOut = document.getElementById('ssSignOut'), signIn = document.getElementById('ssSignIn');
+  const gate = document.getElementById('ssGateNote');
+  const inA = isLoggedIn();
+  const who = inA ? displayNameFor() : '';
+  if(name) name.textContent = inA ? who : 'Not signed in';
+  if(sub)  sub.textContent  = inA ? 'Synced across your devices' : 'Sign in to sync across devices';
+  if(av)   av.textContent   = inA ? (who.trim()[0] || '·').toUpperCase() : '·';
+  if(signOut) signOut.hidden = !inA;
+  if(signIn)  signIn.hidden  = inA;
+  // The drawer gate note moved with its switches; the sheet states the same rule in its own place.
+  if(gate) gate.hidden = inA;
+  const v = document.getElementById('ssVersion');
+  if(v) v.textContent = `Bathroom Report ${BUILD} · ${seedLocations.length.toLocaleString()} locations`;
+  /* Only shown once the passport has actually been rendered and reported a count — the sheet
+   * can be opened before that has ever happened, and an invented zero would read as "you have
+   * earned nothing" rather than "not counted yet". */
+  if(stamp){
+    if(inA && ssStampCount != null){ stamp.hidden = false; stamp.textContent = ssStampCount + ' stamps'; }
+    else stamp.hidden = true;
+  }
+}
+
+function openSettingsSheet(tab){
+  const sheet = document.getElementById('settingsSheet');
+  if(!sheet) return;
+  ssMoveControls();
+  ssSyncIdentity();
+  ssSetTab(tab || 'see');
+  sheet.hidden = false;
+  sheet.setAttribute('aria-hidden', 'false');
+  document.getElementById('ssClose')?.focus({ preventScroll:true });
+}
+function closeSettingsSheet(){
+  const sheet = document.getElementById('settingsSheet');
+  if(!sheet) return;
+  sheet.hidden = true;
+  sheet.setAttribute('aria-hidden', 'true');
+}
+
+/* The drawer closes itself: 'openSettings' is in the NAVIGATES allowlist in index.html, which is
+ * where that decision belongs — a control that takes you somewhere opts IN to closing. */
+document.getElementById('openSettings')?.addEventListener('click', () => openSettingsSheet('see'));
+document.getElementById('ssClose')?.addEventListener('click', closeSettingsSheet);
+document.getElementById('ssScrim')?.addEventListener('click', closeSettingsSheet);
+document.getElementById('ssTabSee')?.addEventListener('click', () => ssSetTab('see'));
+document.getElementById('ssTabAcct')?.addEventListener('click', () => ssSetTab('acct'));
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && !document.getElementById('settingsSheet')?.hidden) closeSettingsSheet();
+});
+document.getElementById('ssPassportRow')?.addEventListener('click', () => {
+  closeSettingsSheet();
+  openAccountPanel('passport');
+});
+document.getElementById('ssSignIn')?.addEventListener('click', () => {
+  closeSettingsSheet();
+  openAccountPanel('account');
+});
+/* Delegates to the existing logOutBtn rather than calling logOutAccount() directly: that handler
+ * also resets the leaderboard cache, refreshes the account UI and reloads ratings. A second
+ * sign-out path that did only half of it would look identical and quietly leave stale state. */
+document.getElementById('ssSignOut')?.addEventListener('click', () => {
+  closeSettingsSheet();
+  document.getElementById('logOutBtn')?.click();
+});
 
 document.getElementById('passportToggle').addEventListener('click', () => openAccountPanel('passport'));
 
@@ -5580,65 +5596,13 @@ function renderAccountSheet(){
   renderAccountRecovery();   // async; the chip shows its loading state meanwhile
 }
 
-/* ---------- The flip ----------
- * Front is the passport data page, back is account settings. Two heights, animated between,
- * because the faces hold different amounts.
+/* The passport flip is gone. Its back face held email, password and theme behind a "flip for
+ * account" gesture, which is a hiding place, not a home — the same failure as content below a
+ * popup's scroll line. Those controls now live in the settings sheet, and the passport card is
+ * one-sided again: purely the collectable object it was always meant to be.
  *
- * The hidden face must be INERT, not merely invisible: backface-visibility hides it visually but
- * leaves it in the accessibility tree and the tab order, so a screen reader would read both sides
- * and Tab would land on buttons nobody can see. */
-const flipScene = document.getElementById('flipScene');
-const flipFront = document.getElementById('flipFront');
-const flipBack  = document.getElementById('flipBack');
-
-function flipShowingBack(){ return !!flipScene && flipScene.classList.contains('flipped'); }
-
-function flipSizeTo(el){ if(flipScene && el) flipScene.style.height = el.offsetHeight + 'px'; }
-
-function flipSync(){
-  if(!flipScene) return;
-  const back = flipShowingBack();
-  const hidden = back ? flipFront : flipBack;
-  const shown  = back ? flipBack : flipFront;
-  hidden.setAttribute('inert', ''); hidden.setAttribute('aria-hidden', 'true');
-  shown.removeAttribute('inert'); shown.removeAttribute('aria-hidden');
-  const toBack = document.getElementById('flipToBack');
-  if(toBack) toBack.setAttribute('aria-expanded', String(back));
-  // The header names whichever face you are looking at, rather than going stale after a flip.
-  const title = document.getElementById('accountHeaderTitle');
-  if(title && isLoggedIn()) title.textContent = back ? 'Account' : 'Bathroom Passport';
-}
-
-function flipCardTo(back){
-  if(!flipScene) return;
-  flipScene.classList.toggle('flipped', back);
-  flipSizeTo(back ? flipBack : flipFront);
-  flipSync();
-}
-
-function toggleFlip(){
-  const next = !flipShowingBack();
-  flipCardTo(next);
-  // Focus follows the face, or it stays on a button that just turned away.
-  const t = document.getElementById(next ? 'flipToFront' : 'flipToBack');
-  if(t) t.focus({ preventScroll:true });
-}
-
-document.getElementById('flipToBack')?.addEventListener('click', e => { e.stopPropagation(); toggleFlip(); });
-document.getElementById('flipToFront')?.addEventListener('click', e => { e.stopPropagation(); toggleFlip(); });
-// Tapping the card flips too — the bar is the signpost, not the only way in. Real controls on the
-// back keep working.
-document.getElementById('flipCard')?.addEventListener('click', e => {
-  if(e.target.closest('.acct-row') || e.target.closest('.acct-seg')) return;
-  toggleFlip();
-});
-// Fonts change the measured height, so size again once they have loaded.
-if(document.fonts && document.fonts.ready) document.fonts.ready.then(() => {
-  if(flipScene) flipSizeTo(flipShowingBack() ? flipBack : flipFront);
-});
-window.addEventListener('resize', () => {
-  if(flipScene) flipSizeTo(flipShowingBack() ? flipBack : flipFront);
-});
+ * flipScene / flipFront / flipCard remain in the DOM; the CSS no longer rotates them and nothing
+ * reads flipShowingBack(), so the card simply renders flat. */
 
 /* Add or change the recovery address. A prompt rather than an inline form: this is a rare,
  * one-line action, and a field that sits in the sheet permanently would be visual weight spent
@@ -5684,12 +5648,9 @@ document.getElementById('acctPasswordRow')?.addEventListener('click', async () =
   note.textContent = 'Link sent to ' + st.email + '.';
 });
 
-document.getElementById('acctThemeLight')?.addEventListener('click', () => {
-  localStorage.setItem('theme', 'light'); applyTheme('light');
-});
-document.getElementById('acctThemeDark')?.addEventListener('click', () => {
-  localStorage.setItem('theme', 'dark'); applyTheme('dark');
-});
+/* The Light/Dark segmented pair is gone with the flip-back. There is now exactly ONE theme
+ * control — the themeToggle switch, moved into the settings sheet — which removes the older
+ * problem of two controls for one setting having to keep each other in step. */
 
 document.getElementById('logOutBtn').addEventListener('click', async () => {
   await logOutAccount();
@@ -5971,13 +5932,6 @@ missingUseLocationBtn.addEventListener('click', () => {
 });
 
 async function submitMissingLocation(){
-  // Defence in depth: the pill is hidden signed-out, but the panel can still be open when a
-  // session expires mid-edit. A plain message beats a generic "something went wrong".
-  if(!isLoggedIn()){
-    missingNote.style.color = '#c62828';
-    missingNote.textContent = 'Log in to send a location request.';
-    return;
-  }
   const description = missingInput.value.trim();
   if(!description && !capturedMissingCoords){
     missingNote.style.color = '#c62828';
@@ -5987,16 +5941,9 @@ async function submitMissingLocation(){
   missingSubmit.disabled = true;
   missingSubmit.innerHTML = 'Sending…';
   const finalDescription = description || '(no description — location only)';
-  const res = await logMissingLocation(finalDescription, capturedMissingCoords);
-  const ok = res && res.ok;
+  const ok = await logMissingLocation(finalDescription, capturedMissingCoords);
   missingNote.style.color = ok ? '#2f6b3c' : '#c62828';
-  if(ok){
-    missingNote.textContent = 'Thanks — sent!';
-  }else if(res && res.reason === 'signedout'){
-    missingNote.textContent = 'Log in to send a location request.';
-  }else{
-    missingNote.textContent = 'Something went wrong, try again.';
-  }
+  missingNote.textContent = ok ? 'Thanks — sent!' : 'Something went wrong, try again.';
   if(ok){
     missingInput.value = '';
     missingInput.placeholder = 'Address or cross streets';

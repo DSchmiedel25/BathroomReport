@@ -1,31 +1,36 @@
-BathroomReport v2.28.3 — deploy bundle (2026-08-03)
+BathroomReport v2.29.0 — settings sheet (2026-08-03)
 
-Files are laid out exactly as they sit in the repo, so on the GitHub web UI
-you can drag the CONTENTS of this folder into the repo root in one upload and
-the workflow file lands in .github/workflows/ automatically. On the Mac:
-unzip over the repo folder and commit everything.
+Drop these five into the repo ROOT. No subfolders this time.
 
-WHAT THIS SHIPS
-  app.js / index.html / sw.js      v2.28.3 — TDZ fix (All places + region
-                                   loading), Bathroom Now walking mode,
-                                   zoom-band fix so regions load wherever
-                                   pins render
-  shell.css / flushpanel.html      badge colors, pills removal, admin rename
-  tools/audit-ui.js                generated-chain exemption
-  .github/workflows/checks.yml     append-aware data check (clears the red X)
-  public-toilets-manifest.js       deduped rebuild — 84,079 records,
-  public-*-locations.js (x10)      5,783 same-restroom duplicates removed
-  build-public-toilets.js          the build with spatial dedup baked in
-  data-triage-report.txt           159 hand-file anomalies to review in
-                                   FlushPanel (not auto-fixed on purpose)
+  app.js  index.html  shell.css  styles.css  sw.js
 
-NOT DEPLOYED BY GIT — two manual steps:
-  firestore.rules      Firebase Console -> Firestore -> Rules -> paste -> Publish
-  functions/index.js   from the repo folder on the Mac:
-                       npx firebase-tools deploy --only functions
-  Until these land, genderSplit votes are rejected. Everything else works.
+WHAT CHANGED
+  New Settings row in the drawer opens a two-tab sheet:
+    "What you see"  — All places, hide-closed, hide-step-only, travel mode,
+                      maps app, theme
+    "Your account"  — passport link, email, change password, sign out
+  Scrim tap, the X, and Escape all close it.
 
-AFTER PUSHING
-  - The audit re-runs itself; green looks like "50 data files, 84079 records"
-  - Hard-refresh the app, footer should read v2.28.3
-  - Pan to Tampa at any zoom from 8 up: southatlantic loads, diamonds appear
+  The passport flip is GONE. Its back face held email/password/theme behind a
+  "flip for account" gesture — those moved into the sheet, and the card is
+  one-sided again. styles.css is in this set because the flip CSS had to be
+  replaced: the scene's height used to be set by JS, so with that removed the
+  card would have rendered at zero height.
+
+  Controls were MOVED, not rebuilt — same element ids, same handlers. That also
+  collapsed the two competing theme controls (drawer switch + flip-card segment)
+  down to one.
+
+TEST AFTER UPLOAD
+  1. Footer reads v2.29.0 · 2026-08-03  (force-close the PWA if it does not)
+  2. Drawer -> Settings opens the sheet
+  3. On "What you see": All places expands, both hide switches work,
+     travel mode and maps app still save, theme flips
+  4. On "Your account": Passport opens full height (not a sliver),
+     email and change-password rows still work, sign out works
+  5. Escape and the scrim both close the sheet
+
+NOT INCLUDED
+  Nothing else changed. firestore.rules and functions/index.js are unchanged
+  since the last bundle — if you have not deployed those to Firebase yet,
+  genderSplit votes are still being rejected.

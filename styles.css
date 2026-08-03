@@ -1137,64 +1137,27 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
 
      Two heights, not one: the faces hold different amounts, so a shared height would mean either
      dead space under the front or a cramped back. The container animates between them. */
-  :root{ --cardH-front:180px; --cardH-back:320px; }
+  /* The card is ONE-SIDED now.
+     The flip is gone: its back face held email, password and theme behind a gesture nobody
+     performed, and those live in the settings sheet instead.
 
-  .flip-scene{ perspective:1400px; transition:height .5s cubic-bezier(.4,0,.2,1); margin-bottom:16px; }
-  .flip-card{
-    position:relative; width:100%; height:100%;
-    transform-style:preserve-3d; transition:transform .5s cubic-bezier(.4,0,.2,1);
-}
-  .flip-scene.flipped .flip-card{ transform:rotateY(180deg); }
-  /* top/left/right, but NOT bottom. With inset:0 each face stretches to the container's height,
-     so measuring the front while the container was still at the back's 320px returned 320 — it
-     could never report its own 180 and the card never shrank on the way back. */
-  .flip-face{
-    position:absolute; top:0; left:0; right:0;
-    backface-visibility:hidden; -webkit-backface-visibility:hidden;
-    border-radius:14px; overflow:hidden;
-}
-  .flip-back{ transform:rotateY(180deg); }
+     What this rewrite has to undo is subtle. The scene's height was set imperatively by JS on
+     every open, and both faces were position:absolute — so with that JS removed the scene had no
+     height, the absolutely-positioned front had nothing to size it, and the passport card would
+     have rendered as a zero-height sliver. Static flow and auto height is the fix, and it is
+     simpler than what it replaces: the card measures itself, at any content length, for free. */
+  :root{ --cardH-front:180px; }
 
-  /* The data page is the front face now, so it takes its height from the variable and lays its
-     content out down the card rather than packing it at the top. */
+  .flip-scene{ margin-bottom:16px; }
+  .flip-card{ position:relative; width:100%; }
+  .flip-face{ position:static; border-radius:14px; overflow:hidden; }
+
   #flipFront.passport-datapage{
     margin-bottom:0; min-height:var(--cardH-front);
-    padding:20px 20px 54px;
+    padding:20px; 
     display:flex; flex-direction:column; justify-content:space-between;
 }
   #flipFront .dp-top, #flipFront .dp-fields{ flex:none; }
-
-  .flip-back{
-    background:var(--panel-bg, rgba(255,255,255,.02));
-    border:1px solid var(--panel-border);
-    padding:16px 16px 56px; min-height:var(--cardH-back);
-}
-  .flip-back .acct-plate:first-child{ margin-top:0; padding-top:0; border-top:0; }
-
-  /* The invitation. A flip nobody knows about is settings you cannot find, so it is a full-width
-     bar that says what happens rather than an icon in a corner. */
-  .flip-btn{
-    position:absolute; left:0; right:0; bottom:0;
-    display:flex; align-items:center; justify-content:center; gap:7px;
-    min-height:44px; padding:12px; border:0; cursor:pointer;
-    background:rgba(4,33,31,.15); color:#04211f;
-    font-family:var(--font-display); font-size:11px; font-weight:600;
-    letter-spacing:.14em; text-transform:uppercase;
-}
-  .flip-back .flip-btn{ background:rgba(127,127,127,.10); color:var(--muted); }
-  .flip-btn:focus-visible{ outline:3px solid #04211f; outline-offset:-3px; }
-  .flip-back .flip-btn:focus-visible{ outline-color:var(--accent); }
-
-  /* Reduced motion gets the same interaction without the turn. */
-  @media (prefers-reduced-motion: reduce){
-    .flip-scene, .flip-card{ transition:none; }
-    .flip-card{ transform-style:flat; }
-    .flip-scene.flipped .flip-card{ transform:none; }
-    .flip-face{ backface-visibility:visible; transition:opacity .15s linear; }
-    .flip-back{ transform:none; opacity:0; }
-    .flip-scene.flipped #flipFront{ opacity:0; }
-    .flip-scene.flipped .flip-back{ opacity:1; }
-}
 
   /* Progress as a seam on the card, sitting directly above the flip strip.
      The block that used to sit below the card repeated STAMPS 4/35 from the card itself, and

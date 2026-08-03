@@ -36,9 +36,6 @@
      the map plugins were the one part of the shell that could never work offline. -->
 <script src="leaflet-doubletapdrag.js" defer></script>
 <script src="leaflet-doubletapdragzoom.js" defer></script>
-<!-- Turns the OSM opening_hours text on public-restroom records into the app's canonical day
-     string. defer keeps it ahead of app.js, which reads window.OsmHours from todayHrsString. -->
-<script src="hours-osm.js" defer></script>
 <script type="module" src="firebase.js"></script>
 <script defer src="stewarts-locations.js"></script>
 <script defer src="cumberland-farms-locations.js"></script>
@@ -314,41 +311,7 @@ You can <b>FIND</b> without an account. Sign in to <b>RATE</b>, <b>SHARE</b>, an
         <div class="dp-seal" aria-hidden="true">BATH<br>ROOM<br>RPT</div>
       </div>
       <div class="dp-progress" id="dpProgress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Stamps collected"><i id="dpProgressFill"></i></div>
-      <button class="flip-btn" id="flipToBack" aria-expanded="false" aria-controls="flipCard">&#8635; Flip for account</button>
-    </div>
-
-    <div class="flip-face flip-back" id="flipBack">
-      <div class="acct-plate"><span>Recovery</span><i></i></div>
-      <button class="acct-row" id="acctEmailRow">
-        <span class="acct-row-main">
-          <span class="acct-row-label">Email</span>
-          <span class="acct-row-sub" id="acctEmailValue">Loading…</span>
-        </span>
-        <span class="acct-chip none" id="acctEmailChip">Not set</span>
-      </button>
-      <div class="acct-note" id="acctEmailNote"></div>
-
-      <div class="acct-plate"><span>Security</span><i></i></div>
-      <button class="acct-row" id="acctPasswordRow">
-        <span class="acct-row-main">
-          <span class="acct-row-label">Change password</span>
-          <span class="acct-row-sub">We'll email you a link</span>
-        </span>
-        <span class="acct-row-go" aria-hidden="true">&rsaquo;</span>
-      </button>
-      <div class="acct-note" id="acctPasswordNote"></div>
-
-      <div class="acct-plate"><span>Appearance</span><i></i></div>
-      <div class="acct-row acct-row-static">
-        <span class="acct-row-main"><span class="acct-row-label">Theme</span></span>
-        <span class="acct-seg" role="group" aria-label="Theme">
-          <button id="acctThemeLight" aria-pressed="false">Light</button>
-          <button id="acctThemeDark" aria-pressed="false">Dark</button>
-        </span>
-      </div>
-
-      <button class="flip-btn" id="flipToFront">&#8635; Flip back to passport</button>
-    </div>
+          </div>
 
   </div>
 </div>
@@ -368,6 +331,110 @@ This is tracked on this device only. Log in to sync it across devices.
 <!-- To add a chain: <script src="<chain>-locations.js"></script> here, then register it in app.js's CHAIN_REGISTRY -->
 <!-- Menu drawer (Stage 1 chrome) -->
 <div id="drawerScrim"></div>
+
+<!-- ============================================================
+     Settings sheet — one home for everything about you and your map.
+
+     Replaces two hiding places: the drawer's scattered controls, and the BACK of the passport
+     flip card, which held email, password and theme behind a "flip for account" gesture almost
+     nobody performs. Same discoverability failure as content below a popup's scroll line.
+
+     Two tabs, split by what a setting AFFECTS: the map you look at, versus the account you own.
+     The strip picker lands on the tab that opens by default because it is a feature nobody is
+     looking for yet.
+
+     Every control here is MOVED, not rebuilt — the element ids are the originals, so every
+     existing handler in app.js keeps working untouched.
+     ============================================================ -->
+<div id="settingsSheet" class="ss" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="ssTitle">
+  <div class="ss-scrim" id="ssScrim"></div>
+  <div class="ss-panel" role="document">
+
+    <div class="ss-top">
+      <div class="ss-avatar" id="ssAvatar" aria-hidden="true">?</div>
+      <div class="ss-who">
+        <span class="ss-name" id="ssName">Not signed in</span>
+        <span class="ss-sub" id="ssSub">Sign in to sync across devices</span>
+      </div>
+      <span class="ss-stamp" id="ssStamp" hidden></span>
+      <button class="ss-x" id="ssClose" aria-label="Close settings">&#10005;</button>
+    </div>
+    <h2 id="ssTitle" class="ss-sr">Settings</h2>
+
+    <div class="ss-tabs" role="tablist">
+      <button role="tab" id="ssTabSee" aria-selected="true"  aria-controls="ssPaneSee">What you see</button>
+      <button role="tab" id="ssTabAcct" aria-selected="false" aria-controls="ssPaneAcct">Your account</button>
+    </div>
+
+    <div class="ss-body">
+      <!-- ===================== WHAT YOU SEE ===================== -->
+      <div id="ssPaneSee" role="tabpanel" aria-labelledby="ssTabSee">
+        <div class="ss-plate"><span>Map</span><i></i></div>
+        <div id="ssSlotChains"></div>
+        <div id="ssSlotOpenNow"></div>
+        <div id="ssSlotAccessible"></div>
+        <div class="ss-gate" id="ssGateNote" hidden>Sign in to change these</div>
+
+        <div class="ss-plate"><span>Getting around</span><i></i></div>
+        <div id="ssSlotTravel"></div>
+        <div id="ssSlotNavApp"></div>
+
+        <div class="ss-plate"><span>Appearance</span><i></i></div>
+        <div id="ssSlotTheme"></div>
+      </div>
+
+      <!-- ===================== YOUR ACCOUNT ===================== -->
+      <div id="ssPaneAcct" role="tabpanel" aria-labelledby="ssTabAcct" hidden>
+        <div class="ss-plate"><span>You</span><i></i></div>
+        <button class="ss-row" id="ssPassportRow">
+          <span class="ss-main"><span class="ss-lab">Your passport</span>
+            <span class="ss-desc" id="ssPassportSub">Stamps, ratings and achievements</span></span>
+          <span class="ss-go" aria-hidden="true">&rsaquo;</span>
+        </button>
+
+        <!-- These four came off the passport's deleted back face. They live here directly rather
+             than being moved in at runtime, because their old container no longer exists — but
+             they keep their original ids, so the handlers in app.js bind to them unchanged. -->
+        <div class="ss-plate"><span>Recovery</span><i></i></div>
+        <button class="ss-row" id="acctEmailRow">
+          <span class="ss-main">
+            <span class="ss-lab">Email</span>
+            <span class="ss-desc" id="acctEmailValue">Loading&hellip;</span>
+          </span>
+          <span class="acct-chip none" id="acctEmailChip">Not set</span>
+          <span class="ss-go" aria-hidden="true">&rsaquo;</span>
+        </button>
+        <div class="acct-note" id="acctEmailNote"></div>
+
+        <div class="ss-plate"><span>Security</span><i></i></div>
+        <button class="ss-row" id="acctPasswordRow">
+          <span class="ss-main">
+            <span class="ss-lab">Change password</span>
+            <span class="ss-desc">We&rsquo;ll email you a link</span>
+          </span>
+          <span class="ss-go" aria-hidden="true">&rsaquo;</span>
+        </button>
+        <div class="acct-note" id="acctPasswordNote"></div>
+
+        <div class="ss-plate ss-plate-out"><span>Session</span><i></i></div>
+        <button class="ss-row" id="ssSignOut" hidden>
+          <span class="ss-main"><span class="ss-lab ss-danger">Sign out</span></span>
+        </button>
+        <button class="ss-row" id="ssSignIn">
+          <span class="ss-main"><span class="ss-lab">Sign in or create an account</span>
+            <span class="ss-desc">Syncs your ratings and settings across devices</span></span>
+          <span class="ss-go" aria-hidden="true">&rsaquo;</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="ss-foot">
+      <span id="ssVersion">Bathroom Report</span><br>
+      Independent and community-created. Not affiliated with any business listed.
+    </div>
+  </div>
+</div>
+
 <nav id="appDrawer" aria-label="Menu">
 <div class="d-brand"><img src="logo.png" alt=""><span class="d-brand-text"><b>BATHROOM <span class="wm-accent">REPORT</span></b><span class="d-tagline">FIND<i>.</i> RATE<i>.</i> SHARE<i>.</i> IMPROVE<i>.</i></span></span><button id="drawerClose" class="d-close" aria-label="Close menu" title="Close">✕</button></div>
 <div class="d-items">
@@ -376,6 +443,9 @@ This is tracked on this device only. Log in to sync it across devices.
      navigation, map settings and the gift shop all read as equally important. The groups say what
      each thing is FOR, which is the information the flat list was missing. -->
 <button id="passportToggle">Passport</button>
+<!-- The settings entry point. Tapping your own name is the universally understood gesture for
+     "things about me", and it costs nothing to learn. -->
+<button id="openSettings">Settings</button>
 
 <div class="d-plate"><span>Map</span><i></i></div>
 
@@ -428,7 +498,7 @@ This is tracked on this device only. Log in to sync it across devices.
   <span class="d-shop-label">Gift shop</span>
   <span class="d-shop-sub">Signature Collection &middot; numbered Collector Series</span>
 </a>
-&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.29.3">v2.29.3 · 2026-08-02</span></div>
+&copy; 2025&ndash;2026 Bathroom Report · Independent, community-created · not affiliated with any business listed.<br><span class="d-count" id="drawerLocCount"></span><span class="d-version" data-version="v2.29.0">v2.29.0 · 2026-08-03</span></div>
 </nav>
 <!-- Community banner (logged-out) -->
 <div id="communityBanner">
@@ -443,9 +513,9 @@ This is tracked on this device only. Log in to sync it across devices.
 <div class="hiw-head"><h2>How Bathroom Report works</h2><button id="howItWorksClose" aria-label="Close">✕</button></div>
 <div class="hiw-body">
 <section><h3>What this is</h3><p>Bathroom Report helps you find a clean, open public bathroom fast, at convenience stores, travel stops, and other reliable spots. It’s community-powered and growing nationwide. The whole idea in four words: <b class="tag-verb">FIND. RATE. SHARE. IMPROVE.</b></p></section>
-<section><h3><span class="tag-verb">FIND</span></h3><p>Open the map and tap Bathroom Now for the closest option. Hours show when we have them. A spot with unknown hours still appears, and we never mark a place closed on a guess. <b>No account needed</b> for any of this.</p></section>
+<section><h3><span class="tag-verb">FIND</span></h3><p>Open the map, tap Bathroom Now for the closest option, or use the key to see which places are around you. Hours show when we have them. A spot with unknown hours still appears, and we never mark a place closed on a guess. <b>No account needed</b> for any of this.</p></section>
 <section><h3><span class="tag-verb">RATE</span></h3><p>Ratings come from people who’ve actually been there, because you can only rate <b>when you’re on-site</b>. They cover the bathroom itself, so you know what to expect before you go. Something broken? Flag it right from the pin.</p></section>
-<section><h3><span class="tag-verb">SHARE</span></h3><p>Get directions, share a spot with a friend, leave a tip (“need a key,” “buzzer required”), or report wrong info, all from a pin. Signed out, directions open in your device’s default maps app. Spotted a place we don’t have? Sign in and send it in with <b>Add a place</b>.</p></section>
+<section><h3><span class="tag-verb">SHARE</span></h3><p>Get directions, share a spot with a friend, leave a tip (“need a key,” “buzzer required”), or report wrong info, all from a pin. Signed out, directions open in your device’s default maps app. Spotted a place we don’t have? Send it in with We Missed One?</p></section>
 <section><h3><span class="tag-verb">IMPROVE</span></h3><p>Confirm a store’s hours, answer quick amenity questions, and build your Passport as you go. Every location is reviewed before it goes on the map, and whole data sources get rejected. One national chain claimed restrooms at 16,000 sites with no evidence behind it, so none of them are here. Nothing is <b>bulk-imported unchecked</b>, and your reports are how it keeps getting better.</p></section>
 <!-- Symbol key. The icons are drawn rather than emoji now, so the shapes carry no built-in
      meaning the way ♿ or ⛽ did — a legend is what makes replacing them safe. Built from the same
@@ -512,7 +582,7 @@ This is tracked on this device only. Log in to sync it across devices.
 <p><b>Do I need an account?</b> No. The map, directions, and Bathroom Now all work signed out. An account adds rating, tips, and Passport, plus place filtering and a saved directions-app preference.</p>
 <p><b>Why can’t I rate this bathroom?</b> You need to be on-site (within about a third of a mile), so ratings come from real visits.</p>
 <p><b>The hours are wrong, or it’s closed.</b> Report it from the pin and we’ll review it.</p>
-<p><b>I don’t see a store I know is there.</b> We add locations by hand. Sign in and send it in with <b>Add a place</b>, and we’ll review it.</p>
+<p><b>I don’t see a store I know is there.</b> We add locations by hand, so send it in and we’ll add it.</p>
 <p><b>Is this affiliated with these businesses?</b> No. It’s an independent, community-created project.</p></section>
 <p class="hiw-updated">Location data last updated: August 2, 2026</p>
 </div>
@@ -533,7 +603,7 @@ This is tracked on this device only. Log in to sync it across devices.
    *
    * An allowlist rather than a growing :not() chain: a switch or a disclosure should leave you
    * where you are, and the next control added here should have to opt IN to closing. */
-  var NAVIGATES = ['passportToggle','infoBtn'];   // drawerClose is wired separately, above
+  var NAVIGATES = ['passportToggle','infoBtn','openSettings'];   // drawerClose is wired separately, above
   if(d)NAVIGATES.forEach(function(id){
     var b=document.getElementById(id);
     if(b)b.addEventListener('click',close);
