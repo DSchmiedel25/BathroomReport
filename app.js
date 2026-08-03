@@ -2136,7 +2136,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.31.0';
+const BUILD = 'v2.32.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -5544,6 +5544,7 @@ function openSettingsSheet(){
    * page coming apart underneath your thumb. */
   document.body.style.overflow = 'hidden';
   ssSyncIdentity();
+  ssSyncValues();
   sheet.hidden = false;
   sheet.setAttribute('aria-hidden', 'false');
   requestAnimationFrame(() => sheet.classList.add('ss-in'));
@@ -5562,6 +5563,13 @@ function closeSettingsSheet(){
    * hides the sheet the user just reopened — it looks like the app slamming the panel shut for
    * no reason, and it is reachable with an ordinary double-tap. Every open bumps the token, and
    * a teardown only acts if it still owns the current one. */
+  /* Unwind the stack first. Closing the sheet from a sub-screen would otherwise leave that
+   * screen flagged open, so the next visit would land on it instead of the root. */
+  while(ssStack.length){
+    const id = ssStack.pop();
+    const el = document.getElementById(id);
+    if(el){ el.classList.remove('in'); el.hidden = true; }
+  }
   document.removeEventListener('keydown', ssTrapTab, true);
   document.body.style.overflow = '';
   /* Focus goes back to whatever opened the sheet — almost always the hamburger. Leaving it on a
@@ -5629,6 +5637,96 @@ function closeSettingsSheet(){
  * file is one long script and the elements below it are not there yet when this line runs. */
 /* #openSettings was a drawer row and went with the drawer. The hamburger opens the sheet now,
  * wired in the inline block in index.html. */
+/* ============================================================================
+ *  Settings navigation stack
+ * ============================================================================
+ * Push/pop with a real history entry per screen, so the phone's own back gesture and the
+ * browser back button both pop — a settings stack that ignores them is the fastest way to
+ * strand someone on a sub-screen with no way out but a force-quit.
+ *
+ * The two choice screens drive the ORIGINAL <select> elements rather than replacing them: a
+ * pick sets .value and dispatches a real 'change' event, so every handler already bound in this
+ * file runs untouched, including the account sync. There is no second code path to keep in step.
+ */
+let ssStack = [];
+
+function ssShowScreen(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.hidden = false;
+  requestAnimationFrame(() => el.classList.add('in'));   // a frame, or there is nothing to animate from
+  ssStack.push(id);
+  ssSyncScreen(id);
+  history.pushState({ ss:id }, '');
+  const back = el.querySelector('[data-ss-back]');
+  if(back) back.focus({ preventScroll:true });
+}
+
+function ssPopScreen(){
+  const id = ssStack.pop();
+  if(!id) return;
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.classList.remove('in');
+  const done = () => { if(!el.classList.contains('in')) el.hidden = true; };
+  el.addEventListener('transitionend', done, { once:true });
+  setTimeout(done, 400);          // transitions can be suppressed; never leave it half-open
+}
+
+/* Every sub-screen reflects live state on entry, because it can be opened at any time and the
+ * value may have changed since it was last seen — from another device, or from the map. */
+function ssSyncScreen(id){
+  if(id === 'ssScreenAround' || id === 'ssScreenNav'){
+    const selId = id === 'ssScreenAround' ? 'travelModeSelect' : 'navAppSelect';
+    const sel = document.getElementById(selId);
+    if(!sel) return;
+    document.querySelectorAll('[data-ss-set="' + selId + '"]').forEach(btn => {
+      btn.classList.toggle('sel', btn.dataset.ssVal === sel.value);
+    });
+  }
+  if(id === 'ssScreenPlaces' && typeof renderChainKey === 'function') renderChainKey();
+}
+
+/* The root rows carry the current value, so you can read every setting without opening one. */
+function ssSyncValues(){
+  const t = document.getElementById('travelModeSelect');
+  const tv = document.getElementById('ssAroundVal');
+  if(t && tv) tv.textContent = t.options[t.selectedIndex] ? t.options[t.selectedIndex].text : '';
+  const n = document.getElementById('navAppSelect');
+  const nv = document.getElementById('ssNavVal');
+  if(n && nv) nv.textContent = n.options[n.selectedIndex] ? n.options[n.selectedIndex].text : '';
+  const pv = document.getElementById('ssPlacesVal');
+  if(pv){
+    const total = Object.keys(CHAIN_REGISTRY).filter(chainHasData).length;
+    const off = [...disabledChains].filter(k => CHAIN_REGISTRY[k]).length;
+    pv.textContent = off ? (total - off) + ' of ' + total : 'All';
+  }
+}
+
+document.addEventListener('click', (e) => {
+  const go = e.target.closest('[data-ss-go]');
+  if(go){ ssShowScreen(go.dataset.ssGo); return; }
+  if(e.target.closest('[data-ss-back]')){ history.back(); return; }
+  const set = e.target.closest('[data-ss-set]');
+  if(set){
+    const sel = document.getElementById(set.dataset.ssSet);
+    if(sel && sel.value !== set.dataset.ssVal){
+      sel.value = set.dataset.ssVal;
+      // A real event, not a direct call — this is what keeps the existing handler the only one.
+      sel.dispatchEvent(new Event('change', { bubbles:true }));
+    }
+    ssSyncScreen(ssStack[ssStack.length - 1]);
+    ssSyncValues();
+    /* Chosen means done. Making someone then press back is a second step for a decision they
+     * have already made — but leave the tick visible for a beat so the choice registers. */
+    setTimeout(() => { if(ssStack.length) history.back(); }, 180);
+  }
+});
+
+window.addEventListener('popstate', () => {
+  if(ssStack.length) ssPopScreen();
+});
+
 document.getElementById('ssClose')?.addEventListener('click', closeSettingsSheet);
 document.getElementById('ssScrim')?.addEventListener('click', closeSettingsSheet);
 document.addEventListener('keydown', e => {

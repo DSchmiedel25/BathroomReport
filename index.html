@@ -411,35 +411,24 @@ This is tracked on this device only. Log in to sync it across devices.
 
       <div class="ss-sec">Map &amp; navigation</div>
       <div class="ss-card">
-        <div id="allChains" class="d-section">
-          <button type="button" id="allChainsToggle" class="d-collapse-head" aria-expanded="false" aria-controls="chainKeyAllList">
-            <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.4" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg></span>
-            <span class="ss-lab">Places on the map</span>
-            <span id="allChainsArrow" class="d-collapse-arrow" aria-hidden="true">&#9662;</span>
-          </button>
-          <div id="chainKeyAllList" class="collapsed"></div>
-        </div>
-        <div id="travelModePref" class="d-section" style="display:none">
-          <div class="d-section-label">
-            <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M21 3L3 10.5l7.5 3L14 21 21 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
-            <span class="ss-lab">Getting around</span>
-          </div>
-          <select id="travelModeSelect" class="nav-pref-select" aria-label="Getting around">
-            <option value="road">On the road</option>
-            <option value="foot">On foot</option>
-          </select>
-        </div>
-        <div id="navAppPref" class="d-section">
-          <div class="d-section-label">
-            <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M9 4L3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 4v13M15 6.5v13" stroke="currentColor" stroke-width="2"/></svg></span>
-            <span class="ss-lab">Directions app</span>
-          </div>
-          <select id="navAppSelect" class="nav-pref-select" aria-label="Preferred directions app">
-            <option value="apple">Apple Maps</option>
-            <option value="google">Google Maps</option>
-            <option value="waze">Waze</option>
-          </select>
-        </div>
+        <button class="ss-row" data-ss-go="ssScreenPlaces">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.4" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Places on the map</span></span>
+          <span class="ss-val" id="ssPlacesVal"></span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <button class="ss-row" id="travelModePref" data-ss-go="ssScreenAround" style="display:none">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M21 3L3 10.5l7.5 3L14 21 21 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Getting around</span></span>
+          <span class="ss-val" id="ssAroundVal">On the road</span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <button class="ss-row" id="navAppPref" data-ss-go="ssScreenNav">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M9 4L3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 4v13M15 6.5v13" stroke="currentColor" stroke-width="2"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Directions app</span></span>
+          <span class="ss-val" id="ssNavVal">Apple Maps</span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
       </div>
 
       <div class="ss-sec">App preferences</div>
@@ -512,10 +501,89 @@ This is tracked on this device only. Log in to sync it across devices.
 
       <div class="ss-foot">
         <span class="d-count" id="drawerLocCount"></span>
-        <span id="ssVersion">Bathroom Report</span> <span class="d-version" data-version="v2.31.0">v2.31.0 · 2026-08-03</span><br>
+        <span id="ssVersion">Bathroom Report</span> <span class="d-version" data-version="v2.32.0">v2.32.0 · 2026-08-03</span><br>
         &copy; 2025&ndash;2026 Bathroom Report. Independent and community-created.
         Not affiliated with any business listed.
       </div>
+    </div>
+
+    <!-- ============================================================
+         Sub-screens. Each is a sibling of the root, slid in over it.
+
+         The two choice screens do NOT replace the <select> elements — those stay in the DOM,
+         visually hidden, and a pick sets .value and dispatches a real 'change' event. Every
+         handler already bound in app.js therefore fires exactly as before: no rewiring, no
+         second code path to keep in step, and the account sync keeps working untouched.
+         ============================================================ -->
+    <div class="ss-screen" id="ssScreenPlaces" hidden>
+      <div class="ss-nav">
+        <button class="ss-back" data-ss-back>
+          <svg viewBox="0 0 9 15" fill="none" aria-hidden="true"><path d="M8 1L1 7.5 8 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Settings
+        </button>
+        <h2 class="ss-nav-title">Places</h2>
+      </div>
+      <p class="ss-hint">Which kinds of stop appear on the map. Turning one off hides it everywhere, including from Bathroom Now.</p>
+      <div class="ss-card">
+        <div id="allChains" class="d-section">
+          <button type="button" id="allChainsToggle" class="d-collapse-head" aria-expanded="true" aria-controls="chainKeyAllList" hidden>All places <span id="allChainsArrow" class="d-collapse-arrow" aria-hidden="true">&#9662;</span></button>
+          <div id="chainKeyAllList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ss-screen" id="ssScreenAround" hidden>
+      <div class="ss-nav">
+        <button class="ss-back" data-ss-back>
+          <svg viewBox="0 0 9 15" fill="none" aria-hidden="true"><path d="M8 1L1 7.5 8 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Settings
+        </button>
+        <h2 class="ss-nav-title">Getting around</h2>
+      </div>
+      <p class="ss-hint">Only changes whether directions open in walking or driving mode. The same places show on the map either way.</p>
+      <div class="ss-card">
+        <button class="ss-row ss-opt" data-ss-set="travelModeSelect" data-ss-val="road">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 17V9.5L7 5h10l2 4.5V17M5 17h14M5 17v2.5M19 17v2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="13.5" r="1.2" fill="currentColor"/><circle cx="16" cy="13.5" r="1.2" fill="currentColor"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">On the road</span><span class="ss-desc">Driving directions</span></span>
+          <svg class="ss-tick" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="ss-row ss-opt" data-ss-set="travelModeSelect" data-ss-val="foot">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="13" cy="4.6" r="2" stroke="currentColor" stroke-width="1.8"/><path d="M13 8c-1.6 0-2.6 1-3 2.4L9 14l2.6 1.4L11 21M14.6 11.6l2.4 1.6.8 3M9.6 15.6L7 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">On foot</span><span class="ss-desc">Walking directions</span></span>
+          <svg class="ss-tick" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="ss-screen" id="ssScreenNav" hidden>
+      <div class="ss-nav">
+        <button class="ss-back" data-ss-back>
+          <svg viewBox="0 0 9 15" fill="none" aria-hidden="true"><path d="M8 1L1 7.5 8 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Settings
+        </button>
+        <h2 class="ss-nav-title">Directions app</h2>
+      </div>
+      <p class="ss-hint">Where &ldquo;Get directions&rdquo; opens.</p>
+      <div class="ss-card">
+        <button class="ss-row ss-opt" data-ss-set="navAppSelect" data-ss-val="apple">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M9 4L3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 4v13M15 6.5v13" stroke="currentColor" stroke-width="1.8"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Apple Maps</span></span>
+          <svg class="ss-tick" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="ss-row ss-opt" data-ss-set="navAppSelect" data-ss-val="google">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10" r="2.6" stroke="currentColor" stroke-width="1.8"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Google Maps</span></span>
+          <svg class="ss-tick" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="ss-row ss-opt" data-ss-set="navAppSelect" data-ss-val="waze">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="11" r="7.5" stroke="currentColor" stroke-width="1.8"/><circle cx="9.5" cy="10" r="1" fill="currentColor"/><circle cx="14.5" cy="10" r="1" fill="currentColor"/><path d="M9.4 13.6a3.4 3.4 0 005.2 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Waze</span><span class="ss-desc">Always opens driving directions</span></span>
+          <svg class="ss-tick" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- The selects themselves: kept, hidden, and still the single source of truth. -->
+    <div class="ss-sr-only" aria-hidden="true">
+      <select id="travelModeSelect" tabindex="-1"><option value="road">On the road</option><option value="foot">On foot</option></select>
+      <select id="navAppSelect" tabindex="-1"><option value="apple">Apple Maps</option><option value="google">Google Maps</option><option value="waze">Waze</option></select>
     </div>
   </div>
 </div>
