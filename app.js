@@ -2092,7 +2092,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.28.1';
+const BUILD = 'v2.28.2';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -5611,12 +5611,27 @@ document.getElementById('listViewItems').addEventListener('click', (e) => {
   }, 50);
 });
 
-// Bathroom Now — choose the best nearby open store by actual driving distance
+// Bathroom Now — choose the best nearby open option by routed distance (walking or driving, per mode)
 function milesBetween(lat1,lng1,lat2,lng2){const toRad=d=>d*Math.PI/180,R=3958.8,dLat=toRad(lat2-lat1),dLng=toRad(lng2-lng1),a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
 function fetchWithTimeout(url,ms=9000){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),ms);return fetch(url,{signal:controller.signal}).finally(()=>clearTimeout(timer));}
-async function getDrivingOptions(user,candidates){
+/* Mode-aware routing. On foot the CAR profile is wrong twice over: the minutes shown are drive
+ * minutes, and the route itself obeys one-ways and highway ramps a walker can ignore while
+ * missing the footpaths a walker would take — the ranking can genuinely pick the wrong
+ * "closest".
+ *
+ * Two servers because the OSRM demo instance only hosts the car graph — putting /walking/ in
+ * its URL still routes by car, silently. FOSSGIS runs true per-profile instances (the same ones
+ * openstreetmap.org's own directions use), so foot mode goes there. Road mode stays on the
+ * proven demo server rather than moving both, so a FOSSGIS outage cannot take down the common
+ * case. The path's /driving/ segment on the foot instance is OSRM URL convention: the INSTANCE
+ * fixes the profile and the segment is ignored. */
+async function getRoutedOptions(user,candidates){
+  const walking = travelMode === 'foot';
+  const base = walking
+    ? 'https://routing.openstreetmap.de/routed-foot'
+    : 'https://router.project-osrm.org';
   const coords=[`${user.lng},${user.lat}`,...candidates.map(x=>`${x.lng},${x.lat}`)].join(';');
-  const url=`https://router.project-osrm.org/table/v1/driving/${coords}?sources=0&annotations=distance,duration`;
+  const url=`${base}/table/v1/driving/${coords}?sources=0&annotations=distance,duration`;
   const response=await fetchWithTimeout(url,9000); if(!response.ok) throw new Error('Routing unavailable');
   const data=await response.json();
   return candidates.map((loc,i)=>({loc,distanceMiles:data.distances?.[0]?.[i+1]/1609.344,durationMinutes:data.durations?.[0]?.[i+1]/60})).filter(x=>Number.isFinite(x.distanceMiles));
@@ -5653,7 +5668,7 @@ function bathroomNowCard(result,fallback=false){
   // Filled chain pill so you can see which brand this is at a glance, colored from the registry.
   const chain=CHAIN_REGISTRY[result.loc.chain]||{};
   const chainBadge=chain.name?`<div class="now-chain-badge" style="background:${chain.color};color:${chain.textColor};">${escapeHtml(chain.name)}</div>`:'';
-  return `<div class="bathroom-now-card"><button class="bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':'Closest bathroom by driving distance'}</div>${chainNote}${chainBadge}<b>${escapeHtml(result.loc.n)}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${lastRatedNote}${hoursMissingNote}${accessNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">Details</button></div></div>`;
+  return `<div class="bathroom-now-card"><button class="bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':(travelMode==='foot'?'Closest bathroom by walking distance':'Closest bathroom by driving distance')}</div>${chainNote}${chainBadge}<b>${escapeHtml(result.loc.n)}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${lastRatedNote}${hoursMissingNote}${accessNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">Details</button></div></div>`;
 }
 // For Bathroom Now: drop any of the top-4 nearest candidates that are in the HARD out-of-order
 // phase, in a SINGLE batched query (Firestore `in` takes up to 10 ids, so 4 = one read cost).
@@ -5752,9 +5767,12 @@ locateBtn.addEventListener('click',()=>{
     const user={lat:pos.coords.latitude,lng:pos.coords.longitude};lastKnownPos={...user,ts:Date.now()};currentListPosition=lastKnownPos;
     setUserLocationMarker(user.lat,user.lng);
     // Prefer the selected chains, but don't strand someone far from their nearest pick —
-    // if nothing selected is within a reasonable driving distance, widen to every chain
-    // (still open-only) so the closest real option wins instead.
-    const CHAIN_FALLBACK_MILES = 20;
+    // if nothing selected is within reasonable reach, widen to every chain (still open-only)
+    // so the closest real option wins instead. On foot the leash is much shorter: widening to
+    // an unselected chain 20 miles away is a rescue by car and an insult on foot — past a
+    // mile and a half, showing a farther option from the chains they DID pick is the honest
+    // answer, and the card's access notes do the rest.
+    const CHAIN_FALLBACK_MILES = travelMode === 'foot' ? 1.5 : 20;
     // Bathroom Now ignores travel mode on purpose: it's the emergency button, so the closest
     // usable bathroom wins even if it's a city/metro spot (e.g. a Dunkin) while in road mode.
     const notClosed = (loc) => isLocationOpenNow(loc) !== false && !isConfirmedNoRestroom(loc);
@@ -5795,7 +5813,7 @@ locateBtn.addEventListener('click',()=>{
       return;
     }
     try{
-      const options=await getDrivingOptions(user,candidates);
+      const options=await getRoutedOptions(user,candidates);
       options.sort((a,b)=>{const rank=x=>isLocationOpenNow(x.loc)===true?0:isLocationOpenNow(x.loc)===null?1:2;return rank(a)-rank(b)||a.distanceMiles-b.distanceMiles;});
       if(!options.length)throw new Error('No routes');showBathroomNowResult(options[0],false);
     }catch(e){
