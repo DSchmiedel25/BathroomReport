@@ -2052,6 +2052,140 @@ function metroAccessBadge(loc){ return accessBadge(loc, true); }
 // aren't in our parseable format). Reuses the same element IDs as the pit-stop popup so the shared
 // directions / share / report / rating / tip handlers attach unchanged. Store-amenity sections are
 // omitted (there's no convenience store); their attach handlers no-op safely via safeAttach().
+/* ============================================================================
+ *  Answer strip — the facts that decide the stop, above the scroll line
+ * ============================================================================
+ * Everything that answers "should I stop here" used to sit below the fold of a popup that gives
+ * no indication there is anything to scroll to. Adding more sections made that worse. This is
+ * one pinned row directly under the name: someone who never scrolls still gets an answer.
+ *
+ * ONE KIND OF FACT PER CELL, and every cell names its own dimension. An earlier draft mixed a
+ * rating, a count and a yes/no in one row with the labels carrying recency instead of the
+ * subject — "OK" with nothing to attach it to. The label is the dimension; the value is the
+ * answer; anything else goes in the badge rows below.
+ *
+ * Cleanliness and Feels safe are deliberately absent: they do not exist yet as vote fields, and
+ * a cell that can never populate is worse than one fewer cell. They slot in here when they do.
+ */
+const STRIP_FACTS = {
+  overall: {
+    label: 'Overall',
+    read(loc, agg){
+      if(!agg || !agg.bathroomCount) return null;
+      return { v: avgStr(agg.bathroomSum, agg.bathroomCount) + '\u2605',
+               meta: String(agg.bathroomCount), tone: '' };
+    }
+  },
+  stalls: {
+    label: 'Stalls',
+    read(loc){
+      const st = confirmedState(BATHROOM_AMENITIES.find(a => a.key === 'restroomType'),
+                                (amenityCache[loc.id] || {}).restroomType);
+      if(!st) return null;
+      return { v: st === 'single' ? '1' : 'Multi', meta: '\u2605', tone: '' };
+    }
+  },
+  rooms: {
+    label: 'Rooms',
+    read(loc){
+      const st = confirmedState(BATHROOM_AMENITIES.find(a => a.key === 'genderSplit'),
+                                (amenityCache[loc.id] || {}).genderSplit);
+      if(!st) return null;
+      return { v: st === 'single' ? 'Shared' : 'M/W', meta: '\u2605', tone: '' };
+    }
+  },
+  changing: { label: 'Changing', read: (loc) => stripYesNo(loc, 'changing') },
+  accessible: {
+    label: 'Accessible',
+    read(loc){
+      /* isConfirmedAccessible takes a SUMMARY; isConfirmedNotAccessible takes a LOC. Passing a
+       * loc to the first silently returns false for every location — it would have read
+       * summary.accessible off the wrong object and found nothing, so this cell would have shown
+       * "No" or blank and never "Yes". Mirrors the existing badge's priority: a community
+       * confirmation or a baked/OSM positive all count as yes. */
+      if(isConfirmedNotAccessible(loc)) return { v: 'No', meta: '\u2605', tone: 'bad' };
+      const yes = isConfirmedAccessible(amenityCache[loc.id])
+        || (loc.conf && loc.conf.accessible)
+        || (loc.osm && loc.osm.accessible)
+        || loc.wheelchair === 'yes' || loc.wheelchair === 'designated';
+      if(yes) return { v: 'Yes', meta: '\u2605', tone: 'ok' };
+      return null;
+    }
+  },
+  showers: { label: 'Showers', read: (loc) => stripYesNo(loc, 'shower', 'storeFeatures') },
+  hours: {
+    label: 'Open',
+    read(loc){
+      const open = isLocationOpenNow(loc);
+      if(open === null) return null;
+      const txt = formatHrsDisplay(loc);
+      return { v: open ? (txt === 'Open 24 hours' ? '24h' : 'Open') : 'Closed',
+               meta: '', tone: open ? 'ok' : 'bad' };
+    }
+  },
+  fee: {
+    label: 'Fee',
+    read(loc){
+      const f = loc.metroInfo && loc.metroInfo.fee;
+      if(!f) return null;
+      return { v: f === 'free' ? 'Free' : 'Paid', meta: '', tone: f === 'free' ? 'ok' : '' };
+    }
+  },
+};
+
+/* Shared reader for the plain yes/no amenities. Returns null rather than "unknown" — an
+ * unanswered fact has no business taking a cell from one that IS answered. */
+function stripYesNo(loc, key, field){
+  const summary = (field === 'storeFeatures' ? storeFeatureCache : amenityCache)[loc.id] || {};
+  const x = summary[key] || { yes:0, no:0 };
+  const conf = (loc.conf || {});
+  if(isConfirmedYes(x) || conf[key]) return { v: 'Yes', meta: '\u2605', tone: 'ok' };
+  if(isConfirmedNo(x))               return { v: 'No',  meta: '\u2605', tone: 'bad' };
+  return null;
+}
+
+/* The person's three, or a sensible default.
+ * Defaults are the three most decision-relevant facts that ACTUALLY EXIST today. Unknown keys
+ * are dropped rather than rendered blank, so a stored preference naming a fact that was later
+ * removed degrades to a shorter strip instead of an empty cell. */
+const STRIP_DEFAULT = ['overall', 'stalls', 'changing'];
+function stripPicks(){
+  try{
+    const raw = JSON.parse(localStorage.getItem('br_strip_picks') || 'null');
+    if(Array.isArray(raw) && raw.length){
+      const clean = raw.filter(k => STRIP_FACTS[k]).slice(0, 3);
+      if(clean.length) return clean;
+    }
+  }catch(e){}
+  return STRIP_DEFAULT;
+}
+
+function stripHtml(loc, agg){
+  const picks = stripPicks();
+  const cells = picks.map(k => {
+    const def = STRIP_FACTS[k];
+    if(!def) return null;
+    let got = null;
+    try{ got = def.read(loc, agg); }catch(e){ got = null; }
+    return { k, label: def.label, got };
+  }).filter(Boolean);
+
+  /* Nothing known at all -> the strip stops being three empty cells and becomes the ask. This
+   * is most of the 84,000 locations on day one, so it has to read as an invitation rather than
+   * a broken row. */
+  if(!cells.some(c => c.got)){
+    return `<div class="answer-strip is-empty"><span>Nothing reported yet \u2014 be the first</span></div>`;
+  }
+  return `<div class="answer-strip">` + cells.map(c => {
+    const g = c.got;
+    const v = g ? escapeHtml(g.v) : '\u2014';
+    const meta = g && g.meta ? ' \u00b7 ' + escapeHtml(g.meta) : '';
+    return `<div class="as-cell${g ? '' : ' as-blank'}">`
+      + `<span class="as-v${g && g.tone ? ' as-' + g.tone : ''}">${v}</span>`
+      + `<span class="as-k">${escapeHtml(c.label)}${meta}</span></div>`;
+  }).join('') + `</div>`;
+}
+
 function metroPopupHtml(loc, agg, myVote){
   const shareUrl = `${location.origin}${location.pathname}?loc=${encodeURIComponent(loc.id)}`;
   const chain = chainFor(loc);
@@ -2076,6 +2210,7 @@ function metroPopupHtml(loc, agg, myVote){
     <div class="popup-head-row">
       <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${escapeHtml(chain.name)}</div>
     </div>
+    ${stripHtml(loc, agg)}
     <div class="addr addr-title">${escapeHtml(loc.addr || '')}</div>
     ${metroAccessBadge(loc)}
     ${(loc.metroInfo && loc.metroInfo.fee) ? `<div class="hours-line">${loc.metroInfo.fee === 'free' ? `${ico('check')} Free to use` : `${ico('help')} Paid / fee`}</div>` : ''}
@@ -2136,7 +2271,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.32.0';
+const BUILD = 'v2.33.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -2252,6 +2387,7 @@ function popupHtml(loc, agg, myVote){
       <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${chain.name}</div>
       <span class="store-icons" id="store-icons-${loc.id}">${storeFeatureIconsHtml(loc, storeFeatureCache[loc.id])}</span>
     </div>
+    ${stripHtml(loc, agg)}
     <div class="addr addr-title">${escapeHtml(loc.addr)}${loc.num ? ' &middot; Shop #' + escapeHtml(loc.num) : ''}</div>
     ${accessBadge(loc)}
     ${hoursLine}

@@ -1311,3 +1311,40 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
   .mp-close:hover{ color:var(--cream); }
   .mp-close:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; }
   #missingPanel{ position:relative; }
+
+  /* ---------- Answer strip ----------
+     One pinned row under the name, carrying the facts that decide the stop. Everything that
+     answers "should I stop here" used to sit below the fold of a popup that gives no sign there
+     is anything to scroll to; this is the fix for that, not decoration.
+
+     Cells are equal-width and the row never wraps: it is meant to be read in one glance, and a
+     row that reflows between locations is harder to read than one that holds its shape. */
+  .answer-strip{
+    display:flex; margin:10px 0 12px;
+    background:var(--popup-tip-input-bg); border:1px solid var(--popup-divider);
+    border-radius:10px; overflow:hidden;
+  }
+  .as-cell{ flex:1; min-width:0; padding:9px 4px; text-align:center; position:relative; }
+  .as-cell + .as-cell::before{
+    content:''; position:absolute; left:0; top:8px; bottom:8px; width:1px;
+    background:var(--popup-divider);
+  }
+  .as-v{ display:block; font-size:15px; font-weight:800; line-height:1.15; color:var(--popup-text); }
+  .as-v.as-ok{ color:#8fd694; }
+  .as-v.as-bad{ color:#f08a86; }
+  /* The label names the DIMENSION and carries the confidence mark. An earlier draft spent it on
+     recency, which left the value with nothing to attach to — "OK" with no clue what was OK. */
+  .as-k{
+    display:block; font-size:9px; font-weight:700; letter-spacing:.3px; text-transform:uppercase;
+    color:var(--popup-muted); margin-top:3px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  /* A cell whose fact is unknown keeps its place rather than vanishing — the gap is itself a
+     prompt, and a row that changes width between locations cannot be read at a glance. */
+  .as-blank{ background:repeating-linear-gradient(-45deg,transparent,transparent 5px,
+    rgba(127,127,127,.05) 5px,rgba(127,127,127,.05) 10px); }
+  .as-blank .as-v{ color:var(--popup-muted); }
+  /* Nothing known at all: the strip becomes the ask instead of three empty cells. This is most
+     of the map on day one, so it has to read as an invitation, not a broken row. */
+  .answer-strip.is-empty{ justify-content:center; padding:11px 10px; }
+  .answer-strip.is-empty span{ font-size:12px; font-weight:700; color:var(--accent); }
