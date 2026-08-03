@@ -1360,3 +1360,17 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
     font-size:12px; font-weight:700; color:var(--popup-muted); padding:4px 2px; }
   .rate-skip:active{ color:var(--accent); }
   .rating-score-none{ font-size:12px; color:var(--popup-muted); }
+
+  /* Dots are buttons now: the visible, discoverable form of the swipe. */
+  .rate-progress button{
+    width:7px; height:7px; border-radius:50%; padding:0; border:0; cursor:pointer;
+    background:var(--popup-divider); display:block; transition:background .15s, transform .15s;
+  }
+  /* Two states, and they mean different things: `on` is "you answered this", `here` is "you are
+     looking at this". A single style for both would make an answered question you had swiped
+     away from look like the one on screen. */
+  .rate-progress button.on{ background:var(--accent); opacity:.5; }
+  .rate-progress button.here{ background:var(--accent); opacity:1; transform:scale(1.35); }
+  .rate-progress button:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
+  /* The stack owns horizontal gestures; the popup keeps vertical scrolling. */
+  .rate-stack{ touch-action:pan-y; }

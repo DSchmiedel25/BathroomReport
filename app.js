@@ -2024,11 +2024,29 @@ const RATING_DIMS = [
 /* Which question to show. The first unanswered one, or — once all three are answered — the
  * overall row as it has always looked, because at that point there is nothing to ask and a
  * cycling control with nothing left to cycle to is just confusing. */
-function ratingDimFor(loc, myVote){
+/* Which question is on screen, per location, for this session.
+ *
+ * This used to be derived — "the first one you have not answered" — which is right for the
+ * first look and wrong the moment someone wants to go BACK. Swiping between the two questions
+ * only makes sense if the block remembers where you are, so the view is now explicit state and
+ * the derivation is just its starting value. */
+const ratingView = {};
+function ratingDimIndex(loc, myVote){
+  if(ratingView[loc.id] != null) return ratingView[loc.id];
   const skipped = ratingSkips[loc.id] || {};
-  const next = RATING_DIMS.find(d => !myVote[d.key] && !skipped[d.key]);
-  return next || RATING_DIMS[0];
+  const i = RATING_DIMS.findIndex(d => !myVote[d.key] && !skipped[d.key]);
+  return i < 0 ? 0 : i;
 }
+function ratingDimFor(loc, myVote){ return RATING_DIMS[ratingDimIndex(loc, myVote)]; }
+
+/* Move to another question. Wraps, because with two of them "next" and "previous" are the same
+ * gesture and stopping at an end would make the second swipe feel broken. */
+function ratingGoTo(loc, i){
+  const n = RATING_DIMS.length;
+  ratingView[loc.id] = ((i % n) + n) % n;
+  refreshRatingSection(loc);
+}
+
 /* Skips are per-location and per-session only, never persisted: someone who skips "did you feel
  * safe" today should be asked again next month, because the answer may have changed and because
  * a permanent skip is a decision nobody knowingly made. */
@@ -2055,16 +2073,27 @@ function ratingSectionInnerHtml(loc, agg, myVote){
   /* Skip is only offered while there is somewhere to skip TO. On the last unanswered dimension
    * it would be a button that appears to do nothing. */
   const remaining = RATING_DIMS.filter(d => !myVote[d.key] && !(ratingSkips[loc.id] || {})[d.key]).length;
-  const skipBtn = remaining > 1
-    ? `<button type="button" class="rate-skip" data-rate-skip="${k}" data-locid="${loc.id}">Skip</button>`
+  /* Shown whenever there is another question to move to, answered or not — it is now a
+   * navigation control, not an escape hatch, so hiding it once everything is answered would
+   * strand someone on whichever question they happened to land on. */
+  const skipBtn = RATING_DIMS.length > 1
+    ? `<button type="button" class="rate-skip" data-rate-go="${idx + 1}" data-locid="${loc.id}">${
+        myVote[k] ? RATING_DIMS[(idx + 1) % RATING_DIMS.length].plate : 'Skip'} &rsaquo;</button>`
     : '';
-  const progress = `<span class="rate-progress" aria-label="${answered} of 3 answered">${
-    RATING_DIMS.map(d => `<i class="${myVote[d.key] ? 'on' : ''}"></i>`).join('')}</span>`;
+  const idx = ratingDimIndex(loc, myVote);
+  /* The dots do three jobs: show how many questions there are, show which one you are on, and
+   * act as the discoverable version of the swipe. A gesture with no visible control is a
+   * feature only the person who built it knows about. */
+  const progress = `<span class="rate-progress">${
+    RATING_DIMS.map((d, i) => `<button type="button" class="${i === idx ? 'here' : ''}${myVote[d.key] ? ' on' : ''}"`
+      + ` data-rate-go="${i}" data-locid="${loc.id}"`
+      + ` aria-label="${escapeHtml(d.plate)}${myVote[d.key] ? ', answered' : ''}"`
+      + ` aria-current="${i === idx}"></button>`).join('')}</span>`;
 
   return `${plate(dim.plate)}
       <div class="rate-head">${progress}${skipBtn}</div>
       ${scoreLine}
-      <div class="rate-stack" id="ratestack-${k}-${loc.id}">
+      <div class="rate-stack" id="ratestack-${k}-${loc.id}" data-rate-swipe="${loc.id}">
         ${starsHtml(loc.id, k, myVote[k])}
         <div class="star-quip" id="quip-${k}-${loc.id}">${myVote[k] ? quipFor(k, myVote[k]) : escapeHtml(dim.q)}</div>
         <div class="rate-flash" id="flash-${k}-${loc.id}" aria-live="polite"></div>
@@ -2469,7 +2498,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.37.0';
+const BUILD = 'v2.38.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -4378,17 +4407,58 @@ function refreshRatingSection(loc){
   if(typeof refreshOpenPopupStrip === 'function') refreshOpenPopupStrip();
 }
 
-/* Skip is per-location and per-session. It advances the question without recording anything —
- * there is deliberately no "no opinion" vote, because a skip is an absence of data, not data. */
+/* Moving between questions never records anything — there is deliberately no "no opinion" vote,
+ * because declining to answer is an absence of data, not data. */
 document.addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-rate-skip]');
+  const btn = e.target.closest('[data-rate-go]');
   if(!btn) return;
-  const id = btn.dataset.locid;
-  const loc = locationsById[id];
+  const loc = locationsById[btn.dataset.locid];
   if(!loc) return;
-  (ratingSkips[id] = ratingSkips[id] || {})[btn.dataset.rateSkip] = true;
-  refreshRatingSection(loc);
+  ratingGoTo(loc, Number(btn.dataset.rateGo));
 });
+
+/* Swipe between the questions.
+ *
+ * The hard part is that this element is FULL of tap targets — five stars, and a tap must not be
+ * read as a tiny swipe. So: a movement threshold before anything counts, an axis lock so the
+ * popup can still be scrolled vertically through this block, and the whole thing is passive
+ * until the axis is known, which keeps the scroll smooth.
+ *
+ * The stars are left entirely alone. Their click handler fires on click, and a click only
+ * happens when the pointer did not travel far, so the two cannot both trigger. */
+(function(){
+  const MIN = 40;                 // px before a drag is a swipe rather than a wobbly tap
+  let id = null, x0 = 0, y0 = 0, axis = null;
+
+  document.addEventListener('touchstart', (e) => {
+    const host = e.target.closest && e.target.closest('[data-rate-swipe]');
+    if(!host){ id = null; return; }
+    id = host.dataset.rateSwipe;
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; axis = null;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if(!id) return;
+    const dx = e.touches[0].clientX - x0, dy = e.touches[0].clientY - y0;
+    if(axis === null){
+      if(Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    }
+    // Vertical: hand it back to the popup's own scrolling and stop watching.
+    if(axis === 'y'){ id = null; return; }
+    if(e.cancelable) e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('touchend', (e) => {
+    if(!id || axis !== 'x') { id = null; return; }
+    const loc = locationsById[id];
+    const dx = (e.changedTouches[0] || {}).clientX - x0;
+    id = null; axis = null;
+    if(!loc || Math.abs(dx) < MIN) return;
+    // Left goes forward, matching every other pager on a phone.
+    ratingGoTo(loc, ratingDimIndex(loc, myVoteCache[loc.id] || emptyVote()) + (dx < 0 ? 1 : -1));
+  });
+})();
 
 function attachStarHandlers(loc){
   const popupEl = document.querySelector(`.popup-inner[data-locid="${loc.id}"]`);
@@ -4499,7 +4569,13 @@ function attachStarHandlers(loc){
         /* Advance to the next question, after a beat so the tick and the saved note are seen.
          * Redrawing instantly would make a successful save look like the control had reset. */
         if(okVote && RATING_DIMS.some(d => d.key === type)){
-          setTimeout(() => refreshRatingSection(loc), 900);
+          /* Move to whatever is still unanswered, or stay put if nothing is. Advancing blindly
+           * would bounce someone off a question they had just deliberately swiped back to. */
+          setTimeout(() => {
+            const v = myVoteCache[loc.id] || emptyVote();
+            const next = RATING_DIMS.findIndex(d => !v[d.key]);
+            if(next >= 0) ratingGoTo(loc, next); else refreshRatingSection(loc);
+          }, 900);
         }
 
         // refresh the label text with new average
