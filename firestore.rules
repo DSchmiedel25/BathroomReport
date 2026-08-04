@@ -263,7 +263,13 @@ service cloud.firestore {
          * It fires only where bathroomCount < 5, i.e. almost every location nobody had rated
          * yet, so first-ever ratings at fresh locations have been failing since the achievement
          * shipped. */
-        && boolOrAbsent('wasHiddenGem');
+        && boolOrAbsent('wasHiddenGem')
+        /* Captured at the moment of rating because neither can be reconstructed later:
+         * wasFirst records that nobody had rated the place yet, and wasChanged that this
+         * rating replaced one you had already left. Same trap as wasHiddenGem, which was
+         * once missing from the allowlist and silently rejected every write after it fired. */
+        && boolOrAbsent('wasFirst')
+        && boolOrAbsent('wasChanged');
     }
     match /votes/{id} {
       /* Was `if true`. Every vote carries clientId (the raw uid), locId, ratedAt and username, so
@@ -283,7 +289,8 @@ service cloud.firestore {
         && id == request.resource.data.locId + '_' + request.auth.uid
         && request.resource.data.keys().hasOnly([
              'store','bathroom','safe','amenities','storeFeatures','amenityMeta',
-             'clientId','locId','lastUpdated','username','ratedAt','wasHiddenGem'
+             'clientId','locId','lastUpdated','username','ratedAt','wasHiddenGem',
+             'wasFirst','wasChanged'
            ])
         && validVoteShape();
       allow update: if ownedByCaller()
@@ -292,7 +299,8 @@ service cloud.firestore {
         // before these rules — possibly carrying retired fields — stay updatable.
         && touchedKeys().hasOnly([
              'store','bathroom','safe','amenities','storeFeatures','amenityMeta',
-             'clientId','locId','lastUpdated','username','ratedAt','wasHiddenGem'
+             'clientId','locId','lastUpdated','username','ratedAt','wasHiddenGem',
+             'wasFirst','wasChanged'
            ])
         && validVoteShape();
       allow delete: if signedIn() && resource.data.clientId == request.auth.uid;

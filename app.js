@@ -2533,7 +2533,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.39.4';
+const BUILD = 'v2.40.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -3603,82 +3603,150 @@ function tierProgress(count, tiers){
   for(const t of tiers){ if(count < t){ total = t; break; } }
   return { done: count >= top, current: Math.min(count, total), total, revealed: count >= tiers[0] };
 }
+/* ============================================================================
+ *  Achievements
+ * ============================================================================
+ * Rebuilt. Three things were wrong with the previous set and none of them were "too easy":
+ *
+ *   1. Sixteen of thirty-five stamps paid for the same behaviour — rating volume.
+ *   2. Ten paid for a PARTICULAR ANSWER: six for five-star ratings, four for one-star. An
+ *      achievement that names a rating value as its goal will change how people rate, and
+ *      "give twenty-five 1-star ratings" is a bounty on bad reviews in an app whose entire
+ *      value is honest ones. All ten are gone, replaced by Full Range, which can only be
+ *      earned by rating across the whole spectrum.
+ *   3. Tips, corrections and safety answers — three of the four verbs in the app's own
+ *      tagline — had no stamps at all, despite being tracked.
+ *
+ * RETIRED stamps stay in this list with `retired:true`. Anyone holding one keeps it, dated,
+ * and nobody new can earn it. Deleting them would silently take a trophy off a passport for
+ * something the holder did nothing wrong to earn.
+ */
+/* How many stamps a person can actually still get. Retired ones are excluded from every
+ * denominator: "4 / 47" would count ten trophies nobody can earn. */
 const ACHIEVEMENT_DEFS = [
+  // ---------- Rate: volume ----------
   { key:'firstFlush', icon:'🚽', name:'First Flush', desc:'Rate your first bathroom',
     calc:s=>({done:s.bathroomRatedCount>=1,current:Math.min(s.bathroomRatedCount,1),total:1})},
   { key:'gettingStarted', icon:'🧻', name:'Getting Started', desc:'Rate 10 bathrooms',
     calc:s=>({done:s.bathroomRatedCount>=10,current:Math.min(s.bathroomRatedCount,10),total:10})},
-  { key:'regular', icon:'🚻', name:'Regular', desc:'Rate 25 bathrooms',
-    calc:s=>({done:s.bathroomRatedCount>=25,current:Math.min(s.bathroomRatedCount,25),total:25})},
-  { key:'halfCentury', icon:'🎯', name:'Half Century', desc:'Rate 50 bathrooms',
+  { key:'regular', icon:'🚻', name:'Regular', desc:'Rate 50 bathrooms',
     calc:s=>({done:s.bathroomRatedCount>=50,current:Math.min(s.bathroomRatedCount,50),total:50})},
   { key:'centuryClub', icon:'💯', name:'Century Club', desc:'Rate 100 bathrooms',
     calc:s=>({done:s.bathroomRatedCount>=100,current:Math.min(s.bathroomRatedCount,100),total:100})},
-  { key:'explorerElite', icon:'🎓', name:'Explorer Elite', desc:'Rate 250 bathrooms',
-    calc:s=>({done:s.bathroomRatedCount>=250,current:Math.min(s.bathroomRatedCount,250),total:250})},
-  { key:'bathroomLegend', icon:'👑', name:'Bathroom Legend', desc:'Rate 500 bathrooms',
+  { key:'hallOfFame', icon:'🏛️', name:'Hall of Fame', desc:'Rate 500 bathrooms',
     calc:s=>({done:s.bathroomRatedCount>=500,current:Math.min(s.bathroomRatedCount,500),total:500})},
-  { key:'hallOfFame', icon:'🏆', name:'Hall of Fame', desc:'Rate 1,000 bathrooms',
-    calc:s=>({done:s.bathroomRatedCount>=1000,current:Math.min(s.bathroomRatedCount,1000),total:1000})},
-  { key:'chainExplorer', icon:'🏪', name:'Chain Explorer', desc:'Rate at least one of every chain on the map',
-    calc:s=>({done:s.totalChains>0&&s.chainCount>=s.totalChains,current:s.chainCount,total:s.totalChains||1})},
-  { key:'brandLoyalist', icon:'🏷️', name:'Brand Loyalist', desc:'Rate 10 locations of a single chain',
-    calc:s=>({done:s.maxOneChain>=10,current:Math.min(s.maxOneChain,10),total:10})},
-  { key:'brandDevotee', icon:'🎖️', name:'Brand Devotee', desc:'Rate 25 locations of a single chain',
-    calc:s=>({done:s.maxOneChain>=25,current:Math.min(s.maxOneChain,25),total:25})},
-  { key:'truckStopHero', icon:'🚛', name:'Truck Stop Hero', desc:"Rate 25 travel-center stops (Pilot Flying J, Love's, Buc-ee's)",
-    calc:s=>({done:s.travelPlazaCount>=25,current:Math.min(s.travelPlazaCount,25),total:25})},
-  { key:'hiddenGemHunter', icon:'💎', name:'Hidden Gem Hunter', desc:'Rate a spot that had fewer than 5 reviews',
-    calc:s=>({done:s.hiddenGemCount>=1,current:Math.min(s.hiddenGemCount,1),total:1})},
-  { key:'gemCollector', icon:'💠', name:'Gem Collector', desc:'Rate 5 hidden gems',
-    calc:s=>({done:s.hiddenGemCount>=5,current:Math.min(s.hiddenGemCount,5),total:5})},
-  { key:'cityHopper', icon:'🌆', name:'City Hopper', desc:'Rate bathrooms in 15 different cities',
+
+  // ---------- Rate: honesty ----------
+  { key:'fullRange', icon:'🎚️', name:'Full Range', desc:'Give a rating at every level, 1 star through 5',
+    calc:s=>({done:s.starLevels>=5,current:Math.min(s.starLevels||0,5),total:5})},
+  { key:'secondLook', icon:'🔁', name:'Second Look', desc:'Change a rating you left before',
+    calc:s=>({done:s.changedCount>=1,current:Math.min(s.changedCount||0,1),total:1})},
+
+  // ---------- Share: tips ----------
+  { key:'firstWord', icon:'💬', name:'First Word', desc:'Write your first tip',
+    calc:s=>({done:s.tipsWrittenCount>=1,current:Math.min(s.tipsWrittenCount||0,1),total:1})},
+  { key:'localGuide', icon:'🗒️', name:'Local Guide', desc:'Write 10 tips',
+    calc:s=>({done:s.tipsWrittenCount>=10,current:Math.min(s.tipsWrittenCount||0,10),total:10})},
+  { key:'storyteller', icon:'📖', name:'Storyteller', desc:'Write 50 tips',
+    calc:s=>({done:s.tipsWrittenCount>=50,current:Math.min(s.tipsWrittenCount||0,50),total:50})},
+
+  // ---------- Improve: fixing the map ----------
+  { key:'fixer', icon:'🔧', name:'Fixer', desc:'Make your first correction — hours, a report, or a new place',
+    calc:s=>({done:s.improvementCount>=1,current:Math.min(s.improvementCount||0,1),total:1})},
+  { key:'caretaker', icon:'🧰', name:'Caretaker', desc:'Make 10 corrections',
+    calc:s=>({done:s.improvementCount>=10,current:Math.min(s.improvementCount||0,10),total:10})},
+  { key:'accessibilityScout', icon:'♿', name:'Accessibility Scout', desc:'Answer the accessibility question at 10 stops',
+    calc:s=>({done:s.accessibleAnsweredCount>=10,current:Math.min(s.accessibleAnsweredCount,10),total:10})},
+  { key:'hoursHero', icon:'🕰️', name:'Hours Hero', desc:'Report hours at stores to help other travelers',
+    hidden:true, tiers:[1,5,10,25,50,100],
+    calc:s=>tierProgress(s.hoursAddedCount||0, [1,5,10,25,50,100])},
+
+  // ---------- Safety ----------
+  { key:'lookout', icon:'👀', name:'Lookout', desc:'Answer “did you feel safe” at 10 stops',
+    calc:s=>({done:s.safeAnsweredCount>=10,current:Math.min(s.safeAnsweredCount||0,10),total:10})},
+  { key:'guardian', icon:'🛡️', name:'Guardian', desc:'Answer “did you feel safe” at 50 stops',
+    calc:s=>({done:s.safeAnsweredCount>=50,current:Math.min(s.safeAnsweredCount||0,50),total:50})},
+
+  // ---------- Find: geography ----------
+  { key:'cityHopper', icon:'🏙️', name:'City Hopper', desc:'Rate bathrooms in 15 different cities',
     calc:s=>({done:s.cityCount>=15,current:Math.min(s.cityCount,15),total:15})},
   { key:'roadWarrior', icon:'🛣️', name:'Road Warrior', desc:'Rate bathrooms in 10 different states',
     calc:s=>({done:s.stateCount>=10,current:Math.min(s.stateCount,10),total:10})},
   { key:'nationwide', icon:'🗺️', name:'Nationwide', desc:'Rate bathrooms in 25 different states',
     calc:s=>({done:s.stateCount>=25,current:Math.min(s.stateCount,25),total:25})},
-  { key:'crossCountry', icon:'🧭', name:'Cross-Country', desc:'Rate two bathrooms 1,000+ miles apart',
+  { key:'crossCountry', icon:'✈️', name:'Cross-Country', desc:'Rate two bathrooms 1,000+ miles apart',
     calc:s=>({done:s.maxMilesApart>=1000,current:Math.min(Math.round(s.maxMilesApart),1000),total:1000})},
   { key:'transcontinental', icon:'🌎', name:'Transcontinental', desc:'Rate two bathrooms 2,500+ miles apart',
     calc:s=>({done:s.maxMilesApart>=2500,current:Math.min(Math.round(s.maxMilesApart),2500),total:2500})},
+  { key:'vacationMode', icon:'🧳', name:'Vacation Mode', desc:'Rate bathrooms in 5 states within one week',
+    hidden:true, calc:s=>({done:s.maxStatesIn7Days>=5,current:Math.min(s.maxStatesIn7Days,5),total:5})},
+
+  // ---------- Find: chains ----------
+  { key:'chainExplorer', icon:'🧭', name:'Chain Explorer', desc:'Rate at least one location at 15 different chains',
+    calc:s=>({done:s.chainCount>=15,current:Math.min(s.chainCount,15),total:15})},
+  { key:'brandLoyalist', icon:'🏷️', name:'Brand Loyalist', desc:'Rate 10 locations of a single chain',
+    calc:s=>({done:s.maxOneChain>=10,current:Math.min(s.maxOneChain,10),total:10})},
+  { key:'brandDevotee', icon:'💛', name:'Brand Devotee', desc:'Rate 25 locations of a single chain',
+    calc:s=>({done:s.maxOneChain>=25,current:Math.min(s.maxOneChain,25),total:25})},
+  { key:'truckStopHero', icon:'🚛', name:'Truck Stop Hero', desc:'Rate 25 travel plazas',
+    calc:s=>({done:s.travelPlazaCount>=25,current:Math.min(s.travelPlazaCount,25),total:25})},
+
+  // ---------- Discovery ----------
+  { key:'trailblazer', icon:'💎', name:'Trailblazer', desc:'Be the first person ever to rate a location',
+    calc:s=>({done:s.firstEverCount>=1,current:Math.min(s.firstEverCount||0,1),total:1})},
+  { key:'pathfinder', icon:'🧩', name:'Pathfinder', desc:'Be the first to rate 25 locations',
+    calc:s=>({done:s.firstEverCount>=25,current:Math.min(s.firstEverCount||0,25),total:25})},
+
+  // ---------- Cadence ----------
   { key:'marathon', icon:'🏃', name:'Marathon', desc:'Rate 5 bathrooms in a single day',
     calc:s=>({done:s.maxInOneDay>=5,current:Math.min(s.maxInOneDay,5),total:5})},
   { key:'streak', icon:'🔥', name:'Streak', desc:'Rate 3 days in a row',
     calc:s=>({done:s.maxStreak>=3,current:Math.min(s.maxStreak,3),total:3})},
-  { key:'onFire', icon:'⚡', name:'On Fire', desc:'Rate 7 days in a row',
+  { key:'onFire', icon:'🌋', name:'On Fire', desc:'Rate 7 days in a row',
     calc:s=>({done:s.maxStreak>=7,current:Math.min(s.maxStreak,7),total:7})},
   { key:'weekendWarrior', icon:'📅', name:'Weekend Warrior', desc:'Rate on 5 weekend days',
     calc:s=>({done:s.weekendCount>=5,current:Math.min(s.weekendCount,5),total:5})},
-  { key:'earlyBird', icon:'☀️', name:'Early Bird', desc:'Rate before 5:00 AM',
+
+  // ---------- Seasonal ----------
+  { key:'winterWarrior', icon:'❄️', name:'Winter Warrior', desc:'Rate 10 bathrooms in December–February',
+    hidden:true, calc:s=>({done:s.winterCount>=10,current:Math.min(s.winterCount||0,10),total:10})},
+  { key:'summerRoadTrip', icon:'🌞', name:'Summer Road Trip', desc:'Rate 10 bathrooms in June–August',
+    hidden:true, calc:s=>({done:s.summerCount>=10,current:Math.min(s.summerCount||0,10),total:10})},
+
+  // ---------- Flavour ----------
+  { key:'earlyBird', icon:'🌅', name:'Early Bird', desc:'Rate before 5:00 AM',
     calc:s=>({done:s.hasEarlyBird,current:s.hasEarlyBird?1:0,total:1})},
-  { key:'nightOwl', icon:'🌙', name:'Night Owl', desc:'Rate between midnight and 4:00 AM',
+  { key:'nightOwl', icon:'🦉', name:'Night Owl', desc:'Rate between midnight and 4:00 AM',
     calc:s=>({done:s.hasNightOwl,current:s.hasNightOwl?1:0,total:1})},
-  { key:'accessibilityScout', icon:'♿', name:'Accessibility Scout', desc:'Answer the accessibility question at 10 stops',
-    calc:s=>({done:s.accessibleAnsweredCount>=10,current:Math.min(s.accessibleAnsweredCount,10),total:10})},
-  // ---- Hidden trophies (masked until unlocked) ----
-  { key:'critic', icon:'⭐', name:'Critic', desc:'Give a 5-star rating', hidden:true,
-    calc:s=>({done:s.fiveStarCount>=1,current:Math.min(s.fiveStarCount,1),total:1})},
-  { key:'perfectionist', icon:'✨', name:'Perfectionist', desc:'Give ten 5-star ratings', hidden:true,
-    calc:s=>({done:s.fiveStarCount>=10,current:Math.min(s.fiveStarCount,10),total:10})},
-  { key:'cleanFreak', icon:'🧼', name:'Clean Freak', desc:'Give twenty-five 5-star ratings', hidden:true,
-    calc:s=>({done:s.fiveStarCount>=25,current:Math.min(s.fiveStarCount,25),total:25})},
-  { key:'toughCrowd', icon:'💢', name:'Tough Crowd', desc:'Give a 1-star rating', hidden:true,
-    calc:s=>({done:s.oneStarCount>=1,current:Math.min(s.oneStarCount,1),total:1})},
-  { key:'ironStomach', icon:'👃', name:'Iron Stomach', desc:'Give twenty-five 1-star ratings', hidden:true,
-    calc:s=>({done:s.oneStarCount>=25,current:Math.min(s.oneStarCount,25),total:25})},
-  { key:'winterWarrior', icon:'❄️', name:'Winter Warrior', desc:'Rate a bathroom in December–February', hidden:true,
-    calc:s=>({done:s.hasWinter,current:s.hasWinter?1:0,total:1})},
-  { key:'summerRoadTrip', icon:'🌞', name:'Summer Road Trip', desc:'Rate a bathroom in June–August', hidden:true,
-    calc:s=>({done:s.hasSummer,current:s.hasSummer?1:0,total:1})},
-  { key:'vacationMode', icon:'🧳', name:'Vacation Mode', desc:'Rate bathrooms in 5 states within one week', hidden:true,
-    calc:s=>({done:s.maxStatesIn7Days>=5,current:Math.min(s.maxStatesIn7Days,5),total:5})},
-  // Hours Hero — a single tiered trophy: hidden until your first hours report, then one bar
-  // rolls through 1/5/10/25/50/100 distinct stores you've reported hours for.
-  { key:'hoursHero', icon:'🕰️', name:'Hours Hero', desc:'Report hours at stores to help other travelers',
-    hidden:true, tiers:[1,5,10,25,50,100],
-    calc:s=>tierProgress(s.hoursAddedCount||0, [1,5,10,25,50,100])}
+  { key:'fourSeasons', icon:'🍂', name:'Four Seasons', desc:'Rate in all four seasons — takes a year',
+    hidden:true, calc:s=>({done:s.seasonCount>=4,current:Math.min(s.seasonCount||0,4),total:4})},
+
+  /* ---------- Retired ----------
+   * No longer obtainable. Kept so holders keep them: the passport reads stored unlocks, so a
+   * deleted definition would quietly erase an earned stamp. `retired` hides them from "still to
+   * earn" without hiding them from the people who have them. */
+  { key:'halfCentury', icon:'🎯', name:'Half Century', desc:'Rate 50 bathrooms', retired:true,
+    calc:s=>({done:false,current:0,total:50})},
+  { key:'explorerElite', icon:'🎓', name:'Explorer Elite', desc:'Rate 250 bathrooms', retired:true,
+    calc:s=>({done:false,current:0,total:250})},
+  { key:'bathroomLegend', icon:'👑', name:'Bathroom Legend', desc:'Rate 500 bathrooms', retired:true,
+    calc:s=>({done:false,current:0,total:500})},
+  { key:'critic', icon:'⭐', name:'Critic', desc:'Give a 5-star rating', retired:true,
+    calc:s=>({done:false,current:0,total:1})},
+  { key:'perfectionist', icon:'✨', name:'Perfectionist', desc:'Give ten 5-star ratings', retired:true,
+    calc:s=>({done:false,current:0,total:10})},
+  { key:'cleanFreak', icon:'🧼', name:'Clean Freak', desc:'Give twenty-five 5-star ratings', retired:true,
+    calc:s=>({done:false,current:0,total:25})},
+  { key:'toughCrowd', icon:'💢', name:'Tough Crowd', desc:'Give a 1-star rating', retired:true,
+    calc:s=>({done:false,current:0,total:1})},
+  { key:'ironStomach', icon:'🤢', name:'Iron Stomach', desc:'Give twenty-five 1-star ratings', retired:true,
+    calc:s=>({done:false,current:0,total:25})},
+  { key:'hiddenGemHunter', icon:'💠', name:'Hidden Gem Hunter', desc:'Rate a spot that had fewer than 5 reviews', retired:true,
+    calc:s=>({done:false,current:0,total:1})},
+  { key:'gemCollector', icon:'🔷', name:'Gem Collector', desc:'Rate 5 hidden gems', retired:true,
+    calc:s=>({done:false,current:0,total:5})},
 ];
+const OBTAINABLE_COUNT = ACHIEVEMENT_DEFS.filter(d => !d.retired).length;
 
 // We don't have real county data in locations.js, only addresses — so "County Collector"
 // uses the city pulled from each address as a rough stand-in for "different areas visited"
@@ -3689,6 +3757,56 @@ function getCityFromAddress(addr){
   return parts.length >= 2 ? parts[parts.length - 2] : parts[0];
 }
 
+/* Prefer the state the data already carries.
+ *
+ * stateFromAddr parses "…, Albany, NY 12205" out of an address string, which works for the
+ * chain datasets and fails completely for public restrooms: all 56,005 of them have an EMPTY
+ * address, because OSM toilet nodes rarely carry one. What they do have is meta.state, written
+ * by build-public-toilets.js from the state file each record came out of — 100% populated, and
+ * read nowhere until now.
+ *
+ * So every geography achievement silently ignored two thirds of the map. Not because a region
+ * had not downloaded — because the parser was looking in the only field these records leave
+ * blank. */
+/* A tiny local record of WHERE each rated location was.
+ *
+ * A vote stores only a locId. Resolving that to a state or a chain needs the location record,
+ * and public restrooms live in region files that load on demand — so opening your passport
+ * after driving somewhere else silently dropped every rating outside the loaded regions from
+ * the geography and chain achievements.
+ *
+ * The fix is that at the moment of rating, the record IS loaded: you tapped its pin. So the two
+ * fields those achievements need get copied then, keyed by locId, and the achievements read
+ * this when the location itself is unavailable. No server change, no rules change, and no
+ * 18 MB download to count your own history.
+ *
+ * Older ratings backfill themselves the next time their region happens to load. */
+const RATED_META_KEY = 'br_rated_meta';
+function ratedMeta(){
+  try{ return JSON.parse(localStorage.getItem(RATED_META_KEY) || '{}') || {}; }catch(e){ return {}; }
+}
+function rememberRatedMeta(loc){
+  if(!loc || !loc.id) return;
+  try{
+    const m = ratedMeta();
+    const st = stateOf(loc);
+    const entry = {};
+    if(st) entry.s = st;
+    if(loc.chain) entry.c = loc.chain;
+    if(typeof loc.lat === 'number' && typeof loc.lng === 'number'){ entry.y = loc.lat; entry.x = loc.lng; }
+    const city = (typeof getCityFromAddress === 'function') ? getCityFromAddress(loc.addr) : '';
+    if(city) entry.t = city;
+    if(!Object.keys(entry).length) return;
+    m[loc.id] = entry;
+    localStorage.setItem(RATED_META_KEY, JSON.stringify(m));
+  }catch(e){ /* private mode — achievements degrade to loaded-only, as before */ }
+}
+
+function stateOf(loc){
+  if(!loc) return null;
+  if(loc.meta && loc.meta.state) return loc.meta.state;
+  return stateFromAddr(loc.addr);
+}
 function stateFromAddr(addr){
   if(!addr) return null;
   let m = addr.match(/\b([A-Z]{2})\b\s*\d{5}/);
@@ -3726,40 +3844,63 @@ async function computeAchievementStats(){
    *
    * locationsById rather than seedLocations.find — the latter is a linear scan of 84,000
    * records run once per vote. */
-  const ratedAll = [];      // every rating, loaded or not
-  const rated = [];         // those whose location we can currently resolve
+  const meta = ratedMeta();
+  const ratedAll = [];      // every rating
+  const rated = [];         // every rating we can place on a map, loaded or remembered
   Object.keys(myVoteCache).forEach(id => {
     const v = myVoteCache[id];
     if(!v || !(v.bathroom > 0)) return;
-    const entry = { bathroom: v.bathroom, ratedAt: v.ratedAt || null, wasHiddenGem: !!v.wasHiddenGem };
+    const entry = { bathroom: v.bathroom, ratedAt: v.ratedAt || null, wasHiddenGem: !!v.wasHiddenGem,
+                    wasFirst: !!v.wasFirst, wasChanged: !!v.wasChanged, safe: v.safe || 0 };
     ratedAll.push(entry);
-    const loc = locationsById[id];
-    if(loc) rated.push({ ...entry, loc });
+    /* The live record if its region is loaded; otherwise the snapshot taken when it was rated.
+     * The snapshot carries only what the achievements need, which is why it can be kept for
+     * every rating without becoming a second copy of the map. */
+    const live = locationsById[id];
+    const m = meta[id];
+    if(live) rated.push({ ...entry, loc: live });
+    else if(m) rated.push({ ...entry, loc: {
+      id, addr: '', chain: m.c, lat: m.y, lng: m.x,
+      meta: m.s ? { state: m.s } : {}, _city: m.t } });
   });
 
   const bathroomRatedCount = ratedAll.length;
   const fiveStarCount = ratedAll.filter(r => r.bathroom === 5).length;
   const oneStarCount  = ratedAll.filter(r => r.bathroom === 1).length;
   const hiddenGemCount = ratedAll.filter(r => r.wasHiddenGem).length;
+  const firstEverCount = ratedAll.filter(r => r.wasFirst).length;
+  const changedCount   = ratedAll.filter(r => r.wasChanged).length;
+  /* Full Range: how many of the five star levels you have ever used. Rewards rating across the
+   * spectrum, which is the opposite of what a "give 25 one-star ratings" stamp rewards. */
+  const starLevels = new Set(ratedAll.map(r => r.bathroom).filter(n => n >= 1 && n <= 5)).size;
+  /* Safety answers, counted from the votes rather than a local store so they survive a new
+   * device the same way ratings do. */
+  const safeAnsweredCount = Object.values(myVoteCache).filter(v => v && v.safe > 0).length;
 
   const states = new Set(), cities = new Set(), chainCounts = {};
   rated.forEach(r => {
-    const st = stateFromAddr(r.loc.addr); if(st) states.add(st);
-    cities.add(getCityFromAddress(r.loc.addr));
+    const st = stateOf(r.loc); if(st) states.add(st);
+    /* _city is the remembered value for a location whose record is not loaded; the parser
+     * would return nothing from the empty address on a snapshot. */
+    const city = r.loc._city || getCityFromAddress(r.loc.addr);
+    if(city) cities.add(city);
     const ck = r.loc.chain || DEFAULT_CHAIN_KEY;
     chainCounts[ck] = (chainCounts[ck] || 0) + 1;
   });
   const maxOneChain = Object.values(chainCounts).reduce((m,n)=>Math.max(m,n), 0);
 
   let hasEarlyBird=false, hasNightOwl=false, hasWinter=false, hasSummer=false;
+  let winterCount=0, summerCount=0;
+  const seasons = new Set();
   const weekendDays = new Set(), dayCounts = {}, dayKeys = new Set();
   rated.forEach(r => {
     if(!r.ratedAt) return;                       // time-based stats need a ratedAt timestamp
     const d = new Date(r.ratedAt), h = d.getHours(), dow = d.getDay(), key = d.toDateString(), mo = d.getMonth();
     if(h < 5) hasEarlyBird = true;
     if(h >= 0 && h < 4) hasNightOwl = true;
-    if(mo === 11 || mo === 0 || mo === 1) hasWinter = true;   // Dec–Feb
-    if(mo >= 5 && mo <= 7) hasSummer = true;                   // Jun–Aug
+    seasons.add(mo <= 1 || mo === 11 ? 'w' : mo <= 4 ? 'sp' : mo <= 7 ? 'su' : 'f');
+    if(mo === 11 || mo === 0 || mo === 1){ hasWinter = true; winterCount++; }   // Dec–Feb
+    if(mo >= 5 && mo <= 7){ hasSummer = true; summerCount++; }   // Jun–Aug
     if(dow === 0 || dow === 6) weekendDays.add(key);
     dayCounts[key] = (dayCounts[key] || 0) + 1;
     dayKeys.add(key);
@@ -3786,8 +3927,8 @@ async function computeAchievementStats(){
 
   // Vacation Mode — most distinct states rated within any single 7-day window.
   const stateDated = rated
-    .filter(r => r.ratedAt && stateFromAddr(r.loc.addr))
-    .map(r => ({ t: r.ratedAt, st: stateFromAddr(r.loc.addr) }))
+    .filter(r => r.ratedAt && stateOf(r.loc))
+    .map(r => ({ t: r.ratedAt, st: stateOf(r.loc) }))
     .sort((a, b) => a.t - b.t);
   let maxStatesIn7Days = 0;
   const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -3803,6 +3944,8 @@ async function computeAchievementStats(){
     chainCount: Object.keys(chainCounts).length, maxOneChain,
     totalChains: Object.keys(CHAIN_REGISTRY).length,
     hasEarlyBird, hasNightOwl, hasWinter, hasSummer, weekendCount: weekendDays.size,
+    winterCount, summerCount, seasonCount: seasons.size,
+    firstEverCount, changedCount, starLevels, safeAnsweredCount,
     travelPlazaCount, maxStatesIn7Days,
     maxInOneDay, maxStreak: longestConsecutiveDayStreak(dayKeys), maxMilesApart,
     visitedCount: bathroomRatedCount, totalLocations: seedLocations.length,
@@ -3961,7 +4104,7 @@ function renderBathroomPassport(stats, results){
      * for a new account than silence. */
     note.textContent = stats.bathroomRatedCount === 0
       ? 'Rate your first bathroom and it will show up here.'
-      : `${unlockedCount} of ${ACHIEVEMENT_DEFS.length} stamps collected.`;
+      : `${unlockedCount} of ${OBTAINABLE_COUNT} stamps collected.`;
   }
   if(typeof ssSyncIdentity === 'function' && !document.getElementById('settingsSheet')?.hidden) ssSyncIdentity();
 
@@ -3971,7 +4114,7 @@ function renderBathroomPassport(stats, results){
    * complete" after three ratings and will keep reading 0.0% for years. Technically true, and a
    * discouraging first thing to see in your own passport. Stamps are finite and finishable, so
    * they are the number worth putting at the top; the map count stays below as context. */
-  const stampPct = ACHIEVEMENT_DEFS.length ? (unlockedCount / ACHIEVEMENT_DEFS.length) * 100 : 0;
+  const stampPct = OBTAINABLE_COUNT ? (unlockedCount / OBTAINABLE_COUNT) * 100 : 0;
   const issued = (() => {
     const u = window.__currentUser;
     const t = u && u.metadata && u.metadata.creationTime ? new Date(u.metadata.creationTime) : null;
@@ -3981,7 +4124,7 @@ function renderBathroomPassport(stats, results){
   const setTxt = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
   setTxt('dpName', displayNameFor() || 'You');
   setTxt('dpIssued', issued);
-  setTxt('dpStamps', `${unlockedCount} / ${ACHIEVEMENT_DEFS.length}`);
+  setTxt('dpStamps', `${unlockedCount} / ${OBTAINABLE_COUNT}`);
   setTxt('dpRated', stats.bathroomRatedCount);
 
   /* The bar is a seam on the card, above the flip strip — progress belongs to the document, not
@@ -3994,7 +4137,7 @@ function renderBathroomPassport(stats, results){
   if(bar){
     bar.setAttribute('aria-valuenow', String(Math.round(stampPct)));
     // Screen readers get the counts, since the bar alone conveys nothing to them.
-    bar.setAttribute('aria-valuetext', `${unlockedCount} of ${ACHIEVEMENT_DEFS.length} stamps collected`);
+    bar.setAttribute('aria-valuetext', `${unlockedCount} of ${OBTAINABLE_COUNT} stamps collected`);
   }
   container.innerHTML = '';
 
@@ -4068,7 +4211,9 @@ function renderBathroomPassport(stats, results){
       </div>`;
     }).join('');
 
-    const rowsHtml = rest.map(def => {
+    /* Retired stamps are unobtainable, so listing them under "Still to earn" would be an
+     * instruction nobody can follow. They still render as earned for anyone holding one. */
+    const rowsHtml = rest.filter(def => !def.retired).map(def => {
       const r = results[def.key];
       // A tiered achievement (Hours Hero) reveals after its first milestone and then shows a
       // rolling bar, unlike binary hidden trophies which stay masked until fully earned.
@@ -4560,6 +4705,18 @@ function attachStarHandlers(loc){
         // Hidden Gem Hunter achievement — capture at the moment of first rating whether the
         // community bathroom count was still under 5, since that fact can't be reconstructed
         // later once more reviews come in.
+        /* Trailblazer needs FIRST-EVER, not "fewer than five". Almost every location on the map
+         * has zero ratings, so the old test fired on essentially every rating and made Hidden
+         * Gem Hunter a duplicate of First Flush. wasFirst is captured alongside rather than
+         * replacing wasHiddenGem, so anyone already holding the old stamp keeps it. */
+        if(type === 'bathroom' && prevVal === 0 && (agg.bathroomCount || 0) === 0){
+          myVote.wasFirst = true;
+        }
+        /* Second Look: this rating replaced one you had already left. Only true on a genuine
+         * change of mind — re-submitting the same number does not count. */
+        if(type === 'bathroom' && prevVal > 0 && prevVal !== val){
+          myVote.wasChanged = true;
+        }
         if(type === 'bathroom' && prevVal === 0 && (agg.bathroomCount || 0) < 5){
           myVote.wasHiddenGem = true;
         }
@@ -4614,6 +4771,8 @@ function attachStarHandlers(loc){
         /* Only the overall score is an "activity": the recap and the header ticker count
          * ratings, and logging clean and safe there would treble the numbers a person sees for
          * what was, to them, one visit. */
+        /* Captured here because this is the one moment the location is guaranteed loaded. */
+        if(okVote) rememberRatedMeta(loc);
         if(okVote && type === 'bathroom') logActivity('rating', { sourceId: loc.id + '_' + getEffectiveId(), locId: loc.id });
         if(note) note.textContent = okVote ? 'Saved ✓ — visible to everyone' : 'Save failed — nothing was recorded';
         if(okVote) maybeShowSupportPrompt();
