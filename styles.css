@@ -1484,3 +1484,15 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
   /* An unconfirmed negative reads as a warning, so it keeps a hint of the negative colour
      without claiming the confidence a confirmed one has. */
   .feature-badge.reported.reported-no{ border-color:rgba(240,138,134,.4); color:#d99b98; }
+
+  /* Layout answers carry a hint line, because "Multiple private restrooms" and "Multi-stall
+     restroom" are one word apart and mean opposite things. The button becomes two lines only
+     where a hint exists; yes/no amenities are untouched. */
+  .amenity-answer-btn.has-hint{
+    flex-direction:column; align-items:flex-start; gap:2px;
+    text-align:left; padding-top:8px; padding-bottom:8px;
+}
+  .amenity-answer-btn .aab-main{ display:flex; align-items:center; gap:6px; }
+  .amenity-answer-btn .aab-hint{
+    font-size:10.5px; font-weight:500; opacity:.7; line-height:1.3; padding-left:1px;
+}

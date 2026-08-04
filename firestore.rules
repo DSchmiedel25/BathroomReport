@@ -153,12 +153,20 @@ service cloud.firestore {
      * value the panel writes. */
     function amenityValueOrAbsent(k) {
       return !(k in request.resource.data)
-        || request.resource.data[k] in ['yes','no','unknown','single','multiple',''];
+        /* multiPrivate joins the set: "several separate locking rooms", which is the commonest
+         * convenience-store layout and had no valid value before. Spelled out rather than
+         * reusing 'multiple' so stored data cannot confuse "two private rooms" with "one room
+         * of stalls" — they are opposite answers to the privacy question. */
+        || request.resource.data[k] in ['yes','no','unknown','single','multiple','multiPrivate',''];
     }
 
     function touchedIsAmenityValue(k) {
       return !touchedKeys().hasAny([k])
-        || request.resource.data[k] in ['yes','no','unknown','single','multiple',''];
+        /* multiPrivate joins the set: "several separate locking rooms", which is the commonest
+         * convenience-store layout and had no valid value before. Spelled out rather than
+         * reusing 'multiple' so stored data cannot confuse "two private rooms" with "one room
+         * of stalls" — they are opposite answers to the privacy question. */
+        || request.resource.data[k] in ['yes','no','unknown','single','multiple','multiPrivate',''];
     }
 
     /* The two vote maps take DISJOINT key sets.

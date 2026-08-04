@@ -717,16 +717,36 @@ const BATHROOM_AMENITIES = [
    * deliberately boolean, which means its values ('yes'/'no') are already inside the value
    * enum in firestore.rules and COUNTED_ANSWERS in functions/index.js — only the key
    * allowlists needed touching, in the three places check 15 enforces. */
-  {key:'restroomType', label:'Restroom setup',
-    question:'One toilet, or multiple stalls?',
-    states:['unknown','single','multiple'],
+  /* Layout — what you walk into.
+   *
+   * This used to ask "one toilet, or multiple stalls?", which had no correct answer at the
+   * commonest convenience-store layout in the country: two separate one-holers. Each room has
+   * one toilet, so "single stall" is wrong; there is no shared room with partitions, so
+   * "multiple stalls" is wrong too. The question conflated PRIVACY with COUNT.
+   *
+   * Three states separate them. Both stored values keep their exact meaning — 'single' always
+   * meant one lockable toilet and 'multiple' always meant partitions in a shared room — so
+   * every existing answer survives and only the third value is new. 'multiPrivate' is spelled
+   * out rather than reusing 'multiple' precisely so the two cannot be confused in stored data.
+   *
+   * Ordered by how often you meet them, not by logic: most convenience stores are a single
+   * private room, and the first option should be the one most people are about to tap. */
+  {key:'restroomType', label:'Restroom layout',
+    question:'What is the setup?',
+    states:['unknown','single','multiPrivate','multiple'],
     stateLabels:{
       unknown:'Not sure',
-      single:'Single stall',
-      multiple:'Multiple stalls'
+      single:'Single private restroom',
+      multiPrivate:'Multiple private restrooms',
+      multiple:'Multi-stall restroom'
+    },
+    stateHints:{
+      single:'One toilet, locking door',
+      multiPrivate:'Separate locking rooms',
+      multiple:'Shared room with stalls'
     }},
   {key:'genderSplit', label:'Restroom rooms',
-    question:"One shared restroom, or separate men's and women's?",
+    question:"Who can use it?",
     /* Multi-state rather than boolean, because a boolean only DISPLAYS in the affirmative:
      * communityConfirmedBadges returns '' unless isConfirmedYes fires, so a confirmed NO — one
      * shared unisex restroom — would render nothing and look identical to "nobody has answered
@@ -740,8 +760,8 @@ const BATHROOM_AMENITIES = [
     states:['unknown','single','multiple'],
     stateLabels:{
       unknown:'Not sure',
-      single:'One shared restroom',
-      multiple:"Separate men's & women's"
+      single:'Anyone',
+      multiple:"Men's & women's"
     }},
   {key:'accessible', label:'Wheelchair accessible', stateIcons:{yes:'♿️'}},
   /* The one amenity whose ABSENCE is worth a badge — see showNegative in
@@ -933,7 +953,14 @@ function renderAmenityStepHtml(myVote, locId){
   if(!a){ return `<div class="amenity-complete">${ico('check')} That's everything — thanks for the intel!</div>`; }
   const states = a.states || ['unknown', 'yes', 'no'];
   const buttons = states.map(s =>
-    `<button type="button" class="amenity-answer-btn ans-${s}" data-key="${a.key}" data-value="${s}">${amenityButtonIcon(s)} ${amenityStateLabel(a, s)}</button>`
+    /* Three layout options are hard to tell apart from their names alone — "Multiple private
+     * restrooms" and "Multi-stall restroom" are one word different and mean opposite things.
+     * The hint is what makes them distinguishable at a glance while someone is standing in the
+     * doorway. Only rendered where a hint exists, so the yes/no amenities are unaffected. */
+    `<button type="button" class="amenity-answer-btn ans-${s}${(a.stateHints && a.stateHints[s]) ? ' has-hint' : ''}" data-key="${a.key}" data-value="${s}">`
+      + `<span class="aab-main">${amenityButtonIcon(s)} ${amenityStateLabel(a, s)}</span>`
+      + ((a.stateHints && a.stateHints[s]) ? `<span class="aab-hint">${escapeHtml(a.stateHints[s])}</span>` : '')
+      + `</button>`
   ).join('');
   return `<div class="amenity-progress">Question ${cursor + 1} of ${list.length}</div>
     <div class="amenity-question-label">${a.question || a.label}</div>
@@ -2303,29 +2330,32 @@ const STRIP_FACTS = {
     /* "Stalls: 1" was the label naming one possible answer and the value contradicting it — a
      * place with a single toilet has no stalls at all. "Toilets: One" states the thing being
      * counted and answers it in the same words the question uses. */
-    label: 'Toilets',
+    label: 'Layout',
     read(loc){
       const def = BATHROOM_AMENITIES.find(a => a.key === 'restroomType');
       const votes = (amenityCache[loc.id] || {}).restroomType;
+      /* Three layouts, three answers. "Several" for two private rooms and "Stalls" for a shared
+       * room are different facts, and collapsing them back into one word here would undo the
+       * whole point of splitting the question. */
+      const short = { single:'Private', multiPrivate:'Several', multiple:'Stalls' };
       const st = confirmedState(def, votes);
-      if(st) return { v: st === 'single' ? 'One' : 'Several', meta: '\u2605', tone: '' };
-      /* Reported: shown, with the count instead of the star. */
+      if(st) return { v: short[st] || '—', meta: '\u2605', tone: '' };
       const rep = reportedState(def, votes);
-      if(rep) return { v: rep === 'single' ? 'One' : 'Several', meta: String((votes || {})[rep] || 1), tone: '' };
+      if(rep) return { v: short[rep] || '—', meta: String((votes || {})[rep] || 1), tone: '' };
       return null;
     }
   },
   rooms: {
-    label: 'Rooms',
+    label: 'Who',
     read(loc){
       /* Community answer first — three people who were there outrank a tag. */
       const def = BATHROOM_AMENITIES.find(a => a.key === 'genderSplit');
       const votes = (amenityCache[loc.id] || {}).genderSplit;
       const st = confirmedState(def, votes);
-      if(st) return { v: st === 'single' ? 'Shared' : 'M/W', meta: '\u2605', tone: '' };
+      if(st) return { v: st === 'single' ? 'Anyone' : "M/W", meta: '\u2605', tone: '' };
       /* Reported outranks the OSM seed: one person who was actually there beats a tag. */
       const rep = reportedState(def, votes);
-      if(rep) return { v: rep === 'single' ? 'Shared' : 'M/W', meta: String((votes || {})[rep] || 1), tone: '' };
+      if(rep) return { v: rep === 'single' ? 'Anyone' : "M/W", meta: String((votes || {})[rep] || 1), tone: '' };
       /* Then the OSM seed. meta.osmGender was written by build-public-toilets.js from unisex=yes
        * (shared) and male=yes AND female=yes (separate), and stores the same 'single'/'multiple'
        * values genderSplit votes do — 7,782 answers that shipped with the data and were read
@@ -2335,7 +2365,7 @@ const STRIP_FACTS = {
        * guessing "separate" from half a pair would be inventing an answer. */
       const seed = loc.meta && loc.meta.osmGender;
       if(seed === 'single' || seed === 'multiple'){
-        return { v: seed === 'single' ? 'Shared' : 'M/W', meta: 'osm', tone: '' };
+        return { v: seed === 'single' ? 'Anyone' : "M/W", meta: 'osm', tone: '' };
       }
       return null;
     }
@@ -2599,7 +2629,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.43.1';
+const BUILD = 'v2.44.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
