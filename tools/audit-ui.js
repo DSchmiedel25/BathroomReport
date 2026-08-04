@@ -214,6 +214,31 @@ console.log('\nmoved rows keep their data');
   else pass('settings fills the account rows it owns');
 }
 
+// ---- 3f: every amenity value list in the rules must agree ----
+/* firestore.rules validates amenity values in THREE separate places — two helpers for the
+ * admin-override path and one inside knownAmenityMap, which is the one that actually guards a
+ * vote. Adding a new state to two of the three looks published and rejects every write, with a
+ * permission-denied the UI reported as a generic "could not save". */
+console.log('\namenity value lists');
+{
+  const rules = fs.readFileSync('firestore.rules', 'utf8');
+  const lists = [...rules.matchAll(/\['yes','no','unknown',([^\]]*)\]/g)].map(m => m[0]);
+  const app = fs.readFileSync('app.js', 'utf8');
+  const states = new Set(['yes', 'no', 'unknown', '']);
+  [...app.matchAll(/states:\[([^\]]+)\]/g)].forEach(m =>
+    m[1].replace(/'/g, '').split(',').forEach(v => states.add(v.trim())));
+
+  if (!lists.length) fail('no amenity value list found in firestore.rules');
+  else if (new Set(lists).size !== 1)
+    fail(`${new Set(lists).size} DIFFERENT amenity value lists in firestore.rules — a value allowed by one will be rejected by another`);
+  else {
+    const allowed = new Set(lists[0].replace(/[\[\]']/g, '').split(',').map(v => v.trim()));
+    const missing = [...states].filter(v => !allowed.has(v));
+    if (missing.length) fail('app.js can emit amenity value(s) the rules reject: ' + missing.join(', '));
+    else pass(`all ${lists.length} rules lists agree, and cover every state app.js can emit`);
+  }
+}
+
 // ---- 4: constants duplicated across files ----
 console.log('\nduplicated constants');
 const app = fs.readFileSync('app.js', 'utf8');

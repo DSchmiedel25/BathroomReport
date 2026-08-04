@@ -181,7 +181,12 @@ service cloud.firestore {
       return !(k in request.resource.data)
         || (request.resource.data[k] is map
             && request.resource.data[k].keys().hasOnly(allowed)
-            && request.resource.data[k].values().hasOnly(['yes','no','unknown','single','multiple','']));
+            /* multiPrivate belongs here too. THIS is the validator that actually guards a
+             * vote's `amenities` map — the two amenityValueOrAbsent helpers above check the
+             * admin-override path. Missing it here meant every write containing the new value
+             * was rejected even after the other two were updated, which is exactly the kind of
+             * partial change that looks published and is not. */
+            && request.resource.data[k].values().hasOnly(['yes','no','unknown','single','multiple','multiPrivate','']));
     }
 
     function boundedMapOrAbsent(k, maxKeys) {
