@@ -1277,3 +1277,18 @@ html[data-theme="light"] .ss-body .d-toggle .d-switch{background:#d6dde3}
    the popupopen/popupclose handlers write inline display on these same elements, and an inline
    style beats a class without it. */
 .is-gone{display:none !important}
+
+/* Offline status bar. Sits under the header, above the map controls — in the flow rather than
+   floating over the map, so it never covers a pin someone is trying to tap. */
+#offlineBar{
+  display:flex; align-items:center; gap:9px;
+  margin:0 10px 8px; padding:9px 12px; border-radius:10px;
+  background:rgba(232,163,61,.13); border:1px solid rgba(232,163,61,.4);
+  font-size:12.5px; line-height:1.4; color:#e8c99a;
+}
+#offlineBar[hidden]{display:none !important}
+/* Amber, not red. Being offline is a condition to work around, not an error to fix — and this
+   app is used in places where no signal is the normal state rather than a fault. */
+#offlineBar .ob-dot{
+  width:8px; height:8px; border-radius:50%; background:#e8a33d; flex:none;
+}

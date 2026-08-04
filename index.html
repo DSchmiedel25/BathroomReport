@@ -131,6 +131,14 @@
 </div>
 </div>
 <div id="mapWrap">
+<!-- Shown only when the browser reports no connection. Not a permanent notice — a status that
+     appears when it is true and leaves when it is not. It says what still works and what happens
+     to anything you write, because the useful information offline is not "you are offline" (the
+     phone already said that) but "keep going, nothing will be lost". -->
+<div id="offlineBar" hidden role="status" aria-live="polite">
+  <span class="ob-dot" aria-hidden="true"></span>
+  <span class="ob-text">Offline &mdash; showing what you&rsquo;ve already loaded. Ratings and tips will upload when you&rsquo;re back.</span>
+</div>
 <div id="topLeftControls">
 <div id="chainKey">
 <button id="chainKeyPill" aria-expanded="false" aria-controls="chainKeyPanel"><svg class="ico" aria-hidden="true"><use href="#i-filter"></use></svg> Filter <span id="chainKeyCount"></span> <span id="chainKeyArrow" aria-hidden="true">▾</span></button>
@@ -500,7 +508,7 @@ This is tracked on this device only. Log in to sync it across devices.
 
       <div class="ss-foot">
         <span class="d-count" id="drawerLocCount"></span>
-        <span id="ssVersion">Bathroom Report</span> <span class="d-version" data-version="v2.48.0">v2.48.0 · 2026-08-04</span><br>
+        <span id="ssVersion">Bathroom Report</span> <span class="d-version" data-version="v2.48.1">v2.48.1 · 2026-08-04</span><br>
         &copy; 2025&ndash;2026 Bathroom Report. Independent and community-created.
         Not affiliated with any business listed.
       </div>
@@ -645,6 +653,7 @@ This is tracked on this device only. Log in to sync it across devices.
 <div class="hiw-body">
 <section><h3>What this is</h3><p>Bathroom Report helps you find a clean, open public bathroom fast, at convenience stores, travel stops, and other reliable spots. It’s community-powered and growing nationwide. The whole idea in four words: <b class="tag-verb">FIND. RATE. SHARE. IMPROVE.</b></p></section>
 <section><h3><span class="tag-verb">FIND</span></h3><p>Open the map, tap Bathroom Now for the closest option, or use the key to see which places are around you. Hours show when we have them. A spot with unknown hours still appears, and we never mark a place closed on a guess. <b>No account needed</b> for any of this.</p></section>
+<section><h3>Going somewhere with no service?</h3><p>The map remembers wherever you&rsquo;ve already looked. <b>Before you leave, pan and zoom around the area you&rsquo;re heading to</b> &mdash; the map squares and the pins you load get stored on your device, and they&rsquo;ll still be there with no signal at all. Rate, tip and answer questions as normal while you&rsquo;re out; anything you write is saved on your phone and uploads by itself the moment you get service back. Nothing is lost and there&rsquo;s nothing to press.</p></section>
 <section><h3><span class="tag-verb">RATE</span></h3><p>Ratings come from people who’ve actually been there, because you can only rate <b>when you’re on-site</b>. They cover the bathroom itself, so you know what to expect before you go. Something broken? Flag it right from the pin.</p></section>
 <section><h3><span class="tag-verb">SHARE</span></h3><p>Get directions, share a spot with a friend, leave a tip (“need a key,” “buzzer required”), or report wrong info, all from a pin. Signed out, directions open in your device’s default maps app. Spotted a place we don’t have? Send it in with We Missed One?</p></section>
 <section><h3><span class="tag-verb">IMPROVE</span></h3><p>Confirm a store’s hours, answer quick amenity questions, and build your Passport as you go. Every location is reviewed before it goes on the map, and whole data sources get rejected. One national chain claimed restrooms at 16,000 sites with no evidence behind it, so none of them are here. Nothing is <b>bulk-imported unchecked</b>, and your reports are how it keeps getting better.</p></section>

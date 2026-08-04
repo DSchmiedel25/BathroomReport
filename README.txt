@@ -1,27 +1,30 @@
-BathroomReport v2.43.1
+BathroomReport v2.48.1 — telling people what to do with no service
 
-FILES     app.js  index.html  styles.css  sw.js    (repo root)
+FILES     app.js  index.html  shell.css  sw.js  firebase.js
 FIREBASE  nothing
 
-FIXES v2.42.0's mistake: the earned stamps had been split into the four verb
-sections, which put the collection in four piles and buried the reward under
-the roadmap. A passport is a page of stamps — that is the thing worth looking
-at, and it reads as one wall again, directly under the card.
+TWO PLACES, ONE MESSAGE
 
-The verbs now group only what is LEFT, which is where grouping helps: it turns
-thirty-odd unearned trophies into "you have done nothing under SHARE".
+1. A banner, only while it is true
+   "Offline — showing what you've already loaded. Ratings and tips will
+    upload when you're back."
 
-    [ passport card ]
-    [ 🚽 ][ 💎 ][ 🌞 ][ 💢 ]      every stamp you hold
+   Amber, not red: no signal is the normal state where this app gets used, not
+   a fault. Sits under the header rather than floating over the map, so it
+   never covers a pin. No dismiss button — it leaves by itself when the
+   connection returns.
 
-    STILL TO EARN
-    FIND     1/12   Places you have been
-    RATE     3/16   Bathrooms you have judged
-    SHARE    0/5    What you have told others
-    IMPROVE  0/4    The map you have fixed
+   The useful information offline is not "you are offline" (the phone already
+   said that). It is "keep going, nothing will be lost."
 
-Counts still report the whole group — "1/12", not "0/11" — because that is the
-useful number even in a section listing only the eleven you have not got.
+2. A How it works section, for BEFORE you leave
+   "Going somewhere with no service?" — explains that panning around the area
+   ahead of time stores the map squares and pins on the device, and that
+   anything written offline uploads by itself later.
 
-ALSO INCLUDES v2.43.0 (reported vs confirmed) in case it has not shipped:
-one vote now shows as a dashed "1 report" badge; three still earns the star.
+   That is the honest advice, because it is exactly how the caching works.
+   There is no download button and this does not pretend there is.
+
+ALSO IN THIS BUILD, if v2.48.0 has not shipped
+  Firestore offline persistence — writes queue and replay automatically.
+  Map tiles cached in their own bucket so the map draws where you have been.

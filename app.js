@@ -1561,6 +1561,24 @@ function quipFor(type, val){
   return options[Math.floor(Math.random() * options.length)];
 }
 
+/* ---------- Offline status ----------
+ * navigator.onLine is a weak signal — it means "there is a network interface", not "the internet
+ * answers", so it reports true on a hotel wifi that goes nowhere. It is still worth using for
+ * the case it IS good at: a phone that has genuinely dropped to no signal, which is the road
+ * case this app cares about.
+ *
+ * Deliberately not a modal, a toast, or anything that needs dismissing. Someone in a dead zone
+ * has a problem already; the app's job is to say "keep going" in one line and get out of the
+ * way. It disappears by itself when the connection returns. */
+function syncOfflineBar(){
+  const bar = document.getElementById('offlineBar');
+  if(!bar) return;
+  bar.hidden = navigator.onLine !== false;
+}
+window.addEventListener('online', syncOfflineBar);
+window.addEventListener('offline', syncOfflineBar);
+syncOfflineBar();
+
 // Wait for the Firebase module script (loaded separately) to finish initializing
 async function fb(){
   while(!window.__fb){
@@ -2749,7 +2767,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.48.0';
+const BUILD = 'v2.48.1';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
