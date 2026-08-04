@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Support Bathroom Report — no ads, no investors</title>
+<meta name="description" content="Bathroom Report is free and ad-free. Hosting costs almost nothing; verifying 84,000+ locations does. Here's exactly where the money goes.">
+<link rel="canonical" href="https://bathroomreport.app/support.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Support Bathroom Report">
+<meta property="og:description" content="No ads, no investors. Hosting is nearly free — verifying locations isn't. Here's exactly where the money goes.">
+<meta property="og:url" content="https://bathroomreport.app/support.html">
+<meta property="og:site_name" content="BathroomReport">
+<meta property="og:image" content="https://bathroomreport.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="BathroomReport">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="icon-512.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#2ea1aa">
+
+<!-- Reuses the guide shell so this page cannot drift from the rest of the site: same wrap,
+     card, cta and foot classes, same type scale. Only the support-specific pieces below
+     are new. -->
+<link rel="stylesheet" href="https://bathroomreport.app/guide/styles.css">
+
+<style>
+  /* Teal is the app's accent (#2EA1AA); the guide shell's blue stays the link colour so
+     nothing else on the page has to change. Used here only for the money blocks. */
+  :root{ --teal:#2EA1AA; --teal-dark:#23848C; --green:#0F6B4C; }
+
+  .lede{font-size:1.05rem;color:var(--ink);margin:0 0 6px}
+
+  /* The receipt. This is the whole argument: two real numbers, side by side, so the ask
+     explains itself before anyone is asked for anything. */
+  .receipt{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:0;margin:24px 0;overflow:hidden}
+  .receipt-row{display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+    padding:16px 20px;border-bottom:1px solid var(--line)}
+  .receipt-row:last-child{border-bottom:0}
+  .receipt-row .what{font-weight:600}
+  .receipt-row .what small{display:block;font-weight:400;color:var(--muted);font-size:.85rem;margin-top:2px}
+  .receipt-row .amt{font-weight:800;font-size:1.15rem;white-space:nowrap}
+  .receipt-row.free .amt{color:var(--muted)}
+  .receipt-row.cost .amt{color:var(--green)}
+
+  /* Support options. Ordered deliberately: something you get, then a tip, then the raw
+     transfer. Buying a thing is never begging, so the store goes first. */
+  .opt{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px;margin-top:14px}
+  .opt h3{margin:0 0 4px;font-size:1.05rem}
+  .opt p{margin:0 0 14px;color:var(--muted);font-size:.92rem}
+  .opt .btn{display:inline-block;font-weight:700;padding:12px 20px;border-radius:12px;
+    background:var(--sign);color:#fff}
+  .opt .btn:hover{background:var(--sign-dark);text-decoration:none}
+  .opt .btn.teal{background:var(--teal)}
+  .opt .btn.teal:hover{background:var(--teal-dark)}
+  .opt .btn.quiet{background:transparent;color:var(--sign);border:1px solid var(--line);padding:11px 19px}
+  .opt .btn.quiet:hover{border-color:var(--sign);background:transparent}
+
+  .pledge{border-left:3px solid var(--teal);padding:2px 0 2px 16px;margin:28px 0;color:var(--muted)}
+  .pledge b{color:var(--ink)}
+
+  .backlink{display:inline-block;margin-top:8px;font-weight:600}
+</style>
+</head>
+
+<body data-pagetype="support">
+<header class="topbar"><div class="wrap"><a href="https://bathroomreport.app/">▸ BathroomReport</a></div></header>
+
+<main class="wrap">
+
+<p class="eyebrow">Support</p>
+<h1>Keep Bathroom Report free.</h1>
+<p class="lede">No ads. No investors. No data sold. Just one person keeping a map of 84,000+ bathrooms accurate.</p>
+<p class="addr">Most projects asking for money say "help cover our costs" without saying what those are. Here are mine.</p>
+
+<div class="receipt">
+  <div class="receipt-row free">
+    <div class="what">Running the app
+      <small>Servers, database, hosting &mdash; a week of real traffic</small>
+    </div>
+    <div class="amt">$0.13</div>
+  </div>
+  <div class="receipt-row cost">
+    <div class="what">Verifying locations
+      <small>Address lookups, roughly $30 per 1,000 places</small>
+    </div>
+    <div class="amt">$179.73</div>
+  </div>
+</div>
+
+<p>That's an actual week. Hosting a map is close to free now &mdash; three hundred thousand database reads cost twelve cents. What costs money is making the map <em>right</em>: every address checked, every duplicate removed, every closed store pulled.</p>
+
+<p>Nothing here is bulk-imported and left alone. Casey's went from 1,500 records to 2,400 real ones. Kwik Trip went <em>down</em> by 500 when double-counted stores got cleaned out. That work is the product, and it's the only part with a bill attached.</p>
+
+<h2 class="cityhdr">Three ways to help</h2>
+
+<div class="opt">
+  <h3>Buy something</h3>
+  <p>Shirts, stickers, and the numbered Collector Series. You get a thing, the map gets funded. Best deal on this page.</p>
+  <a class="btn" href="https://bathroomreport-shop.fourthwall.com/?utm_source=bathroomreport.app&utm_medium=support&utm_campaign=support_page" target="_blank" rel="noopener noreferrer">Shop the store →</a>
+</div>
+
+<div class="opt">
+  <h3>Leave a tip</h3>
+  <p>One-time, no account, Apple Pay works. $30 funds the next thousand verified addresses &mdash; and I'll post which ones.</p>
+  <a class="btn teal" href="https://ko-fi.com/bathroomreport" target="_blank" rel="noopener noreferrer">Tip on Ko-fi →</a>
+</div>
+
+<div class="opt">
+  <h3>Send it directly</h3>
+  <p>If you'd rather skip the middleman.</p>
+  <a class="btn quiet" href="https://cash.app/$BathroomReport" target="_blank" rel="noopener noreferrer">Cash App</a>
+</div>
+
+<p class="pledge"><b>And if you'd rather not spend anything:</b> rate a bathroom. Confirm a store's hours. Send in a place that's missing. That's worth more than a tip &mdash; it's the part I can't buy.</p>
+
+<h2 class="cityhdr">The promise</h2>
+<p><b>No ads, ever.</b> Not banners, not sponsored pins, not a chain paying to look cleaner than it is. The moment a business can pay to change what the map says, the map is worthless. That's the whole reason this page exists.</p>
+
+<a class="backlink cta" href="https://bathroomreport.app/">← Back to the map</a>
+
+<div class="foot">
+  Bathroom Report is an independent, community-created project. It isn't affiliated with or endorsed by any business listed.<br>
+  Questions? <a href="mailto:dave@bathroomreport.app">dave@bathroomreport.app</a><br>
+  &copy; 2025&ndash;2026 Bathroom Report. Map data &copy; OpenStreetMap contributors.
+</div>
+
+</main>
+</body>
+</html>
