@@ -2309,9 +2309,17 @@ function ratingSectionInnerHtml(loc, agg, myVote){
    * clean and safe show their own average once anyone has answered, and their count, so the
    * number on screen is never detached from how many people stand behind it. */
   const sum = agg[k + 'Sum'] || 0, count = agg[k + 'Count'] || 0;
+  /* "No ratings yet" is only true if nobody has rated — including you.
+   *
+   * Offline, your own vote comes from Firestore's cache while the community aggregate often does
+   * not, so the card claimed nobody had rated while showing your four filled stars directly
+   * underneath. Saying the count is unknown is honest; saying it is zero is not. */
+  const mineHere = myVote[k] > 0;
   const scoreLine = count
     ? `<div class="rating-score-line"><span class="rating-score">${avgStr(sum, count)}★</span> ${ratingConfidenceHtml(count)}</div>`
-    : `<div class="rating-score-line rating-score-none">${k === 'bathroom' ? 'No ratings yet' : 'Nobody has answered this yet'}</div>`;
+    : `<div class="rating-score-line rating-score-none">${
+        mineHere ? 'Your rating' + (navigator.onLine === false ? ' \u00b7 totals unavailable offline' : '')
+                 : (k === 'bathroom' ? 'No ratings yet' : 'Nobody has answered this yet')}</div>`;
   /* Skip is only offered while there is somewhere to skip TO. On the last unanswered dimension
    * it would be a button that appears to do nothing. */
   const remaining = RATING_DIMS.filter(d => !myVote[d.key] && !(ratingSkips[loc.id] || {})[d.key]).length;
@@ -2767,7 +2775,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.48.1';
+const BUILD = 'v2.48.2';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -3526,7 +3534,7 @@ function wireOoo(loc){
   const setNote = (msg, err) => { const n = document.getElementById(noteId) || document.getElementById('note-bathroom-' + loc.id); if(n){ n.style.color = err ? '#c62828' : ''; n.textContent = msg || ''; } };
   const gatedWrite = async (writeFn, confirmMsg) => {
     if(confirmMsg && !window.confirm(confirmMsg)) return;
-    setNote("Checking you're nearby…");
+    setNote(nearbyWaitNote());
     const v = await verifyNearby(loc, { allowAdmin: true });
     if(!v.ok){ setNote(verifyFailMessage(v), true); return; }
     try{ await writeFn(); }catch(e){ setNote('Could not save — try again.', true); return; }
@@ -3602,7 +3610,7 @@ async function attachAmenityHandlers(loc){
     const allBtns = stepEl.querySelectorAll('.amenity-answer-btn');
 
     allBtns.forEach(b => b.disabled = true);
-    if(note){ note.style.color=''; note.textContent = "Checking you're nearby…"; }
+    if(note){ note.style.color=''; note.textContent = nearbyWaitNote(); }
 
     const verification = await verifyNearby(loc, { allowAdmin: true });
     if(!verification.ok){
@@ -3699,7 +3707,7 @@ async function attachStoreFeatureHandlers(loc){
     const allBtns = stepEl.querySelectorAll('.store-feature-answer-btn');
 
     allBtns.forEach(b => b.disabled = true);
-    if(note){ note.style.color=''; note.textContent = "Checking you're nearby…"; }
+    if(note){ note.style.color=''; note.textContent = nearbyWaitNote(); }
 
     const verification = await verifyNearby(loc, { allowAdmin: true });
     if(!verification.ok){
@@ -4888,6 +4896,18 @@ async function clearOutOfOrder(loc){
 }
 let lastKnownPos = null; // cached briefly so every star tap doesn't re-prompt GPS
 
+/* What to say while the position is being taken.
+ *
+ * Offline this can take half a minute, because there is no network assistance to speed up a GPS
+ * fix. "Checking you're nearby…" with no further explanation reads as a hang, and someone in a
+ * dead zone with 19% battery will assume the app is broken and close it — losing the answer
+ * they were about to give. Naming the wait costs nothing and buys the patience it needs. */
+function nearbyWaitNote(){
+  return navigator.onLine === false
+    ? "Checking you're nearby… this takes longer with no signal"
+    : "Checking you're nearby…";
+}
+
 function getVerifiedPosition(){
   const now = Date.now();
   if(lastKnownPos && (now - lastKnownPos.ts) < 5 * 60 * 1000){
@@ -4895,17 +4915,35 @@ function getVerifiedPosition(){
   }
   return new Promise((resolve) => {
     if(!navigator.geolocation){ resolve(null); return; }
+    const onOk = (pos) => {
+      // accuracy is metres, 68% confidence, and the browser gives it for free. Keeping it lets
+      // verifyNearby scale the geofence to how good the fix actually is.
+      lastKnownPos = { lat: pos.coords.latitude, lng: pos.coords.longitude,
+                       accuracy: (typeof pos.coords.accuracy === 'number' ? pos.coords.accuracy : null),
+                       ts: Date.now() };
+      resolve(lastKnownPos);
+    };
+    /* Offline needs longer, and needs a second attempt.
+     *
+     * GPS itself works fine with no signal — satellites do not care. What disappears is the
+     * network assistance that normally makes a fix nearly instant, so a cold start can take
+     * thirty seconds or more. A 10-second high-accuracy timeout therefore fails almost every
+     * time in a dead zone, and the failure blocks the write before the offline queue can ever
+     * hold it. The queue was useless behind a gate that could not open.
+     *
+     * So: offline gets a longer window, and a high-accuracy miss falls back to a coarse fix
+     * rather than giving up. A coarse fix is enough — verifyNearby already widens the radius to
+     * match the accuracy it is given, so a poor position is handled honestly rather than
+     * treated as no position at all. */
+    const offline = navigator.onLine === false;
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        // accuracy is metres, 68% confidence, and the browser gives it for free. Keeping it lets
-        // verifyNearby scale the geofence to how good the fix actually is.
-        lastKnownPos = { lat: pos.coords.latitude, lng: pos.coords.longitude,
-                         accuracy: (typeof pos.coords.accuracy === 'number' ? pos.coords.accuracy : null),
-                         ts: Date.now() };
-        resolve(lastKnownPos);
+      onOk,
+      () => {
+        if(!offline){ resolve(null); return; }
+        navigator.geolocation.getCurrentPosition(onOk, () => resolve(null),
+          { enableHighAccuracy: false, timeout: 20000, maximumAge: 15 * 60 * 1000 });
       },
-      () => resolve(null),
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: offline ? 30000 : 10000 }
     );
   });
 }
