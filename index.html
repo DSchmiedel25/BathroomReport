@@ -685,13 +685,14 @@ This is tracked on this device only. Log in to sync it across devices.
 <section class="hiw-support">
   <h3>Keep Bathroom Report free</h3>
   <p><b>No ads, ever.</b> Not banners, not sponsored pins, not a chain paying to look cleaner than it is. Hosting the map is nearly free; verifying 84,000+ locations isn&rsquo;t.</p>
-  <div class="hiw-support-actions">
-    <a href="/support.html" class="hiw-btn hiw-btn-shop" aria-label="See where the money goes and how to support Bathroom Report">
-      <svg class="ico hiw-shop-icon" aria-hidden="true"><use href="#i-bag"></use></svg>
-      <span>Where the money goes</span>
-    </a>
-  </div>
-  <p class="hiw-store-caption">The full breakdown, the shop, and the tip jar all live on one page now.</p>
+  <!-- Deliberately NOT .hiw-support-actions: that is a two-column grid built for the old
+       Donate + Shop pair, and a lone button in it gets half the width and wraps its label.
+       A bare .hiw-btn is inline-flex, so it sizes to its own text. -->
+  <a href="/support.html" class="hiw-btn" aria-label="See where the money goes and how to support Bathroom Report">
+    <svg class="ico hiw-shop-icon" aria-hidden="true"><use href="#i-bag"></use></svg>
+    <span>Where the money goes</span>
+  </a>
+  <p class="hiw-support-note">The full cost breakdown, the shop, and the tip jar all live on one page.</p>
 </section><section><h3>Contact</h3><p>Questions, corrections, or ideas? Email <a href="mailto:dave@bathroomreport.app">dave@bathroomreport.app</a>.</p></section>
 <section><h3>Follow us</h3><div class="hiw-social-row"><a href="https://x.com/Bathroom_Report" target="_blank" rel="noopener" aria-label="Follow Bathroom Report on X"><img src="icon-x.png" alt="Follow on X"></a></div></section>
 <section class="hiw-faq"><h3>FAQ</h3>
