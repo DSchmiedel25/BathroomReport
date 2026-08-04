@@ -554,6 +554,38 @@ const CONFIRM_THRESHOLD = 3;
 function isConfirmedYes(x){ return !!x && x.yes >= CONFIRM_THRESHOLD && x.yes > x.no; }
 function isConfirmedNo(x){  return !!x && x.no  >= CONFIRM_THRESHOLD && x.no  > x.yes; }
 
+/* ---------- Reported, but not yet confirmed ----------
+ * A third state between "nobody knows" and "the community agrees".
+ *
+ * Until now an answer was invisible until three people gave the same one. At a location with a
+ * single rating that means the first person's answer is stored, correct, and shown to nobody —
+ * possibly for years. The question also keeps being asked, which is right, but the asker gets
+ * no sign their answer landed.
+ *
+ * So one vote is enough to DISPLAY, and three is still what it takes to be CONFIRMED. The
+ * badge says which it is, because "one person said so" and "several people agree" are
+ * different claims and the reader deserves to know which they are looking at.
+ *
+ * Deliberately NOT a change to amenitySettled: the question keeps being served until the real
+ * threshold, so showing early costs no data. */
+function isReportedYes(x){ return !!x && x.yes >= 1 && x.yes > x.no && !isConfirmedYes(x); }
+function isReportedNo(x){  return !!x && x.no  >= 1 && x.no  > x.yes && !isConfirmedNo(x); }
+
+/* The leading state for a multi-state amenity that has votes but has not confirmed. Same tie
+ * rule as confirmedState — a 1-1 split is not a report, it is a disagreement. */
+function reportedState(a, x){
+  if(!isMultiState(a) || !x) return null;
+  if(confirmedState(a, x)) return null;
+  let best = null, bestN = 0, tied = false;
+  for(const st of a.states){
+    if(st === 'unknown') continue;
+    const n = x[st] || 0;
+    if(n > bestN){ best = st; bestN = n; tied = false; }
+    else if(n === bestN && n > 0){ tied = true; }
+  }
+  return (!tied && bestN >= 1) ? best : null;
+}
+
 /* ---------- Multi-state amenities ----------
  * Most amenities answer yes/no. restroomType answers single/multiple instead, and every
  * confirmation path here was written against {yes,no} only — so its votes tallied to nothing,
@@ -932,7 +964,7 @@ function osmVerifiedBadges(loc, featureDefs, communitySummary, skip){
 }
 
 // Community-confirmed badges for a given feature list (amber ⭐). Excludes any keys in `skip`.
-// Refresh the unified "Confirmed by visitors" block and collapse it when empty. Call after any
+// Refresh the unified "What visitors say" block and collapse it when empty. Call after any
 // vote save or summary load, since a new confirmation may have just crossed the threshold.
 function refreshCommunityBlock(loc){
   const el = document.getElementById('community-summary-' + loc.id);
@@ -953,7 +985,16 @@ function communityConfirmedBadges(loc, featureDefs, summary, skip){
       // here: it stores key -> 1 and cannot carry a state, and the offline bake deliberately
       // skips this amenity, so live votes are the only source.
       const st = confirmedState(a, x);
-      return st ? `<span class="feature-badge community">${amenityAnswerIcon(a, st)} ${escapeHtml(amenityStateLabel(a, st))} <svg class="ico ico-fill" aria-hidden="true"><use href="#i-star"></use></svg></span>` : '';
+      if(st) return `<span class="feature-badge community">${amenityAnswerIcon(a, st)} ${escapeHtml(amenityStateLabel(a, st))} <svg class="ico ico-fill" aria-hidden="true"><use href="#i-star"></use></svg></span>`;
+      /* Reported: shown, but marked as one person's word rather than a confirmation. The count
+       * is included because "1 report" and "2 reports" are meaningfully different levels of
+       * confidence and hiding the difference would flatten them. */
+      const rep = reportedState(a, x);
+      if(rep){
+        const n = x[rep] || 0;
+        return `<span class="feature-badge reported">${amenityAnswerIcon(a, rep)} ${escapeHtml(amenityStateLabel(a, rep))} <em>${n} report${n === 1 ? '' : 's'}</em></span>`;
+      }
+      return '';
     }
     if(!(isConfirmedYes(x) || conf[a.key])){
       /* A confirmed NO is a real answer and was being thrown away here — three people agreeing
@@ -984,6 +1025,18 @@ function communityConfirmedBadges(loc, featureDefs, summary, skip){
       if(isConfirmedNo(x) && a.showNegative){
         return `<span class="feature-badge community-no">${AMENITY_ANSWER_ICONS.no} ${escapeHtml(a.label)}: No <svg class="ico ico-fill" aria-hidden="true"><use href="#i-star"></use></svg></span>`;
       }
+      /* Reported but not confirmed. Same rule as the multi-state branch above: one vote is
+       * enough to show, three is still what "confirmed" means, and the badge says which.
+       * Negatives follow showNegative here too — an unconfirmed "no changing table" from one
+       * person is exactly the kind of claim that should be visible AND clearly provisional. */
+      if(isReportedYes(x)){
+        const n = x.yes || 0;
+        return `<span class="feature-badge reported">${amenityAnswerIcon(a, 'yes')} ${escapeHtml(a.label)} <em>${n} report${n === 1 ? '' : 's'}</em></span>`;
+      }
+      if(isReportedNo(x) && a.showNegative){
+        const n = x.no || 0;
+        return `<span class="feature-badge reported reported-no">${AMENITY_ANSWER_ICONS.no} ${escapeHtml(a.label)}: No <em>${n} report${n === 1 ? '' : 's'}</em></span>`;
+      }
       return '';
     }
     return `<span class="feature-badge community">${amenityAnswerIcon(a, 'yes')} ${a.label} <svg class="ico ico-fill" aria-hidden="true"><use href="#i-star"></use></svg></span>`;
@@ -1013,7 +1066,7 @@ function communitySectionHasContent(loc){ return communitySummaryHtml(loc) !== '
  * refreshes them either way).
  *
  * These were inside the isLoggedIn() branch, which meant a logged-out visitor saw only the
- * sign-in hint — no "Confirmed by visitors", no OSM bathroom features. Since the pitch is
+ * sign-in hint — no "What visitors say", no OSM bathroom features. Since the pitch is
  * "no account needed", that is what most first-time visitors saw: changing tables and
  * restroom type were in the data and confirmed, and simply never rendered for them.
  * aggregates/ and amenityOverrides/ are both `allow read: if true`, and fetchCommunityDoc()
@@ -1021,7 +1074,7 @@ function communitySectionHasContent(loc){ return communitySummaryHtml(loc) !== '
  * was withheld. Writing still requires sign-in; nothing below is a write path. */
 function communityBlockHtml(loc){
   return `<div class="community-section${communitySectionHasContent(loc) ? '' : ' is-empty'}" id="community-section-${loc.id}">
-      ${plate('Confirmed by visitors')}
+      ${plate('What visitors say')}
       <div class="feature-badges" id="community-summary-${loc.id}">${communitySummaryHtml(loc)}</div>
     </div>`;
 }
@@ -1044,7 +1097,7 @@ function tipsSectionHtml(loc, canWrite){
 
 function amenitySummaryHtml(summary, loc){
   // OSM-verified bathroom badges only — community confirmations now live in the unified
-  // "Confirmed by visitors" block above. Same two exclusions as that block: 'accessible' has its
+  // "What visitors say" block above. Same two exclusions as that block: 'accessible' has its
   // own prominent badge, and 'hasRestroom' says nothing useful in the affirmative.
   const verified = osmVerifiedBadges(loc, BATHROOM_AMENITIES, summary, ['accessible', 'hasRestroom']);
   if(!summary && !verified) return '<span class="feature-badge unconfirmed">Loading features…</span>';
@@ -1297,7 +1350,7 @@ function storeFeatureEditorHtml(locId, myVote){
 // Store features render as a compact icon row in the popup head (beside the store name) rather
 // than a labelled section. Gas in particular was never votable — OSM-known, display-only — so a
 // whole section for it read as clutter. Selection rule is unchanged: OSM-verified only, since
-// community-confirmed features already appear in the "Confirmed by visitors" block.
+// community-confirmed features already appear in the "What visitors say" block.
 // Every icon carries title + aria-label — an icon must never be the only cue.
 function storeFeatureIconsHtml(loc, summary){
   const osm = (loc && loc.osm) || {};
@@ -2252,19 +2305,27 @@ const STRIP_FACTS = {
      * counted and answers it in the same words the question uses. */
     label: 'Toilets',
     read(loc){
-      const st = confirmedState(BATHROOM_AMENITIES.find(a => a.key === 'restroomType'),
-                                (amenityCache[loc.id] || {}).restroomType);
-      if(!st) return null;
-      return { v: st === 'single' ? 'One' : 'Several', meta: '\u2605', tone: '' };
+      const def = BATHROOM_AMENITIES.find(a => a.key === 'restroomType');
+      const votes = (amenityCache[loc.id] || {}).restroomType;
+      const st = confirmedState(def, votes);
+      if(st) return { v: st === 'single' ? 'One' : 'Several', meta: '\u2605', tone: '' };
+      /* Reported: shown, with the count instead of the star. */
+      const rep = reportedState(def, votes);
+      if(rep) return { v: rep === 'single' ? 'One' : 'Several', meta: String((votes || {})[rep] || 1), tone: '' };
+      return null;
     }
   },
   rooms: {
     label: 'Rooms',
     read(loc){
       /* Community answer first — three people who were there outrank a tag. */
-      const st = confirmedState(BATHROOM_AMENITIES.find(a => a.key === 'genderSplit'),
-                                (amenityCache[loc.id] || {}).genderSplit);
+      const def = BATHROOM_AMENITIES.find(a => a.key === 'genderSplit');
+      const votes = (amenityCache[loc.id] || {}).genderSplit;
+      const st = confirmedState(def, votes);
       if(st) return { v: st === 'single' ? 'Shared' : 'M/W', meta: '\u2605', tone: '' };
+      /* Reported outranks the OSM seed: one person who was actually there beats a tag. */
+      const rep = reportedState(def, votes);
+      if(rep) return { v: rep === 'single' ? 'Shared' : 'M/W', meta: String((votes || {})[rep] || 1), tone: '' };
       /* Then the OSM seed. meta.osmGender was written by build-public-toilets.js from unisex=yes
        * (shared) and male=yes AND female=yes (separate), and stores the same 'single'/'multiple'
        * values genderSplit votes do — 7,782 answers that shipped with the data and were read
@@ -2328,6 +2389,11 @@ function stripYesNo(loc, key, field){
   const conf = (loc.conf || {});
   if(isConfirmedYes(x) || conf[key]) return { v: 'Yes', meta: '\u2605', tone: 'ok' };
   if(isConfirmedNo(x))               return { v: 'No',  meta: '\u2605', tone: 'bad' };
+  /* Same three tiers as the badges below. A card that shows "Changing table · 1 report" in the
+   * badge row and a blank cell in the strip above it is contradicting itself about the same
+   * fact. The star is reserved for confirmed; a report says how many. */
+  if(isReportedYes(x)) return { v: 'Yes', meta: x.yes + '', tone: '' };
+  if(isReportedNo(x))  return { v: 'No',  meta: x.no + '',  tone: '' };
   return null;
 }
 
@@ -2533,7 +2599,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.42.0';
+const BUILD = 'v2.43.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
