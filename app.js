@@ -1561,23 +1561,64 @@ function quipFor(type, val){
   return options[Math.floor(Math.random() * options.length)];
 }
 
-/* ---------- Offline status ----------
- * navigator.onLine is a weak signal — it means "there is a network interface", not "the internet
- * answers", so it reports true on a hotel wifi that goes nowhere. It is still worth using for
- * the case it IS good at: a phone that has genuinely dropped to no signal, which is the road
- * case this app cares about.
+/* ---------- Connectivity ----------
  *
- * Deliberately not a modal, a toast, or anything that needs dismissing. Someone in a dead zone
- * has a problem already; the app's job is to say "keep going" in one line and get out of the
- * way. It disappears by itself when the connection returns. */
+ * navigator.onLine cannot be trusted on its own. It reports whether a network INTERFACE exists,
+ * not whether anything answers — and on iOS it commonly stays true in airplane mode, which is
+ * exactly the case this app cares about. Every offline behaviour hung off that flag and so none
+ * of them fired.
+ *
+ * What is trustworthy is what actually happened. So connectivity is tracked from OUTCOMES: a
+ * request that completed means online, a request that failed to reach the network means offline.
+ * navigator.onLine is still used, but only in the direction it is reliable — when it says false
+ * it is telling the truth.
+ *
+ * A probe runs on demand rather than on a timer, because polling a server every few seconds to
+ * discover something the next real request will tell you is a battery cost for no information —
+ * and battery is not free to someone stopped in a dead zone.
+ */
+let _netOk = true;
+let _netProbeAt = 0;
+
+function isOffline(){ return _netOk === false; }
+
+function markNet(ok){
+  if(_netOk === ok) return;
+  _netOk = ok;
+  syncOfflineBar();
+}
+
+/* A tiny same-origin request. HEAD on a file the service worker will not answer from cache, with
+ * a cache-buster, so a success genuinely means the network replied rather than the cache did. */
+async function probeNet(){
+  if(navigator.onLine === false){ markNet(false); return false; }
+  const now = Date.now();
+  if(now - _netProbeAt < 10000) return _netOk;     // do not hammer it
+  _netProbeAt = now;
+  try{
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 4000);
+    await fetch('./manifest.webmanifest?probe=' + now, { method:'HEAD', cache:'no-store', signal: ctl.signal });
+    clearTimeout(t);
+    markNet(true);
+    return true;
+  }catch(e){ markNet(false); return false; }
+}
+
 function syncOfflineBar(){
   const bar = document.getElementById('offlineBar');
   if(!bar) return;
-  bar.hidden = navigator.onLine !== false;
+  bar.hidden = !isOffline();
 }
-window.addEventListener('online', syncOfflineBar);
-window.addEventListener('offline', syncOfflineBar);
-syncOfflineBar();
+
+/* The events are still worth listening to — 'offline' is reliable when it fires, and 'online'
+ * is a good moment to check whether it is actually true. */
+window.addEventListener('offline', () => markNet(false));
+window.addEventListener('online', () => probeNet());
+/* Coming back to the app is the other moment worth re-checking: a phone that was in a dead zone
+ * has usually moved by the time it is unlocked again. */
+document.addEventListener('visibilitychange', () => { if(!document.hidden) probeNet(); });
+probeNet();
 
 // Wait for the Firebase module script (loaded separately) to finish initializing
 async function fb(){
@@ -1951,6 +1992,7 @@ async function saveMyVote(id, data){
       payload.ratedAt = Date.now();
       if(myVoteCache[id]) myVoteCache[id].ratedAt = payload.ratedAt;
     }
+    markNet(true);   // it landed, so the connection is real
     await setDoc(doc(db, 'votes', fsId(id) + '_' + clientId), payload, { merge: true });
     // Mirror this rating into the user's OWN profile doc (users/{uid}) so the Passport and the
     // whole "my ratings" load cost ONE read no matter how many ratings they have. The votes doc
@@ -1972,6 +2014,11 @@ async function saveMyVote(id, data){
      * votes allowlist for weeks and every first-ever rating at a fresh location was being denied
      * with a permission-denied nobody could see. A rejected write is not routine. */
     console.error('saveMyVote failed', id, e && (e.code || e.message), e);
+    /* A write that could not reach Firestore is the most reliable offline signal there is —
+     * better than any probe, because it is the actual thing the person was trying to do.
+     * 'unavailable' is Firestore's code for "no connection"; a rules rejection is not. */
+    if(e && /unavailable|deadline|network/i.test(e.code || e.message || '')) markNet(false);
+    else if(e && e.code === 'permission-denied') markNet(true);   // reached the server, was refused
     /* Kept so the caller can say WHY. saveMyVote returns a boolean by design — every call site
      * only cares whether to roll back — but the popup message should distinguish "the server
      * refused this value" from "you are offline", and those are the same boolean. */
@@ -2318,7 +2365,7 @@ function ratingSectionInnerHtml(loc, agg, myVote){
   const scoreLine = count
     ? `<div class="rating-score-line"><span class="rating-score">${avgStr(sum, count)}★</span> ${ratingConfidenceHtml(count)}</div>`
     : `<div class="rating-score-line rating-score-none">${
-        mineHere ? 'Your rating' + (navigator.onLine === false ? ' \u00b7 totals unavailable offline' : '')
+        mineHere ? 'Your rating' + (isOffline() ? ' \u00b7 totals unavailable offline' : '')
                  : (k === 'bathroom' ? 'No ratings yet' : 'Nobody has answered this yet')}</div>`;
   /* Skip is only offered while there is somewhere to skip TO. On the last unanswered dimension
    * it would be a button that appears to do nothing. */
@@ -2775,7 +2822,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.48.2';
+const BUILD = 'v2.48.3';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -4903,7 +4950,7 @@ let lastKnownPos = null; // cached briefly so every star tap doesn't re-prompt G
  * dead zone with 19% battery will assume the app is broken and close it — losing the answer
  * they were about to give. Naming the wait costs nothing and buys the patience it needs. */
 function nearbyWaitNote(){
-  return navigator.onLine === false
+  return isOffline()
     ? "Checking you're nearby… this takes longer with no signal"
     : "Checking you're nearby…";
 }
@@ -4935,7 +4982,7 @@ function getVerifiedPosition(){
      * rather than giving up. A coarse fix is enough — verifyNearby already widens the radius to
      * match the accuracy it is given, so a poor position is handled honestly rather than
      * treated as no position at all. */
-    const offline = navigator.onLine === false;
+    const offline = isOffline();
     navigator.geolocation.getCurrentPosition(
       onOk,
       () => {

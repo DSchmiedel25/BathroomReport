@@ -1,33 +1,30 @@
-BathroomReport v2.48.2 — airplane-mode fixes
+BathroomReport v2.48.3 — stop trusting navigator.onLine
 
 FILES     app.js  index.html  shell.css  sw.js  firebase.js
 FIREBASE  nothing
 
-THE BIG ONE — the geofence blocked the offline queue
-  GPS works fine with no signal; satellites do not care. What disappears is the
-  network assistance that normally makes a fix nearly instant, so a cold start
-  can take thirty seconds. The 10-second high-accuracy timeout therefore failed
-  almost every time in a dead zone — and that failure blocked the write BEFORE
-  the offline queue could ever hold it. The queue shipped in v2.48.0 was
-  useless behind a gate that could not open.
+WHY NOTHING OFFLINE WORKED
+  Every offline behaviour hung off navigator.onLine, and on iOS that flag
+  commonly stays TRUE in airplane mode. It reports whether a network interface
+  exists, not whether anything answers. So the banner never showed, the longer
+  GPS timeout never applied, and the score line never explained itself — all
+  three were asking a question that was being answered wrongly.
 
-  Offline now gets 30 seconds at high accuracy, then falls back to a coarse fix
-  accepting a position up to 15 minutes old. verifyNearby already widens its
-  radius to match the accuracy it is given, so a poor fix is handled honestly
-  rather than treated as no fix at all.
+  Connectivity is now tracked from OUTCOMES:
+    · a probe request that completes  -> online
+    · a probe that fails              -> offline
+    · a vote write that returns "unavailable" -> offline
+    · a vote write that lands                 -> online
+    · a vote write REJECTED by rules          -> online (the server was reached)
+    · navigator.onLine === false      -> offline (the one direction it is honest)
 
-  And the wait says why: "Checking you're nearby… this takes longer with no
-  signal". Thirty silent seconds on 19% battery reads as a hang, and someone
-  who closes the app loses the answer they were about to give.
+  The probe runs on demand — on the online event, and when the app is brought
+  back to the foreground — not on a timer. Polling a server every few seconds
+  to learn something the next real request will tell you is a battery cost for
+  no information, and battery matters to someone stopped in a dead zone.
 
-"NO RATINGS YET" ABOVE FOUR FILLED STARS
-  Your own vote comes from Firestore's cache offline; the community aggregate
-  often does not. So the card claimed nobody had rated while showing your
-  rating underneath. It now says "Your rating · totals unavailable offline",
-  because the count being unknown is true and the count being zero is not.
-
-STILL TO CHECK
-  The offline banner did not appear in your screenshot. Either v2.48.1 was not
-  live yet, or iOS reports navigator.onLine as true in airplane mode — it
-  sometimes does. If it still does not show after deploying this, that is worth
-  knowing, and the fix is a real reachability probe rather than the flag.
+TESTING IT
+  Airplane mode, then open the app. The amber bar should appear within a few
+  seconds of the first probe. Rate something: the nearby check will say it
+  takes longer with no signal, then save into the queue. Turn airplane mode
+  off and the bar goes away and the rating uploads by itself.
