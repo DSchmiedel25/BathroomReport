@@ -670,6 +670,13 @@ function amenityPriority(key, summary){
 // yes/no answer. Result: up to 1 resurfaced + fill to QUESTIONS_PER_VISIT with fresh, ranked by
 // priority. (1 resurface max even when no fresh remain.)
 const NOT_SURE_RETIRE = 2;
+/* Keys the person has asked to answer again, per location, for this session only.
+ *
+ * Declared HERE rather than beside its click handler because pickVisitQuestions reads it and
+ * runs first — a `const` read before its declaration throws, and that is the exact bug that
+ * broke every popup in v2.38. Module state goes above the first thing that touches it. */
+const reopenedKeys = {};
+
 function pickVisitQuestions(loc, myVote){
   const summary = { ...(amenityCache[loc.id] || {}), ...(storeFeatureCache[loc.id] || {}) };
   const mine = { ...(myVote.amenities || {}), ...(myVote.storeFeatures || {}) };
@@ -687,8 +694,12 @@ function pickVisitQuestions(loc, myVote){
     // "Is there a public restroom?" is targeted, not universal — see restroomDoubted.
     if(key === 'hasRestroom' && !restroomDoubted(loc)) return false;
     if(amenitySettled(loc, key, summary)) return false;                 // confirmed / gas
+    /* A key you asked to change is eligible again even though you have answered it. Session-only
+     * and deliberately not persisted: it reopens the question without touching the stored value,
+     * so if you never answer, nothing changed. */
+    const reopened = (reopenedKeys[loc.id] && reopenedKeys[loc.id].has(key));
     const ans = mine[key];
-    if(ans === 'yes' || ans === 'no' || (ans && ans !== 'unknown')) return false; // answered for real
+    if(!reopened && (ans === 'yes' || ans === 'no' || (ans && ans !== 'unknown'))) return false; // answered for real
     const ns = (meta[key] && meta[key].notSure) || 0;
     if(ns >= NOT_SURE_RETIRE) return false;                             // retired for this person
     return true;
@@ -1026,61 +1037,36 @@ function myAnswersHtml(loc, myVote){
   </div>`;
 }
 
-/* Reopening clears your stored answer so the question becomes eligible again, then re-renders.
- * It does NOT write anything: the vote is only saved when you pick a new answer, so backing out
- * without answering leaves you exactly as you were rather than wiping what you had said. */
-document.addEventListener('click', async (e) => {
+/* Reopening does NOT delete anything.
+ *
+ * The first version cleared your stored answer immediately so the question became eligible
+ * again. That was wrong in a way that only shows up on the road: ANSWERING is geofenced to a
+ * few hundred metres, and clearing was not. Tap "change" at home and your answer is gone with
+ * no way to replace it until you drive back — the app quietly destroyed data you could not
+ * restore.
+ *
+ * So "change" now only marks the question as one you want asked again. Your stored answer stays
+ * exactly where it is until you pick a new one, and the normal answer path overwrites it — the
+ * same path, with the same geofence. Change your mind and walk away, and nothing happened.
+ *
+ * This is how the star ratings already behave: your stars stay filled and tapping a different
+ * one replaces the value. There was no reason for amenities to be more destructive. */
+document.addEventListener('click', (e) => {
   const btn = e.target.closest && e.target.closest('[data-reopen]');
   if(!btn) return;
   const loc = locationsById[btn.dataset.locid];
   if(!loc) return;
   const key = btn.dataset.reopen;
-  const myVote = myVoteCache[loc.id] || emptyVote();
-  const isStore = STORE_FEATURES.some(a => a.key === key);
-  const bucket = isStore ? (myVote.storeFeatures = myVote.storeFeatures || {})
-                         : (myVote.amenities = myVote.amenities || {});
-  const previous = bucket[key];
-  delete bucket[key];
-  /* Also clear the not-sure counter, or a key you had skipped twice before answering would come
-   * back already halfway to being retired again. */
-  if(myVote.amenityMeta && myVote.amenityMeta[key]) delete myVote.amenityMeta[key].notSure;
-  myVoteCache[loc.id] = myVote;
-  /* Persist the removal so the community tally drops your old answer immediately — otherwise a
-   * wrong vote keeps counting toward a confirmation while you are busy correcting it.
-   *
-   * NOT saveMyVote. That writes with { merge: true }, and a merge cannot remove anything: the
-   * key was deleted from the local object and the server kept its copy, so "change" worked
-   * until the next reload and then the old answer came back. deleteField is the only way to
-   * take a field out of a merged write, and it has to name the nested path explicitly. */
-  let ok = false;
-  try{
-    const {db, doc, setDoc, deleteField} = await fb();
-    const field = (isStore ? 'storeFeatures.' : 'amenities.') + key;
-    /* locId is included even though it is unchanged: the update rule asserts
-     * `id == request.resource.data.locId + '_' + uid`, and stating it here makes that check
-     * read the value being written rather than depending on how the merged result is composed.
-     * It is in the touched-keys allowlist, so naming it costs nothing. */
-    const patch = { [field]: deleteField(), locId: loc.id, lastUpdated: Date.now() };
-    /* Clear the not-sure counter in the same write, or a key skipped twice before being
-     * answered comes back already halfway to being retired again. */
-    if((myVote.amenityMeta || {})[key]) patch['amenityMeta.' + key + '.notSure'] = deleteField();
-    await setDoc(doc(db, 'votes', fsId(loc.id) + '_' + getEffectiveId()), patch, { merge: true });
-    ok = true;
-  }catch(err){ console.error('reopen failed', key, err && (err.code || err.message), err); ok = false; }
-  if(!ok){                                          // put it back if the write failed
-    bucket[key] = previous;
-    myVoteCache[loc.id] = myVote;
-    return;
-  }
-  /* Force a fresh question pick, exactly as the answer path does — visitQuestions is cached per
-   * location and would otherwise still hold the list from before this key became eligible. */
+  (reopenedKeys[loc.id] = reopenedKeys[loc.id] || new Set()).add(key);
+  /* Force a fresh pick so the newly-eligible key is actually offered — visitQuestions is cached
+   * per location and would otherwise hold the list from before. */
   delete visitQuestions[loc.id]; delete visitCursor[loc.id];
+  const myVote = myVoteCache[loc.id] || emptyVote();
   const step = document.getElementById('amenity-step-' + loc.id);
   if(step) step.innerHTML = renderAmenityStepHtml(myVote, loc.id);
   const mine = document.getElementById('my-answers-' + loc.id);
   if(mine) mine.innerHTML = myAnswersHtml(loc, myVote);
-  if(typeof refreshCommunityBlock === 'function') refreshCommunityBlock(loc);
-  if(typeof refreshOpenPopupStrip === 'function') refreshOpenPopupStrip();
+  if(step) step.scrollIntoView({ block:'nearest', behavior:'smooth' });
 });
 
 function amenityEditorHtml(locId, myVote){
@@ -2752,7 +2738,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.45.3';
+const BUILD = 'v2.46.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
