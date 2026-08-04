@@ -1442,8 +1442,11 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
      FIND. RATE. SHARE. IMPROVE. — the lockup used as structure, matching the settings footer.
      Thirty-seven stamps in one flat grid was a wall that told you nothing about what any of
      them were for; grouped, the passport answers "which kind of contributor am I". */
-  .stamp-group{ margin-top:22px; }
-  .stamp-group:first-child{ margin-top:6px; }
+  /* The verb sections now sit under a "Still to earn" plate rather than starting the block, so
+     the first one needs less air above it than it did when it was the top of the page. */
+  .stamp-group{ margin-top:18px; }
+  .stamp-group:first-child{ margin-top:10px; }
+  .plate.stamp-todo{ margin-top:22px; }
   .sg-head{ display:flex; align-items:baseline; gap:8px; margin-bottom:10px; }
   .sg-verb{
     font-family:var(--font-display); font-weight:600; font-size:13px;

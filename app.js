@@ -2599,7 +2599,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.43.0';
+const BUILD = 'v2.43.1';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -4407,26 +4407,34 @@ function renderBathroomPassport(stats, results){
       </div>`;
     };
 
-    /* One section per verb, in the order the lockup says them. Within a section: the stamps you
-     * hold, then what is left. A group with nothing in it is skipped entirely rather than
-     * rendering an empty heading. */
+    /* The stamps you hold stay together, directly under the card.
+     *
+     * An earlier pass split them into the four verb sections, which put the collection in four
+     * piles and buried the reward under the roadmap. A passport is a page of stamps; that IS
+     * the thing worth looking at, and it should read as one wall.
+     *
+     * The verbs group what is LEFT, which is where grouping actually helps — it turns a list of
+     * thirty-odd unearned trophies into "you have done nothing under SHARE", which is a far
+     * more useful thing to learn than the alphabetical order they used to sit in. */
     const sections = STAMP_GROUPS.map(g => {
       const mine = earned.filter(d => stampGroup(d) === g.id);
       const left = rest.filter(d => stampGroup(d) === g.id && !d.retired);
-      if(!mine.length && !left.length) return '';
-      const count = `${mine.length}/${mine.length + left.length}`;
+      if(!left.length) return '';
+      /* The count still reports the whole group, earned included — "1/12" is the useful number
+       * even in a section that only lists the eleven you have not got. */
       return `<div class="stamp-group">
         <div class="sg-head">
           <span class="sg-verb">${g.label}</span>
           <span class="sg-blurb">${escapeHtml(g.blurb)}</span>
-          <span class="sg-count">${count}</span>
+          <span class="sg-count">${mine.length}/${mine.length + left.length}</span>
         </div>
-        ${mine.length ? `<div class="stamp-grid">${mine.map(stampHtml).join('')}</div>` : ''}
-        ${left.length ? `<div class="sg-left">${left.map(rowHtml).join('')}</div>` : ''}
+        <div class="sg-left">${left.map(rowHtml).join('')}</div>
       </div>`;
     }).join('');
 
-    listEl.innerHTML = sections;
+    listEl.innerHTML =
+      (earned.length ? `<div class="stamp-grid">${earned.map(stampHtml).join('')}</div>` : '')
+      + (sections ? `<div class="plate stamp-todo"><span>${earned.length ? 'Still to earn' : 'Collect your first'}</span><i></i></div>${sections}` : '');
   }
 }
 

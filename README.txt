@@ -1,32 +1,27 @@
-BathroomReport v2.43.0 — reported vs confirmed
+BathroomReport v2.43.1
 
-FILES     app.js  index.html  styles.css  sw.js     (repo root)
+FILES     app.js  index.html  styles.css  sw.js    (repo root)
 FIREBASE  nothing
 
-THE PROBLEM
-  An amenity answer was invisible until three people gave the same one. At a
-  location with a single visitor, the first person's answer is stored, correct,
-  and shown to nobody — possibly for years. That is why "single vs multiple
-  stalls" looked missing: it had been answered, and the answer had nowhere to go.
+FIXES v2.42.0's mistake: the earned stamps had been split into the four verb
+sections, which put the collection in four piles and buried the reward under
+the roadmap. A passport is a page of stamps — that is the thing worth looking
+at, and it reads as one wall again, directly under the card.
 
-THE CHANGE
-  Three states now, not two:
+The verbs now group only what is LEFT, which is where grouping helps: it turns
+thirty-odd unearned trophies into "you have done nothing under SHARE".
 
-    nothing            no votes           shows nothing
-    reported           1-2 votes          outlined badge, dashed, "2 reports"
-    confirmed          3+ votes           filled badge with the star, as before
+    [ passport card ]
+    [ 🚽 ][ 💎 ][ 🌞 ][ 💢 ]      every stamp you hold
 
-  The question KEEPS being asked until three. Showing early costs no data — it
-  just stops the first answer disappearing.
+    STILL TO EARN
+    FIND     1/12   Places you have been
+    RATE     3/16   Bathrooms you have judged
+    SHARE    0/5    What you have told others
+    IMPROVE  0/4    The map you have fixed
 
-  The star still means confirmed. A report never borrows it, and states its
-  count outright, because "one person said so" and "several agree" are
-  different claims.
+Counts still report the whole group — "1/12", not "0/11" — because that is the
+useful number even in a section listing only the eleven you have not got.
 
-  A tie shows nothing: 1-1 is a disagreement, not a report.
-
-  The answer strip at the top of the card follows the same three tiers, or the
-  card would contradict itself about the same fact two rows apart.
-
-  Section heading is now "What visitors say" rather than "Confirmed by
-  visitors", since it holds both kinds.
+ALSO INCLUDES v2.43.0 (reported vs confirmed) in case it has not shipped:
+one vote now shows as a dashed "1 report" badge; three still earns the star.
