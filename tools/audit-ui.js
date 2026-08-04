@@ -292,6 +292,25 @@ console.log('\nvote views redraw together');
   }
 }
 
+// ---- 3i: the aggregate must be replaced, not merged ----
+/* set(..., { merge: true }) walks INTO nested maps. The aggregate's `amen` map is rebuilt from
+ * scratch on every recomputation, so merging it means a key whose last vote was withdrawn
+ * lingers at its old count forever — the badge kept reading "Multi-stall restroom · 1 report"
+ * from a vote that no longer existed. Same one level deeper: a count falling to zero merged as
+ * "leave it alone". */
+console.log('\naggregate write');
+{
+  if (!fs.existsSync('functions/index.js')) pass('no functions/index.js to check');
+  else {
+    const f = fs.readFileSync('functions/index.js', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    if (/tx\.set\(ref, patch, \{ ?merge: ?true ?\}\)/.test(f))
+      fail('the aggregate is written with merge — withdrawn amenity votes will linger');
+    else if (!/tx\.set\(ref, next\)/.test(f))
+      fail('could not find the full-document aggregate write');
+    else pass('aggregate replaced whole, so withdrawn votes disappear');
+  }
+}
+
 // ---- 4: constants duplicated across files ----
 console.log('\nduplicated constants');
 const app = fs.readFileSync('app.js', 'utf8');

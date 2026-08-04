@@ -207,10 +207,25 @@ exports.recomputeBathroomAggregate = onDocumentWritten('votes/{voteId}', async (
       || JSON.stringify(cur.amen || {}) !== JSON.stringify(totals.amen || {});
     if (changed || !curSnap.exists) patch.lastUpdated = Date.now();
 
-    /* amen is written whole, not merged, so a key whose last vote was withdrawn disappears
-     * instead of lingering at its old count. The rest of the document still merges, preserving
-     * fields this function does not own. */
-    tx.set(ref, patch, { merge: true });
+    /* The whole document is written, NOT merged.
+     *
+     * The previous line claimed amen was "written whole" while calling set with { merge: true },
+     * and a merge walks INTO nested maps: amen.restroomType survived every recomputation that no
+     * longer contained it. Withdraw the only vote for a layout and the badge kept showing
+     * "Multi-stall restroom · 1 report" forever, sourced from a vote that no longer existed.
+     * The same applies one level deeper — a state count falling from 2 to 0 was merged as "leave
+     * it at 2".
+     *
+     * So the next document is composed explicitly: everything currently on it, then the fields
+     * this function owns, with amen replaced outright. Fields written by anything else are
+     * preserved by the spread rather than by merge semantics, which is the same guarantee stated
+     * out loud instead of assumed. */
+    const next = { ...cur, ...patch, amen: totals.amen || {} };
+    /* FieldValue.delete() is meaningless in a full set — the field simply must not be present. */
+    Object.keys(next).forEach(k => {
+      if (next[k] && typeof next[k] === 'object' && next[k]._methodName === 'delete') delete next[k];
+    });
+    tx.set(ref, next);
   });
 
   /* When a vote is DELETED, remove the activity entries it backed.
