@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import {
     getFirestore, doc, getDoc, setDoc, increment, arrayUnion,
-    collection, addDoc, query, where, getDocs, deleteDoc
+    collection, addDoc, query, where, getDocs, deleteDoc, deleteField
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import {
     getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
@@ -63,7 +63,11 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 
   // Expose just what the rest of the (non-module) page script needs
   window.__fb = {
-    db, doc, getDoc, setDoc, increment, arrayUnion, collection, addDoc, query, where, getDocs, deleteDoc,
+    /* deleteField is the ONLY way to remove a field from a doc written with { merge: true }.
+     * Deleting the key from the object client-side and merging leaves the server value exactly
+     * where it was — which is why "change" on an amenity answer appeared to work and then the
+     * old answer came back on reload. */
+    db, doc, getDoc, setDoc, increment, arrayUnion, collection, addDoc, query, where, getDocs, deleteDoc, deleteField,
     auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile,
     functions, httpsCallable
   };
