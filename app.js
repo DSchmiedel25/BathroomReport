@@ -2533,7 +2533,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.40.0';
+const BUILD = 'v2.41.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -3746,6 +3746,60 @@ const ACHIEVEMENT_DEFS = [
   { key:'gemCollector', icon:'🔷', name:'Gem Collector', desc:'Rate 5 hidden gems', retired:true,
     calc:s=>({done:false,current:0,total:5})},
 ];
+
+/* The back of a stamp.
+ *
+ * An earned stamp showed icon, name and date, and put its criterion in a `title` attribute —
+ * a hover tooltip, which does nothing at all on a phone. So the moment you earned something,
+ * the app stopped telling you what you had done for it.
+ *
+ * A tile is about 78px across, which at legible size is roughly 50 characters. Several
+ * descriptions run past that ("Make your first correction — hours, a report, or a new place"
+ * is 60), so the back gets its own terse line rather than a truncated one. Kept as a map
+ * rather than a field on each def so the definitions stay about the RULES. */
+const STAMP_SHORT = {
+  firstFlush:'1 rating', gettingStarted:'10 ratings', regular:'50 ratings',
+  centuryClub:'100 ratings', hallOfFame:'500 ratings',
+  fullRange:'Every star, 1–5', secondLook:'Changed a rating',
+  firstWord:'1 tip', localGuide:'10 tips', storyteller:'50 tips',
+  fixer:'1 correction', caretaker:'10 corrections',
+  accessibilityScout:'Access at 10 stops', hoursHero:'Hours reported',
+  lookout:'Safety at 10 stops', guardian:'Safety at 50 stops',
+  cityHopper:'15 cities', roadWarrior:'10 states', nationwide:'25 states',
+  crossCountry:'1,000 mi apart', transcontinental:'2,500 mi apart',
+  vacationMode:'5 states in a week',
+  chainExplorer:'15 chains', brandLoyalist:'10 of one chain',
+  brandDevotee:'25 of one chain', truckStopHero:'25 travel plazas',
+  trailblazer:'First ever to rate', pathfinder:'First at 25 places',
+  marathon:'5 in one day', streak:'3 days running', onFire:'7 days running',
+  weekendWarrior:'5 weekend days',
+  winterWarrior:'10 in winter', summerRoadTrip:'10 in summer',
+  earlyBird:'Before 5 AM', nightOwl:'After midnight', fourSeasons:'All four seasons',
+  // retired
+  halfCentury:'50 ratings', explorerElite:'250 ratings', bathroomLegend:'500 ratings',
+  critic:'A 5-star rating', perfectionist:'Ten 5-stars', cleanFreak:'Twenty-five 5-stars',
+  toughCrowd:'A 1-star rating', ironStomach:'Twenty-five 1-stars',
+  hiddenGemHunter:'Under 5 reviews', gemCollector:'5 hidden gems',
+};
+function stampShort(def){ return STAMP_SHORT[def.key] || def.desc; }
+
+/* Tap a stamp to turn it over.
+ *
+ * Delegated from the document because the grid is rebuilt on every passport render, so binding
+ * per tile would leak listeners and miss any stamp earned since the last bind.
+ *
+ * Only one is face-down at a time. A wall of turned-over stamps is a wall of text with no
+ * trophies left in it, and the front is the thing worth looking at. */
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest && e.target.closest('[data-stamp]');
+  if(!btn) return;
+  const wasOpen = btn.getAttribute('aria-pressed') === 'true';
+  document.querySelectorAll('[data-stamp][aria-pressed="true"]')
+    .forEach(el => el.setAttribute('aria-pressed', 'false'));
+  btn.setAttribute('aria-pressed', String(!wasOpen));
+  if(!wasOpen && navigator.vibrate) navigator.vibrate(8);
+});
+
 const OBTAINABLE_COUNT = ACHIEVEMENT_DEFS.filter(d => !d.retired).length;
 
 // We don't have real county data in locations.js, only addresses — so "County Collector"
@@ -4204,11 +4258,22 @@ function renderBathroomPassport(stats, results){
       const d = r.unlockedAt ? new Date(r.unlockedAt) : null;
       // Short date in a document hand: "22 JUL 26", not "7/22/2026".
       const dateStr = d ? d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'2-digit' }).toUpperCase() : '';
-      return `<div class="stamp" style="--tilt:${tilt(def.key)}deg" title="${escapeHtml(def.desc)}">
-        <span class="stamp-ico" aria-hidden="true">${def.icon}</span>
-        <span class="stamp-name">${escapeHtml(def.name)}</span>
-        ${dateStr ? `<span class="stamp-date">${dateStr}</span>` : ''}
-      </div>`;
+      /* A button, not a div: it is tappable, so it has to be reachable by keyboard and
+       * announced as a control. aria-label carries the whole thing for a screen reader, which
+       * never sees the flip at all. */
+      return `<button type="button" class="stamp${def.retired ? ' stamp-retired' : ''}" style="--tilt:${tilt(def.key)}deg"
+        data-stamp="${def.key}" aria-pressed="false"
+        aria-label="${escapeHtml(def.name)} — ${escapeHtml(stampShort(def))}${dateStr ? ', earned ' + dateStr : ''}${def.retired ? ', retired' : ''}">
+        <span class="stamp-face stamp-front">
+          <span class="stamp-ico" aria-hidden="true">${def.icon}</span>
+          <span class="stamp-name">${escapeHtml(def.name)}</span>
+          ${dateStr ? `<span class="stamp-date">${dateStr}</span>` : ''}
+        </span>
+        <span class="stamp-face stamp-back">
+          <span class="stamp-how">${escapeHtml(stampShort(def))}</span>
+          ${def.retired ? '<span class="stamp-tag">retired</span>' : ''}
+        </span>
+      </button>`;
     }).join('');
 
     /* Retired stamps are unobtainable, so listing them under "Still to earn" would be an

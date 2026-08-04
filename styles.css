@@ -1106,22 +1106,61 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
     display:grid; grid-template-columns:repeat(auto-fill, minmax(94px, 1fr));
     gap:10px; margin:4px 0 6px;
 }
+  /* A stamp turns over to say what it was for.
+     The criterion used to live in a title attribute — a hover tooltip, invisible on a phone —
+     so an earned stamp stopped explaining itself the moment you earned it. Now the front is the
+     trophy and the back is the reason. */
   .stamp{
-    aspect-ratio:1; border-radius:10px; padding:8px 6px;
+    aspect-ratio:1; border-radius:10px; padding:0; border:0; background:none;
+    font-family:inherit; cursor:pointer; position:relative;
+    transform:rotate(var(--tilt, 0deg));
+    perspective:600px; -webkit-tap-highlight-color:transparent;
+}
+  /* Both faces share one grid cell, so the tile is sized by its content and neither face has to
+     be positioned absolutely against a guessed height. */
+  .stamp-face{
+    grid-area:1 / 1; border-radius:10px; padding:8px 6px;
     display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
     border:2px solid var(--accent); color:var(--accent);
     background:color-mix(in srgb, var(--accent) 7%, transparent);
-    transform:rotate(var(--tilt, 0deg));
+    backface-visibility:hidden; -webkit-backface-visibility:hidden;
+    transition:transform .35s cubic-bezier(.4,0,.2,1);
 }
+  .stamp{ display:grid; }
+  .stamp-front{ transform:rotateY(0deg); }
+  .stamp-back{ transform:rotateY(180deg); background:var(--accent); color:var(--charcoal, #14202b); }
+  .stamp[aria-pressed="true"] .stamp-front{ transform:rotateY(-180deg); }
+  .stamp[aria-pressed="true"] .stamp-back{ transform:rotateY(0deg); }
+
   .stamp-ico{ font-size:22px; line-height:1; margin-bottom:5px; }
   .stamp-name{
     font-family:var(--font-display); font-weight:600; font-size:9.5px;
     letter-spacing:.05em; text-transform:uppercase; line-height:1.15;
 }
   .stamp-date{ font-size:8px; margin-top:3px; opacity:.75; font-weight:700; letter-spacing:.04em; }
-  /* A tilted grid is decoration; straighten it when motion or visual noise is unwelcome. */
+  .stamp-how{
+    font-family:var(--font-display); font-weight:600; font-size:10px; line-height:1.25;
+    letter-spacing:.02em;
+}
+  .stamp-tag{
+    font-size:7.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase;
+    margin-top:4px; opacity:.7;
+}
+  /* Retired: earned, dated, and no longer obtainable. Muted rather than removed — deleting the
+     definition would silently take the trophy off the passport of whoever holds it. */
+  .stamp-retired .stamp-face{ border-style:dashed; opacity:.72; }
+
+  .stamp:focus-visible{ outline:3px solid var(--accent); outline-offset:3px; border-radius:12px; }
+
+  /* A tilted grid is decoration; straighten it when motion or visual noise is unwelcome, and
+     swap the turn for a cross-fade so the back is still reachable. */
   @media (prefers-reduced-motion: reduce){
-    .stamp{ transform:none; }
+    .stamp{ transform:none; perspective:none; }
+    .stamp-face{ transition:opacity .15s linear; backface-visibility:visible; }
+    .stamp-front, .stamp-back{ transform:none; }
+    .stamp-back{ opacity:0; }
+    .stamp[aria-pressed="true"] .stamp-front{ opacity:0; }
+    .stamp[aria-pressed="true"] .stamp-back{ opacity:1; }
 }
 
   /* The "Still to earn" heading reuses the popup placard. That rule's keyline is var(--popup-divider),
