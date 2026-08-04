@@ -1496,3 +1496,29 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
   .amenity-answer-btn .aab-hint{
     font-size:10.5px; font-weight:500; opacity:.7; line-height:1.3; padding-left:1px;
 }
+
+  /* ---------- Your own answers ----------
+     Answering an amenity used to be a one-way door: the question was filtered out for you
+     forever, and until three people agreed your answer was not shown either. A mistaken tap was
+     permanent AND invisible. This is the way back — and the way to see that your answer landed
+     at all, which matters most at a location where you are the only visitor. */
+  .my-answers{ margin-top:14px; }
+  .ma-head{
+    font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--popup-muted); margin-bottom:7px;
+}
+  .ma-rows{ display:flex; flex-wrap:wrap; gap:6px; }
+  /* Quieter than a community badge on purpose. This is what YOU said, not what the place is —
+     a confirmed badge has the weight of several people behind it and this has one. */
+  .my-answer{
+    display:inline-flex; align-items:center; gap:8px;
+    background:transparent; border:1px solid var(--popup-divider); border-radius:20px;
+    padding:6px 10px; font-family:inherit; font-size:12px; color:var(--popup-text);
+    cursor:pointer;
+}
+  .my-answer:active{ background:var(--popup-tip-input-bg); }
+  .ma-what{ font-weight:700; }
+  .ma-change{
+    font-size:10.5px; font-weight:700; color:var(--accent); opacity:.9;
+    border-left:1px solid var(--popup-divider); padding-left:8px;
+}

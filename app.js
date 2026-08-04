@@ -745,7 +745,10 @@ const BATHROOM_AMENITIES = [
       multiPrivate:'Separate locking rooms',
       multiple:'Shared room with stalls'
     }},
-  {key:'genderSplit', label:'Restroom rooms',
+  /* The label is what a reader sees on the badge, so it has to state the FACT rather than name
+   * the question. "Restroom rooms" described neither — it was a leftover from when this asked
+   * how many rooms there were, which is now the layout question's job. */
+  {key:'genderSplit', label:'Open to',
     question:"Who can use it?",
     /* Multi-state rather than boolean, because a boolean only DISPLAYS in the affirmative:
      * communityConfirmedBadges returns '' unless isConfirmedYes fires, so a confirmed NO — one
@@ -967,11 +970,88 @@ function renderAmenityStepHtml(myVote, locId){
     <div class="amenity-answer-row">${buttons}</div>`;
 }
 
+/* ---------- Your own answers, and a way to change them ----------
+ *
+ * Answering an amenity used to be a one-way door. pickVisitQuestions filters out anything you
+ * have personally answered, so the question never came back — and until three people agreed,
+ * your answer was not displayed either. A mistaken tap was permanent and invisible, fixable
+ * only in the Firestore console.
+ *
+ * That is also inconsistent with ratings, which show your stars filled in and let you change
+ * them whenever you like. This closes the gap: what you said, shown back to you, tappable.
+ *
+ * Three jobs at once — correct a mistake, confirm your answer registered at all, and update a
+ * place that has been renovated. */
+function myAnswersHtml(loc, myVote){
+  const mine = (myVote && myVote.amenities) || {};
+  const mineStore = (myVote && myVote.storeFeatures) || {};
+  const rows = [];
+  const add = (defs, source) => defs.forEach(a => {
+    const val = source[a.key];
+    if(!val || val === 'unknown') return;          // "not sure" is not an answer to show back
+    const label = isMultiState(a)
+      ? amenityStateLabel(a, val)
+      : `${a.label}: ${val === 'yes' ? 'Yes' : 'No'}`;
+    rows.push(`<button type="button" class="my-answer" data-reopen="${a.key}" data-locid="${loc.id}">
+      <span class="ma-what">${escapeHtml(label)}</span>
+      <span class="ma-change">change</span>
+    </button>`);
+  });
+  add(BATHROOM_AMENITIES, mine);
+  add(STORE_FEATURES, mineStore);
+  if(!rows.length) return '';
+  return `<div class="my-answers">
+    <div class="ma-head">You said</div>
+    <div class="ma-rows">${rows.join('')}</div>
+  </div>`;
+}
+
+/* Reopening clears your stored answer so the question becomes eligible again, then re-renders.
+ * It does NOT write anything: the vote is only saved when you pick a new answer, so backing out
+ * without answering leaves you exactly as you were rather than wiping what you had said. */
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest && e.target.closest('[data-reopen]');
+  if(!btn) return;
+  const loc = locationsById[btn.dataset.locid];
+  if(!loc) return;
+  const key = btn.dataset.reopen;
+  const myVote = myVoteCache[loc.id] || emptyVote();
+  const isStore = STORE_FEATURES.some(a => a.key === key);
+  const bucket = isStore ? (myVote.storeFeatures = myVote.storeFeatures || {})
+                         : (myVote.amenities = myVote.amenities || {});
+  const previous = bucket[key];
+  delete bucket[key];
+  /* Also clear the not-sure counter, or a key you had skipped twice before answering would come
+   * back already halfway to being retired again. */
+  if(myVote.amenityMeta && myVote.amenityMeta[key]) delete myVote.amenityMeta[key].notSure;
+  myVoteCache[loc.id] = myVote;
+  /* Persist the removal so the community tally drops your old answer immediately — otherwise a
+   * wrong vote keeps counting toward a confirmation while you are busy correcting it.
+   * saveMyVote takes a location ID, not a location. */
+  let ok = false;
+  try{ ok = await saveMyVote(loc.id, myVote); }catch(err){ ok = false; }
+  if(!ok){                                          // put it back if the write failed
+    bucket[key] = previous;
+    myVoteCache[loc.id] = myVote;
+    return;
+  }
+  /* Force a fresh question pick, exactly as the answer path does — visitQuestions is cached per
+   * location and would otherwise still hold the list from before this key became eligible. */
+  delete visitQuestions[loc.id]; delete visitCursor[loc.id];
+  const step = document.getElementById('amenity-step-' + loc.id);
+  if(step) step.innerHTML = renderAmenityStepHtml(myVote, loc.id);
+  const mine = document.getElementById('my-answers-' + loc.id);
+  if(mine) mine.innerHTML = myAnswersHtml(loc, myVote);
+  if(typeof refreshCommunityBlock === 'function') refreshCommunityBlock(loc);
+  if(typeof refreshOpenPopupStrip === 'function') refreshOpenPopupStrip();
+});
+
 function amenityEditorHtml(locId, myVote){
   return `<div class="amenities-editor">
     ${plate('Help out')}
     <div class="amenity-step" id="amenity-step-${locId}">${renderAmenityStepHtml(myVote, locId)}</div>
     <div class="save-note" id="amenities-note-${locId}"></div>
+    <div id="my-answers-${locId}">${myAnswersHtml(locationsById[locId] || {id:locId}, myVote)}</div>
   </div>`;
 }
 
@@ -2629,7 +2709,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.44.0';
+const BUILD = 'v2.45.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
