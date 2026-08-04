@@ -239,24 +239,57 @@ console.log('\namenity value lists');
   }
 }
 
-// ---- 3g: removing a field needs deleteField, not a merge ----
-/* Every vote write goes through setDoc({ merge: true }), and a merge cannot remove anything —
- * it merges nested maps key by key. Deleting a key from the local object and saving therefore
- * looks like it worked until the next reload, when the server's copy comes back. Any code path
- * whose PURPOSE is to remove an answer has to use deleteField on the dotted path. */
-console.log('\nfield removal');
+// ---- 3g: never destroy an answer you cannot let the person replace ----
+/* Two rules, learned the hard way:
+ *
+ * 1. Answering an amenity is geofenced to a few hundred metres. Clearing one was not, so
+ *    "change" tapped at home deleted an answer the person could not replace until they drove
+ *    back. Reopening must therefore NOT delete — it marks the question askable and lets the
+ *    normal, geofenced answer path overwrite.
+ *
+ * 2. If any path ever does need to remove a field, it cannot use saveMyVote: that writes with
+ *    { merge: true }, and a merge merges nested maps key by key. It never removes. deleteField
+ *    on the dotted path is the only way, and it must be exported from firebase.js. */
+console.log('\nanswer removal safety');
 {
   const src = fs.readFileSync('app.js', 'utf8');
-  const fbjs = fs.existsSync('firebase.js') ? fs.readFileSync('firebase.js', 'utf8') : '';
-  const reopen = src.slice(src.indexOf("closest('[data-reopen]')"), src.indexOf("closest('[data-reopen]')") + 2600);
-  if (!reopen) fail('could not find the reopen handler to check');
-  else if (/saveMyVote\(/.test(reopen) && !/deleteField\(\)/.test(reopen))
-    fail('the reopen handler saves via merge — the removed answer will come back on reload');
-  else if (!/deleteField\(\)/.test(reopen))
-    fail('the reopen handler does not use deleteField');
-  else if (!/deleteField/.test(fbjs))
-    fail('deleteField is used in app.js but not exported from firebase.js');
-  else pass('answer removal uses deleteField on a dotted path, and it is exported');
+  const i = src.indexOf("closest('[data-reopen]')");
+  const reopen = i < 0 ? '' : src.slice(i, i + 2200);
+  if (!reopen) fail('could not find the reopen handler');
+  else if (/delete\s+bucket\[key\]|deleteField\(\)/.test(reopen))
+    fail('reopen destroys the stored answer — answering is geofenced, so it may not be replaceable');
+  else if (!/reopenedKeys/.test(reopen))
+    fail('reopen does not mark the question askable, so nothing will be offered');
+  else pass('reopen preserves the stored answer until a new one is given');
+
+  /* Anywhere else that deletes from a vote object must not then merge it away. */
+  const merges = [...src.matchAll(/delete\s+\w*[Vv]ote[\w.\[\]']*;[\s\S]{0,400}?saveMyVote\(/g)];
+  if (merges.length) fail(merges.length + ' path(s) delete a vote field then save via merge — the removal will not persist');
+  else pass('no path removes a vote field through a merge write');
+}
+
+// ---- 3h: everything reading myVoteCache must redraw together ----
+/* Three views read a person's vote: the question step, the YOU SAID list, and the community
+ * badges. They were refreshed from three different places, so replacing myVoteCache in one of
+ * them left the others showing minutes-old data — a card could ask "What is the setup?" while
+ * listing "Multi-stall restroom" underneath, from the same object.
+ *
+ * So: anything that ASSIGNS myVoteCache[...] wholesale must call refreshVoteViews rather than
+ * poking one node itself. */
+console.log('\nvote views redraw together');
+{
+  const src = fs.readFileSync('app.js', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  if (!/function refreshVoteViews/.test(src)) fail('refreshVoteViews is gone — the views will drift apart again');
+  else {
+    /* A direct innerHTML write to one half, not inside refreshVoteViews itself, is the smell. */
+    const body = src.slice(src.indexOf('function refreshVoteViews'));
+    const own = body.slice(0, body.indexOf('\n}') + 2);
+    const outside = src.replace(own, '');
+    const lone = [...outside.matchAll(/getElementById\('amenity-step-'[^;]*innerHTML\s*=/g)].length
+               + [...outside.matchAll(/getElementById\('my-answers-'[^;]*innerHTML\s*=/g)].length;
+    if (lone) fail(lone + ' place(s) redraw one vote view directly instead of calling refreshVoteViews');
+    else pass('every vote view is redrawn through refreshVoteViews');
+  }
 }
 
 // ---- 4: constants duplicated across files ----
