@@ -440,7 +440,8 @@ ${loc.amenities.length ? `<div class="card"><p class="eyebrow" style="margin-top
 <a class="cta" href="${esc(CONFIG.appDeepLink(loc))}">Open in ${esc(CONFIG.siteName)} →</a>
 <p style="color:var(--muted);font-size:.9rem;margin-top:4px">See it on the live map, add a rating, or report the current status.</p>
 <div class="foot">${loc.updated ? `Last updated ${esc(String(loc.updated))}. ` : ""}Data is community-contributed and may change. ·
-  <a href="${esc(`${S()}/${chainSlug(loc)}/`)}">More ${esc(loc.chain)} locations</a></div>`;
+  <a href="${esc(`${S()}/${chainSlug(loc)}/`)}">More ${esc(loc.chain)} locations</a> &middot;
+  <a href="https://bathroomreport.app/support.html">Keep this map free</a></div>`;
   return { url, html: shell({ title, desc, canonical: url, body, jsonLdStr: jsonLd(loc, url), chain: loc.chain, locId: loc.id, pageType: "location" }) };
 }
 

@@ -486,6 +486,19 @@ This is tracked on this device only. Log in to sync it across devices.
         </button>
       </div>
 
+      <!-- Support gets its own section rather than a row under About. It used to link straight
+           to the shop, which made buying a shirt the only visible way to help; /support.html
+           shows the actual costs first and lets the reader choose shop, tip, or neither. -->
+      <div class="ss-sec">Support</div>
+      <div class="ss-card">
+        <a href="/support.html" class="ss-row ss-shop">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 8h12l-1 12H7L6 8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8V6a3 3 0 016 0v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Keep this free</span>
+            <span class="ss-desc">Where the money goes &middot; shop &middot; tip</span></span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </a>
+      </div>
+
       <div class="ss-sec">About</div>
       <div class="ss-card">
         <button class="ss-row" id="infoBtn" title="FAQ and how it works">
@@ -494,13 +507,6 @@ This is tracked on this device only. Log in to sync it across devices.
             <span class="ss-desc">What the ratings mean and where the data comes from</span></span>
           <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
-        <a href="https://bathroomreport-shop.fourthwall.com/?utm_source=bathroomreport.app&amp;utm_medium=website&amp;utm_campaign=main_menu"
-           target="_blank" rel="noopener noreferrer" class="ss-row ss-shop">
-          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 8h12l-1 12H7L6 8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8V6a3 3 0 016 0v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
-          <span class="ss-main"><span class="ss-lab">Support this project</span>
-            <span class="ss-desc">Gift shop &middot; Signature Collection</span></span>
-          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        </a>
       </div>
 
       <!-- FIND. RATE. SHARE. IMPROVE. as the labels for the numbers that were already here. -->
@@ -678,44 +684,14 @@ This is tracked on this device only. Log in to sync it across devices.
 <section><h3>Not affiliated</h3><p>Bathroom Report is an independent, community-created project. It isn’t affiliated with or endorsed by any business listed. &copy; 2025&ndash;2026 Bathroom Report. All rights reserved. Map data &copy; OpenStreetMap contributors.</p></section>
 <section class="hiw-support">
   <h3>Keep Bathroom Report free</h3>
-
-  <p>
-    Bathroom Report is independent (no ads, no investors), just me keeping
-    the map accurate and the servers running.
-  </p>
-
-  <p class="hiw-support-note">
-    Every donation or purchase helps fund better location data, new features,
-    and the continued growth of BathroomReport.app.
-  </p>
-
+  <p><b>No ads, ever.</b> Not banners, not sponsored pins, not a chain paying to look cleaner than it is. Hosting the map is nearly free; verifying 84,000+ locations isn&rsquo;t.</p>
   <div class="hiw-support-actions">
-    <a
-      href="https://cash.app/$BathroomReport"
-      target="_blank"
-      rel="noopener noreferrer"
-      class="hiw-btn hiw-btn-donate"
-      aria-label="Support Bathroom Report through Cash App"
-    >
-      <img src="icon-cashapp.png" class="hiw-btn-icon" alt="">
-      <span>Donate</span>
-    </a>
-
-    <a
-      href="https://bathroomreport-shop.fourthwall.com/?utm_source=bathroomreport.app&utm_medium=website&utm_campaign=support_section"
-      target="_blank"
-      rel="noopener noreferrer"
-      class="hiw-btn hiw-btn-shop"
-      aria-label="Shop Bathroom Report merchandise"
-    >
+    <a href="/support.html" class="hiw-btn hiw-btn-shop" aria-label="See where the money goes and how to support Bathroom Report">
       <svg class="ico hiw-shop-icon" aria-hidden="true"><use href="#i-bag"></use></svg>
-      <span>Shop the Store</span>
+      <span>Where the money goes</span>
     </a>
   </div>
-
-  <p class="hiw-store-caption">
-    <b>No ads, ever.</b> Store sales and tips keep this app running. Shop the Signature Collection and numbered Collector Series.
-  </p>
+  <p class="hiw-store-caption">The full breakdown, the shop, and the tip jar all live on one page now.</p>
 </section><section><h3>Contact</h3><p>Questions, corrections, or ideas? Email <a href="mailto:dave@bathroomreport.app">dave@bathroomreport.app</a>.</p></section>
 <section><h3>Follow us</h3><div class="hiw-social-row"><a href="https://x.com/Bathroom_Report" target="_blank" rel="noopener" aria-label="Follow Bathroom Report on X"><img src="icon-x.png" alt="Follow on X"></a></div></section>
 <section class="hiw-faq"><h3>FAQ</h3>
