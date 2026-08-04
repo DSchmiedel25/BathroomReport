@@ -1061,13 +1061,24 @@ document.addEventListener('click', (e) => {
   /* Force a fresh pick so the newly-eligible key is actually offered — visitQuestions is cached
    * per location and would otherwise hold the list from before. */
   delete visitQuestions[loc.id]; delete visitCursor[loc.id];
+  refreshVoteViews(loc);
+  const step = document.getElementById('amenity-step-' + loc.id);
+  if(step) step.scrollIntoView({ block:'nearest', behavior:'smooth' });
+});
+
+/* Every view that reads myVoteCache, redrawn together.
+ *
+ * There are three of them and they were being updated in three different places, which is how
+ * the question and the YOU SAID list came to disagree. Adding a fourth reader means adding it
+ * here, once. */
+function refreshVoteViews(loc){
+  if(!loc || !loc.id) return;
   const myVote = myVoteCache[loc.id] || emptyVote();
   const step = document.getElementById('amenity-step-' + loc.id);
   if(step) step.innerHTML = renderAmenityStepHtml(myVote, loc.id);
   const mine = document.getElementById('my-answers-' + loc.id);
   if(mine) mine.innerHTML = myAnswersHtml(loc, myVote);
-  if(step) step.scrollIntoView({ block:'nearest', behavior:'smooth' });
-});
+}
 
 function amenityEditorHtml(locId, myVote){
   return `<div class="amenities-editor">
@@ -2738,7 +2749,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.46.0';
+const BUILD = 'v2.46.1';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -3545,8 +3556,14 @@ async function attachAmenityHandlers(loc){
     if(saved){
       myVoteCache[loc.id] = { ...emptyVote(), ...saved };
       delete visitQuestions[loc.id]; delete visitCursor[loc.id];   // force a fresh, correct pick
-      const stepReset = document.getElementById('amenity-step-' + loc.id);
-      if(stepReset) stepReset.innerHTML = renderAmenityStepHtml(myVoteCache[loc.id], loc.id);
+      /* BOTH halves, or they contradict each other.
+       *
+       * This refreshed the vote from the server and redrew only the question. The YOU SAID list
+       * kept whatever was rendered when the popup was built, so a card could show "What is the
+       * setup?" and "Multi-stall restroom" at the same time — the question saying the answer is
+       * unknown and the list saying it is known, from the same object, one of them minutes out
+       * of date. Anything that replaces myVoteCache has to redraw everything reading it. */
+      refreshVoteViews(loc);
     }
   }catch(e){ /* non-fatal — fall back to whatever's cached */ }
 
