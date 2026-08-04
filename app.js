@@ -2533,7 +2533,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.41.0';
+const BUILD = 'v2.42.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -3800,6 +3800,49 @@ document.addEventListener('click', (e) => {
   if(!wasOpen && navigator.vibrate) navigator.vibrate(8);
 });
 
+
+/* The four verbs from the lockup — FIND. RATE. SHARE. IMPROVE. — used as the structure of the
+ * passport, the same way they label the numbers in the settings footer.
+ *
+ * Thirty-seven stamps in one flat grid is a wall, and nothing in it tells you what any of them
+ * are FOR. Grouped, the passport answers a question it could not answer before: which kind of
+ * contributor are you, and where are the gaps.
+ *
+ * RATE holds sixteen of the thirty-seven, which is lopsided but true — rating is the core act
+ * and everything about volume, honesty, cadence and timing belongs to it. The alternative was
+ * inventing groups to even the columns out, which would be a nicer chart and a worse map of
+ * what the app is.
+ *
+ * Safety sits under SHARE rather than RATE: you are telling the next person whether to stop,
+ * which is the same job a tip does. */
+const STAMP_GROUPS = [
+  { id:'find',    label:'Find',    blurb:'Places you have been' },
+  { id:'rate',    label:'Rate',    blurb:'Bathrooms you have judged' },
+  { id:'share',   label:'Share',   blurb:'What you have told others' },
+  { id:'improve', label:'Improve', blurb:'The map you have fixed' },
+];
+const STAMP_GROUP_OF = {
+  cityHopper:'find', roadWarrior:'find', nationwide:'find', crossCountry:'find',
+  transcontinental:'find', vacationMode:'find', chainExplorer:'find', brandLoyalist:'find',
+  brandDevotee:'find', truckStopHero:'find', trailblazer:'find', pathfinder:'find',
+
+  firstFlush:'rate', gettingStarted:'rate', regular:'rate', centuryClub:'rate', hallOfFame:'rate',
+  fullRange:'rate', secondLook:'rate', marathon:'rate', streak:'rate', onFire:'rate',
+  weekendWarrior:'rate', winterWarrior:'rate', summerRoadTrip:'rate', earlyBird:'rate',
+  nightOwl:'rate', fourSeasons:'rate',
+
+  firstWord:'share', localGuide:'share', storyteller:'share', lookout:'share', guardian:'share',
+
+  fixer:'improve', caretaker:'improve', accessibilityScout:'improve', hoursHero:'improve',
+
+  /* Retired stamps keep a group so they sit with their own kind rather than in a bin at the
+   * bottom — a Clean Freak stamp is still a rating stamp. */
+  halfCentury:'rate', explorerElite:'rate', bathroomLegend:'rate', critic:'rate',
+  perfectionist:'rate', cleanFreak:'rate', toughCrowd:'rate', ironStomach:'rate',
+  hiddenGemHunter:'find', gemCollector:'find',
+};
+function stampGroup(def){ return STAMP_GROUP_OF[def.key] || 'rate'; }
+
 const OBTAINABLE_COUNT = ACHIEVEMENT_DEFS.filter(d => !d.retired).length;
 
 // We don't have real county data in locations.js, only addresses — so "County Collector"
@@ -4253,7 +4296,7 @@ function renderBathroomPassport(stats, results){
       return (((h % 100) / 100) * 5 - 2.5).toFixed(2);   // -2.5deg … +2.5deg
     };
 
-    const stampsHtml = earned.map(def => {
+    const stampHtml = (def) => {
       const r = results[def.key];
       const d = r.unlockedAt ? new Date(r.unlockedAt) : null;
       // Short date in a document hand: "22 JUL 26", not "7/22/2026".
@@ -4274,11 +4317,11 @@ function renderBathroomPassport(stats, results){
           ${def.retired ? '<span class="stamp-tag">retired</span>' : ''}
         </span>
       </button>`;
-    }).join('');
+    };
 
     /* Retired stamps are unobtainable, so listing them under "Still to earn" would be an
      * instruction nobody can follow. They still render as earned for anyone holding one. */
-    const rowsHtml = rest.filter(def => !def.retired).map(def => {
+    const rowHtml = (def) => {
       const r = results[def.key];
       // A tiered achievement (Hours Hero) reveals after its first milestone and then shows a
       // rolling bar, unlike binary hidden trophies which stay masked until fully earned.
@@ -4296,13 +4339,28 @@ function renderBathroomPassport(stats, results){
           ${progressStr ? `<div class="achievement-progress">${progressStr}</div>` : ''}
         </div>
       </div>`;
+    };
+
+    /* One section per verb, in the order the lockup says them. Within a section: the stamps you
+     * hold, then what is left. A group with nothing in it is skipped entirely rather than
+     * rendering an empty heading. */
+    const sections = STAMP_GROUPS.map(g => {
+      const mine = earned.filter(d => stampGroup(d) === g.id);
+      const left = rest.filter(d => stampGroup(d) === g.id && !d.retired);
+      if(!mine.length && !left.length) return '';
+      const count = `${mine.length}/${mine.length + left.length}`;
+      return `<div class="stamp-group">
+        <div class="sg-head">
+          <span class="sg-verb">${g.label}</span>
+          <span class="sg-blurb">${escapeHtml(g.blurb)}</span>
+          <span class="sg-count">${count}</span>
+        </div>
+        ${mine.length ? `<div class="stamp-grid">${mine.map(stampHtml).join('')}</div>` : ''}
+        ${left.length ? `<div class="sg-left">${left.map(rowHtml).join('')}</div>` : ''}
+      </div>`;
     }).join('');
 
-    listEl.innerHTML =
-      (earned.length ? `<div class="stamp-grid">${stampsHtml}</div>` : '')
-      + (rest.length
-          ? `<div class="plate"><span>${earned.length ? 'Still to earn' : 'Collect your first'}</span><i></i></div>${rowsHtml}`
-          : '');
+    listEl.innerHTML = sections;
   }
 }
 

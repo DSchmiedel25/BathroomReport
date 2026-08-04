@@ -1437,3 +1437,29 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
     font-family:inherit; font-size:13.5px; font-weight:600; padding:10px; opacity:.7;
   }
   .ob-fine{ font-size:11.5px; line-height:1.5; margin:18px 0 0; opacity:.55; }
+
+  /* ---------- Passport, grouped by verb ----------
+     FIND. RATE. SHARE. IMPROVE. — the lockup used as structure, matching the settings footer.
+     Thirty-seven stamps in one flat grid was a wall that told you nothing about what any of
+     them were for; grouped, the passport answers "which kind of contributor am I". */
+  .stamp-group{ margin-top:22px; }
+  .stamp-group:first-child{ margin-top:6px; }
+  .sg-head{ display:flex; align-items:baseline; gap:8px; margin-bottom:10px; }
+  .sg-verb{
+    font-family:var(--font-display); font-weight:600; font-size:13px;
+    letter-spacing:.16em; text-transform:uppercase; color:var(--accent); flex:none;
+}
+  .sg-blurb{
+    font-size:11px; color:var(--muted); flex:1; min-width:0;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+  /* The count is the point of grouping — it says how far into each kind of contribution you are,
+     which the old flat list could not show at all. */
+  .sg-count{
+    font-family:var(--font-display); font-weight:600; font-size:11px;
+    color:var(--muted); flex:none; font-variant-numeric:tabular-nums;
+}
+  .sg-left{ margin-top:10px; }
+  /* Unearned rows inside a group sit tighter than they did as a full-width list — there are
+     four of these blocks now, not one. */
+  .sg-left .achievement-card{ padding:9px 10px; }
