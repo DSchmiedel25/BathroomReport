@@ -161,49 +161,41 @@
 <button class="mp-ghost" id="missingSubmit"><svg class="ico" aria-hidden="true"><use href="#i-send"></use></svg> Send it in</button>
 <div class="save-note" id="missingNote"></div>
 </div>
+<!-- ============================================================
+     First run — one screen, one job.
+
+     This was 202 words across three cards, an expandable "more tips" section and a travel-mode
+     choice, all before anyone had seen a single bathroom. Everything in it was true and almost
+     none of it was needed: the app is a map with pins, and tapping a pin is not a thing that
+     needs teaching.
+
+     What a first-time visitor actually needs is the one thing the app cannot do without and
+     cannot ask for later without an awkward prompt out of nowhere: permission to know where
+     they are. So this asks for it, says plainly why, and gets out of the way.
+
+     Travel mode moved to Settings, where it was already duplicated — it is a question about
+     directions, and asking it before someone has tapped anything is asking them to decide about
+     a feature they have not met.
+     ============================================================ -->
 <div id="onboardingOverlay">
-<div id="onboardingCard" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
-<div id="onboardingScroll">
-<h2 id="onboardingTitle">🚽 Welcome to Bathroom Report</h2>
-<p class="onboardingTagline">Find a clean, open bathroom, and help the next person.</p>
-<div class="onboardingGrid" aria-label="Quick tour">
-<div class="onboardingTip">
-<span aria-hidden="true">📍</span>
-<div><b>Find a bathroom</b><small>Tap any pin for hours, ratings, and directions.</small></div>
-</div>
-<div class="onboardingTip">
-<span aria-hidden="true">🚽</span>
-<div><b>Bathroom Now</b><small>One tap to the closest open bathroom.</small></div>
-</div>
-<div class="onboardingTip">
-<span aria-hidden="true">👤</span>
-<div><b>Optional account</b><small>Sign in to rate bathrooms, add tips, filter places, set your maps app, and build your Passport.</small></div>
-</div>
-</div>
-<details id="onboardingMore">
-<summary>More tips &amp; important info</summary>
-<div class="onboardingMoreBody">
-<p>Use List to see the bathrooms closest to you. Directions open in your device's default maps app. Sign in to choose Apple Maps, Google Maps, or Waze.</p>
-<p>Hours are shown when we have them. A spot with unknown hours still appears. It's never marked closed on a guess.</p>
-<p>Share a pin, or report wrong info from its popup.</p>
-<p>An account is optional. Sign in to rate and add tips, filter which places show on the map, set your preferred directions app, switch appearance, and sync your Passport and achievements across devices.</p>
-<p class="onboardingDisclaimer">Bathroom Report is an independent, community-created project and isn't affiliated with or endorsed by any business listed.</p>
-<p class="onboardingUpdated">Location data updated: August 2, 2026</p>
-</div>
-</details>
-</div>
-<div id="onboardingMode" style="display:none">
-<div class="onboardingModeQ">How are you getting around?</div>
-<div class="onboardingModeBtns">
-<button type="button" class="btn onboardingModeBtn" data-mode="road">🛣️ On the road</button>
-<button type="button" class="btn onboardingModeBtn" data-mode="foot">🚶 On foot</button>
-</div>
-<small class="onboardingModeHint">Directions open in walking or driving mode. Switch anytime in the menu.</small>
-</div>
-<div id="onboardingActions">
-<button id="onboardingClose" class="btn btn-amber">Got it!</button>
-</div>
-</div>
+  <div id="onboardingCard" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
+    <div class="ob-mark" aria-hidden="true">
+      <svg viewBox="0 0 44 44" fill="none">
+        <path d="M22 3c-7.2 0-13 5.6-13 12.6 0 8.9 11.2 22 12.3 23.3.4.4 1 .4 1.4 0C23.8 37.6 35 24.5 35 15.6 35 8.6 29.2 3 22 3z" stroke="currentColor" stroke-width="2.4"/>
+        <rect x="15" y="11" width="14" height="10" rx="2.4" fill="currentColor"/>
+        <rect x="17.6" y="21" width="8.8" height="4" rx="1.4" fill="currentColor" opacity=".55"/>
+      </svg>
+    </div>
+    <h2 id="onboardingTitle">Find a bathroom near you</h2>
+    <p class="ob-sub" id="onboardingSub">Turn on location and the map opens where you are, with the closest open bathroom one tap away.</p>
+
+    <button type="button" class="ob-go" id="onboardingLocate">Use my location</button>
+    <!-- Never a dead end. Someone who declines, or whose browser refuses, still gets the map —
+         they just have to pan to it themselves. -->
+    <button type="button" class="ob-skip" id="onboardingClose">Not now &mdash; just show the map</button>
+
+    <p class="ob-fine">Your location is used on your device to sort what is nearby. It is never stored or sent anywhere.</p>
+  </div>
 </div>
 <div id="listViewPanel">
 <div id="listViewHeader">
@@ -507,7 +499,7 @@ This is tracked on this device only. Log in to sync it across devices.
 
       <div class="ss-foot">
         <span class="d-count" id="drawerLocCount"></span>
-        <span id="ssVersion">Bathroom Report</span> <span class="d-version" data-version="v2.38.1">v2.38.1 · 2026-08-03</span><br>
+        <span id="ssVersion">Bathroom Report</span> <span class="d-version" data-version="v2.39.0">v2.39.0 · 2026-08-03</span><br>
         &copy; 2025&ndash;2026 Bathroom Report. Independent and community-created.
         Not affiliated with any business listed.
       </div>

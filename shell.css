@@ -1271,3 +1271,9 @@ html[data-theme="light"] .ss-body .d-toggle .d-switch{background:#d6dde3}
 /* Used by controls kept for their handlers but removed from the layout. */
 .ss-offscreen{position:absolute !important;width:1px !important;height:1px !important;
   padding:0 !important;margin:-1px !important;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Hidden outright, not dimmed. Used for map controls that only work signed in — a disabled
+   button still takes up the corner of a map and still asks to be understood. !important because
+   the popupopen/popupclose handlers write inline display on these same elements, and an inline
+   style beats a class without it. */
+.is-gone{display:none !important}

@@ -1374,3 +1374,27 @@ html[data-theme="light"] #appDrawer .nav-pref-select{
   .rate-progress button:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
   /* The stack owns horizontal gestures; the popup keeps vertical scrolling. */
   .rate-stack{ touch-action:pan-y; }
+
+  /* ---------- Onboarding, rebuilt ----------
+     One screen, one job: ask for location. Overrides the rules above rather than replacing
+     them, because #onboardingCard and its media query are shared with the re-openable tour and
+     unpicking them by hand is how live CSS gets broken. */
+  #onboardingCard{ text-align:center; padding:28px 22px 22px; max-width:340px; }
+  .ob-mark{ color:var(--accent); margin:0 auto 14px; width:52px; height:52px; }
+  .ob-mark svg{ width:52px; height:52px; display:block; }
+  #onboardingCard h2{ font-size:22px; line-height:1.25; margin:0 0 8px; }
+  .ob-sub{ font-size:14.5px; line-height:1.5; margin:0 0 22px; opacity:.85; }
+  /* The primary action is the only filled thing on the card — there is exactly one thing to do. */
+  .ob-go{
+    display:block; width:100%; border:0; cursor:pointer; font-family:inherit;
+    background:var(--accent); color:var(--accent-ink);
+    font-size:16px; font-weight:800; padding:15px 16px; border-radius:12px;
+  }
+  .ob-go:disabled{ opacity:.65; cursor:default; }
+  /* After a denial the primary button becomes the way out, so it stops shouting. */
+  .ob-go-secondary{ background:transparent; color:var(--accent); box-shadow:inset 0 0 0 1.5px currentColor; }
+  .ob-skip{
+    display:block; width:100%; margin-top:10px; background:none; border:0; cursor:pointer;
+    font-family:inherit; font-size:13.5px; font-weight:600; padding:10px; opacity:.7;
+  }
+  .ob-fine{ font-size:11.5px; line-height:1.5; margin:18px 0 0; opacity:.55; }

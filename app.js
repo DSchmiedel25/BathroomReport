@@ -2522,7 +2522,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.38.1';
+const BUILD = 'v2.39.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -4745,44 +4745,65 @@ document.getElementById('supportPromptOverlay')?.addEventListener('click', (even
   if(event.target.id === 'supportPromptOverlay') closeSupportPrompt();
 });
 
-// Onboarding overlay — the quick welcome/tour. Shown once per device on first run, and
-// re-openable anytime via the header ℹ️ button. The road/foot choice appears only when a metro
-// layer exists; otherwise it stays hidden and onboarding is unchanged.
+/* Onboarding — one screen whose only job is the location prompt.
+ *
+ * Asking for location HERE rather than on first use of Bathroom Now matters: a permission
+ * dialog that appears the instant you tap a button feels like an interruption, and browsers
+ * remember a denial. Asked once, with a sentence saying why, it is a question rather than an
+ * ambush — and if the answer is no, the map still works.
+ *
+ * The travel-mode choice moved to Settings. It was being asked before anyone had tapped a pin,
+ * about a feature they had not met, and it already existed in two places. */
 function openOnboarding(){
   const ov = document.getElementById('onboardingOverlay');
   if(ov) ov.classList.add('show');
-  const mode = document.getElementById('onboardingMode');
-  if(!mode) return;
-  if(metroKeys().length > 0){
-    mode.style.display = '';
-    // Read the stored value directly (travelMode the variable may not be initialized this early).
-    const cur = localStorage.getItem('travelMode') === 'foot' ? 'foot' : 'road';
-    mode.querySelectorAll('.onboardingModeBtn').forEach(b =>
-      b.classList.toggle('selected', b.dataset.mode === cur));
-  } else {
-    mode.style.display = 'none';
-  }
 }
-// First run: show it once per device.
-if(localStorage.getItem('onboardingSeen') !== '1') openOnboarding();
-// Header ℹ️ button re-opens the tour anytime.
-document.getElementById('onboardingInfoBtn')?.addEventListener('click', openOnboarding);
-document.getElementById('onboardingClose').addEventListener('click', () => {
+function closeOnboarding(){
   localStorage.setItem('onboardingSeen', '1');
-  document.getElementById('onboardingOverlay').classList.remove('show');
+  document.getElementById('onboardingOverlay')?.classList.remove('show');
+}
+
+if(localStorage.getItem('onboardingSeen') !== '1') openOnboarding();
+document.getElementById('onboardingInfoBtn')?.addEventListener('click', openOnboarding);
+document.getElementById('onboardingClose')?.addEventListener('click', closeOnboarding);
+
+document.getElementById('onboardingLocate')?.addEventListener('click', () => {
+  const btn = document.getElementById('onboardingLocate');
+  const sub = document.getElementById('onboardingSub');
+  if(!navigator.geolocation){
+    /* No API at all — nothing to prompt for, so do not pretend. Straight to the map. */
+    closeOnboarding();
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Waiting for permission\u2026';
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      /* Centre on them before dismissing. Closing first would show the default view for a beat
+       * and then jump, which reads as the app losing its place. */
+      try{ map.setView([pos.coords.latitude, pos.coords.longitude], 14, { animate:false }); }catch(e){}
+      if(typeof setUserLocationMarker === 'function'){
+        try{ setUserLocationMarker(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy); }catch(e){}
+      }
+      closeOnboarding();
+    },
+    (err) => {
+      /* A denial is a real answer, not a failure. Say what it means, change the button into the
+       * way out, and never re-prompt — the browser would refuse a second ask anyway, so a retry
+       * button would be a control that does nothing. */
+      btn.disabled = false;
+      btn.textContent = 'Show me the map';
+      btn.classList.add('ob-go-secondary');
+      btn.onclick = closeOnboarding;
+      if(sub) sub.textContent = err && err.code === 1
+        ? 'No problem \u2014 the map works without it. You can turn location on later in your browser settings.'
+        : 'Could not get your location just now. The map still works; pan to where you are.';
+      document.getElementById('onboardingClose')?.classList.add('is-gone');
+    },
+    { enableHighAccuracy:true, timeout:10000, maximumAge:60000 }
+  );
 });
-// Onboarding road/foot choice — picks driving vs walking directions; the map is unaffected.
-document.querySelectorAll('.onboardingModeBtn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    travelMode = (btn.dataset.mode === 'foot') ? 'foot' : 'road';
-    saveTravelMode();
-    saveTravelModeToAccount();
-    localStorage.setItem('travelModeChosen', '1');
-    document.querySelectorAll('.onboardingModeBtn').forEach(b => b.classList.toggle('selected', b === btn));
-    renderLayers();
-    applyFilters();
-  });
-});
+
 // ("How it works" opens the info page — wired in index.html's chrome script)
 
 // If this page was opened via a shared link or a /guide/ SEO page (?loc=xyz),
@@ -5907,6 +5928,24 @@ function applyAuthVisibility(){
   // style cannot beat. The .is-hidden rule carries !important to match.
   const passport = document.getElementById('ssPassportRow');
   if(passport) passport.classList.toggle('is-hidden', !loggedIn);
+
+  /* Two map controls that do nothing useful signed out.
+   *
+   * "Add a place" opens a form whose submit requires an account, so it was an invitation to
+   * fill something in and then be told no. The Filter pill was worse: signed out its rows are
+   * a legend rather than switches — by its own comment, "a legend, not controls" — so it looked
+   * like a filter, opened like a filter, and could not filter.
+   *
+   * Both are hidden rather than disabled. A disabled control still occupies the corner of a map
+   * and still asks to be understood; the honest version of a control you cannot use is its
+   * absence, and the onboarding already says an account unlocks filtering. */
+  const addPlace = document.getElementById('missingBtn');
+  if(addPlace) addPlace.classList.toggle('is-gone', !loggedIn);
+  const filterPill = document.getElementById('chainKey');
+  if(filterPill) filterPill.classList.toggle('is-gone', !loggedIn);
+  /* Close the panel on the way out, or signing out while it is open leaves an orphaned popover
+   * floating over the map with no control attached to it. */
+  if(!loggedIn) document.getElementById('chainKeyPanel')?.classList.remove('open');
 
   ['openNowToggle', 'accessibleToggle', 'themeToggle'].forEach(id => {
     const el = document.getElementById(id);
