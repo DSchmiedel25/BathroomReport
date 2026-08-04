@@ -117,6 +117,103 @@ else pass('#menuBtn opens the settings sheet');
 if (/id="appDrawer"/.test(html)) fail('the drawer markup is back — two menus again');
 else pass('no drawer markup remains');
 
+// ---- 3c: the popup builders must actually RUN ----
+/* Added after a temporal-dead-zone bug shipped in four consecutive builds and broke every popup
+ * on the map. `node --check` passed (the syntax was valid), every grep passed (every pattern was
+ * correct), and nothing here noticed, because none of these checks EXECUTE anything.
+ *
+ * A const read four lines above its own declaration is invisible to static inspection and
+ * instant on the first call. So this calls the function. */
+console.log('\npopup builders execute');
+(() => {
+  const L = html && fs.readFileSync('app.js', 'utf8').split('\n');
+  const at = re => L.findIndex(x => re.test(x));
+  const s1 = at(/^const RATING_DIMS = \[/), e1 = at(/^const ratingSkips = \{\};/);
+  const s2 = at(/^function ratingSectionInnerHtml/);
+  if (s1 < 0 || e1 < 0 || s2 < 0) { fail('could not locate the rating block to test'); return; }
+  let d = 0, e2 = s2;
+  for (let i = s2; i < L.length; i++) {
+    d += (L[i].match(/\{/g) || []).length - (L[i].match(/\}/g) || []).length;
+    if (i > s2 && d === 0) { e2 = i; break; }
+  }
+  const stub = `
+    const escapeHtml = s => String(s ?? '');
+    const avgStr = (s, c) => c > 0 ? (s / c).toFixed(1) : '-';
+    const oooCache = {};
+    function oooStatus(){ return { phase:'none' }; }
+    function relativeTimeFromNow(){ return 'x'; }
+    function ico(){ return ''; }
+    function plate(t){ return '[' + t + ']'; }
+    function ratingConfidenceHtml(){ return ''; }
+    function quipFor(){ return 'q'; }
+    function starsHtml(){ return '[stars]'; }
+    ${L.slice(s1, e1 + 1).join('\n')}
+    ${L.slice(s2, e2 + 1).join('\n')}
+    return ratingSectionInnerHtml;`;
+  let fn;
+  try { fn = new Function(stub)(); }
+  catch (e) { fail('rating block will not even load: ' + e.message); return; }
+  const loc = { id: 'x' };
+  const agg = { bathroomSum: 8, bathroomCount: 2, safeSum: 9, safeCount: 2 };
+  const states = [
+    ['nothing answered', { bathroom: 0, safe: 0 }],
+    ['overall only',     { bathroom: 4, safe: 0 }],
+    ['safety only',      { bathroom: 0, safe: 5 }],
+    ['both answered',    { bathroom: 4, safe: 5 }],
+  ];
+  let bad = 0;
+  for (const [name, vote] of states) {
+    try {
+      const out = fn(loc, agg, vote);
+      if (!out || !out.includes('[stars]')) { fail(name + ': rendered without a star row'); bad++; }
+    } catch (e) { fail(name + ': THREW ' + e.message); bad++; }
+  }
+  if (!bad) pass('ratingSectionInnerHtml renders in all ' + states.length + ' answer states');
+})();
+
+// ---- 3d: personal counts must not depend on what has downloaded ----
+/* Public restrooms load region by region, so seedLocations holds a fraction of the map at any
+ * moment. Anything that counts a person's own history by looking a location UP will silently
+ * drop the rest — which is how a passport came to show 1 rating for someone who had left 12,
+ * and how the footer came to claim 28,074 locations out of 84,079. Both were the same mistake
+ * in different places, so this checks for the shape of it rather than either instance. */
+console.log('\npersonal counts vs lazy loading');
+{
+  /* Read locally: `app` is declared BELOW this block, and reaching for it here threw exactly
+   * the temporal-dead-zone error this file now exists to catch. Fitting, and a reminder that a
+   * check written above its own dependency is no better than the code it audits. */
+  const appSrc = fs.readFileSync('app.js', 'utf8');
+  /* Comments stripped first. The function carries a comment explaining why it no longer uses
+   * seedLocations.find, and matching prose that describes the bug is how a check reports a
+   * failure that was already fixed. */
+  const stats = appSrc.slice(appSrc.indexOf('async function computeAchievementStats'),
+                             appSrc.indexOf('async function computeAchievementStats') + 9000)
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  if (/seedLocations\.find/.test(stats))
+    fail('computeAchievementStats resolves locations by scanning seedLocations — unloaded regions will be dropped');
+  else if (!/bathroomRatedCount = ratedAll\.length/.test(stats))
+    fail('bathroomRatedCount is derived from location-resolved votes, not from the votes themselves');
+  else pass('rating counts come from the votes, not from what is loaded');
+
+  if (/pendingPublicCount/.test(appSrc)) pass('footer totals include regions not yet downloaded');
+  else fail('footer counts only what has downloaded');
+}
+
+// ---- 3e: rows moved between panels must bring their filler ----
+/* The email row was moved from the passport into settings and its populating function stayed
+ * behind, so it showed a loading placeholder forever. The same trap applies to any row that is
+ * written by JS rather than authored in markup: check that whatever fills it is reachable from
+ * the panel it now lives in. */
+console.log('\nmoved rows keep their data');
+{
+  const src = fs.readFileSync('app.js', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const open = src.slice(src.indexOf('function openSettingsSheet'),
+                         src.indexOf('function closeSettingsSheet'));
+  if (!/renderAccountRecovery\(\)/.test(open))
+    fail('#acctEmailRow lives in settings but nothing fills it when settings opens');
+  else pass('settings fills the account rows it owns');
+}
+
 // ---- 4: constants duplicated across files ----
 console.log('\nduplicated constants');
 const app = fs.readFileSync('app.js', 'utf8');

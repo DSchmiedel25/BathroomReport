@@ -2097,6 +2097,13 @@ function ratingSectionInnerHtml(loc, agg, myVote){
   /* Skip is only offered while there is somewhere to skip TO. On the last unanswered dimension
    * it would be a button that appears to do nothing. */
   const remaining = RATING_DIMS.filter(d => !myVote[d.key] && !(ratingSkips[loc.id] || {})[d.key]).length;
+  /* Declared BEFORE anything that reads it.
+   *
+   * This sat four lines below the skip button that uses it, and `const` has a temporal dead
+   * zone — so ratingSectionInnerHtml threw on every single call, which meant every popup on the
+   * map failed to render. `node --check` cannot see it (the syntax is valid) and neither can a
+   * grep for the right patterns, because every pattern WAS right; only the order was wrong. */
+  const idx = ratingDimIndex(loc, myVote);
   /* Shown whenever there is another question to move to, answered or not — it is now a
    * navigation control, not an escape hatch, so hiding it once everything is answered would
    * strand someone on whichever question they happened to land on. */
@@ -2104,7 +2111,6 @@ function ratingSectionInnerHtml(loc, agg, myVote){
     ? `<button type="button" class="rate-skip" data-rate-go="${idx + 1}" data-locid="${loc.id}">${
         myVote[k] ? RATING_DIMS[(idx + 1) % RATING_DIMS.length].plate : 'Skip'} &rsaquo;</button>`
     : '';
-  const idx = ratingDimIndex(loc, myVote);
   /* The dots do three jobs: show how many questions there are, show which one you are on, and
    * act as the discoverable version of the swipe. A gesture with no visible control is a
    * feature only the person who built it knows about. */
@@ -2241,12 +2247,15 @@ const STRIP_FACTS = {
      * seated-vs-urinal rather than how many. Useful once voted — it is the privacy question,
      * whether you can lock the door behind you — but it can never be seeded, so it is available
      * and never a default. */
-    label: 'Stalls',
+    /* "Stalls: 1" was the label naming one possible answer and the value contradicting it — a
+     * place with a single toilet has no stalls at all. "Toilets: One" states the thing being
+     * counted and answers it in the same words the question uses. */
+    label: 'Toilets',
     read(loc){
       const st = confirmedState(BATHROOM_AMENITIES.find(a => a.key === 'restroomType'),
                                 (amenityCache[loc.id] || {}).restroomType);
       if(!st) return null;
-      return { v: st === 'single' ? '1' : 'Multi', meta: '\u2605', tone: '' };
+      return { v: st === 'single' ? 'One' : 'Several', meta: '\u2605', tone: '' };
     }
   },
   rooms: {
@@ -2300,7 +2309,9 @@ const STRIP_FACTS = {
     }
   },
   fee: {
-    label: 'Fee',
+    /* "Fee: Free" says there is a fee and then says there is not. The label is the question —
+     * what does it cost — and the value answers it. */
+    label: 'Cost',
     read(loc){
       const f = loc.metroInfo && loc.metroInfo.fee;
       if(!f) return null;
@@ -2522,7 +2533,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.39.0';
+const BUILD = 'v2.39.4';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -3701,19 +3712,35 @@ function longestConsecutiveDayStreak(dayKeySet){
 // bundled location data — states, chains, cities, coordinates, and each rating's ratedAt.
 // No check-in reads, no extra queries: zero Firestore reads beyond the Passport's votes load.
 async function computeAchievementStats(){
-  const rated = [];
+  /* TWO lists, because a rating and the place it was left have different availability.
+   *
+   * `rated` used to be the only one, and it dropped any vote whose location was not in
+   * seedLocations — which holds only what has been DOWNLOADED this session. Public restrooms
+   * load region by region, so someone who rated eleven places and came back without panning to
+   * those regions saw a passport claiming one rating. Their own history, hidden by a caching
+   * detail.
+   *
+   * The vote itself carries everything a COUNT needs. Only the geographic and per-chain
+   * achievements need the location record, and those degrade honestly: an unloaded region
+   * cannot contribute a state or a chain, but it can no longer erase the rating as well.
+   *
+   * locationsById rather than seedLocations.find — the latter is a linear scan of 84,000
+   * records run once per vote. */
+  const ratedAll = [];      // every rating, loaded or not
+  const rated = [];         // those whose location we can currently resolve
   Object.keys(myVoteCache).forEach(id => {
     const v = myVoteCache[id];
     if(!v || !(v.bathroom > 0)) return;
-    const loc = seedLocations.find(l => l.id === id);
-    if(!loc) return;
-    rated.push({ loc, bathroom: v.bathroom, ratedAt: v.ratedAt || null, wasHiddenGem: !!v.wasHiddenGem });
+    const entry = { bathroom: v.bathroom, ratedAt: v.ratedAt || null, wasHiddenGem: !!v.wasHiddenGem };
+    ratedAll.push(entry);
+    const loc = locationsById[id];
+    if(loc) rated.push({ ...entry, loc });
   });
 
-  const bathroomRatedCount = rated.length;
-  const fiveStarCount = rated.filter(r => r.bathroom === 5).length;
-  const oneStarCount  = rated.filter(r => r.bathroom === 1).length;
-  const hiddenGemCount = rated.filter(r => r.wasHiddenGem).length;
+  const bathroomRatedCount = ratedAll.length;
+  const fiveStarCount = ratedAll.filter(r => r.bathroom === 5).length;
+  const oneStarCount  = ratedAll.filter(r => r.bathroom === 1).length;
+  const hiddenGemCount = ratedAll.filter(r => r.wasHiddenGem).length;
 
   const states = new Set(), cities = new Set(), chainCounts = {};
   rated.forEach(r => {
@@ -6134,6 +6161,14 @@ function ssTrapTab(e){
 function openSettingsSheet(){
   const sheet = document.getElementById('settingsSheet');
   if(!sheet) return;
+  /* Fill the email row.
+   *
+   * renderAccountRecovery was only ever called by renderAccountSheet, which runs when the
+   * PASSPORT panel opens. The email row moved into settings and its filler did not follow, so
+   * the row sat at its "Loading…" placeholder forever — a spinner for a request nobody had
+   * made. Safe to call on every open: it is idempotent, it bails when the elements are absent,
+   * and it does nothing at all when signed out. */
+  if(isLoggedIn() && typeof renderAccountRecovery === 'function') renderAccountRecovery();
   ssCloseToken++;                            // invalidate any in-flight teardown
   ssLastFocus = document.activeElement;      // so Escape returns you where you were
   document.addEventListener('keydown', ssTrapTab, true);
