@@ -810,7 +810,12 @@ const AMENITY_ANSWER_ICONS = {
   no: `<svg class="ico" aria-hidden="true"><use href="#i-ban"></use></svg>`,
   unknown: `<svg class="ico" aria-hidden="true"><use href="#i-help"></use></svg>`,
   single: `<svg class="ico" aria-hidden="true"><use href="#i-lock"></use></svg>`,
-  multiple: `<svg class="ico" aria-hidden="true"><use href="#i-restroom"></use></svg>`
+  multiple: `<svg class="ico" aria-hidden="true"><use href="#i-restroom"></use></svg>`,
+  /* Added with the third layout state. Without it amenityButtonIcon fell through to its '•'
+   * fallback, so the new option rendered a bare bullet next to two properly iconed ones — which
+   * reads as a rendering fault rather than a choice. Two locks side by side: the same lock as
+   * "single private", twice, which is exactly what the option means. */
+  multiPrivate: `<svg class="ico" aria-hidden="true"><use href="#i-locks"></use></svg>`
 };
 
 function amenityAnswerIcon(a, val){
@@ -828,6 +833,21 @@ function amenityAnswerIcon(a, val){
  *
  * Multi-state answers ('single' / 'multiple') are unaffected — they have no stateIcons and were
  * already falling through to this same set. */
+/* A rejected write and a dropped connection produced the same sentence, and they are not the
+ * same problem: one needs a rules deploy and the other needs a signal. saveMyVote already logs
+ * the Firestore error code — this surfaces the part that changes what you should do about it.
+ *
+ * Written for the person holding the phone, not the person who wrote the rules: "this answer
+ * was not accepted" is actionable (report it, try a different answer), "check your connection"
+ * is actionable, and "try again" is not. */
+function saveFailureNote(err){
+  const e = err || lastSaveError;
+  const code = e && (e.code || e.message || '');
+  if(/permission-denied|PERMISSION_DENIED/.test(code)) return 'That answer was not accepted — please report it.';
+  if(/unavailable|network|offline|deadline/i.test(code))  return 'Could not save — check your connection.';
+  return 'Could not save — nothing was recorded.';
+}
+
 function amenityButtonIcon(val){
   return AMENITY_ANSWER_ICONS[val] || '•';
 }
@@ -1880,7 +1900,9 @@ function mirrorEntry(payload){
  * slower and correct. */
 const MIRROR_MAX_LOCATIONS = 2500;
 
+let lastSaveError = null;   // set by saveMyVote on failure; read by saveFailureNote
 async function saveMyVote(id, data){
+  lastSaveError = null;
   try{
     const {db, doc, setDoc} = await fb();
     const clientId = getEffectiveId();
@@ -1918,6 +1940,10 @@ async function saveMyVote(id, data){
      * votes allowlist for weeks and every first-ever rating at a fresh location was being denied
      * with a permission-denied nobody could see. A rejected write is not routine. */
     console.error('saveMyVote failed', id, e && (e.code || e.message), e);
+    /* Kept so the caller can say WHY. saveMyVote returns a boolean by design — every call site
+     * only cares whether to roll back — but the popup message should distinguish "the server
+     * refused this value" from "you are offline", and those are the same boolean. */
+    lastSaveError = e;
     return false;
   }
 }
@@ -2709,7 +2735,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.45.0';
+const BUILD = 'v2.45.1';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -3592,7 +3618,7 @@ async function attachAmenityHandlers(loc){
       else myVoteCache[loc.id] = prevVote;
       if(bathroom) amenityCache[loc.id] = prevCache;
       else storeFeatureCache[loc.id] = prevCache;
-      if(note){ note.style.color = '#c62828'; note.textContent = 'Could not save — nothing was recorded.'; }
+      if(note){ note.style.color = '#c62828'; note.textContent = saveFailureNote(); }
       allBtns.forEach(b => b.disabled = false);
       return;
     }
@@ -3661,7 +3687,7 @@ async function attachStoreFeatureHandlers(loc){
       else myVoteCache[loc.id] = prevVote;
       storeFeatureCache[loc.id] = prevCache;
 
-      if(note){ note.style.color = '#c62828'; note.textContent = 'Could not save — nothing was recorded.'; }
+      if(note){ note.style.color = '#c62828'; note.textContent = saveFailureNote(); }
       allBtns.forEach(b => b.disabled = false);
       return;
     }
