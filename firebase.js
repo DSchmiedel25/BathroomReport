@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import {
-    getFirestore, doc, getDoc, setDoc, increment, arrayUnion,
+    getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+    doc, getDoc, setDoc, increment, arrayUnion,
     collection, addDoc, query, where, getDocs, deleteDoc, deleteField
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import {
@@ -57,7 +58,30 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
     console.warn('App Check did not initialise; requests will be unattested', e && e.code);
   }
 
-  const db = getFirestore(fbApp);
+  /* Offline persistence.
+   *
+   * Without it, a rating left in a dead zone simply fails — which is the exact situation this
+   * app exists for. With it, Firestore keeps its own IndexedDB copy: reads work offline from
+   * whatever has been seen before, and writes QUEUE and replay automatically when the signal
+   * comes back. No retry logic, no outbox, no conflict handling to write and get wrong.
+   *
+   * persistentMultipleTabManager because the site is a PWA and a browser tab can easily both be
+   * open; the single-tab manager throws when a second one starts and the whole init falls over.
+   *
+   * initializeFirestore must run INSTEAD of getFirestore, not after it — calling getFirestore
+   * first pins the default settings and the later call throws "already been called with
+   * different options". */
+  let db;
+  try{
+    db = initializeFirestore(fbApp, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
+  }catch(e){
+    /* Private browsing and some locked-down enterprise profiles refuse IndexedDB outright.
+     * Falling back leaves the app exactly as it was before this change rather than dead. */
+    console.warn('offline persistence unavailable; continuing without it', e && e.code);
+    db = getFirestore(fbApp);
+  }
   const auth = getAuth(fbApp);
   const functions = getFunctions(fbApp);
 

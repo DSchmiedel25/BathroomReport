@@ -2749,7 +2749,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.46.2';
+const BUILD = 'v2.48.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -3509,7 +3509,7 @@ function wireOoo(loc){
   const gatedWrite = async (writeFn, confirmMsg) => {
     if(confirmMsg && !window.confirm(confirmMsg)) return;
     setNote("Checking you're nearby…");
-    const v = await verifyNearby(loc);
+    const v = await verifyNearby(loc, { allowAdmin: true });
     if(!v.ok){ setNote(verifyFailMessage(v), true); return; }
     try{ await writeFn(); }catch(e){ setNote('Could not save — try again.', true); return; }
     await loadOoo(loc.id);
@@ -3586,7 +3586,7 @@ async function attachAmenityHandlers(loc){
     allBtns.forEach(b => b.disabled = true);
     if(note){ note.style.color=''; note.textContent = "Checking you're nearby…"; }
 
-    const verification = await verifyNearby(loc);
+    const verification = await verifyNearby(loc, { allowAdmin: true });
     if(!verification.ok){
       if(note){ note.style.color = '#c62828'; note.textContent = verifyFailMessage(verification); }
       allBtns.forEach(b => b.disabled = false);
@@ -3683,7 +3683,7 @@ async function attachStoreFeatureHandlers(loc){
     allBtns.forEach(b => b.disabled = true);
     if(note){ note.style.color=''; note.textContent = "Checking you're nearby…"; }
 
-    const verification = await verifyNearby(loc);
+    const verification = await verifyNearby(loc, { allowAdmin: true });
     if(!verification.ok){
       if(note){ note.style.color = '#c62828'; note.textContent = verifyFailMessage(verification); }
       allBtns.forEach(b => b.disabled = false);
@@ -4907,7 +4907,30 @@ function verifyFailMessage(v){
   return '📍 You need to be at this stop to do that.';
 }
 
-async function verifyNearby(loc){
+async function verifyNearby(loc, opts){
+  opts = opts || {};
+  /* Admins answer from anywhere.
+   *
+   * The geofence exists so a rating means "I was there", and that reasoning does not change for
+   * an admin — what changes is that an admin correcting bad data already knows the place and
+   * cannot always drive back to prove it. The alternative was the amenityOverrides path, which
+   * writes to a different collection, does not trigger the aggregate recompute, and renders no
+   * badge at all. One narrow exemption is less machinery and less to go wrong than a parallel
+   * authority system.
+   *
+   * OPT-IN PER CALLER, and deliberately not granted to the star rating. Correcting "this has two
+   * private restrooms" is stating a fact you know; giving it four stars from ninety miles away
+   * is inventing an opinion about a visit that did not happen. The exemption covers facts —
+   * amenities, hours, out-of-order — and stops there.
+   *
+   * The vote is otherwise completely ordinary: same document, same rules, same recompute, and it
+   * counts as ONE report like anyone else's until other people agree. No special badge, because
+   * an admin who was there last week is exactly as reliable as anyone else who was.
+   *
+   * Worth being clear that this is a CLIENT-side gate and always was — the rules never checked
+   * position, so anyone determined could already bypass it. This does not weaken a defence; it
+   * makes an existing one skippable for the account that maintains the data. */
+  if(opts.allowAdmin && window.__isAdmin) return { ok: true, admin: true, distance: 0, radius: 0, accuracy: 0 };
   const pos = await getVerifiedPosition();
   if(!pos) return { ok: false, reason: 'no-location' };
   const dist = milesBetween(pos.lat, pos.lng, loc.lat, loc.lng);
@@ -5027,6 +5050,8 @@ function attachStarHandlers(loc){
 
         showFlash(loc.id, type, 'Checking you\'re nearby…', 0, false);
 
+        /* No admin bypass here on purpose: a star rating is a claim about a visit, and an admin
+         * ninety miles away has not made one. Facts get the exemption; opinions do not. */
         const verification = await verifyNearby(loc);
         if(!verification.ok){
           /* Three outcomes, not two. Telling someone standing inside the building that they are
