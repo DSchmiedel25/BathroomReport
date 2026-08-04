@@ -239,6 +239,26 @@ console.log('\namenity value lists');
   }
 }
 
+// ---- 3g: removing a field needs deleteField, not a merge ----
+/* Every vote write goes through setDoc({ merge: true }), and a merge cannot remove anything —
+ * it merges nested maps key by key. Deleting a key from the local object and saving therefore
+ * looks like it worked until the next reload, when the server's copy comes back. Any code path
+ * whose PURPOSE is to remove an answer has to use deleteField on the dotted path. */
+console.log('\nfield removal');
+{
+  const src = fs.readFileSync('app.js', 'utf8');
+  const fbjs = fs.existsSync('firebase.js') ? fs.readFileSync('firebase.js', 'utf8') : '';
+  const reopen = src.slice(src.indexOf("closest('[data-reopen]')"), src.indexOf("closest('[data-reopen]')") + 2600);
+  if (!reopen) fail('could not find the reopen handler to check');
+  else if (/saveMyVote\(/.test(reopen) && !/deleteField\(\)/.test(reopen))
+    fail('the reopen handler saves via merge — the removed answer will come back on reload');
+  else if (!/deleteField\(\)/.test(reopen))
+    fail('the reopen handler does not use deleteField');
+  else if (!/deleteField/.test(fbjs))
+    fail('deleteField is used in app.js but not exported from firebase.js');
+  else pass('answer removal uses deleteField on a dotted path, and it is exported');
+}
+
 // ---- 4: constants duplicated across files ----
 console.log('\nduplicated constants');
 const app = fs.readFileSync('app.js', 'utf8');

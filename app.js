@@ -1047,9 +1047,26 @@ document.addEventListener('click', async (e) => {
   myVoteCache[loc.id] = myVote;
   /* Persist the removal so the community tally drops your old answer immediately — otherwise a
    * wrong vote keeps counting toward a confirmation while you are busy correcting it.
-   * saveMyVote takes a location ID, not a location. */
+   *
+   * NOT saveMyVote. That writes with { merge: true }, and a merge cannot remove anything: the
+   * key was deleted from the local object and the server kept its copy, so "change" worked
+   * until the next reload and then the old answer came back. deleteField is the only way to
+   * take a field out of a merged write, and it has to name the nested path explicitly. */
   let ok = false;
-  try{ ok = await saveMyVote(loc.id, myVote); }catch(err){ ok = false; }
+  try{
+    const {db, doc, setDoc, deleteField} = await fb();
+    const field = (isStore ? 'storeFeatures.' : 'amenities.') + key;
+    /* locId is included even though it is unchanged: the update rule asserts
+     * `id == request.resource.data.locId + '_' + uid`, and stating it here makes that check
+     * read the value being written rather than depending on how the merged result is composed.
+     * It is in the touched-keys allowlist, so naming it costs nothing. */
+    const patch = { [field]: deleteField(), locId: loc.id, lastUpdated: Date.now() };
+    /* Clear the not-sure counter in the same write, or a key skipped twice before being
+     * answered comes back already halfway to being retired again. */
+    if((myVote.amenityMeta || {})[key]) patch['amenityMeta.' + key + '.notSure'] = deleteField();
+    await setDoc(doc(db, 'votes', fsId(loc.id) + '_' + getEffectiveId()), patch, { merge: true });
+    ok = true;
+  }catch(err){ console.error('reopen failed', key, err && (err.code || err.message), err); ok = false; }
   if(!ok){                                          // put it back if the write failed
     bucket[key] = previous;
     myVoteCache[loc.id] = myVote;
@@ -2735,7 +2752,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.45.2';
+const BUILD = 'v2.45.3';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
