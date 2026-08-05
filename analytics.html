@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Analytics Board — BathroomReport</title>
+<!-- Back-office page. The URL is public but the numbers here are aggregate counts,
+     nothing personal and no credentials. Keep it out of the index anyway. -->
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0F6B4C">
+<link rel="icon" href="icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Overpass:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --green:#0F6B4C;--green-dk:#0A4E37;--teal:#2EA1AA;--ink:#04211F;
+  --paper:#E9ECE7;--card:#FFFFFF;--line:#D3D9D3;--muted:#5C6B66;
+  --up:#0F6B4C;--down:#B23A2E;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:Overpass,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:860px;margin:0 auto;padding:0 18px 72px}
+
+.mast{background:var(--ink);color:#fff;padding:22px 0 20px;margin-bottom:22px}
+.mast .wrap{padding-bottom:0}
+.brand{font-family:Fredoka,sans-serif;font-weight:700;font-size:.86rem;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--teal);margin:0 0 6px}
+.mast h1{font-size:1.85rem;font-weight:900;letter-spacing:-.015em;margin:0 0 6px;line-height:1.1}
+.mast p{margin:0;color:#A9BAB4;font-size:.9rem}
+.stamp{font-size:.8rem;color:#8FA49E;margin-top:8px}
+.stamp b{color:#fff;font-weight:700}
+
+.band{background:var(--green);color:#fff;border-radius:10px;padding:11px 16px;
+  margin:34px 0 14px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.55),inset 0 0 0 4px var(--green)}
+.band h2{font-size:.92rem;font-weight:900;letter-spacing:.16em;text-transform:uppercase;margin:0}
+.band span{font-size:.83rem;color:#C6E3D8;font-weight:600}
+
+/* ---- headline tiles ------------------------------------------------- */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:11px}
+.tile{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--green);
+  border-radius:11px;padding:15px 16px}
+.tile.t{border-left-color:var(--teal)}
+.tile .k{font-size:.68rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 6px}
+.tile .v{font-size:2rem;font-weight:900;line-height:1;letter-spacing:-.02em;margin:0}
+.tile .d{font-size:.8rem;font-weight:700;margin:7px 0 0;color:var(--muted)}
+.tile .d.up{color:var(--up)}.tile .d.down{color:var(--down)}
+.tile .sub{font-size:.78rem;color:var(--muted);margin:5px 0 0;font-weight:400}
+
+/* ---- chart ---------------------------------------------------------- */
+.chart{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:16px 16px 10px;margin-top:11px}
+.chart h3{font-size:.72rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 12px}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 4px;font-size:.79rem;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+
+/* ---- tables --------------------------------------------------------- */
+.panel{background:var(--card);border:1px solid var(--line);border-radius:11px;
+  padding:16px 18px;margin-top:11px}
+.panel h3{font-size:.72rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 4px}
+.panel .note{font-size:.83rem;color:var(--muted);margin:0 0 12px}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th{text-align:left;font-size:.66rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);padding:0 0 7px;border-bottom:1px solid var(--line)}
+th.n,td.n{text-align:right}
+td{padding:9px 0;border-bottom:1px solid #EFF2EF}
+tr:last-child td{border-bottom:0}
+.chip{display:inline-block;font-size:.66rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;
+  padding:2px 8px;border-radius:999px;background:var(--paper);color:var(--muted);margin-left:7px;vertical-align:1px}
+.chip.hi{background:var(--green);color:#fff}
+.bar{height:5px;border-radius:3px;background:var(--teal);margin-top:5px;min-width:2px}
+
+/* ---- utm reference --------------------------------------------------- */
+.utm{margin-top:11px}
+.utm-row{display:flex;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid #EFF2EF;flex-wrap:wrap}
+.utm-row:last-child{border-bottom:0}
+.utm-row .lbl{font-weight:800;font-size:.9rem;min-width:106px}
+.utm-row code{flex:1;min-width:200px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.75rem;background:#F2F5F2;border:1px solid var(--line);border-radius:6px;
+  padding:7px 9px;color:#31413D;word-break:break-all}
+.copy{border:0;background:var(--ink);color:#fff;font:inherit;font-size:.78rem;font-weight:800;
+  padding:8px 14px;border-radius:8px;cursor:pointer}
+.copy:hover{background:#0A3B36}
+.copy:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+
+/* ---- launchpad cards -------------------------------------------------- */
+.q{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--teal);
+  border-radius:11px;padding:16px 18px;margin-bottom:11px}
+.q h3{font-size:1.03rem;font-weight:800;margin:0 0 6px;line-height:1.3}
+.q p{margin:0 0 11px;font-size:.92rem;color:#374A45}
+.path{display:block;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.79rem;background:#F2F5F2;border:1px solid var(--line);border-radius:7px;
+  padding:9px 11px;margin:0 0 12px;color:#31413D;white-space:pre-wrap;word-break:break-word}
+.go{display:inline-block;text-decoration:none;font-weight:800;font-size:.86rem;
+  padding:10px 17px;border-radius:9px;background:var(--ink);color:#fff}
+.go:hover{background:#0A3B36}
+.go:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+
+.msg{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--down);
+  border-radius:11px;padding:16px 18px;margin-top:11px;font-size:.9rem}
+.msg b{display:block;margin-bottom:5px}
+.msg code{background:var(--paper);padding:1px 5px;border-radius:4px;font-size:.9em}
+.muted{color:var(--muted)}
+
+@media (max-width:520px){.mast h1{font-size:1.5rem}.tile .v{font-size:1.7rem}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="wrap">
+    <p class="brand">Bathroom Report</p>
+    <h1>Analytics board</h1>
+    <p>Live from GA4 and Clarity, pulled nightly.</p>
+    <p class="stamp" id="stamp">Loading…</p>
+  </div>
+</header>
+
+<div class="wrap">
+  <div id="app"><p class="muted">Reading analytics-data.json…</p></div>
+
+  <div class="band"><h2>Tag your links</h2><span>Nothing shows up as "facebook" unless you tell it to</span></div>
+  <div class="panel utm">
+    <p class="note">GA4 only knows where someone came from if the link says so. Paste the URL,
+      swap the campaign name for something you'll recognise later, and shorten it if the medium
+      is print. Everything below feeds the Traffic sources table above.</p>
+    <div id="utms"></div>
+  </div>
+
+  <div class="band"><h2>Go deeper</h2><span>What the API can't give you</span></div>
+
+  <section class="q">
+    <h3>Watch people actually use it</h3>
+    <p>Recordings and heatmaps are the one thing with no API at all. Filter to mobile sessions
+      over thirty seconds — that's someone who meant to use the map — and watch ten.</p>
+    <span class="path">Recordings → Filters → Device: Mobile · Session duration &gt; 30s</span>
+    <a class="go" href="https://clarity.microsoft.com/projects/view/xrq6arvfpv/recordings">Open recordings</a>
+  </section>
+
+  <section class="q">
+    <h3>See where the map screen gets tapped</h3>
+    <p>Whether the drawer, the chain filter and the account button are being found — or whether
+      everything happens in the map area alone.</p>
+    <span class="path">Heatmaps → URL: bathroomreport.app/ → Click</span>
+    <a class="go" href="https://clarity.microsoft.com/projects/view/xrq6arvfpv/heatmaps">Open heatmaps</a>
+  </section>
+
+  <section class="q">
+    <h3>Anything happening right now</h3>
+    <p>The live event stream is the fastest check that a card scan or a new post is landing.
+      The nightly pull is always at least a day behind.</p>
+    <span class="path">Reports → Realtime → Overview</span>
+    <a class="go" href="https://analytics.google.com/">Open GA4 realtime</a>
+  </section>
+</div>
+
+<script>
+const DATA_URL = "analytics-data.json";
+
+/* ---------- formatting ------------------------------------------------ */
+const nf = new Intl.NumberFormat("en-US");
+const n = (v) => nf.format(Math.round(v || 0));
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+/* Sum a {date: value} map over the last `days` days ending yesterday. Everything on this page
+ * is "the last N days", never "this month", because a calendar month resets to a tiny number
+ * on the 1st and makes a healthy week look like a collapse. */
+function sumLast(map, days, offset = 0) {
+  const keys = Object.keys(map || {}).sort();
+  const end = keys.length - offset;
+  return keys.slice(Math.max(0, end - days), end).reduce((t, k) => t + (Number(map[k]) || 0), 0);
+}
+function delta(cur, prev) {
+  if (!prev) return cur > 0 ? { cls: "up", txt: "new" } : { cls: "", txt: "—" };
+  const pct = Math.round(((cur - prev) / prev) * 100);
+  if (pct === 0) return { cls: "", txt: "flat vs. previous" };
+  return { cls: pct > 0 ? "up" : "down", txt: `${pct > 0 ? "▲" : "▼"} ${Math.abs(pct)}% vs. previous` };
+}
+
+/* Friendly names for the sources you control. Anything not listed shows raw, which is how
+ * you spot a link somebody shared without a tag on it. */
+const SOURCE_LABEL = {
+  "facebook": "Facebook", "m.facebook.com": "Facebook", "l.facebook.com": "Facebook",
+  "facebook.com": "Facebook", "instagram": "Instagram", "reddit": "Reddit",
+  "card": "Road trip cards", "shirt": "Shirt", "sticker": "Stickers",
+  "google": "Google search", "guide": "Guide pages", "direct_share": "Shared links",
+  "(direct)": "Direct / typed in", "bing": "Bing",
+};
+const label = (s) => SOURCE_LABEL[String(s).toLowerCase()] || s || "(none)";
+
+/* ---------- tiny inline chart ----------------------------------------- */
+/* Hand-rolled SVG rather than a chart library: this page loads over the same connection as
+ * the map and pulling 300 KB of charting code for two series would be absurd. */
+function chart(title, series) {
+  const dates = series[0].points.map(p => p.date);
+  if (!dates.length) return "";
+  const W = 700, H = 150, PAD = 4;
+  const max = Math.max(1, ...series.flatMap(s => s.points.map(p => p.v)));
+  const x = (i) => (dates.length < 2 ? W / 2 : (i / (dates.length - 1)) * W);
+  const y = (v) => H - PAD - (v / max) * (H - PAD * 2);
+
+  const paths = series.map(s => {
+    const d = s.points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join("");
+    return `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.5"
+      stroke-linejoin="round" stroke-linecap="round"/>`;
+  }).join("");
+
+  const legend = series.map(s =>
+    `<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join("");
+
+  return `<div class="chart"><h3>${esc(title)}</h3>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
+         aria-label="${esc(title)}, ${dates.length} days">
+      <line x1="0" y1="${H - PAD}" x2="${W}" y2="${H - PAD}" stroke="#D3D9D3" stroke-width="1"/>
+      ${paths}
+    </svg>
+    <div class="legend">${legend}
+      <span class="muted">${esc(dates[0])} → ${esc(dates[dates.length - 1])} · peak ${n(max)}/day</span>
+    </div></div>`;
+}
+function lastN(map, days) {
+  const keys = Object.keys(map || {}).sort().slice(-days);
+  return keys.map(k => ({ date: k, v: Number(map[k]) || 0 }));
+}
+
+/* ---------- UTM reference --------------------------------------------- */
+const BASE = "https://bathroomreport.app/";
+const UTMS = [
+  ["Facebook post", "utm_source=facebook&utm_medium=social&utm_campaign=post_" + new Date().toISOString().slice(0,7).replace("-","")],
+  ["Facebook group", "utm_source=facebook&utm_medium=social&utm_campaign=group_share"],
+  ["Reddit", "utm_source=reddit&utm_medium=social&utm_campaign=subreddit_post"],
+  ["Card — #1", "utm_source=card&utm_medium=print&utm_campaign=roadtrip_set&utm_content=card1"],
+  ["Card — #2", "utm_source=card&utm_medium=print&utm_campaign=roadtrip_set&utm_content=card2"],
+  ["Card — #3", "utm_source=card&utm_medium=print&utm_campaign=roadtrip_set&utm_content=card3"],
+  ["Card — #4", "utm_source=card&utm_medium=print&utm_campaign=roadtrip_set&utm_content=card4"],
+  ["Shirt", "utm_source=shirt&utm_medium=print&utm_campaign=merch"],
+  ["Sticker", "utm_source=sticker&utm_medium=print&utm_campaign=merch"],
+];
+function renderUtms() {
+  document.getElementById("utms").innerHTML = UTMS.map(([name, q]) => {
+    const url = BASE + "?" + q;
+    return `<div class="utm-row"><span class="lbl">${esc(name)}</span>
+      <code>${esc(url)}</code>
+      <button class="copy" type="button" data-url="${esc(url)}">Copy</button></div>`;
+  }).join("");
+  document.getElementById("utms").addEventListener("click", async (e) => {
+    const b = e.target.closest(".copy");
+    if (!b) return;
+    try {
+      await navigator.clipboard.writeText(b.dataset.url);
+      const t = b.textContent; b.textContent = "Copied"; setTimeout(() => { b.textContent = t; }, 1400);
+    } catch (err) { b.textContent = "Copy failed"; }
+  });
+}
+
+/* ---------- render ---------------------------------------------------- */
+function render(d) {
+  const ga = d.ga4 || {};
+  const daily = ga.daily || {};
+  const signups = ga.signupsByDate || {};
+  const ev = ga.events || {};
+  const out = [];
+
+  const stamp = d.generated ? new Date(d.generated) : null;
+  const stale = stamp && (Date.now() - stamp.getTime()) > 40 * 3600 * 1000;
+  document.getElementById("stamp").innerHTML = stamp
+    ? `Last pull <b>${stamp.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}</b>` +
+      (stale ? " — the nightly job may have stopped." : "")
+    : "No data file yet.";
+
+  if ((d.errors || []).length) {
+    out.push(`<div class="msg"><b>Last run reported a problem</b>
+      ${d.errors.map(e => `<div class="muted">${esc(e)}</div>`).join("")}
+      <div class="muted" style="margin-top:7px">Numbers below are whatever was captured
+      before the failure.</div></div>`);
+  }
+
+  if (!Object.keys(daily).length) {
+    out.push(`<div class="msg"><b>No GA4 data yet</b>
+      Run the <code>Pull analytics</code> workflow once from the Actions tab. If it has run,
+      check that <code>GA4_PROPERTY_ID</code> and <code>GA4_SA_KEY</code> are set as repo
+      secrets and that the service account was added to the property as a Viewer.</div>`);
+    document.getElementById("app").innerHTML = out.join("");
+    return;
+  }
+
+  /* ---- headline tiles ---- */
+  const users7 = sumLast(mapOf(daily, "activeUsers"), 7);
+  const usersPrev7 = sumLast(mapOf(daily, "activeUsers"), 7, 7);
+  const su7 = sumLast(signups, 7), suPrev7 = sumLast(signups, 7, 7);
+  const su1 = sumLast(signups, 1);
+  const suAll = Object.values(signups).reduce((t, v) => t + Number(v || 0), 0);
+  const d7 = delta(users7, usersPrev7), dsu = delta(su7, suPrev7);
+
+  out.push(`<div class="band"><h2>People</h2><span>Rolling windows, not calendar months</span></div>`);
+  out.push(`<div class="tiles">
+    <div class="tile"><p class="k">Unique users · 7d</p><p class="v">${n(users7)}</p>
+      <p class="d ${d7.cls}">${d7.txt}</p></div>
+    <div class="tile"><p class="k">Unique users · 28d</p><p class="v">${n(sumLast(mapOf(daily,"activeUsers"),28))}</p>
+      <p class="sub">${n(sumLast(mapOf(daily,"sessions"),28))} sessions</p></div>
+    <div class="tile t"><p class="k">Accounts · 7d</p><p class="v">${n(su7)}</p>
+      <p class="d ${dsu.cls}">${dsu.txt}</p></div>
+    <div class="tile t"><p class="k">Accounts · yesterday</p><p class="v">${n(su1)}</p>
+      <p class="sub">${n(suAll)} tracked since start</p></div>
+  </div>`);
+
+  out.push(chart("Unique users and accounts per day, last 60 days", [
+    { name: "Unique users", color: "#0F6B4C", points: lastN(mapOf(daily, "activeUsers"), 60) },
+    { name: "Accounts created", color: "#2EA1AA", points: lastN(signups, 60) },
+  ]));
+
+  out.push(`<div class="msg" style="border-left-color:#D3D9D3">
+    <b>On the accounts number</b>
+    <span class="muted">This counts the <code>sign_up</code> event, which ad blockers and
+    consent refusals will eat some of — so it runs a little under the truth. The authoritative
+    total is the user count in the Firebase console. Use this one for the trend, that one for
+    the headcount.</span></div>`);
+
+  /* ---- traffic sources ---- */
+  const sources = (ga.sources || []).filter(s => s.sessions > 0).slice(0, 14);
+  const topSessions = sources.length ? sources[0].sessions : 1;
+  out.push(`<div class="band"><h2>Where people came from</h2><span>Last 90 days, by source</span></div>`);
+  out.push(`<div class="panel">
+    <p class="note">Source and medium as tagged on the link. Untagged traffic collapses into
+      <code>(direct)</code>, so a big direct number usually means a link went out without UTMs.</p>
+    <table><thead><tr><th>Source</th><th>Medium</th><th class="n">Sessions</th><th class="n">Users</th></tr></thead>
+    <tbody>${sources.map(s => `<tr>
+      <td>${esc(label(s.source))}${/card|shirt|sticker/i.test(s.source) ? '<span class="chip hi">print</span>' : ""}
+        <div class="bar" style="width:${Math.max(2, (s.sessions / topSessions) * 100)}%"></div></td>
+      <td class="muted">${esc(s.medium || "—")}</td>
+      <td class="n">${n(s.sessions)}</td><td class="n">${n(s.users)}</td></tr>`).join("")}
+    </tbody></table></div>`);
+
+  const camps = (ga.campaigns || []).slice(0, 12);
+  if (camps.length) {
+    out.push(`<div class="panel"><h3>By campaign and card</h3>
+      <p class="note">Content is the <code>utm_content</code> value — one per card design, so this
+        is which artwork actually gets scanned.</p>
+      <table><thead><tr><th>Campaign</th><th>Content</th><th class="n">Sessions</th></tr></thead>
+      <tbody>${camps.map(c => `<tr><td>${esc(c.campaign)}</td>
+        <td class="muted">${esc(c.content || "—")}</td>
+        <td class="n">${n(c.sessions)}</td></tr>`).join("")}</tbody></table></div>`);
+  }
+
+  /* ---- actions ---- */
+  out.push(`<div class="band"><h2>What people did</h2><span>Last 90 days</span></div>`);
+  const EV = [
+    ["share", "Shares", "Location shared from a popup"],
+    ["deeplink_open", "Shared links opened", "Someone arrived on a ?loc= link"],
+    ["guide_cta_click", "Guide → map", "Tapped through from an SEO page"],
+    ["shop_click", "Left for the shop", "Clicked a Fourthwall link"],
+    ["login", "Logins", "Returning accounts"],
+    ["sign_up", "Signups", "Same number as the tile above"],
+  ];
+  out.push(`<div class="panel"><table>
+    <thead><tr><th>Action</th><th class="n">Count</th></tr></thead><tbody>
+    ${EV.map(([k, name, note]) => `<tr><td>${esc(name)}
+      <div class="muted" style="font-size:.8rem">${esc(note)}</div></td>
+      <td class="n">${ev[k] == null ? '<span class="muted">—</span>' : n(ev[k])}</td></tr>`).join("")}
+  </tbody></table>
+  <p class="note" style="margin:12px 0 0">A dash means the event hasn't fired yet. New events
+    take about 24 hours to appear after a deploy.</p></div>`);
+
+  /* ---- stale guide urls ---- */
+  const res = ga.deeplinkResolved;
+  if (res && Object.keys(res).length) {
+    const bad = Number(res["false"] || 0), good = Number(res["true"] || 0);
+    out.push(`<div class="panel"><h3>Stale guide URLs</h3>
+      <p class="note">${bad === 0
+        ? "Every shared and indexed link resolved to a live pin. Nothing to do."
+        : `<b>${n(bad)}</b> arrivals landed on a pin that no longer exists, against ${n(good)} that worked.
+           Rebuild the guide pages and resubmit the sitemap.`}</p></div>`);
+  }
+
+  /* ---- guide pages ---- */
+  const gp = (ga.guidePages || []).slice(0, 10);
+  if (gp.length) {
+    out.push(`<div class="panel"><h3>Top guide pages</h3>
+      <p class="note">Where Google is actually sending people. These chains are the ones worth
+        enriching next.</p>
+      <table><thead><tr><th>Page</th><th class="n">Sessions</th></tr></thead>
+      <tbody>${gp.map(p => `<tr><td style="word-break:break-all">${esc(p.page)}</td>
+        <td class="n">${n(p.sessions)}</td></tr>`).join("")}</tbody></table></div>`);
+  }
+
+  /* ---- clarity ---- */
+  const cd = (d.clarity && d.clarity.daily) || {};
+  const days = Object.keys(cd).sort();
+  if (days.length) {
+    const latest = cd[days[days.length - 1]];
+    const pick = (frag) => {
+      const k = Object.keys(latest).find(key => key.toLowerCase().includes(frag));
+      return k ? latest[k] : null;
+    };
+    const tiles = [
+      ["Rage clicks", pick("rageclick")], ["Dead clicks", pick("deadclick")],
+      ["Quick backs", pick("quickback")], ["Script errors", pick("scripterror")],
+      ["Excessive scroll", pick("excessivescroll")], ["Sessions", pick("totalsessioncount")],
+    ].filter(([, v]) => v != null);
+    out.push(`<div class="band"><h2>Frustration signals</h2><span>Clarity · ${esc(days[days.length - 1])}</span></div>`);
+    out.push(`<div class="tiles">${tiles.map(([k, v]) =>
+      `<div class="tile t"><p class="k">${esc(k)}</p><p class="v">${n(v)}</p></div>`).join("")}</div>`);
+    out.push(`<div class="panel"><p class="note" style="margin:0">${n(days.length)} day${days.length === 1 ? "" : "s"}
+      collected so far. Clarity's API only reaches back three days, so this file is the only
+      long-term record of these numbers that will ever exist — if the nightly job stops for four
+      days, those days are gone for good.</p></div>`);
+  } else {
+    out.push(`<div class="band"><h2>Frustration signals</h2><span>Clarity</span></div>`);
+    out.push(`<div class="msg"><b>No Clarity data yet</b>
+      Add <code>CLARITY_TOKEN</code> as a repo secret — generate it in Clarity under
+      Settings → Data Export → Generate new API token — then run the workflow.</div>`);
+  }
+
+  document.getElementById("app").innerHTML = out.join("");
+}
+// {date: {activeUsers, ...}} -> {date: activeUsers}
+function mapOf(daily, key) {
+  const o = {};
+  for (const [date, v] of Object.entries(daily)) o[date] = v[key];
+  return o;
+}
+
+/* cache:'no-store' — GitHub Pages caches aggressively and a stale dashboard that looks fresh
+   is worse than one that admits it's empty. */
+fetch(DATA_URL, { cache: "no-store" })
+  .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(render)
+  .catch(() => {
+    document.getElementById("stamp").textContent = "No data file yet.";
+    document.getElementById("app").innerHTML = `<div class="msg">
+      <b>analytics-data.json not found</b>
+      It's created by the <code>Pull analytics</code> workflow. Open the Actions tab and run it
+      once manually — after that it runs itself every night at 5am Eastern.</div>`;
+  });
+
+renderUtms();
+</script>
+</body>
+</html>
