@@ -31,9 +31,10 @@ const CONFIG = {
   // with your live app at the repo root:
   sectionPath: "guide",
   // GA4 measurement ID — same property as the app, so guide→app is one funnel.
-  // Set to "" to omit analytics from generated pages entirely.
-  // Microsoft Clarity project id — same project as the app, so guide -> app is one funnel.
-  // Set to "" to omit analytics from generated pages entirely.
+  // Set to "" to omit GA4 from generated pages.
+  ga4Id: process.env.GA4_ID || "G-P30WFPVB80",
+  // Microsoft Clarity project id — session recordings and heatmaps for the
+  // guide pages. Set to "" to omit Clarity from generated pages.
   clarityProjectId: process.env.CLARITY_PROJECT_ID || "xrq6arvfpv",
   // Deep link into the live map, tagged so GA4 attributes the session to the
   // guide page it came from. The app reads ?loc= and zooms to that pin.
@@ -356,29 +357,51 @@ padding:5px 13px;font-size:.86rem;font-weight:600}
 /* ============================================================
  * 7. TEMPLATES
  * ==========================================================*/
-// GA4 for the static guide pages. Same measurement ID as the app, so a visitor
-// who lands on a guide page and taps through to the map is one session, not two.
-// The click handler fires `guide_cta_click` before navigation so you can see which
-// chains and pages actually drive people into the app.
+/* Analytics for the static guide pages: GA4 for the aggregate/trend numbers,
+ * Clarity for recordings and heatmaps. Both use the SAME ids as the app, so a
+ * visitor who lands on a guide page and taps through to the map is one session,
+ * not two. Either can be disabled independently by setting its CONFIG id to "".
+ *
+ * The shared click handler fires `guide_cta_click` to whichever tools are loaded
+ * before navigation, so you can see which chains and pages actually drive people
+ * into the app. */
 function analyticsSnippet() {
-  const id = CONFIG.clarityProjectId;
-  if (!id) return "";
-  // Microsoft Clarity. The CTA click is tagged as a custom event so guide -> app shows up
-  // as one journey rather than two unrelated sessions.
-  return `<script type="text/javascript">
+  const ga = CONFIG.ga4Id, cl = CONFIG.clarityProjectId;
+  if (!ga && !cl) return "";
+  let out = "";
+  if (ga) {
+    out += `<script async src="https://www.googletagmanager.com/gtag/js?id=${esc(ga)}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', '${esc(ga)}');
+</script>`;
+  }
+  if (cl) {
+    out += `<script type="text/javascript">
   (function(c,l,a,r,i,t,y){
     c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
     t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
     y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-  })(window, document, "clarity", "script", "${esc(id)}");
+  })(window, document, "clarity", "script", "${esc(cl)}");
+</script>`;
+  }
+  out += `<script>
   document.addEventListener('click', function(e){
     var a = e.target.closest && e.target.closest('a.cta');
-    if(!a || !window.clarity) return;
-    clarity('event', 'guide_cta_click');
-    clarity('set', 'chain', document.body.dataset.chain || '');
-    clarity('set', 'page_type', document.body.dataset.pagetype || '');
+    if(!a) return;
+    var chain = document.body.dataset.chain || '';
+    var pageType = document.body.dataset.pagetype || '';
+    if(window.gtag) gtag('event','guide_cta_click',{chain:chain,page_type:pageType});
+    if(window.clarity){
+      clarity('set','chain',chain);
+      clarity('set','page_type',pageType);
+      clarity('event','guide_cta_click');
+    }
   });
-  </script>`;
+</script>`;
+  return out;
 }
 
 function shell({ title, desc, canonical, body, jsonLdStr, chain, locId, pageType }) {
@@ -553,6 +576,7 @@ ${urls.map((u) => `  <url><loc>${esc(u)}</loc></url>`).join("\n")}
   console.log(`Wrote ${urls.length} pages under /${CONFIG.sectionPath}/`);
   console.log(`  + /${CONFIG.sectionPath}/sitemap.xml (guide URLs)`);
   console.log(`  + /sitemap-index.xml (points at your existing sitemap.xml AND the guide one)`);
+  console.log(`  Analytics on generated pages: ${[CONFIG.ga4Id && "GA4", CONFIG.clarityProjectId && "Clarity"].filter(Boolean).join(" + ") || "none"}`);
   console.log(`  + /robots.txt`);
   console.log(`  Your existing sitemap.xml was NOT modified.`);
 }

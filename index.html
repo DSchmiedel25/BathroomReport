@@ -89,6 +89,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Overpass:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="shell.css">
+  <!-- GA4. app.js already fires a `deeplink_open` event through gtag() when a
+       /guide/ page or a shared link lands here with ?loc= — that call was guarded by
+       `typeof gtag === 'function'`, so with no loader on the page it silently did
+       nothing and every guide->app arrival went unrecorded. Same measurement ID the
+       generated /guide/ pages use, so the two are one property and one funnel. -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-P30WFPVB80"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-P30WFPVB80');
+  </script>
   <script type="text/javascript">
     (function(c,l,a,r,i,t,y){
         c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
