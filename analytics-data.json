@@ -1,6 +1,157 @@
 {
-  "generated": "2026-08-05T01:42:42.094Z",
-  "ga4": {},
+  "generated": "2026-08-05T01:48:55.140Z",
+  "ga4": {
+    "daily": {
+      "2026-07-17": {
+        "activeUsers": 17,
+        "newUsers": 17,
+        "sessions": 25,
+        "pageViews": 38
+      },
+      "2026-07-18": {
+        "activeUsers": 40,
+        "newUsers": 39,
+        "sessions": 49,
+        "pageViews": 80
+      },
+      "2026-07-19": {
+        "activeUsers": 29,
+        "newUsers": 28,
+        "sessions": 50,
+        "pageViews": 113
+      },
+      "2026-07-20": {
+        "activeUsers": 15,
+        "newUsers": 11,
+        "sessions": 26,
+        "pageViews": 124
+      },
+      "2026-07-21": {
+        "activeUsers": 15,
+        "newUsers": 11,
+        "sessions": 30,
+        "pageViews": 95
+      },
+      "2026-07-22": {
+        "activeUsers": 19,
+        "newUsers": 14,
+        "sessions": 36,
+        "pageViews": 114
+      },
+      "2026-07-23": {
+        "activeUsers": 22,
+        "newUsers": 15,
+        "sessions": 33,
+        "pageViews": 115
+      },
+      "2026-07-24": {
+        "activeUsers": 18,
+        "newUsers": 12,
+        "sessions": 29,
+        "pageViews": 70
+      },
+      "2026-07-25": {
+        "activeUsers": 0,
+        "newUsers": 0,
+        "sessions": 2,
+        "pageViews": 1
+      }
+    },
+    "signupsByDate": {},
+    "sources": [
+      {
+        "source": "(direct)",
+        "medium": "(none)",
+        "sessions": 248,
+        "users": 123
+      },
+      {
+        "source": "facebook.com",
+        "medium": "referral",
+        "sessions": 8,
+        "users": 8
+      },
+      {
+        "source": "qr",
+        "medium": "test",
+        "sessions": 7,
+        "users": 5
+      },
+      {
+        "source": "lm.facebook.com",
+        "medium": "referral",
+        "sessions": 4,
+        "users": 4
+      },
+      {
+        "source": "test",
+        "medium": "test",
+        "sessions": 4,
+        "users": 4
+      },
+      {
+        "source": "m.facebook.com",
+        "medium": "referral",
+        "sessions": 3,
+        "users": 3
+      },
+      {
+        "source": "(not set)",
+        "medium": "(not set)",
+        "sessions": 2,
+        "users": 2
+      },
+      {
+        "source": "google",
+        "medium": "organic",
+        "sessions": 1,
+        "users": 1
+      },
+      {
+        "source": "l.facebook.com",
+        "medium": "referral",
+        "sessions": 1,
+        "users": 1
+      },
+      {
+        "source": "reddit.com",
+        "medium": "referral",
+        "sessions": 1,
+        "users": 1
+      },
+      {
+        "source": "t.co",
+        "medium": "referral",
+        "sessions": 1,
+        "users": 1
+      }
+    ],
+    "campaigns": [
+      {
+        "campaign": "(direct)",
+        "content": "(not set)",
+        "sessions": 248
+      },
+      {
+        "campaign": "(referral)",
+        "content": "(not set)",
+        "sessions": 18
+      },
+      {
+        "campaign": "test",
+        "content": "(not set)",
+        "sessions": 4
+      },
+      {
+        "campaign": "(organic)",
+        "content": "(not set)",
+        "sessions": 1
+      }
+    ],
+    "events": {},
+    "guidePages": [],
+    "deeplinkResolved": null
+  },
   "clarity": {
     "daily": {
       "2026-08-04": {
@@ -58,7 +209,5 @@
       }
     }
   },
-  "errors": [
-    "ga4: credentials not configured"
-  ]
+  "errors": []
 }
