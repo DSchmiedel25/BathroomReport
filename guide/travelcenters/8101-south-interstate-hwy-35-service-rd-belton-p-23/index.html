@@ -18,20 +18,32 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="https://bathroomreport.app/guide/styles.css">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"ConvenienceStore","name":"TravelCenters of America — Belton","url":"https://bathroomreport.app/guide/travelcenters/8101-south-interstate-hwy-35-service-rd-belton-p-23/","address":{"@type":"PostalAddress","streetAddress":"8101 South Interstate Hwy 35 Service Rd.","addressLocality":"Belton","addressRegion":"TX","postalCode":"76513","addressCountry":"US"},"geo":{"@type":"GeoCoordinates","latitude":30.98543,"longitude":-97.503002}}</script>
-<script type="text/javascript">
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-P30WFPVB80"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-P30WFPVB80');
+</script><script type="text/javascript">
   (function(c,l,a,r,i,t,y){
     c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
     t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
     y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
   })(window, document, "clarity", "script", "xrq6arvfpv");
+</script><script>
   document.addEventListener('click', function(e){
     var a = e.target.closest && e.target.closest('a.cta');
-    if(!a || !window.clarity) return;
-    clarity('event', 'guide_cta_click');
-    clarity('set', 'chain', document.body.dataset.chain || '');
-    clarity('set', 'page_type', document.body.dataset.pagetype || '');
+    if(!a) return;
+    var chain = document.body.dataset.chain || '';
+    var pageType = document.body.dataset.pagetype || '';
+    if(window.gtag) gtag('event','guide_cta_click',{chain:chain,page_type:pageType});
+    if(window.clarity){
+      clarity('set','chain',chain);
+      clarity('set','page_type',pageType);
+      clarity('event','guide_cta_click');
+    }
   });
-  </script>
+</script>
 </head>
 <body data-chain="TravelCenters of America" data-locid="travelcenters-atp-23" data-pagetype="location">
 <header class="topbar"><div class="wrap"><a href="https://bathroomreport.app/guide/">▸ BathroomReport</a></div></header>

@@ -18,20 +18,32 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="https://bathroomreport.app/guide/styles.css">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"ConvenienceStore","name":"Maverik — Bevington","url":"https://bathroomreport.app/guide/maverik/101-e-hwy-92-bevington-8008/","address":{"@type":"PostalAddress","streetAddress":"101 E. Hwy 92","addressLocality":"Bevington","addressRegion":"IA","postalCode":"50033","addressCountry":"US"},"geo":{"@type":"GeoCoordinates","latitude":41.361104,"longitude":-93.789841},"openingHours":"Mo-Su 00:00-23:59"}</script>
-<script type="text/javascript">
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-P30WFPVB80"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-P30WFPVB80');
+</script><script type="text/javascript">
   (function(c,l,a,r,i,t,y){
     c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
     t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
     y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
   })(window, document, "clarity", "script", "xrq6arvfpv");
+</script><script>
   document.addEventListener('click', function(e){
     var a = e.target.closest && e.target.closest('a.cta');
-    if(!a || !window.clarity) return;
-    clarity('event', 'guide_cta_click');
-    clarity('set', 'chain', document.body.dataset.chain || '');
-    clarity('set', 'page_type', document.body.dataset.pagetype || '');
+    if(!a) return;
+    var chain = document.body.dataset.chain || '';
+    var pageType = document.body.dataset.pagetype || '';
+    if(window.gtag) gtag('event','guide_cta_click',{chain:chain,page_type:pageType});
+    if(window.clarity){
+      clarity('set','chain',chain);
+      clarity('set','page_type',pageType);
+      clarity('event','guide_cta_click');
+    }
   });
-  </script>
+</script>
 </head>
 <body data-chain="Maverik" data-locid="maverik-4382741118008" data-pagetype="location">
 <header class="topbar"><div class="wrap"><a href="https://bathroomreport.app/guide/">▸ BathroomReport</a></div></header>
