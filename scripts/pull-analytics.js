@@ -226,15 +226,22 @@ const isoDate = (yyyymmdd) =>
 /* ============================================================
  * CLARITY
  * ==========================================================*/
-/* One request per run, out of the 10 per project per day the API allows. numOfDays=1 gets
- * yesterday. The other nine are left deliberately unused so there is headroom to debug by hand
- * without knocking out that night's collection. */
-async function pullClarity(token) {
+/* The API allows 10 requests per project per day and serves at most the trailing 3 days. What it
+ * will NOT do is break a multi-day window down by day: ask for 3 days and you get one lump total
+ * covering all three. So the normal run asks for 1 day, which is unambiguously yesterday.
+ *
+ * That makes a missed night permanent — and GitHub drops scheduled runs under load, so it will
+ * happen. The way back in is arithmetic: a 2-day total minus the day already on file leaves the
+ * day that is missing. Same for 3. One extra request per recovered day, out of a budget where
+ * nine go unused every night.
+ *
+ * Beyond 3 days there is no recovering anything, by design of the API. */
+async function clarityRequest(numOfDays) {
   const res = await request(
-    "https://www.clarity.ms/export-data/api/v1/project-live-insights?numOfDays=1",
-    { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+    `https://www.clarity.ms/export-data/api/v1/project-live-insights?numOfDays=${numOfDays}`,
+    { headers: { Authorization: `Bearer ${process.env.CLARITY_TOKEN}`, "Content-Type": "application/json" } }
   );
-  if (res.status === 429) throw new Error("Clarity rate limit hit (10/project/day) — skipping tonight");
+  if (res.status === 429) throw new Error("Clarity rate limit hit (10/project/day)");
   if (res.status !== 200) throw new Error(`Clarity ${res.status}: ${res.body.slice(0, 300)}`);
 
   const payload = JSON.parse(res.body);
@@ -251,18 +258,91 @@ async function pullClarity(token) {
   return flat;
 }
 
+/* Only counts survive subtraction.
+ *
+ * A 3-day window reports averages and percentages across the whole window — average scroll
+ * depth, sessions-with-metric percentage, pages per session. Subtracting two of those produces
+ * a number that looks plausible and means nothing. Reconstructed days therefore carry the
+ * additive metrics only, and say so.
+ *
+ * A key also has to be present in EVERY known day before it can be subtracted. Miss that and a
+ * day lacking the key contributes zero to the sum, so the whole window's total lands on the
+ * reconstructed day — a wrong number with nothing marking it as wrong. This is what makes it
+ * safe to build on an earlier reconstruction: those carry only additive keys, so the
+ * intersection is exactly the set that subtracts correctly. */
+const isAdditive = (key) => !/percentage|average|avg|rate/i.test(key);
+
+function subtractDays(total, known) {
+  const out = {}, dropped = [];
+  for (const [k, v] of Object.entries(total)) {
+    if (typeof v !== "number") continue;
+    if (!isAdditive(k)) { dropped.push(k); continue; }
+    if (!known.every(day => typeof day[k] === "number")) { dropped.push(k); continue; }
+    const sum = known.reduce((t, day) => t + day[k], 0);
+    // Clamp: bot reclassification can shift a total slightly after the fact, and a negative
+    // count is more misleading than a zero.
+    out[k] = Math.max(0, v - sum);
+  }
+  out._recovered = true;
+  out._droppedMetrics = dropped.length;
+  return out;
+}
+
+const isoOffset = (daysAgo) => {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - daysAgo);
+  return d.toISOString().slice(0, 10);
+};
+
+/* Returns { day: snapshot } for whatever it managed to get, plus how many requests it spent. */
+async function pullClarity(existingDaily) {
+  const got = {};
+  let calls = 0;
+
+  // Day 1 — yesterday. Always the first ask: it is the only window that needs no arithmetic.
+  const d1 = isoOffset(1);
+  if (existingDaily[d1]) {
+    console.log(`Clarity: ${d1} already captured — left alone`);
+  } else {
+    got[d1] = await clarityRequest(1); calls++;
+    console.log(`Clarity: ok — captured ${d1}`);
+  }
+
+  /* Backfill 2 and 3 days ago if they are missing AND everything more recent is on file,
+   * because the subtraction needs every other day in the window to be known. */
+  for (const back of [2, 3]) {
+    const day = isoOffset(back);
+    if (existingDaily[day] || got[day]) continue;
+
+    const newer = [];
+    for (let i = 1; i < back; i++) {
+      const k = isoOffset(i);
+      const snap = got[k] || existingDaily[k];
+      if (snap) newer.push(snap);
+    }
+    if (newer.length !== back - 1) {
+      console.warn(`Clarity: can't reconstruct ${day} — a more recent day is also missing`);
+      continue;
+    }
+    try {
+      const total = await clarityRequest(back); calls++;
+      got[day] = subtractDays(total, newer);
+      console.log(`Clarity: reconstructed ${day} from the ${back}-day total (counts only)`);
+    } catch (e) {
+      console.warn(`Clarity: reconstruction of ${day} failed — ${e.message}`);
+      break;   // out of budget or the API is unhappy; stop asking
+    }
+  }
+
+  return { days: got, calls };
+}
+
 /* ============================================================
  * MAIN
  * ==========================================================*/
 function loadExisting() {
   try { return JSON.parse(fs.readFileSync(OUT, "utf8")); }
   catch (e) { return { ga4: {}, clarity: { daily: {} } }; }
-}
-
-function yesterdayIso() {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
 }
 
 async function main() {
@@ -295,18 +375,15 @@ async function main() {
 
   // ---- Clarity ---------------------------------------------
   if (process.env.CLARITY_TOKEN) {
-    const day = yesterdayIso();
     try {
-      const snap = await pullClarity(process.env.CLARITY_TOKEN);
+      const { days, calls } = await pullClarity(next.clarity.daily);
       /* Never overwrite a day already captured. A re-run would otherwise replace a good
        * snapshot with whatever the API feels like returning, and there is no way to get the
        * original back. */
-      if (next.clarity.daily[day]) {
-        console.log(`Clarity: ${day} already captured — left alone`);
-      } else {
-        next.clarity.daily[day] = snap;
-        console.log(`Clarity: ok — captured ${day}`);
+      for (const [day, snap] of Object.entries(days)) {
+        if (!next.clarity.daily[day]) next.clarity.daily[day] = snap;
       }
+      if (calls) console.log(`Clarity: used ${calls} of 10 requests today`);
     } catch (e) {
       console.error("Clarity failed:", e.message);
       next.errors.push(`clarity: ${e.message}`);
