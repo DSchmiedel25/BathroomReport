@@ -123,11 +123,27 @@ tr:last-child td{border-bottom:0}
 
 .qr{display:flex;gap:20px;margin-top:20px;padding-top:20px;border-top:1px solid var(--line);flex-wrap:wrap}
 .qr-img{flex:0 0 168px;line-height:0}
-.qr-img svg{width:168px;height:168px;border:1px solid var(--line);border-radius:8px}
+/* Checkerboard behind the preview so a transparent background reads as transparent
+   rather than as an accidental white one. */
+.qr-img{background-image:
+  linear-gradient(45deg,#DDE2DD 25%,transparent 25%,transparent 75%,#DDE2DD 75%),
+  linear-gradient(45deg,#DDE2DD 25%,transparent 25%,transparent 75%,#DDE2DD 75%);
+  background-size:16px 16px;background-position:0 0,8px 8px;
+  border:1px solid var(--line);border-radius:8px}
+.qr-img svg{width:168px;height:168px;display:block;border-radius:7px}
 .qr-side{flex:1;min-width:220px}
 .qr-side h4{font-size:.68rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
   color:var(--muted);margin:0 0 6px}
 .qr-btns{display:flex;gap:8px;flex-wrap:wrap;margin:11px 0}
+
+.fld.span2{grid-column:1/-1}
+.swatches{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.sw{display:inline-flex;align-items:center;gap:8px}
+.sw input[type=color]{width:38px;height:32px;padding:2px;border:1px solid var(--line);
+  border-radius:7px;background:var(--card);cursor:pointer}
+.sw label{font-size:.82rem;font-weight:700;color:var(--ink);text-transform:none;letter-spacing:0;margin:0}
+.sw.chk input{width:17px;height:17px;accent-color:var(--green);cursor:pointer}
+.sw.chk label{font-weight:400;color:var(--muted)}
 @media (max-width:560px){.lb{grid-template-columns:1fr;gap:16px}}
 
 /* ---- launchpad cards -------------------------------------------------- */
@@ -235,6 +251,23 @@ tr:last-child td{border-bottom:0}
         </select>
         <p class="help">Higher redundancy survives damage but packs in more squares, which makes
           the code harder to scan when it's printed small.</p>
+      </div>
+
+      <div class="fld span2">
+        <label>Colours</label>
+        <div class="chips" id="lbPresets">
+          <button type="button" data-fg="#04211F" data-bg="#FFFFFF">Classic</button>
+          <button type="button" data-fg="#04211F" data-bg="#E9ECE7">On card stock</button>
+          <button type="button" data-fg="#0F6B4C" data-bg="#E9ECE7">Signage green</button>
+          <button type="button" data-fg="#E9ECE7" data-bg="#04211F">Inverted</button>
+          <button type="button" data-fg="#E9ECE7" data-bg="" data-transparent="1">Inverted, no box</button>
+        </div>
+        <div class="swatches">
+          <span class="sw"><input type="color" id="lbFg" value="#04211F"><label for="lbFg">Squares</label></span>
+          <span class="sw"><input type="color" id="lbBg" value="#FFFFFF"><label for="lbBg">Background</label></span>
+          <span class="sw chk"><input type="checkbox" id="lbTransparent"><label for="lbTransparent">No background — drop it straight on the artwork</label></span>
+        </div>
+        <p class="help" id="lbContrast"></p>
       </div>
     </div>
 
@@ -436,16 +469,37 @@ function makeQr(text, ecc) {
 // single most common reason a QR that looks fine on screen won't read off a printed card.
 const QUIET = 4;
 
-function qrSvg(q, px) {
+/* Relative luminance, WCAG formula. Used for two separate jobs: telling you whether there is
+ * enough contrast to scan at all, and telling you which way round the code is — because a
+ * scanner doesn't care about colour, only about which of the two is darker. */
+function luminance(hex) {
+  const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex || "");
+  if (!m) return 1;
+  const [r, g, b] = m.slice(1).map(h => {
+    const c = parseInt(h, 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+function contrastRatio(a, b) {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+function qrSvg(q, px, opt) {
+  const { fg, bg, transparent } = opt;
   const n = q.getModuleCount(), total = n + QUIET * 2;
   let d = "";
   for (let r = 0; r < n; r++)
     for (let c = 0; c < n; c++)
       if (q.isDark(r, c)) d += `M${c + QUIET} ${r + QUIET}h1v1h-1z`;
+  /* With no background rect the quiet zone becomes whatever it is placed on. That is the point
+   * of the transparent option — but it also means the artwork underneath has to stay clear of
+   * the margin, or the design bleeds into the code's margin and scanners lose the edge. */
+  const plate = transparent ? "" : `<rect width="${total}" height="${total}" fill="${bg}"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}" ` +
     `width="${px}" height="${px}" shape-rendering="crispEdges">` +
-    `<rect width="${total}" height="${total}" fill="#FFFFFF"/>` +
-    `<path d="${d}" fill="#04211F"/></svg>`;
+    plate + `<path d="${d}" fill="${fg}"/></svg>`;
 }
 
 function download(name, blob) {
@@ -462,36 +516,90 @@ function fileStem(v) {
 
 let currentQr = null, currentValuesCache = null;
 
+function colourOpts() {
+  const transparent = $("lbTransparent").checked;
+  return { fg: $("lbFg").value, bg: $("lbBg").value, transparent };
+}
+
+/* The one thing worth being loud about. A scanner locates a QR by the 1:1:3:1:1 ratio in the
+ * finder squares, and that ratio survives inversion — which is why inverted codes work at all.
+ * But most decoders only test one polarity. Recent iPhone cameras re-invert and try again;
+ * plenty of Android scanners and in-app readers do not. Testing on your own phone and
+ * concluding it's fine is exactly how an unscannable card gets printed. */
+function colourAdvice(opt, moduleCount) {
+  const effectiveBg = opt.transparent ? "#04211F" : opt.bg;   // assume a dark card underneath
+  const ratio = contrastRatio(opt.fg, effectiveBg);
+  const inverted = luminance(opt.fg) > luminance(effectiveBg);
+  const out = [];
+
+  if (ratio < 4) {
+    out.push(["bad", "Not enough contrast",
+      `${ratio.toFixed(1)}:1 between the squares and the background. Under about 4:1 it will fail
+       on a lot of phones. Push the two colours further apart.`]);
+  } else if (ratio < 7) {
+    out.push(["", "Contrast is workable but not generous",
+      `${ratio.toFixed(1)}:1. Fine on screen; on a printed card, ink spread will eat into it.`]);
+  }
+
+  if (inverted) {
+    out.push(["", "This is an inverted code",
+      "Light squares on dark reverses what most scanners expect. iPhone's camera re-inverts and " +
+      "copes; a good number of Android and in-app scanners don't. Print one and try it on a " +
+      "borrowed Android before you order a run of cards."]);
+  }
+  if (opt.transparent) {
+    out.push(["", "No background means the artwork is the background",
+      "Keep the margin around the code completely clear — " +
+      `about ${Math.round((4 / (moduleCount + 8)) * 100)}% of the code's width on every side. ` +
+      "Artwork creeping into that margin is what kills these."]);
+  }
+  return out;
+}
+
 function refresh() {
   const v = currentValuesCache = currentValues();
   $("lbCustom").hidden = $("lbDest").value !== "custom";
+  $("lbBg").disabled = $("lbTransparent").checked;
 
   const url = buildUrl(v);
   $("lbUrl").textContent = url || "—";
 
-  $("lbWarn").innerHTML = warnings(v, url).map(([cls, title, body]) =>
+  const opt = colourOpts();
+  const ok = url && v.source && v.medium;
+  currentQr = ok ? makeQr(url, v.ecc) : null;
+  const n = currentQr ? currentQr.getModuleCount() : 41;
+
+  const notes = warnings(v, url).concat(ok ? colourAdvice(opt, n) : []);
+  $("lbWarn").innerHTML = notes.map(([cls, title, body]) =>
     `<div class="warn ${cls}"><span>${cls === "bad" ? "✕" : "!"}</span>
       <span><b>${esc(title)}</b> — ${esc(body)}</span></div>`).join("");
 
+  const ratio = contrastRatio(opt.fg, opt.transparent ? "#04211F" : opt.bg);
+  $("lbContrast").textContent = opt.transparent
+    ? `Contrast ${ratio.toFixed(1)}:1 against a dark card. Transparent PNG and SVG both export clean.`
+    : `Contrast ${ratio.toFixed(1)}:1. Aim for 7:1 or better on anything going to print.`;
+
   // Reflect chip state so the pressed one matches what's actually in the field.
-  document.querySelectorAll(".chips").forEach(box => {
+  document.querySelectorAll(".chips[data-for]").forEach(box => {
     const val = norm($(box.dataset.for).value);
     box.querySelectorAll("button").forEach(b =>
       b.setAttribute("aria-pressed", String(b.textContent === val)));
   });
+  document.querySelectorAll("#lbPresets button").forEach(b =>
+    b.setAttribute("aria-pressed", String(
+      b.dataset.fg.toLowerCase() === opt.fg.toLowerCase() &&
+      Boolean(b.dataset.transparent) === opt.transparent &&
+      (opt.transparent || b.dataset.bg.toLowerCase() === opt.bg.toLowerCase()))));
 
-  const ok = url && v.source && v.medium;
   $("qrWrap").hidden = !ok;
-  if (!ok) { currentQr = null; return; }
+  if (!ok) return;
 
-  currentQr = makeQr(url, v.ecc);
   if (!currentQr) {
     $("qrBox").innerHTML = "";
     $("qrMeta").textContent = "Couldn't generate — the QR library didn't load.";
     return;
   }
-  $("qrBox").innerHTML = qrSvg(currentQr, 168);
-  const n = currentQr.getModuleCount();
+  $("qrBox").innerHTML = qrSvg(currentQr, 168, opt);
   $("qrMeta").textContent =
     `${n}×${n} squares. ${n > 45
       ? "That's dense for a poker card — shorten the URL or drop to a lower redundancy setting."
@@ -499,13 +607,14 @@ function refresh() {
 }
 
 function initBuilder() {
-  ["lbDest", "lbCustom", "lbSource", "lbMedium", "lbCampaign", "lbContent", "lbEcc"]
+  ["lbDest", "lbCustom", "lbSource", "lbMedium", "lbCampaign", "lbContent", "lbEcc",
+   "lbFg", "lbBg", "lbTransparent"]
     .forEach(id => {
       $(id).addEventListener("input", refresh);
       $(id).addEventListener("change", refresh);
     });
 
-  document.querySelectorAll(".chips").forEach(box => {
+  document.querySelectorAll(".chips[data-for]").forEach(box => {
     box.addEventListener("click", (e) => {
       const b = e.target.closest("button");
       if (!b) return;
@@ -514,6 +623,15 @@ function initBuilder() {
       input.value = norm(input.value) === b.textContent ? "" : b.textContent;
       refresh();
     });
+  });
+
+  $("lbPresets").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    $("lbFg").value = b.dataset.fg;
+    $("lbTransparent").checked = Boolean(b.dataset.transparent);
+    if (b.dataset.bg) $("lbBg").value = b.dataset.bg;
+    refresh();
   });
 
   const flash = (btn, msg) => {
@@ -532,18 +650,20 @@ function initBuilder() {
   $("qrSvgBtn").addEventListener("click", () => {
     if (!currentQr) return;
     download(fileStem(currentValuesCache) + ".svg",
-      new Blob([qrSvg(currentQr, 1024)], { type: "image/svg+xml" }));
+      new Blob([qrSvg(currentQr, 1024, colourOpts())], { type: "image/svg+xml" }));
   });
 
   $("qrPngBtn").addEventListener("click", () => {
     if (!currentQr) return;
     const SIZE = 1200;
-    const svg = qrSvg(currentQr, SIZE);
+    const svg = qrSvg(currentQr, SIZE, colourOpts());
     const img = new Image();
     img.onload = () => {
       const cv = document.createElement("canvas");
       cv.width = cv.height = SIZE;
       const ctx = cv.getContext("2d");
+      // Canvas starts transparent and nothing fills it, so the "no background" option
+      // survives into the PNG rather than quietly becoming white.
       // Nearest-neighbour: smoothing softens the module edges and scanners start missing it.
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(img, 0, 0, SIZE, SIZE);
