@@ -12,6 +12,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Overpass:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<!-- QR encoder. Pinned to an exact version on cdnjs, the same host the map plugins come from.
+     Only isDark()/getModuleCount() are used and the SVG is assembled here, so the output is
+     vector and prints at any size — a rasterised QR at card scale is the usual reason a printed
+     code won't scan. If this fails to load the builder still works; only the QR panel goes away. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.0.3/qrcode.min.js" crossorigin="anonymous"></script>
 <style>
 :root{
   --green:#0F6B4C;--green-dk:#0A4E37;--teal:#2EA1AA;--ink:#04211F;
@@ -77,18 +82,53 @@ tr:last-child td{border-bottom:0}
 .chip.hi{background:var(--green);color:#fff}
 .bar{height:5px;border-radius:3px;background:var(--teal);margin-top:5px;min-width:2px}
 
-/* ---- utm reference --------------------------------------------------- */
-.utm{margin-top:11px}
-.utm-row{display:flex;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid #EFF2EF;flex-wrap:wrap}
-.utm-row:last-child{border-bottom:0}
-.utm-row .lbl{font-weight:800;font-size:.9rem;min-width:106px}
-.utm-row code{flex:1;min-width:200px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  font-size:.75rem;background:#F2F5F2;border:1px solid var(--line);border-radius:6px;
-  padding:7px 9px;color:#31413D;word-break:break-all}
-.copy{border:0;background:var(--ink);color:#fff;font:inherit;font-size:.78rem;font-weight:800;
-  padding:8px 14px;border-radius:8px;cursor:pointer}
+/* ---- link builder ----------------------------------------------------- */
+.lb{display:grid;grid-template-columns:1fr 1fr;gap:18px 20px;margin:4px 0 18px}
+.fld label{display:block;font-size:.68rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:7px}
+.fld .req{color:var(--green);letter-spacing:.06em}
+.fld .opt{color:#9AA8A3;letter-spacing:.06em}
+.fld input,.fld select{width:100%;font:inherit;font-size:.98rem;padding:10px 12px;
+  border:1px solid var(--line);border-radius:9px;background:#FBFCFB;color:var(--ink)}
+.fld select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),
+  linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:38px}
+.fld input:focus,.fld select:focus{outline:3px solid rgba(46,161,170,.4);outline-offset:1px;border-color:var(--teal)}
+.fld input[hidden]{display:none}
+.fld .help{font-size:.79rem;color:var(--muted);margin:7px 0 0;line-height:1.4}
+.fld .help code{background:var(--paper);padding:1px 4px;border-radius:4px;font-size:.94em}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.chips button{border:1px solid var(--line);background:var(--card);color:var(--muted);
+  font:inherit;font-size:.76rem;font-weight:700;padding:4px 10px;border-radius:999px;cursor:pointer}
+.chips button:hover{border-color:var(--teal);color:var(--ink)}
+.chips button[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:#fff}
+.chips button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+
+.out{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;margin-top:4px}
+.out code{flex:1;min-width:220px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.79rem;background:#F2F5F2;border:1px solid var(--line);border-radius:8px;
+  padding:11px 12px;color:#31413D;word-break:break-all;line-height:1.45}
+.copy{border:0;background:var(--ink);color:#fff;font:inherit;font-size:.8rem;font-weight:800;
+  padding:10px 16px;border-radius:8px;cursor:pointer;white-space:nowrap}
 .copy:hover{background:#0A3B36}
+.copy.alt{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.copy.alt:hover{background:var(--paper)}
 .copy:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+
+.warn{display:flex;gap:9px;align-items:flex-start;font-size:.85rem;margin-top:11px;
+  padding:10px 13px;border-radius:9px;background:#FDF3E7;border:1px solid #F0DCC0;color:#6B4A18}
+.warn.bad{background:#FCEBE9;border-color:#F1C4BF;color:#8A2C22}
+.warn b{font-weight:800}
+
+.qr{display:flex;gap:20px;margin-top:20px;padding-top:20px;border-top:1px solid var(--line);flex-wrap:wrap}
+.qr-img{flex:0 0 168px;line-height:0}
+.qr-img svg{width:168px;height:168px;border:1px solid var(--line);border-radius:8px}
+.qr-side{flex:1;min-width:220px}
+.qr-side h4{font-size:.68rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 6px}
+.qr-btns{display:flex;gap:8px;flex-wrap:wrap;margin:11px 0}
+@media (max-width:560px){.lb{grid-template-columns:1fr;gap:16px}}
 
 /* ---- launchpad cards -------------------------------------------------- */
 .q{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--teal);
@@ -127,12 +167,97 @@ tr:last-child td{border-bottom:0}
 <div class="wrap">
   <div id="app"><p class="muted">Reading analytics-data.json…</p></div>
 
-  <div class="band"><h2>Tag your links</h2><span>Nothing shows up as "facebook" unless you tell it to</span></div>
-  <div class="panel utm">
-    <p class="note">GA4 only knows where someone came from if the link says so. Paste the URL,
-      swap the campaign name for something you'll recognise later, and shorten it if the medium
-      is print. Everything below feeds the Traffic sources table above.</p>
-    <div id="utms"></div>
+  <div class="band"><h2>Build a link</h2><span>Nothing shows up as "Facebook" unless the link says so</span></div>
+  <div class="panel">
+    <p class="note">GA4 only knows where somebody came from if the link tells it. Fill in the
+      fields, copy the URL, or download the QR for print. Whatever you build here shows up in
+      the Traffic sources table above within a day of the first click.</p>
+
+    <div class="lb">
+      <div class="fld">
+        <label for="lbDest">Goes to</label>
+        <select id="lbDest">
+          <option value="https://bathroomreport.app/">The map (home)</option>
+          <option value="https://bathroomreport.app/support.html">Support page</option>
+          <option value="https://bathroomreport.app/guide/">Guide index</option>
+          <option value="custom">Somewhere else…</option>
+        </select>
+        <input id="lbCustom" type="url" placeholder="https://bathroomreport.app/guide/caseys/" hidden>
+      </div>
+
+      <div class="fld">
+        <label for="lbSource">Source <span class="req">required</span></label>
+        <input id="lbSource" type="text" placeholder="facebook" autocomplete="off" spellcheck="false">
+        <div class="chips" data-for="lbSource">
+          <button type="button">facebook</button><button type="button">x</button>
+          <button type="button">instagram</button><button type="button">reddit</button>
+          <button type="button">tiktok</button><button type="button">youtube</button>
+          <button type="button">card</button><button type="button">shirt</button>
+          <button type="button">sticker</button><button type="button">flyer</button>
+        </div>
+        <p class="help">The specific thing the link lives on. One name per surface, forever —
+          renaming it later splits your history in two.</p>
+      </div>
+
+      <div class="fld">
+        <label for="lbMedium">Medium <span class="req">required</span></label>
+        <input id="lbMedium" type="text" placeholder="social" autocomplete="off" spellcheck="false">
+        <div class="chips" data-for="lbMedium">
+          <button type="button">social</button><button type="button">qr</button>
+          <button type="button">print</button><button type="button">email</button>
+          <button type="button">referral</button><button type="button">video</button>
+        </div>
+        <p class="help">The kind of thing it is. Use <code>qr</code> for anything scanned off a
+          physical object — then one filter shows you every scan across cards, shirts and stickers
+          at once, and source tells them apart.</p>
+      </div>
+
+      <div class="fld">
+        <label for="lbCampaign">Campaign</label>
+        <input id="lbCampaign" type="text" placeholder="roadtrip_set" autocomplete="off" spellcheck="false">
+        <p class="help">What this batch is. Reuse it across a set so they group together.</p>
+      </div>
+
+      <div class="fld">
+        <label for="lbContent">Variant <span class="opt">optional</span></label>
+        <input id="lbContent" type="text" placeholder="card2" autocomplete="off" spellcheck="false">
+        <p class="help">Which one within the batch. Four cards, four values — this is how you
+          learn which artwork gets scanned.</p>
+      </div>
+
+      <div class="fld">
+        <label for="lbEcc">QR will be</label>
+        <select id="lbEcc">
+          <option value="L">On a screen</option>
+          <option value="M" selected>Printed on card or paper</option>
+          <option value="Q">On fabric or something curved</option>
+          <option value="H">Somewhere it'll get scuffed</option>
+        </select>
+        <p class="help">Higher redundancy survives damage but packs in more squares, which makes
+          the code harder to scan when it's printed small.</p>
+      </div>
+    </div>
+
+    <div class="out">
+      <code id="lbUrl">https://bathroomreport.app/</code>
+      <button class="copy" type="button" id="lbCopy">Copy</button>
+    </div>
+    <div id="lbWarn"></div>
+
+    <div class="qr" id="qrWrap" hidden>
+      <div class="qr-img" id="qrBox"></div>
+      <div class="qr-side">
+        <h4>QR code</h4>
+        <p id="qrMeta" class="muted"></p>
+        <div class="qr-btns">
+          <button class="copy" type="button" id="qrSvgBtn">Download SVG</button>
+          <button class="copy alt" type="button" id="qrPngBtn">Download PNG</button>
+        </div>
+        <p class="help">Use the SVG for anything going to a printer — it stays sharp at any size,
+          including 300 DPI on the MakePlayingCards template. PNG is 1200px, fine for posts and
+          screens. Leave the white border intact; scanners need that gap.</p>
+      </div>
+    </div>
   </div>
 
   <div class="band"><h2>Go deeper</h2><span>What the API can't give you</span></div>
@@ -231,34 +356,203 @@ function lastN(map, days) {
   return keys.map(k => ({ date: k, v: Number(map[k]) || 0 }));
 }
 
-/* ---------- UTM reference --------------------------------------------- */
-const BASE = "https://bathroomreport.app/";
-const UTMS = [
-  ["Facebook post", "utm_source=facebook&utm_medium=social&utm_campaign=post_" + new Date().toISOString().slice(0,7).replace("-","")],
-  ["Facebook group", "utm_source=facebook&utm_medium=social&utm_campaign=group_share"],
-  ["Reddit", "utm_source=reddit&utm_medium=social&utm_campaign=subreddit_post"],
-  ["Card — #1", "utm_source=card&utm_medium=print&utm_campaign=roadtrip_set&utm_content=card1"],
-  ["Card — #2", "utm_source=card&utm_medium=print&utm_campaign=roadtrip_set&utm_content=card2"],
-  ["Card — #3", "utm_source=card&utm_medium=print&utm_campaign=roadtrip_set&utm_content=card3"],
-  ["Card — #4", "utm_source=card&utm_medium=print&utm_campaign=roadtrip_set&utm_content=card4"],
-  ["Shirt", "utm_source=shirt&utm_medium=print&utm_campaign=merch"],
-  ["Sticker", "utm_source=sticker&utm_medium=print&utm_campaign=merch"],
-];
-function renderUtms() {
-  document.getElementById("utms").innerHTML = UTMS.map(([name, q]) => {
-    const url = BASE + "?" + q;
-    return `<div class="utm-row"><span class="lbl">${esc(name)}</span>
-      <code>${esc(url)}</code>
-      <button class="copy" type="button" data-url="${esc(url)}">Copy</button></div>`;
-  }).join("");
-  document.getElementById("utms").addEventListener("click", async (e) => {
-    const b = e.target.closest(".copy");
-    if (!b) return;
+/* ---------- link builder ---------------------------------------------- */
+const $ = (id) => document.getElementById(id);
+
+/* GA4 treats "Facebook", "facebook" and "face book" as three different sources, and there is no
+ * way to merge them after the fact — the split is permanent in the historical data. So the input
+ * is normalised on the way out rather than trusted, and the person is told when it changed. */
+const norm = (s) => String(s || "").trim().toLowerCase()
+  .replace(/\s+/g, "_").replace(/[^a-z0-9_\-.]/g, "");
+
+function currentValues() {
+  const destSel = $("lbDest").value;
+  const dest = destSel === "custom" ? $("lbCustom").value.trim() : destSel;
+  return {
+    dest,
+    source: norm($("lbSource").value),
+    medium: norm($("lbMedium").value),
+    campaign: norm($("lbCampaign").value),
+    content: norm($("lbContent").value),
+    ecc: $("lbEcc").value,
+    typedSource: $("lbSource").value.trim(),
+    typedMedium: $("lbMedium").value.trim(),
+  };
+}
+
+function buildUrl(v) {
+  if (!v.dest) return "";
+  let u;
+  try { u = new URL(v.dest); } catch (e) { return ""; }
+  // Rebuild rather than append: retyping a field should not leave the old value behind.
+  ["utm_source", "utm_medium", "utm_campaign", "utm_content"].forEach(k => u.searchParams.delete(k));
+  if (v.source) u.searchParams.set("utm_source", v.source);
+  if (v.medium) u.searchParams.set("utm_medium", v.medium);
+  if (v.campaign) u.searchParams.set("utm_campaign", v.campaign);
+  if (v.content) u.searchParams.set("utm_content", v.content);
+  return u.toString();
+}
+
+function warnings(v, url) {
+  const w = [];
+  if (!v.dest) w.push(["bad", "No destination", "Pick one above or paste a full URL starting with https://"]);
+  else if (!url) w.push(["bad", "That URL doesn't parse", "It needs the https:// on the front."]);
+  if (url && (!v.source || !v.medium)) {
+    w.push(["", "Source and medium are both needed",
+      "With one missing, GA4 files the visit under (direct) and you lose the attribution entirely."]);
+  }
+  const changed = [];
+  if (v.typedSource && v.typedSource !== v.source) changed.push(`${v.typedSource} → ${v.source}`);
+  if (v.typedMedium && v.typedMedium !== v.medium) changed.push(`${v.typedMedium} → ${v.medium}`);
+  if (changed.length) {
+    w.push(["", "Cleaned up for you", changed.join(", ") +
+      " — GA4 counts different capitalisation as different sources, so these are lowercased."]);
+  }
+  if (url && url.length > 160) {
+    w.push(["", "Long URL", `${url.length} characters packs a lot of squares into the QR. ` +
+      "Shorten the campaign name if this one is going on a card."]);
+  }
+  return w;
+}
+
+/* ---------- QR ---------------------------------------------------------- */
+/* The library's own createSvgTag() isn't in every published version, so the SVG is assembled
+ * from isDark() — an API that has been stable since 1.0 and can't break under a CDN bump. */
+function makeQr(text, ecc) {
+  if (typeof qrcode !== "function") return null;
+  // Smallest type that fits. Bigger types mean more, smaller squares — worse at card size.
+  for (let type = 1; type <= 40; type++) {
     try {
-      await navigator.clipboard.writeText(b.dataset.url);
-      const t = b.textContent; b.textContent = "Copied"; setTimeout(() => { b.textContent = t; }, 1400);
-    } catch (err) { b.textContent = "Copy failed"; }
+      const q = qrcode(type, ecc);
+      q.addData(text);
+      q.make();
+      return q;
+    } catch (e) { /* payload too big for this type — try the next one up */ }
+  }
+  return null;
+}
+
+// Quiet zone is 4 modules per the spec. Scanners genuinely fail without it, and it is the
+// single most common reason a QR that looks fine on screen won't read off a printed card.
+const QUIET = 4;
+
+function qrSvg(q, px) {
+  const n = q.getModuleCount(), total = n + QUIET * 2;
+  let d = "";
+  for (let r = 0; r < n; r++)
+    for (let c = 0; c < n; c++)
+      if (q.isDark(r, c)) d += `M${c + QUIET} ${r + QUIET}h1v1h-1z`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}" ` +
+    `width="${px}" height="${px}" shape-rendering="crispEdges">` +
+    `<rect width="${total}" height="${total}" fill="#FFFFFF"/>` +
+    `<path d="${d}" fill="#04211F"/></svg>`;
+}
+
+function download(name, blob) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+function fileStem(v) {
+  return ["qr", v.source, v.content || v.campaign].filter(Boolean).join("-") || "qr";
+}
+
+let currentQr = null, currentValuesCache = null;
+
+function refresh() {
+  const v = currentValuesCache = currentValues();
+  $("lbCustom").hidden = $("lbDest").value !== "custom";
+
+  const url = buildUrl(v);
+  $("lbUrl").textContent = url || "—";
+
+  $("lbWarn").innerHTML = warnings(v, url).map(([cls, title, body]) =>
+    `<div class="warn ${cls}"><span>${cls === "bad" ? "✕" : "!"}</span>
+      <span><b>${esc(title)}</b> — ${esc(body)}</span></div>`).join("");
+
+  // Reflect chip state so the pressed one matches what's actually in the field.
+  document.querySelectorAll(".chips").forEach(box => {
+    const val = norm($(box.dataset.for).value);
+    box.querySelectorAll("button").forEach(b =>
+      b.setAttribute("aria-pressed", String(b.textContent === val)));
   });
+
+  const ok = url && v.source && v.medium;
+  $("qrWrap").hidden = !ok;
+  if (!ok) { currentQr = null; return; }
+
+  currentQr = makeQr(url, v.ecc);
+  if (!currentQr) {
+    $("qrBox").innerHTML = "";
+    $("qrMeta").textContent = "Couldn't generate — the QR library didn't load.";
+    return;
+  }
+  $("qrBox").innerHTML = qrSvg(currentQr, 168);
+  const n = currentQr.getModuleCount();
+  $("qrMeta").textContent =
+    `${n}×${n} squares. ${n > 45
+      ? "That's dense for a poker card — shorten the URL or drop to a lower redundancy setting."
+      : "Comfortable at card size."}`;
+}
+
+function initBuilder() {
+  ["lbDest", "lbCustom", "lbSource", "lbMedium", "lbCampaign", "lbContent", "lbEcc"]
+    .forEach(id => {
+      $(id).addEventListener("input", refresh);
+      $(id).addEventListener("change", refresh);
+    });
+
+  document.querySelectorAll(".chips").forEach(box => {
+    box.addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      const input = $(box.dataset.for);
+      // Second tap on the same chip clears it, so a mistake doesn't need selecting and deleting.
+      input.value = norm(input.value) === b.textContent ? "" : b.textContent;
+      refresh();
+    });
+  });
+
+  const flash = (btn, msg) => {
+    const t = btn.textContent;
+    btn.textContent = msg;
+    setTimeout(() => { btn.textContent = t; }, 1400);
+  };
+
+  $("lbCopy").addEventListener("click", async () => {
+    const url = $("lbUrl").textContent;
+    if (!url || url === "—") return;
+    try { await navigator.clipboard.writeText(url); flash($("lbCopy"), "Copied"); }
+    catch (e) { flash($("lbCopy"), "Copy failed"); }
+  });
+
+  $("qrSvgBtn").addEventListener("click", () => {
+    if (!currentQr) return;
+    download(fileStem(currentValuesCache) + ".svg",
+      new Blob([qrSvg(currentQr, 1024)], { type: "image/svg+xml" }));
+  });
+
+  $("qrPngBtn").addEventListener("click", () => {
+    if (!currentQr) return;
+    const SIZE = 1200;
+    const svg = qrSvg(currentQr, SIZE);
+    const img = new Image();
+    img.onload = () => {
+      const cv = document.createElement("canvas");
+      cv.width = cv.height = SIZE;
+      const ctx = cv.getContext("2d");
+      // Nearest-neighbour: smoothing softens the module edges and scanners start missing it.
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0, SIZE, SIZE);
+      cv.toBlob(b => download(fileStem(currentValuesCache) + ".png", b), "image/png");
+    };
+    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+  });
+
+  refresh();
 }
 
 /* ---------- render ---------------------------------------------------- */
@@ -441,7 +735,7 @@ fetch(DATA_URL, { cache: "no-store" })
       once manually — after that it runs itself every night at 5am Eastern.</div>`;
   });
 
-renderUtms();
+initBuilder();
 </script>
 </body>
 </html>
