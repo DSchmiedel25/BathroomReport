@@ -2,6 +2,45 @@
 // Only active with ?debug=1 in the URL — zero cost for normal users. Logs timing
 // marks to the console so real devices can report where startup time goes.
 const PERF_DEBUG = (() => { try{ return new URLSearchParams(location.search).has('debug'); }catch(e){ return false; } })();
+
+/* One place every GA4 event goes through.
+ *
+ * gtag is loaded from index.html, but it is the first thing an ad blocker removes and it is
+ * absent entirely on any page that forgot the snippet. Every call site would otherwise need its
+ * own `typeof gtag === 'function'` guard — the deeplink_open block had one, which is why it
+ * failed silently for months rather than throwing something anybody would have noticed. This
+ * wrapper carries the guard once, and mirrors the same event into Clarity so a session recording
+ * can be filtered by what the person actually did, not just where they went.
+ *
+ * Fire-and-forget by design: analytics must never be able to break a signup or a share. */
+function track(name, params){
+  const p = params || {};
+  try{ if(typeof gtag === 'function') gtag('event', name, p); }catch(e){}
+  try{
+    if(typeof window.clarity === 'function'){
+      window.clarity('event', name);
+      // Clarity tags are strings and are what its recording filters search on.
+      Object.keys(p).forEach(k => {
+        const v = p[k];
+        if(v !== undefined && v !== null && v !== '') window.clarity('set', k, String(v));
+      });
+    }
+  }catch(e){}
+}
+
+/* Outbound clicks to the Fourthwall shop. GA4 cannot follow anyone across to another domain,
+ * so a shirt sale is never attributable here — but "how many people left for the shop, and from
+ * which entry point" is, and that is the number that says whether the merch links are worth the
+ * space they take up. Delegated so it covers the settings sheet, the support page, and anything
+ * added later without another listener. */
+document.addEventListener('click', (e) => {
+  const a = e.target.closest && e.target.closest('a[href*="fourthwall.com"]');
+  if(!a) return;
+  let campaign = '';
+  try{ campaign = new URL(a.href).searchParams.get('utm_campaign') || ''; }catch(err){}
+  track('shop_click', { link_url: a.href, placement: campaign || 'unknown' });
+}, true);
+
 function perfMark(label){
   if(!PERF_DEBUG) return;
   try{ console.log('[perf] ' + label + ' @ ' + Math.round(performance.now()) + 'ms'); }catch(e){}
@@ -1736,6 +1775,11 @@ async function signUpAccount(username, password, email){
      * send failure means an unconfirmed address, not a failed signup. Telling somebody their
      * signup failed after it actually succeeded would be the worse outcome. */
     const rec = await saveRecoveryEmail(String(email).trim().toLowerCase());
+    /* Counted here rather than at form submit, so a failed or abandoned signup never inflates it.
+     * This is the growth number the analytics board reports a daily and weekly delta on. It will
+     * always sit slightly under the true total in the Firebase console — blockers and consent
+     * refusals eat some — so treat it as a trend, not a headcount. */
+    track('sign_up', { method: 'username', recovery_email_sent: rec.ok });
     return { ok: true, emailSent: rec.ok, emailReason: rec.reason };
   }catch(e){
     if(e.code === 'auth/email-already-in-use') return { ok: false, reason: 'That username is already taken.' };
@@ -1751,6 +1795,8 @@ async function logInAccount(username, password){
     const oldAnonId = getClientId();
     const cred = await signInWithEmailAndPassword(auth, usernameToEmail(clean), password);
     await migrateAnonymousDataToAccount(oldAnonId, cred.user.uid, clean);
+    // Returning logins vs. new signups is the difference between an audience and a churn rate.
+    track('login', { method: 'username' });
     return { ok: true };
   }catch(e){
     if(e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password'){
@@ -3102,10 +3148,15 @@ function attachShareHandler(loc){
     if(navigator.share){
       try{
         await navigator.share({ title: `${name} — BathroomReport`, url });
+        /* Only after the sheet resolves. A rejected promise means they backed out, and counting
+         * that as a share would make the number meaningless. iOS does not tell us which app they
+         * picked, so `method` is as granular as this can get. */
+        track('share', { method: 'native', chain: name, loc_id: loc.id });
       }catch(e){ /* user cancelled the share sheet — no action needed */ }
     } else if(navigator.clipboard){
       try{
         await navigator.clipboard.writeText(url);
+        track('share', { method: 'clipboard', chain: name, loc_id: loc.id });
         /* innerHTML, not textContent: the button now holds an <svg> and a label, and assigning
          * textContent would delete both and leave a bare glyph where the control had been. */
         const restore = newBtn.innerHTML;
@@ -5492,17 +5543,15 @@ document.getElementById('onboardingLocate')?.addEventListener('click', () => {
   // Attribution: where did this deep link come from? ("guide" = an SEO page,
   // absent = a link someone shared directly.)
   const source = params.get('utm_source') || 'direct_share';
-  if(typeof gtag === 'function'){
-    gtag('event', 'deeplink_open', {
-      loc_id: targetId,
-      chain: (target && target.n) || '',
-      source: source,
-      campaign: params.get('utm_campaign') || '',
-      // false = the link pointed at a pin we no longer have (renamed/removed id),
-      // which is the signal that a stale /guide/ page is still in Google's index.
-      resolved: found
-    });
-  }
+  track('deeplink_open', {
+    loc_id: targetId,
+    chain: (target && target.n) || '',
+    source: source,
+    campaign: params.get('utm_campaign') || '',
+    // false = the link pointed at a pin we no longer have (renamed/removed id),
+    // which is the signal that a stale /guide/ page is still in Google's index.
+    resolved: found
+  });
 
   // Strip loc + any utm_* so the URL is shareable and refresh-safe. GA4 has already
   // captured them by this point. replaceState leaves no extra history entry.

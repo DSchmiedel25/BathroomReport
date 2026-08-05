@@ -113,6 +113,35 @@ p{margin:0 0 14px}
 @media (max-width:520px){h1{font-size:1.6rem}.wrap{padding:20px 16px 56px}}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
 </style>
+<!-- Analytics. Same GA4 property and Clarity project as the app, so a visit here is the
+     same session as the map — this page is where the shop and tip links live, and without a
+     tag on it there was no way to tell whether anybody ever reached them. -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-P30WFPVB80"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-P30WFPVB80');
+</script>
+<script type="text/javascript">
+  (function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+  })(window, document, "clarity", "script", "xrq6arvfpv");
+</script>
+<script>
+  // Outbound to the Fourthwall shop. app.js is not loaded on this page, so this page carries
+  // its own copy of the handler rather than importing 428 KB of map code for one listener.
+  document.addEventListener('click', function(e){
+    var a = e.target.closest && e.target.closest('a[href*="fourthwall.com"]');
+    if(!a) return;
+    var campaign = '';
+    try{ campaign = new URL(a.href).searchParams.get('utm_campaign') || ''; }catch(err){}
+    if(typeof gtag === 'function') gtag('event','shop_click',{link_url:a.href,placement:campaign||'unknown'});
+    if(typeof window.clarity === 'function'){ window.clarity('event','shop_click'); }
+  }, true);
+</script>
 </head>
 
 <body>
