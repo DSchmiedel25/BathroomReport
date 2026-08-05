@@ -822,10 +822,13 @@ function render(d) {
     out.push(`<div class="band"><h2>Frustration signals</h2><span>Clarity · ${esc(days[days.length - 1])}</span></div>`);
     out.push(`<div class="tiles">${tiles.map(([k, v]) =>
       `<div class="tile t"><p class="k">${esc(k)}</p><p class="v">${n(v)}</p></div>`).join("")}</div>`);
+    const rebuilt = days.filter(d => cd[d]._recovered).length;
     out.push(`<div class="panel"><p class="note" style="margin:0">${n(days.length)} day${days.length === 1 ? "" : "s"}
       collected so far. Clarity's API only reaches back three days, so this file is the only
-      long-term record of these numbers that will ever exist — if the nightly job stops for four
-      days, those days are gone for good.</p></div>`);
+      long-term record of these numbers that will ever exist.${rebuilt
+        ? ` ${n(rebuilt)} of them ${rebuilt === 1 ? "was" : "were"} reconstructed after a missed run —
+            those carry counts only, since averages and percentages can't be recovered by subtraction.`
+        : ""}</p></div>`);
   } else {
     out.push(`<div class="band"><h2>Frustration signals</h2><span>Clarity</span></div>`);
     out.push(`<div class="msg"><b>No Clarity data yet</b>
