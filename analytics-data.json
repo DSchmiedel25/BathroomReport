@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-05T16:13:41.053Z",
+  "generated": "2026-08-07T02:54:45.082Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -63,19 +63,33 @@
         "pageViews": 3
       },
       "2026-08-05": {
-        "activeUsers": 2,
-        "newUsers": 0,
-        "sessions": 2,
-        "pageViews": 2
+        "activeUsers": 7,
+        "newUsers": 5,
+        "sessions": 9,
+        "pageViews": 10
+      },
+      "2026-08-06": {
+        "activeUsers": 9,
+        "newUsers": 7,
+        "sessions": 13,
+        "pageViews": 19
       }
     },
-    "signupsByDate": {},
+    "signupsByDate": {
+      "2026-08-06": 1
+    },
     "sources": [
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 252,
-        "users": 125
+        "sessions": 271,
+        "users": 136
+      },
+      {
+        "source": "(not set)",
+        "medium": "(not set)",
+        "sessions": 8,
+        "users": 6
       },
       {
         "source": "facebook.com",
@@ -88,12 +102,6 @@
         "medium": "test",
         "sessions": 7,
         "users": 5
-      },
-      {
-        "source": "(not set)",
-        "medium": "(not set)",
-        "sessions": 5,
-        "users": 3
       },
       {
         "source": "lm.facebook.com",
@@ -114,6 +122,12 @@
         "users": 3
       },
       {
+        "source": "reddit.com",
+        "medium": "referral",
+        "sessions": 2,
+        "users": 2
+      },
+      {
         "source": "google",
         "medium": "organic",
         "sessions": 1,
@@ -121,12 +135,6 @@
       },
       {
         "source": "l.facebook.com",
-        "medium": "referral",
-        "sessions": 1,
-        "users": 1
-      },
-      {
-        "source": "reddit.com",
         "medium": "referral",
         "sessions": 1,
         "users": 1
@@ -142,17 +150,17 @@
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 248
+        "sessions": 259
       },
       {
         "campaign": "(referral)",
         "content": "(not set)",
-        "sessions": 18
+        "sessions": 19
       },
       {
         "campaign": "(direct)",
         "content": "",
-        "sessions": 4
+        "sessions": 12
       },
       {
         "campaign": "test",
@@ -165,7 +173,9 @@
         "sessions": 1
       }
     ],
-    "events": {},
+    "events": {
+      "sign_up": 1
+    },
     "guidePages": [],
     "deeplinkResolved": null
   },
@@ -291,6 +301,94 @@
         "ReferrerUrl.name": 0,
         "ReferrerUrl.sessionsCount": 7,
         "PopularPages.visitsCount": 12,
+        "_recovered": true,
+        "_droppedMetrics": 14
+      },
+      "2026-08-06": {
+        "DeadClickCount.sessionsCount": 9,
+        "DeadClickCount.sessionsWithMetricPercentage": 11.11,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 88.89,
+        "DeadClickCount.pagesViews": 1,
+        "DeadClickCount.subTotal": 1,
+        "ExcessiveScroll.sessionsCount": 9,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 9,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 9,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 9,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 11.11,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 88.89,
+        "ScriptErrorCount.pagesViews": 1,
+        "ScriptErrorCount.subTotal": 1,
+        "ErrorClickCount.sessionsCount": 9,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 98.4,
+        "Traffic.totalSessionCount": 9,
+        "Traffic.totalBotSessionCount": 3,
+        "Traffic.distinctUserCount": 10,
+        "Traffic.pagesPerSessionPercentage": 1.5714285714285714,
+        "EngagementTime.totalTime": 281,
+        "EngagementTime.activeTime": 61,
+        "Browser.name": "MobileSafari",
+        "Browser.sessionsCount": 5,
+        "Device.name": "Mobile",
+        "Device.sessionsCount": 6,
+        "OS.name": "IOS",
+        "OS.sessionsCount": 7,
+        "Country.name": "United States",
+        "Country.sessionsCount": 9,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 9,
+        "ReferrerUrl.name": 0,
+        "ReferrerUrl.sessionsCount": 9,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 13
+      },
+      "2026-08-05": {
+        "DeadClickCount.sessionsCount": 5,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 5,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 5,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 5,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 5,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 5,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "Traffic.totalSessionCount": 5,
+        "Traffic.totalBotSessionCount": 1,
+        "Traffic.distinctUserCount": 6,
+        "EngagementTime.totalTime": 0,
+        "EngagementTime.activeTime": 8,
+        "Browser.sessionsCount": 2,
+        "Device.sessionsCount": 3,
+        "OS.sessionsCount": 2,
+        "Country.sessionsCount": 5,
+        "PageTitle.sessionsCount": 5,
+        "ReferrerUrl.name": 0,
+        "ReferrerUrl.sessionsCount": 4,
+        "PopularPages.visitsCount": 6,
         "_recovered": true,
         "_droppedMetrics": 14
       }
