@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-07T11:54:31.931Z",
+  "generated": "2026-08-08T11:00:59.094Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -73,6 +73,18 @@
         "newUsers": 7,
         "sessions": 13,
         "pageViews": 19
+      },
+      "2026-08-07": {
+        "activeUsers": 8,
+        "newUsers": 4,
+        "sessions": 11,
+        "pageViews": 10
+      },
+      "2026-08-08": {
+        "activeUsers": 1,
+        "newUsers": 1,
+        "sessions": 1,
+        "pageViews": 1
       }
     },
     "signupsByDate": {
@@ -82,14 +94,14 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 271,
-        "users": 136
+        "sessions": 277,
+        "users": 139
       },
       {
         "source": "(not set)",
         "medium": "(not set)",
-        "sessions": 8,
-        "users": 6
+        "sessions": 17,
+        "users": 9
       },
       {
         "source": "facebook.com",
@@ -104,16 +116,22 @@
         "users": 5
       },
       {
+        "source": "test",
+        "medium": "test",
+        "sessions": 5,
+        "users": 5
+      },
+      {
         "source": "lm.facebook.com",
         "medium": "referral",
         "sessions": 4,
         "users": 4
       },
       {
-        "source": "test",
-        "medium": "test",
-        "sessions": 4,
-        "users": 4
+        "source": "google",
+        "medium": "organic",
+        "sessions": 3,
+        "users": 3
       },
       {
         "source": "m.facebook.com",
@@ -128,13 +146,13 @@
         "users": 2
       },
       {
-        "source": "google",
-        "medium": "organic",
+        "source": "l.facebook.com",
+        "medium": "referral",
         "sessions": 1,
         "users": 1
       },
       {
-        "source": "l.facebook.com",
+        "source": "stripe.lightning.force.com",
         "medium": "referral",
         "sessions": 1,
         "users": 1
@@ -160,7 +178,7 @@
       {
         "campaign": "(direct)",
         "content": "",
-        "sessions": 12
+        "sessions": 18
       },
       {
         "campaign": "test",
@@ -169,7 +187,22 @@
       },
       {
         "campaign": "(organic)",
+        "content": "",
+        "sessions": 2
+      },
+      {
+        "campaign": "(organic)",
         "content": "(not set)",
+        "sessions": 1
+      },
+      {
+        "campaign": "(referral)",
+        "content": "",
+        "sessions": 1
+      },
+      {
+        "campaign": "test",
+        "content": "",
         "sessions": 1
       }
     ],
@@ -391,6 +424,59 @@
         "PopularPages.visitsCount": 6,
         "_recovered": true,
         "_droppedMetrics": 14
+      },
+      "2026-08-07": {
+        "DeadClickCount.sessionsCount": 5,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 5,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 5,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 5,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 5,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 5,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 97.6,
+        "Traffic.totalSessionCount": 5,
+        "Traffic.totalBotSessionCount": 4,
+        "Traffic.distinctUserCount": 9,
+        "Traffic.pagesPerSessionPercentage": 1,
+        "EngagementTime.totalTime": 53,
+        "EngagementTime.activeTime": 23,
+        "Browser.name": "Chrome",
+        "Browser.sessionsCount": 2,
+        "Device.name": "PC",
+        "Device.sessionsCount": 3,
+        "OS.name": "Android",
+        "OS.sessionsCount": 1,
+        "Country.name": "United States",
+        "Country.sessionsCount": 5,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 5,
+        "ReferrerUrl.name": 0,
+        "ReferrerUrl.sessionsCount": 4,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 7
       }
     }
   },
