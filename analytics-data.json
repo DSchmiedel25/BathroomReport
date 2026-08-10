@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-09T11:02:51.524Z",
+  "generated": "2026-08-10T11:57:37.506Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -68,32 +68,34 @@
         "sessions": 9,
         "pageViews": 10
       },
-      "2026-08-07": {
-        "activeUsers": 8,
-        "newUsers": 4,
-        "sessions": 11,
-        "pageViews": 10
+      "2026-08-06": {
+        "activeUsers": 9,
+        "newUsers": 8,
+        "sessions": 13,
+        "pageViews": 19
       },
       "2026-08-08": {
         "activeUsers": 1,
         "newUsers": 1,
         "sessions": 1,
         "pageViews": 1
+      },
+      "2026-08-09": {
+        "activeUsers": 2,
+        "newUsers": 1,
+        "sessions": 2,
+        "pageViews": 2
       }
     },
-    "signupsByDate": {},
+    "signupsByDate": {
+      "2026-08-06": 1
+    },
     "sources": [
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 265,
-        "users": 132
-      },
-      {
-        "source": "(not set)",
-        "medium": "(not set)",
-        "sessions": 11,
-        "users": 6
+        "sessions": 274,
+        "users": 139
       },
       {
         "source": "facebook.com",
@@ -108,10 +110,10 @@
         "users": 5
       },
       {
-        "source": "test",
-        "medium": "test",
-        "sessions": 5,
-        "users": 5
+        "source": "(not set)",
+        "medium": "(not set)",
+        "sessions": 4,
+        "users": 3
       },
       {
         "source": "lm.facebook.com",
@@ -120,10 +122,10 @@
         "users": 4
       },
       {
-        "source": "google",
-        "medium": "organic",
-        "sessions": 3,
-        "users": 3
+        "source": "test",
+        "medium": "test",
+        "sessions": 4,
+        "users": 4
       },
       {
         "source": "m.facebook.com",
@@ -138,13 +140,13 @@
         "users": 2
       },
       {
-        "source": "l.facebook.com",
-        "medium": "referral",
+        "source": "google",
+        "medium": "organic",
         "sessions": 1,
         "users": 1
       },
       {
-        "source": "stripe.lightning.force.com",
+        "source": "l.facebook.com",
         "medium": "referral",
         "sessions": 1,
         "users": 1
@@ -160,7 +162,7 @@
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 259
+        "sessions": 272
       },
       {
         "campaign": "(referral)",
@@ -168,17 +170,12 @@
         "sessions": 19
       },
       {
-        "campaign": "(direct)",
-        "content": "",
-        "sessions": 6
-      },
-      {
         "campaign": "test",
         "content": "(not set)",
         "sessions": 4
       },
       {
-        "campaign": "(organic)",
+        "campaign": "(direct)",
         "content": "",
         "sessions": 2
       },
@@ -186,19 +183,11 @@
         "campaign": "(organic)",
         "content": "(not set)",
         "sessions": 1
-      },
-      {
-        "campaign": "(referral)",
-        "content": "",
-        "sessions": 1
-      },
-      {
-        "campaign": "test",
-        "content": "",
-        "sessions": 1
       }
     ],
-    "events": {},
+    "events": {
+      "sign_up": 1
+    },
     "guidePages": [],
     "deeplinkResolved": null
   },
@@ -506,6 +495,59 @@
         "Traffic.pagesPerSessionPercentage": 0,
         "EngagementTime.totalTime": 0,
         "EngagementTime.activeTime": 0
+      },
+      "2026-08-09": {
+        "DeadClickCount.sessionsCount": 1,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 1,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 1,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 1,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 1,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 1,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 1,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 1,
+        "Traffic.pagesPerSessionPercentage": 1,
+        "EngagementTime.totalTime": 9,
+        "EngagementTime.activeTime": 9,
+        "Browser.name": "MobileSafari",
+        "Browser.sessionsCount": 1,
+        "Device.name": "Mobile",
+        "Device.sessionsCount": 1,
+        "OS.name": "IOS",
+        "OS.sessionsCount": 1,
+        "Country.name": "United States",
+        "Country.sessionsCount": 1,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 1,
+        "ReferrerUrl.name": 0,
+        "ReferrerUrl.sessionsCount": 1,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 1
       }
     }
   },
