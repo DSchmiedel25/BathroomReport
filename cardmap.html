@@ -431,8 +431,8 @@ async function loadDrops(){
     renderCount();
     fitToDrops();
   }catch(e){
-    console.error('cardDrops load failed', e && e.code);
-    toast('Could not load card drops.', true);
+    console.error('cardDrops load failed', e);
+    toast('Load failed: ' + (e && e.code ? e.code : 'unknown'), true);
   }
 }
 
@@ -656,8 +656,9 @@ $('#saveBtn').addEventListener('click', async () => {
     renderCount();
     closeSheet();
   }catch(e){
-    console.error('save failed', e && e.code);
-    toast('Could not save — check your admin access.', true);
+    console.error('save failed', e);
+    // Admin-only page, so showing the raw code is safe and saves a console round-trip.
+    toast('Save failed: ' + (e && e.code ? e.code : e && e.message ? e.message : 'unknown'), true);
   }finally{
     btn.disabled = false; btn.textContent = 'Save';
   }
