@@ -821,6 +821,61 @@ service cloud.firestore {
     }
 
     // ============================================================
+    //  Card drop map (admin-only field tracking)
+    // ============================================================
+    /* Where physical BathroomReport cards have been left. Admin-only on BOTH read and
+     * write — cardmap.html is served by GitHub Pages and is therefore publicly reachable
+     * by URL, exactly like FlushPanel, so the rules are the only real gate.
+     *
+     * createdBy must be the caller's own uid, so one admin cannot attribute a drop to the
+     * other. It is absent from the update allowlist, so authorship is fixed once written. */
+    match /cardDrops/{id} {
+      allow read: if isAdmin();
+
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly([
+             'lat','lng','note','status','placedAt','updatedAt','markedGoneAt',
+             'createdBy','createdByName'
+           ])
+        && request.resource.data.createdBy == request.auth.uid
+        && 'lat' in request.resource.data && validLatOrAbsent('lat')
+        && 'lng' in request.resource.data && validLngOrAbsent('lng')
+        && request.resource.data.status in ['active','gone']
+        && request.resource.data.placedAt is int
+        && request.resource.data.placedAt <= request.time.toMillis() + 60000
+        && request.resource.data.placedAt > 1700000000000
+        && boundedStrOrAbsent('note', 200)
+        && boundedStrOrAbsent('createdByName', 40)
+        && numOrAbsent('updatedAt')
+        /* Stamped only when a drop is marked gone, so it is normally absent. When present it
+         * must be a sane epoch millis like every other timestamp here. */
+        && (!('markedGoneAt' in request.resource.data)
+            || (request.resource.data.markedGoneAt is int
+                && request.resource.data.markedGoneAt <= request.time.toMillis() + 60000
+                && request.resource.data.markedGoneAt > 1700000000000));
+
+      // Note, status and position are editable; authorship and placedAt are not.
+      allow update: if isAdmin()
+        && touchedKeys().hasOnly(['lat','lng','note','status','updatedAt','markedGoneAt'])
+        && validLatOrAbsent('lat') && validLngOrAbsent('lng')
+        && (!touchedKeys().hasAny(['status'])
+            || request.resource.data.status in ['active','gone'])
+        && touchedIsBoundedStr('note', 200)
+        && touchedIsNum('updatedAt')
+        /* Three legal shapes: untouched, DELETED (flipping back to still-there removes it,
+         * so the key is absent from the post-write document), or set to a sane stamp.
+         * touchedIsNum would reject the delete, since the key is touched but absent. */
+        && (!touchedKeys().hasAny(['markedGoneAt'])
+            || !('markedGoneAt' in request.resource.data)
+            || (request.resource.data.markedGoneAt is int
+                && request.resource.data.markedGoneAt <= request.time.toMillis() + 60000
+                && request.resource.data.markedGoneAt > 1700000000000));
+
+      allow delete: if isAdmin();
+    }
+
+
+    // ============================================================
     //  Default deny — anything not listed above is inaccessible
     // ============================================================
     match /{document=**} {
