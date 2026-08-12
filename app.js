@@ -5528,39 +5528,74 @@ document.getElementById('onboardingLocate')?.addEventListener('click', () => {
 // jump straight to that pin. We also report the arrival to GA4 and then scrub the
 // tracking params out of the URL, so a refresh or a re-share doesn't carry UTMs
 // around and the address bar stays clean.
+/* Two kinds of tagged arrival land here:
+ *
+ *   ?loc=<id>              a shared link or a /guide/ SEO page pointing at one pin
+ *   ?utm_* with no loc     a campaign entry point — the QR on a printed card, for one
+ *
+ * This block used to return the moment `loc` was absent, so a campaign arrival fired no event
+ * AND kept its utm_* params sitting in the address bar. That second part is the real bug: the
+ * printed cards carry ?utm_campaign=card_v2, so anyone who scanned one and then shared the URL
+ * they landed on passed the card campaign along to whoever they sent it to, and every one of
+ * those arrivals counted as another card scan.
+ *
+ * GA4's automatic page_view carries the campaign on its own either way. The explicit event is
+ * here because a named event can be counted directly rather than inferred from a session
+ * dimension, and because gtag is the first thing an ad blocker removes.
+ */
 (function(){
   const params = new URLSearchParams(window.location.search);
   // A link shared before the id rename carries the raw form (?loc=node%2F123). Normalise it so
   // those links keep resolving; meta.srcId holds the original if it is ever needed.
   const rawTarget = params.get('loc');
   const targetId = rawTarget ? fsId(rawTarget) : rawTarget;
-  if(!targetId) return;
+  const hasUtm = Array.from(params.keys()).some(k => k.startsWith('utm_'));
+  if(!targetId && !hasUtm) return;
 
-  const target = seedLocations.find(l => l.id === targetId);
-  const found = Boolean(target && markers[targetId]);
-  if(found) zoomToMarker(markers[targetId]);
+  // Attribution: where did this arrival come from? ("guide" = an SEO page,
+  // absent on a ?loc= link = someone shared it directly.)
+  const source   = params.get('utm_source')   || 'direct_share';
+  const medium   = params.get('utm_medium')   || '';
+  const campaign = params.get('utm_campaign') || '';
 
-  // Attribution: where did this deep link come from? ("guide" = an SEO page,
-  // absent = a link someone shared directly.)
-  const source = params.get('utm_source') || 'direct_share';
-  track('deeplink_open', {
-    loc_id: targetId,
-    chain: (target && target.n) || '',
-    source: source,
-    campaign: params.get('utm_campaign') || '',
-    // false = the link pointed at a pin we no longer have (renamed/removed id),
-    // which is the signal that a stale /guide/ page is still in Google's index.
-    resolved: found
-  });
+  if(targetId){
+    const target = seedLocations.find(l => l.id === targetId);
+    const found = Boolean(target && markers[targetId]);
+    if(found) zoomToMarker(markers[targetId]);
 
-  // Strip loc + any utm_* so the URL is shareable and refresh-safe. GA4 has already
-  // captured them by this point. replaceState leaves no extra history entry.
-  const keep = new URLSearchParams();
-  params.forEach((v, k) => {
-    if(k !== 'loc' && !k.startsWith('utm_')) keep.append(k, v);
-  });
-  const qs = keep.toString();
-  history.replaceState({}, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+    track('deeplink_open', {
+      loc_id: targetId,
+      chain: (target && target.n) || '',
+      source: source,
+      campaign: campaign,
+      // false = the link pointed at a pin we no longer have (renamed/removed id),
+      // which is the signal that a stale /guide/ page is still in Google's index.
+      resolved: found
+    });
+  } else {
+    // A tagged arrival that names no location: the campaign itself is the whole signal.
+    track('campaign_arrival', { source: source, medium: medium, campaign: campaign });
+  }
+
+  /* Strip loc + any utm_* so the URL is shareable and refresh-safe.
+   *
+   * Deliberately deferred to load rather than done here. gtag's library is fetched async and
+   * reads document.location when it gets around to processing the queued config() — so
+   * rewriting the URL mid-app.js can beat it to that read and cost GA4 the campaign outright,
+   * which is the opposite of the point. Waiting for load is invisible to the user and removes
+   * the race. replaceState leaves no extra history entry.
+   */
+  const strip = () => {
+    const cur = new URLSearchParams(location.search);
+    const keep = new URLSearchParams();
+    cur.forEach((v, k) => {
+      if(k !== 'loc' && !k.startsWith('utm_')) keep.append(k, v);
+    });
+    const qs = keep.toString();
+    history.replaceState({}, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+  };
+  if(document.readyState === 'complete') strip();
+  else window.addEventListener('load', strip, { once: true });
 })();
 
 // Resize every pin whenever the zoom level changes
