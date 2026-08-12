@@ -6763,6 +6763,10 @@ function openAccountPanel(mode){
      * reopening the passport could land you on the stats reverse with no explanation. No height
      * call any more — the grid sizes both faces on its own. */
     flipCardTo(false);
+  } else {
+    // Reopening always lands on Sign Up: anyone with an account is normally already signed in,
+    // so the person looking at this panel is usually here for the first time.
+    setAuthMode('signup');
   }
 }
 
@@ -7344,6 +7348,45 @@ document.getElementById('accountClose').addEventListener('click', () => {
   suppressNextLocateClick = true;
   setTimeout(() => { suppressNextLocateClick = false; }, 400);
 });
+
+/* Which of the two jobs the logged-out panel is doing.
+ *
+ * Both action buttons stay in the DOM under their original ids, with their original handlers —
+ * only visibility moves. Nothing about how a signup or a login actually runs is touched here,
+ * which is the whole reason it is done this way.
+ */
+function setAuthMode(mode){
+  const signup = mode !== 'login';
+  const segUp = document.getElementById('authModeSignUp');
+  const segIn = document.getElementById('authModeLogIn');
+  if(!segUp || !segIn) return;
+
+  segUp.setAttribute('aria-pressed', String(signup));
+  segIn.setAttribute('aria-pressed', String(!signup));
+
+  document.getElementById('authEmailBlock').style.display = signup ? '' : 'none';
+  document.getElementById('authSignUpBtn').style.display  = signup ? '' : 'none';
+  document.getElementById('authLogInBtn').style.display   = signup ? 'none' : '';
+  // Only meaningful against an existing account, so it belongs to the log-in side.
+  document.getElementById('authForgotBtn').style.display  = signup ? 'none' : '';
+
+  /* Password managers have to be told which of the two this is. With one autocomplete value
+   * serving both, a manager offers to overwrite a saved credential on a signup and to create a
+   * second one on a login. */
+  const pw = document.getElementById('authPassword');
+  if(pw){
+    pw.setAttribute('autocomplete', signup ? 'new-password' : 'current-password');
+    pw.placeholder = signup ? 'at least 6 characters' : 'your password';
+  }
+
+  // A failed login must not leave its error sitting over the signup form, where it reads as a
+  // complaint about something the person has not done yet.
+  const note = document.getElementById('authNote');
+  if(note) note.textContent = '';
+}
+document.getElementById('authModeSignUp').addEventListener('click', () => setAuthMode('signup'));
+document.getElementById('authModeLogIn').addEventListener('click', () => setAuthMode('login'));
+setAuthMode('signup');
 
 document.getElementById('authForgotBtn').addEventListener('click', async () => {
   const username = document.getElementById('authUsername').value.trim();

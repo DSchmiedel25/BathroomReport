@@ -287,18 +287,30 @@
 You can <b>FIND</b> without an account. Sign in to <b>RATE</b>, <b>SHARE</b>, and
 <b>IMPROVE</b>, so your name and history follow you across devices.
 </p>
+<!-- Sign up and log in are two different jobs. They used to share one form with three
+     equal-weight buttons and an email field that had to explain when it did and did not
+     apply; the switch below picks one job and shows only what that job needs. -->
+<div class="acct-seg acct-seg--auth" role="group" aria-label="Sign up or log in">
+<button type="button" id="authModeSignUp" aria-pressed="true">Sign Up</button>
+<button type="button" id="authModeLogIn" aria-pressed="false">Log In</button>
+</div>
 <div class="rating-label" style="color:var(--cream);">Username</div>
-<input type="text" id="authUsername" maxlength="20" placeholder="letters, numbers, underscore" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
+<input type="text" id="authUsername" maxlength="20" autocomplete="username" placeholder="letters, numbers, underscore" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
 <div class="rating-label" style="color:var(--cream);">Password</div>
-<input type="password" id="authPassword" placeholder="at least 6 characters" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
-<div class="rating-label" style="color:var(--cream);">Email <span style="opacity:.7;font-weight:400;">(new accounts)</span></div>
+<input type="password" id="authPassword" autocomplete="new-password" placeholder="at least 6 characters" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
+<!-- Signup only. signUpAccount() rejects a missing or malformed address, so this is required
+     in fact — it was previously labelled "(new accounts)" and told people they could leave it
+     blank, which is true for logging in and fails the signup it appeared to belong to. -->
+<div id="authEmailBlock">
+<div class="rating-label" style="color:var(--cream);">Email</div>
 <input type="email" id="authEmail" autocomplete="email" inputmode="email" maxlength="254" placeholder="so you can reset a forgotten password" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
 <p style="background:#1e2a33;border:1px solid #2ea1aa;border-radius:6px;padding:8px 10px;color:#bcd7dd;font-size:12px;margin:0 0 12px;">
-📧 Used only to reset your password. We'll send a link to confirm it. Not shown publicly, not used for anything else. Logging in? Leave it blank.
+📧 Required. You log in with your username, so this is the only way to reset a forgotten password. Not shown publicly, not used for anything else.
 </p>
-<button class="btn btn-amber" id="authSignUpBtn" style="width:100%;margin-bottom:8px;">Sign Up (new account)</button>
-<button class="btn btn-secondary" id="authLogInBtn" style="width:100%;">Log In (existing account)</button>
-<button class="btn btn-secondary" id="authForgotBtn" style="width:100%;margin-top:8px;font-size:13px;">Forgot your password?</button>
+</div>
+<button class="btn btn-amber" id="authSignUpBtn" style="width:100%;">Create Account</button>
+<button class="btn btn-amber" id="authLogInBtn" style="width:100%;display:none;">Log In</button>
+<button class="btn btn-secondary" id="authForgotBtn" style="width:100%;margin-top:8px;font-size:13px;display:none;">Forgot your password?</button>
 <button id="onboardingInfoBtn" class="btn btn-secondary" style="width:100%;margin-top:8px;">ℹ️ How it works</button>
 <div class="save-note" id="authNote" style="height:auto;margin-top:8px;"></div>
 </div>

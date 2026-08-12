@@ -25,7 +25,7 @@ function trimTiles(){
   }, 5000);
 }
 
-const CACHE_NAME = 'bathroomreport-v311';
+const CACHE_NAME = 'bathroomreport-v312';
 
 // CORE SHELL ONLY — deliberately does NOT precache the chain data files.
 // Precaching all ~5.6 MB of location data forced a full re-download on every cache
