@@ -177,6 +177,28 @@
   .sheet textarea:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:transparent}
   .char-count{font-size:11px; color:var(--muted); text-align:right; margin-top:5px}
   .char-count.over{color:var(--danger)}
+
+  /* ---- Note log ----
+     One row per entry, newest at the top. The delete sits on the row rather than behind a
+     confirm: an entry is a line of text you typed, and the drop itself still has its own
+     Delete for the thing that actually matters. */
+  .note-row{
+    border:1px solid var(--line); border-radius:12px; padding:9px 10px; margin-bottom:8px;
+    background:rgba(255,255,255,.02);
+  }
+  .note-row textarea{margin:0; min-height:62px}
+  .note-row-foot{display:flex; align-items:center; gap:8px; margin-top:7px}
+  .note-row-foot input[type="datetime-local"]{
+    flex:1 1 auto; min-width:0; background:var(--bg2); color:var(--text);
+    border:1px solid var(--line); border-radius:9px; padding:7px 9px; font-size:14px;
+  }
+  .note-row-foot input:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:transparent}
+  .note-del{
+    flex:none; width:44px; height:44px; border-radius:10px; border:1px solid var(--line);
+    background:transparent; color:var(--danger); font-size:17px; cursor:pointer;
+  }
+  .note-del:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+  .note-empty{color:var(--muted); font-size:13px; margin:0 0 8px}
   .status-row{display:flex; gap:8px; margin-top:4px}
   .status-opt{
     flex:1; min-height:44px; border-radius:10px; border:1px solid var(--line);
@@ -253,11 +275,9 @@
   <p class="sub" id="sheetSub"></p>
 
   <div id="editorBody">
-    <label class="field" for="noteInput" style="margin-bottom:6px">
-      <span style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:700">Note</span>
-    </label>
-    <textarea id="noteInput" maxlength="200" placeholder="e.g. 5 cards on the counter by the register"></textarea>
-    <div class="char-count" id="charCount">0 / 200</div>
+    <span style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:700">Log</span>
+    <div id="noteLog"></div>
+    <button type="button" class="btn" id="addNoteBtn" style="width:100%;margin-top:2px">+ Add entry</button>
 
     <span style="display:block;font-size:12px;color:var(--muted);margin:14px 0 6px;font-weight:700">Status</span>
     <div class="status-row" role="group" aria-label="Drop status">
@@ -430,12 +450,57 @@ function markerTitle(data){
   if(data.status === 'gone') bits.push('picked up');
   return bits.join(' — ');
 }
+
+/* ---- Note log ----
+ *
+ * A drop used to carry one `note` string, overwritten on every save, so "placed 5 on the
+ * counter" was destroyed the moment you recorded "only 2 left". The log keeps both, each with
+ * its own time.
+ *
+ * `note` is still written, holding the NEWEST entry's text. It is what markerTitle and every
+ * other existing reader use, so keeping it in sync means none of them had to change, and a
+ * drop saved by this page stays readable to anything written before the log existed.
+ *
+ * Stored oldest-first; rendered newest-first.
+ */
+function notesFor(d){
+  if(Array.isArray(d.notes)){
+    return d.notes
+      .filter(n => n && typeof n.text === 'string' && typeof n.ts === 'number')
+      .slice()
+      .sort((a, b) => a.ts - b.ts);
+  }
+  // Legacy single note: shown as the first log entry, dated to when the drop was placed.
+  // Nothing is discarded — it converts to an array the next time the drop is saved.
+  if(typeof d.note === 'string' && d.note.trim()){
+    return [{ text: d.note.trim(), ts: typeof d.placedAt === 'number' ? d.placedAt : Date.now() }];
+  }
+  return [];
+}
+
+// epoch ms → the 'YYYY-MM-DDTHH:mm' a datetime-local input wants, in LOCAL time.
+// toISOString would hand back UTC and silently shift every entry by the offset.
+function tsToLocalInput(ts){
+  const d = new Date(typeof ts === 'number' ? ts : Date.now());
+  const pad = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+    + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+// Back the other way. A datetime-local string with no zone is parsed as local time, which is
+// what was displayed. Returns null for a cleared or unparseable field so the caller can fall back.
+function localInputToTs(v){
+  if(!v) return null;
+  const t = new Date(v).getTime();
+  return Number.isFinite(t) ? t : null;
+}
 function toast(msg, isErr){
   const t = $('#toast'); t.textContent = msg; t.className = 'show' + (isErr ? ' err' : '');
   clearTimeout(toast._t); toast._t = setTimeout(() => { t.className = ''; }, 2600);
 }
 
 const NOTE_MAX = 200;
+// Bounded so one drop's log can't grow without limit; mirrored in the firestore rule.
+const NOTES_MAX = 40;
 const STATUSES = ['active','gone'];
 
 let currentUser = null;
@@ -682,7 +747,8 @@ function startNewDrop(lat, lng){
   openSheet({
     title: 'New card drop',
     sub: lat.toFixed(6) + ', ' + lng.toFixed(6),
-    note: '',
+    // One blank entry, stamped now, so the commonest case is type-and-save.
+    notes: [{ text: '', ts: Date.now() }],
     status: 'active',
     meta: '',
     canDelete: false
@@ -710,27 +776,94 @@ function openEditor(id){
   openSheet({
     title: ageLabel(d.placedAt),
     sub: sub.join(' · '),
-    note: d.note || '',
+    notes: notesFor(d),
     status: STATUSES.includes(d.status) ? d.status : 'active',
     meta: parts.join(' '),
     canDelete: true
   });
 }
 
-function openSheet({ title, sub, note, status, meta, canDelete }){
+function openSheet({ title, sub, notes, status, meta, canDelete }){
   // Always restore editor mode — the stats view shares this sheet.
   $('#editorBody').classList.remove('hidden');
   $('#statsBody').classList.add('hidden');
   $('#sheetTitle').textContent = title;
   $('#sheetSub').textContent = sub;
-  $('#noteInput').value = note;
+  renderNoteLog(notes || []);
   $('#metaLine').textContent = meta;
   $('#deleteBtn').classList.toggle('hidden', !canDelete);
   setSheetStatus(status);
-  updateCharCount();
   $('#sheetScrim').classList.remove('hidden');
   $('#sheet').classList.remove('hidden');
-  $('#noteInput').focus();
+  const first = $('#noteLog').querySelector('textarea');
+  if(first) first.focus();
+}
+
+/* Rows are the source of truth once the sheet is open — save reads them back out of the DOM.
+ * Re-rendering the whole list on every keystroke would take focus away mid-word, so add and
+ * delete mutate the list directly instead. */
+function renderNoteLog(entries){
+  const wrap = $('#noteLog');
+  wrap.textContent = '';
+  // Newest first: the reason you opened the sheet is usually the most recent state.
+  entries.slice().sort((a, b) => b.ts - a.ts).forEach(n => addNoteRow(n.text, n.ts, false));
+  syncNoteEmpty();
+}
+
+function syncNoteEmpty(){
+  const wrap = $('#noteLog');
+  const has = wrap.querySelector('.note-row');
+  let empty = wrap.querySelector('.note-empty');
+  if(has){ if(empty) empty.remove(); return; }
+  if(!empty){
+    empty = document.createElement('p');
+    empty.className = 'note-empty';
+    empty.textContent = 'No entries yet.';
+    wrap.appendChild(empty);
+  }
+}
+
+function addNoteRow(text, ts, focus){
+  const wrap = $('#noteLog');
+  const row = document.createElement('div');
+  row.className = 'note-row';
+
+  const ta = document.createElement('textarea');
+  ta.maxLength = NOTE_MAX;
+  ta.placeholder = 'e.g. placed 5 on the counter by the register';
+  ta.value = text || '';
+
+  const foot = document.createElement('div');
+  foot.className = 'note-row-foot';
+
+  const when = document.createElement('input');
+  when.type = 'datetime-local';
+  when.setAttribute('aria-label', 'Date and time for this entry');
+  when.value = tsToLocalInput(ts);
+
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'note-del';
+  del.setAttribute('aria-label', 'Delete this entry');
+  del.textContent = '✕';
+  del.addEventListener('click', () => { row.remove(); syncNoteEmpty(); });
+
+  foot.append(when, del);
+  row.append(ta, foot);
+  // Newest first, so a new entry goes on top.
+  wrap.insertBefore(row, wrap.firstChild);
+  syncNoteEmpty();
+  if(focus) ta.focus();
+}
+
+/* Read the rows back. Entries with no text are dropped rather than saved blank — an empty
+ * row is an add you changed your mind about, not a record of nothing happening. */
+function readNoteLog(){
+  return Array.from($('#noteLog').querySelectorAll('.note-row')).map(row => {
+    const text = row.querySelector('textarea').value.trim();
+    const ts = localInputToTs(row.querySelector('input[type="datetime-local"]').value);
+    return { text, ts: ts === null ? Date.now() : ts };
+  }).filter(n => n.text).sort((a, b) => a.ts - b.ts);
 }
 
 /* Stats view. Reuses the sheet so there is one bottom-sheet style, one scrim and one
@@ -808,13 +941,9 @@ document.querySelectorAll('.status-opt').forEach(b => {
   b.addEventListener('click', () => setSheetStatus(b.dataset.status));
 });
 
-function updateCharCount(){
-  const n = $('#noteInput').value.length;
-  const el = $('#charCount');
-  el.textContent = n + ' / ' + NOTE_MAX;
-  el.classList.toggle('over', n > NOTE_MAX);
-}
-$('#noteInput').addEventListener('input', updateCharCount);
+/* updateCharCount is gone with the single note field. Each log row carries its own
+   maxlength, so the browser enforces the cap per entry and save re-checks it. */
+$('#addNoteBtn').addEventListener('click', () => addNoteRow('', Date.now(), true));
 
 $('#cancelBtn').addEventListener('click', closeSheet);
 $('#sheetScrim').addEventListener('click', closeSheet);
@@ -827,8 +956,12 @@ document.addEventListener('keydown', e => {
 
 // ---------- Save ----------
 $('#saveBtn').addEventListener('click', async () => {
-  const note = $('#noteInput').value.trim();
-  if(note.length > NOTE_MAX){ toast('Note is too long.', true); return; }
+  const notes = readNoteLog();
+  if(notes.length > NOTES_MAX){ toast('Too many log entries (max ' + NOTES_MAX + ').', true); return; }
+  if(notes.some(n => n.text.length > NOTE_MAX)){ toast('An entry is too long (max ' + NOTE_MAX + ').', true); return; }
+  // `note` mirrors the newest entry so markerTitle and anything else reading the old field
+  // keeps working. Empty log → empty string, which is what an untouched drop always had.
+  const note = notes.length ? notes[notes.length - 1].text : '';
   const btn = $('#saveBtn');
   btn.disabled = true; btn.textContent = 'Saving…';
   try{
@@ -836,7 +969,7 @@ $('#saveBtn').addEventListener('click', async () => {
       const rec = drops.get(editingId);
       const prevStatus = rec ? rec.data.status : null;
       const now = Date.now();
-      const patch = { note, status: sheetStatus, updatedAt: now };
+      const patch = { note, notes, status: sheetStatus, updatedAt: now };
 
       /* markedGoneAt is stamped only on the transition INTO gone, and removed on the way
          back out. Re-saving a pin that was already gone leaves the original stamp alone,
@@ -854,6 +987,7 @@ $('#saveBtn').addEventListener('click', async () => {
       await updateDoc(doc(db, 'cardDrops', editingId), patch);
       if(rec){
         rec.data.note = note;
+        rec.data.notes = notes;
         rec.data.status = sheetStatus;
         rec.data.updatedAt = now;
         if(newMarkedGoneAt !== undefined) rec.data.markedGoneAt = newMarkedGoneAt;
@@ -873,6 +1007,7 @@ $('#saveBtn').addEventListener('click', async () => {
         lat: p.lat,
         lng: p.lng,
         note,
+        notes,
         status: sheetStatus,
         placedAt: now,
         createdBy: currentUser.uid,

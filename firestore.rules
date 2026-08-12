@@ -832,9 +832,23 @@ service cloud.firestore {
     match /cardDrops/{id} {
       allow read: if isAdmin();
 
+      /* The per-drop note log: a list of { text, ts }, oldest first.
+       *
+       * Rules cannot iterate a list, so the ELEMENTS are not validated here — only that the
+       * field is a list and how long it may get. That was an unacceptable gap on /tips, where
+       * any signed-in user could write; it is a much smaller one here, because both read and
+       * write on this collection are already admin-only, so every writer is trusted before
+       * this check runs. The bound is what stops one drop's document growing without limit.
+       * Mirrors NOTES_MAX in cardmap.html. */
+      function validNoteLog() {
+        return !('notes' in request.resource.data)
+          || (request.resource.data.notes is list
+              && request.resource.data.notes.size() <= 40);
+      }
+
       allow create: if isAdmin()
         && request.resource.data.keys().hasOnly([
-             'lat','lng','note','status','placedAt','updatedAt','markedGoneAt',
+             'lat','lng','note','notes','status','placedAt','updatedAt','markedGoneAt',
              'createdBy','createdByName'
            ])
         && request.resource.data.createdBy == request.auth.uid
@@ -845,6 +859,7 @@ service cloud.firestore {
         && request.resource.data.placedAt <= request.time.toMillis() + 60000
         && request.resource.data.placedAt > 1700000000000
         && boundedStrOrAbsent('note', 200)
+        && validNoteLog()
         && boundedStrOrAbsent('createdByName', 40)
         && numOrAbsent('updatedAt')
         /* Stamped only when a drop is marked gone, so it is normally absent. When present it
@@ -854,10 +869,11 @@ service cloud.firestore {
                 && request.resource.data.markedGoneAt <= request.time.toMillis() + 60000
                 && request.resource.data.markedGoneAt > 1700000000000));
 
-      // Note, status and position are editable; authorship and placedAt are not.
+      // Note, log, status and position are editable; authorship and placedAt are not.
       allow update: if isAdmin()
-        && touchedKeys().hasOnly(['lat','lng','note','status','updatedAt','markedGoneAt'])
+        && touchedKeys().hasOnly(['lat','lng','note','notes','status','updatedAt','markedGoneAt'])
         && validLatOrAbsent('lat') && validLngOrAbsent('lng')
+        && validNoteLog()
         && (!touchedKeys().hasAny(['status'])
             || request.resource.data.status in ['active','gone'])
         && touchedIsBoundedStr('note', 200)
