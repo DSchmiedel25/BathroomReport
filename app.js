@@ -102,7 +102,12 @@ const CHAIN_REGISTRY = {
   quickChek: { name: "QuickChek", color: '#003da5', textColor: '#ffffff', dataVar: 'quickChekLocations' },
   townPump: { name: "Town Pump", color: '#8a1f2b', textColor: '#ffffff', dataVar: 'townPumpLocations' },
   restarea: { name: "Rest Area", color: '#1976d2', textColor: '#ffffff', dataVar: 'restareaLocations' },
-  nycDunkin: { name: "Dunkin'", color: '#ff6e0c', textColor: '#ffffff', dataVar: 'nycDunkinLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
+  /* Dunkin' is national (9,587 stores), which is why it carries no metro: key — that field is
+   * unread and the two city-scoped Dunkin' entries it used to sit on were retired into this one.
+   * It DOES keep group:'metro', because that flag buys three things this chain needs: the
+   * restroom-only popup and question list (a customer restroom, not a destination), and the
+   * zoom-12 gate, without which nine thousand pins would render at national zoom. */
+  dunkin: { name: "Dunkin'", color: '#ff6e0c', textColor: '#ffffff', dataVar: 'dunkinLocations', group: 'metro', layer: 'customer' },
   nycStarbucks: { name: 'Starbucks', color: '#00704a', textColor: '#ffffff', dataVar: 'nycStarbucksLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
   nycGregorys: { name: 'Gregorys Coffee', color: '#1a1a1a', textColor: '#ffffff', dataVar: 'nycGregorysLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
   /* All four public-restroom sets are configured IDENTICALLY — no group, layer:'public', same
@@ -113,7 +118,6 @@ const CHAIN_REGISTRY = {
    * gates and two popups the moment restrooms went nationwide. */
   nycPublic: { name: 'Public restroom', color: '#6b7280', textColor: '#ffffff', dataVar: 'nycPublicLocations', layer: 'public', shape: 'diamond' },
   bosTatte: { name: 'Tatte Bakery', color: '#b5651d', textColor: '#ffffff', dataVar: 'bosTatteLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
-  bosDunkin: { name: "Dunkin'", color: '#ff6e0c', textColor: '#ffffff', dataVar: 'bosDunkinLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
   bosStarbucks: { name: 'Starbucks', color: '#00704a', textColor: '#ffffff', dataVar: 'bosStarbucksLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
   bosPavement: { name: 'Pavement Coffeehouse', color: '#00695c', textColor: '#ffffff', dataVar: 'bosPavementLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
   bosFlour: { name: 'Flour Bakery', color: '#c8506e', textColor: '#ffffff', dataVar: 'bosFlourLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
@@ -6167,8 +6171,8 @@ function chainsInViewport(){
 // (Deliberately no toast/popup on tap; a single quiet line at the panel foot does the telling.)
 /* One row per DISPLAY NAME, not per registry key.
  *
- * Several chains exist once per metro — nycDunkin + bosDunkin, nycStarbucks + bosStarbucks,
- * nycPublic + bosPublic — and each pair shares a display name, so the list showed
+ * Several chains exist once per metro — nycStarbucks + bosStarbucks, nycPublic + bosPublic —
+ * and each pair shares a display name, so the list showed
  * "Public restroom" twice with no way to tell them apart. A user doesn't care that the data
  * is split by city; they want one switch.
  *
@@ -6292,7 +6296,7 @@ function renderChainKey(){
     /* Count what the next screen actually LISTS, which is names, not registry keys.
      *
      * groupKeysByName merges chains sharing a display name — the NYC and Boston copies of
-     * Dunkin' and Starbucks are separate keys, and the four public-restroom sets all render as
+     * Starbucks are separate keys, and the four public-restroom sets all render as
      * "Public restroom". So the row promised 9 chains and opened onto 7 rows, and 5 onto 2.
      * A count that disagrees with the list one tap away is worse than no count. */
     const shown = groupKeysByName(keys).size;
