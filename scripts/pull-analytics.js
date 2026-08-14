@@ -172,7 +172,7 @@ async function pullGA4(token, propertyId) {
     .map((r) => ({ campaign: r.dims[0], content: r.dims[1] || "", sessions: r.mets[0] }));
 
   // 5. Events we deliberately fire: sign_up, login, share, shop_click, guide_cta_click,
-  //    deeplink_open.
+  //    deeplink_open, rating_submit, bathroom_now.
   const events = await runReport(token, propertyId, {
     dateRanges: dateRange(GA4_LOOKBACK_DAYS),
     dimensions: [{ name: "eventName" }],
@@ -180,9 +180,40 @@ async function pullGA4(token, propertyId) {
     orderBys: [{ metric: { metricName: "eventCount" }, desc: true }],
     limit: 60,
   });
-  const KEEP = new Set(["sign_up", "login", "share", "shop_click", "guide_cta_click", "deeplink_open"]);
+  const KEEP = new Set(["sign_up", "login", "share", "shop_click", "guide_cta_click",
+    "deeplink_open", "rating_submit", "bathroom_now"]);
   out.events = {};
   for (const r of rows(events)) if (KEEP.has(r.dims[0])) out.events[r.dims[0]] = r.mets[0];
+
+  /* 5b. Ratings per day — the conversion the whole project runs on, and the only number here
+   *     that says the app is working rather than just being visited. */
+  const ratings = await runReport(token, propertyId, {
+    dateRanges: dateRange(GA4_LOOKBACK_DAYS),
+    dimensions: [{ name: "date" }],
+    metrics: [{ name: "eventCount" }],
+    dimensionFilter: { filter: { fieldName: "eventName", stringFilter: { value: "rating_submit" } } },
+    orderBys: [{ dimension: { dimensionName: "date" } }],
+    limit: 400,
+  });
+  out.ratingsByDate = {};
+  for (const r of rows(ratings)) out.ratingsByDate[isoDate(r.dims[0])] = r.mets[0];
+
+  /* 5c. The Bathroom Now funnel, split by outcome. Needs the `outcome` custom dimension
+   *     registered; without it this is just a total with no breakdown, so it fails soft. */
+  try {
+    const bn = await runReport(token, propertyId, {
+      dateRanges: dateRange(GA4_LOOKBACK_DAYS),
+      dimensions: [{ name: "customEvent:outcome" }],
+      metrics: [{ name: "eventCount" }],
+      dimensionFilter: { filter: { fieldName: "eventName", stringFilter: { value: "bathroom_now" } } },
+      limit: 10,
+    });
+    out.bathroomNow = {};
+    for (const r of rows(bn)) out.bathroomNow[r.dims[0]] = r.mets[0];
+  } catch (e) {
+    console.warn("  ! bathroom_now outcome breakdown unavailable — register `outcome` under Admin → Custom definitions");
+    out.bathroomNow = null;
+  }
 
   // 6. Guide landing pages — which SEO pages Google actually sends people to.
   const landing = await runReport(token, propertyId, {
@@ -197,7 +228,34 @@ async function pullGA4(token, propertyId) {
   });
   out.guidePages = rows(landing).map((r) => ({ page: r.dims[0], sessions: r.mets[0] }));
 
-  /* 7. Stale /guide/ URLs. `resolved` is a custom event parameter, and GA4 will reject the
+  /* 7. Where people are, by state. This is the one that tells you whether the map is only
+   *    useful in the Northeast — coverage is densest where the chains you enriched operate, so
+   *    a state with traffic and thin data is the next enrichment target. */
+  const states = await runReport(token, propertyId, {
+    dateRanges: dateRange(GA4_LOOKBACK_DAYS),
+    dimensions: [{ name: "region" }, { name: "country" }],
+    metrics: [{ name: "activeUsers" }, { name: "sessions" }],
+    orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+    limit: 60,
+  });
+  out.states = rows(states)
+    .filter((r) => r.dims[0] && r.dims[0] !== "(not set)")
+    .map((r) => ({ state: r.dims[0], country: r.dims[1], users: r.mets[0], sessions: r.mets[1] }));
+
+  // 8. City level. Same data one notch finer — useful for spotting whether a state's traffic is
+  //    one metro or genuinely spread out.
+  const cities = await runReport(token, propertyId, {
+    dateRanges: dateRange(GA4_LOOKBACK_DAYS),
+    dimensions: [{ name: "city" }, { name: "region" }],
+    metrics: [{ name: "activeUsers" }],
+    orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+    limit: 40,
+  });
+  out.cities = rows(cities)
+    .filter((r) => r.dims[0] && r.dims[0] !== "(not set)")
+    .map((r) => ({ city: r.dims[0], state: r.dims[1], users: r.mets[0] }));
+
+  /* 9. Stale /guide/ URLs. `resolved` is a custom event parameter, and GA4 will reject the
    *    query outright until it is registered under Admin -> Custom definitions. That is a
    *    setup step, not a failure, so this one is allowed to come back empty without taking
    *    the whole run down with it. */
@@ -362,7 +420,8 @@ async function main() {
       const token = await googleAccessToken(JSON.parse(rawKey));
       next.ga4 = await pullGA4(token, propertyId);
       const days = Object.keys(next.ga4.daily || {}).length;
-      console.log(`GA4: ok — ${days} days, ${next.ga4.sources.length} sources, ${next.ga4.campaigns.length} campaigns`);
+      console.log(`GA4: ok — ${days} days, ${next.ga4.sources.length} sources, ` +
+        `${next.ga4.campaigns.length} campaigns, ${(next.ga4.states || []).length} states`);
     } catch (e) {
       // Keep last night's GA4 data rather than blanking the dashboard over one bad night.
       console.error("GA4 failed:", e.message);
