@@ -680,6 +680,7 @@ function render(d) {
   const ga = d.ga4 || {};
   const daily = ga.daily || {};
   const signups = ga.signupsByDate || {};
+  const ratings = ga.ratingsByDate || {};
   const ev = ga.events || {};
   const out = [];
 
@@ -710,24 +711,33 @@ function render(d) {
   const users7 = sumLast(mapOf(daily, "activeUsers"), 7);
   const usersPrev7 = sumLast(mapOf(daily, "activeUsers"), 7, 7);
   const su7 = sumLast(signups, 7), suPrev7 = sumLast(signups, 7, 7);
-  const su1 = sumLast(signups, 1);
   const suAll = Object.values(signups).reduce((t, v) => t + Number(v || 0), 0);
-  const d7 = delta(users7, usersPrev7), dsu = delta(su7, suPrev7);
+  const ra7 = sumLast(ratings, 7), raPrev7 = sumLast(ratings, 7, 7);
+  const raAll = Object.values(ratings).reduce((t, v) => t + Number(v || 0), 0);
+  const d7 = delta(users7, usersPrev7), dsu = delta(su7, suPrev7), dra = delta(ra7, raPrev7);
 
-  out.push(`<div class="band"><h2>People</h2><span>Rolling windows, not calendar months</span></div>`);
+  /* Ratings lead. Everything else on this page counts people arriving; this is the only number
+     saying the app did its job, and it is what the whole project is bottlenecked on. */
+  out.push(`<div class="band"><h2>The numbers</h2><span>Rolling windows, not calendar months</span></div>`);
   out.push(`<div class="tiles">
-    <div class="tile"><p class="k">Unique users · 7d</p><p class="v">${n(users7)}</p>
+    <div class="tile"><p class="k">Ratings \u00b7 7d</p><p class="v">${n(ra7)}</p>
+      <p class="d ${dra.cls}">${dra.txt}</p></div>
+    <div class="tile"><p class="k">Unique users \u00b7 7d</p><p class="v">${n(users7)}</p>
       <p class="d ${d7.cls}">${d7.txt}</p></div>
-    <div class="tile"><p class="k">Unique users · 28d</p><p class="v">${n(sumLast(mapOf(daily,"activeUsers"),28))}</p>
-      <p class="sub">${n(sumLast(mapOf(daily,"sessions"),28))} sessions</p></div>
-    <div class="tile t"><p class="k">Accounts · 7d</p><p class="v">${n(su7)}</p>
+    <div class="tile t"><p class="k">Accounts \u00b7 7d</p><p class="v">${n(su7)}</p>
       <p class="d ${dsu.cls}">${dsu.txt}</p></div>
-    <div class="tile t"><p class="k">Accounts · yesterday</p><p class="v">${n(su1)}</p>
-      <p class="sub">${n(suAll)} tracked since start</p></div>
+    <div class="tile t"><p class="k">Ratings per 100 users</p>
+      <p class="v">${users7 ? (ra7 / users7 * 100).toFixed(0) : "\u2014"}</p>
+      <p class="sub">last 7 days \u00b7 the engagement rate that matters</p></div>
+    <div class="tile"><p class="k">Unique users \u00b7 28d</p><p class="v">${n(sumLast(mapOf(daily,"activeUsers"),28))}</p>
+      <p class="sub">${n(sumLast(mapOf(daily,"sessions"),28))} sessions</p></div>
+    <div class="tile t"><p class="k">Tracked since start</p><p class="v">${n(raAll)}</p>
+      <p class="sub">ratings \u00b7 ${n(suAll)} accounts</p></div>
   </div>`);
 
-  out.push(chart("Unique users and accounts per day, last 60 days", [
+  out.push(chart("Ratings, users and accounts per day, last 60 days", [
     { name: "Unique users", color: "#0F6B4C", points: lastN(mapOf(daily, "activeUsers"), 60) },
+    { name: "Ratings", color: "#B23A2E", points: lastN(ratings, 60) },
     { name: "Accounts created", color: "#2EA1AA", points: lastN(signups, 60) },
   ]));
 
@@ -764,9 +774,88 @@ function render(d) {
         <td class="n">${n(c.sessions)}</td></tr>`).join("")}</tbody></table></div>`);
   }
 
+  /* ---- geography ---- */
+  const states = (ga.states || []).filter(s => s.users > 0);
+  if (states.length) {
+    const us = states.filter(s => s.country === "United States");
+    const intl = states.filter(s => s.country !== "United States");
+    const totalUsers = states.reduce((t, s) => t + s.users, 0);
+    const top = us.slice(0, 12);
+    const topMax = top.length ? top[0].users : 1;
+
+    out.push(`<div class="band"><h2>Where people are</h2><span>Last 90 days</span></div>`);
+    out.push(`<div class="panel">
+      <p class="note">Approximate, from IP address — accurate to the state, loose at city level,
+        and a VPN puts someone wherever their exit node is. Good enough for "is this only working
+        in the Northeast", not for anything finer.</p>
+      <table><thead><tr><th>State</th><th class="n">Users</th><th class="n">Share</th></tr></thead>
+      <tbody>${top.map(s => `<tr>
+        <td>${esc(s.state)}
+          <div class="bar" style="width:${Math.max(2, (s.users / topMax) * 100)}%"></div></td>
+        <td class="n">${n(s.users)}</td>
+        <td class="n muted">${((s.users / totalUsers) * 100).toFixed(0)}%</td></tr>`).join("")}
+      </tbody></table>
+      ${us.length > 12 ? `<p class="note" style="margin:12px 0 0">Plus ${n(us.length - 12)} more
+        state${us.length - 12 === 1 ? "" : "s"} with fewer users.</p>` : ""}
+      ${intl.length ? `<p class="note" style="margin:12px 0 0">Outside the US:
+        ${intl.slice(0, 6).map(s => `${esc(s.state)} (${n(s.users)})`).join(", ")}. Worth knowing
+        the map is US-only — those are people finding nothing useful.</p>` : ""}
+    </div>`);
+
+    const cities = (ga.cities || []).filter(c => c.users > 0).slice(0, 12);
+    if (cities.length) {
+      out.push(`<div class="panel"><h3>Top cities</h3>
+        <p class="note">A state that's really one metro looks different from one that's spread
+          along an interstate — this is how you tell which you have.</p>
+        <table><thead><tr><th>City</th><th class="n">Users</th></tr></thead>
+        <tbody>${cities.map(c => `<tr>
+          <td>${esc(c.city)}<span class="muted">${c.state ? ", " + esc(c.state) : ""}</span></td>
+          <td class="n">${n(c.users)}</td></tr>`).join("")}</tbody></table></div>`);
+    }
+  }
+
+  /* ---- bathroom now funnel ---- */
+  const bn = ga.bathroomNow;
+  if (bn && Object.keys(bn).length) {
+    const taps = Number(bn.tap || 0);
+    const found = Number(bn.found || 0);
+    const denied = Number(bn.permission_denied || 0);
+    const none = Number(bn.none_found || 0);
+    const failed = Number(bn.location_failed || 0) + Number(bn.unsupported || 0);
+    const pct = (v) => taps ? `${Math.round((v / taps) * 100)}%` : "—";
+    out.push(`<div class="band"><h2>Find me the closest</h2><span>The main button, by what happened next</span></div>`);
+    out.push(`<div class="panel">
+      <table><thead><tr><th>Outcome</th><th class="n">Count</th><th class="n">Of taps</th></tr></thead>
+      <tbody>
+        <tr><td>Tapped the button</td><td class="n">${n(taps)}</td><td class="n muted">—</td></tr>
+        <tr><td>Got a bathroom
+          <div class="muted" style="font-size:.8rem">The button worked</div></td>
+          <td class="n">${n(found)}</td><td class="n">${pct(found)}</td></tr>
+        <tr><td>Denied location permission
+          <div class="muted" style="font-size:.8rem">Never saw a result</div></td>
+          <td class="n">${n(denied)}</td><td class="n">${pct(denied)}</td></tr>
+        <tr><td>Nothing open nearby
+          <div class="muted" style="font-size:.8rem">A coverage hole</div></td>
+          <td class="n">${n(none)}</td><td class="n">${pct(none)}</td></tr>
+        <tr><td>Location lookup failed
+          <div class="muted" style="font-size:.8rem">Timeout or unsupported browser</div></td>
+          <td class="n">${n(failed)}</td><td class="n">${pct(failed)}</td></tr>
+      </tbody></table>
+      ${denied > taps * 0.25 ? `<p class="note" style="margin:12px 0 0"><b>Permission denial is
+        your biggest leak.</b> A browser gives one prompt per visitor and a reflexive Deny sticks.
+        A short screen explaining why location is needed, shown before the prompt, is the standard
+        fix.</p>` : ""}
+      ${none > taps * 0.15 ? `<p class="note" style="margin:12px 0 0">A meaningful share found
+        nothing open nearby. Cross-reference against the states table above — that's where data
+        is thin.</p>` : ""}
+    </div>`);
+  }
+
   /* ---- actions ---- */
   out.push(`<div class="band"><h2>What people did</h2><span>Last 90 days</span></div>`);
   const EV = [
+    ["rating_submit", "Ratings", "Stars submitted \u2014 the conversion"],
+    ["bathroom_now", "Find-me taps", "All outcomes, broken out above"],
     ["share", "Shares", "Location shared from a popup"],
     ["deeplink_open", "Shared links opened", "Someone arrived on a ?loc= link"],
     ["guide_cta_click", "Guide → map", "Tapped through from an SEO page"],

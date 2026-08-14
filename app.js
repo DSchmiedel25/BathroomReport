@@ -714,7 +714,6 @@ const NOT_SURE_RETIRE = 2;
  * Declared HERE rather than beside its click handler because pickVisitQuestions reads it and
  * runs first — a `const` read before its declaration throws, and that is the exact bug that
  * broke every popup in v2.38. Module state goes above the first thing that touches it. */
-const reopenedKeys = {};
 
 function pickVisitQuestions(loc, myVote){
   const summary = { ...(amenityCache[loc.id] || {}), ...(storeFeatureCache[loc.id] || {}) };
@@ -733,12 +732,11 @@ function pickVisitQuestions(loc, myVote){
     // "Is there a public restroom?" is targeted, not universal — see restroomDoubted.
     if(key === 'hasRestroom' && !restroomDoubted(loc)) return false;
     if(amenitySettled(loc, key, summary)) return false;                 // confirmed / gas
-    /* A key you asked to change is eligible again even though you have answered it. Session-only
-     * and deliberately not persisted: it reopens the question without touching the stored value,
-     * so if you never answer, nothing changed. */
-    const reopened = (reopenedKeys[loc.id] && reopenedKeys[loc.id].has(key));
+    /* No reopen flag any more. Removing an answer deletes the stored value outright, so the key
+     * becomes eligible here by the ordinary rule — there is no longer a state where you have
+     * answered AND want asking again. */
     const ans = mine[key];
-    if(!reopened && (ans === 'yes' || ans === 'no' || (ans && ans !== 'unknown'))) return false; // answered for real
+    if(ans === 'yes' || ans === 'no' || (ans && ans !== 'unknown')) return false; // answered for real
     const ns = (meta[key] && meta[key].notSure) || 0;
     if(ns >= NOT_SURE_RETIRE) return false;                             // retired for this person
     return true;
@@ -1040,18 +1038,14 @@ function renderAmenityStepHtml(myVote, locId){
     <div class="amenity-answer-row">${buttons}</div>`;
 }
 
-/* ---------- Your own answers, and a way to change them ----------
+/* ---------- Your own answers, and a way to take them back ----------
  *
  * Answering an amenity used to be a one-way door. pickVisitQuestions filters out anything you
  * have personally answered, so the question never came back — and until three people agreed,
  * your answer was not displayed either. A mistaken tap was permanent and invisible, fixable
  * only in the Firestore console.
  *
- * That is also inconsistent with ratings, which show your stars filled in and let you change
- * them whenever you like. This closes the gap: what you said, shown back to you, tappable.
- *
- * Three jobs at once — correct a mistake, confirm your answer registered at all, and update a
- * place that has been renovated. */
+ * This closes the gap: what you said, shown back to you, with a way to withdraw it. */
 function myAnswersHtml(loc, myVote){
   const mine = (myVote && myVote.amenities) || {};
   const mineStore = (myVote && myVote.storeFeatures) || {};
@@ -1059,13 +1053,25 @@ function myAnswersHtml(loc, myVote){
   const add = (defs, source) => defs.forEach(a => {
     const val = source[a.key];
     if(!val || val === 'unknown') return;          // "not sure" is not an answer to show back
-    const label = isMultiState(a)
-      ? amenityStateLabel(a, val)
-      : `${a.label}: ${val === 'yes' ? 'Yes' : 'No'}`;
-    rows.push(`<button type="button" class="my-answer" data-reopen="${a.key}" data-locid="${loc.id}">
-      <span class="ma-what">${escapeHtml(label)}</span>
-      <span class="ma-change">change</span>
-    </button>`);
+    /* Every row names its own question.
+     *
+     * Multi-state rows used to print the bare answer — "Single private restroom" with nothing
+     * saying what it answered — while yes/no rows printed "Wheelchair accessible: Yes". Two
+     * formats in one list, and the terse one is unreadable out of context.
+     *
+     * The label also has to survive a value this build doesn't recognise. amenityStateLabel
+     * falls back to "Not sure" for anything outside stateLabels, and 'shared'/'split' are still
+     * in the Firestore enum from an earlier scheme — so a stored legacy value rendered as a row
+     * reading "Not sure", which looks like no answer at all and told you nothing about which
+     * question was stuck. Those now say so plainly and can be cleared like anything else. */
+    const known = isMultiState(a) ? !!(a.stateLabels && a.stateLabels[val]) : (val === 'yes' || val === 'no');
+    const answer = !known ? 'an old answer' :
+      (isMultiState(a) ? amenityStateLabel(a, val) : (val === 'yes' ? 'Yes' : 'No'));
+    rows.push(`<div class="my-answer${known ? '' : ' is-legacy'}" data-akey="${a.key}">
+      <span class="ma-what"><b>${escapeHtml(a.label)}</b>${escapeHtml(': ' + answer)}</span>
+      <button type="button" class="ma-change" data-reopen="${a.key}" data-locid="${loc.id}"
+        aria-label="Remove your answer to ${escapeHtml(a.label)}">remove</button>
+    </div>`);
   });
   add(BATHROOM_AMENITIES, mine);
   add(STORE_FEATURES, mineStore);
@@ -1073,36 +1079,117 @@ function myAnswersHtml(loc, myVote){
   return `<div class="my-answers">
     <div class="ma-head">You said</div>
     <div class="ma-rows">${rows.join('')}</div>
+    <div class="ma-foot">Removing takes your answer off the map right away. You can answer again
+      next time you're there.</div>
   </div>`;
 }
 
-/* Reopening does NOT delete anything.
+/* Removing is NOT geofenced, and it really does delete.
  *
- * The first version cleared your stored answer immediately so the question became eligible
- * again. That was wrong in a way that only shows up on the road: ANSWERING is geofenced to a
- * few hundred metres, and clearing was not. Tap "change" at home and your answer is gone with
- * no way to replace it until you drive back — the app quietly destroyed data you could not
- * restore.
+ * The earlier version only marked the question askable again and left the stored value alone,
+ * to avoid clearing an answer you couldn't replace until you drove back. That protected the
+ * wrong thing. If you realise you got one wrong, the useful action is to pull it down NOW —
+ * leaving bad data live on the map until you happen to return is the worse outcome, and it also
+ * left legacy values permanently stuck, because replacing them required being on site.
  *
- * So "change" now only marks the question as one you want asked again. Your stored answer stays
- * exactly where it is until you pick a new one, and the normal answer path overwrites it — the
- * same path, with the same geofence. Change your mind and walk away, and nothing happened.
+ * So: removal is a correction and needs no proof of presence. ADDING an answer still does —
+ * that geofence is what makes an answer mean "I was there", and none of this touches it.
  *
- * This is how the star ratings already behave: your stars stay filled and tapping a different
- * one replaces the value. There was no reason for amenities to be more destructive. */
-document.addEventListener('click', (e) => {
+ * Undo holds the old value in memory only. Refresh and it's gone, which is correct: the removal
+ * is already committed server-side by then. */
+const removedAnswers = {};   // "locId:key" -> { value, bathroom }
+
+async function removeMyAnswer(loc, key){
+  const myVote = myVoteCache[loc.id] || emptyVote();
+  const bathroom = isBathroomKey(key);
+  const source = bathroom ? (myVote.amenities || {}) : (myVote.storeFeatures || {});
+  const value = source[key];
+  if(!value) return false;
+
+  const updated = { ...myVote };
+  const next = { ...source };
+  delete next[key];
+  if(bathroom) updated.amenities = next; else updated.storeFeatures = next;
+
+  // Mirror the optimistic tally the answer path keeps, so the confirmed-by-visitors block
+  // drops the vote immediately instead of waiting on the Cloud Function.
+  const cache = bathroom ? amenityCache : storeFeatureCache;
+  const prevCache = JSON.parse(JSON.stringify(cache[loc.id] || {}));
+  const cell = (cache[loc.id] = cache[loc.id] || {})[key];
+  if(cell && cell[value] > 0) cell[value]--;
+
+  const prevVote = myVoteCache[loc.id];
+  myVoteCache[loc.id] = updated;
+
+  const ok = await saveMyVote(loc.id, updated);
+  if(!ok){
+    if(prevVote === undefined) delete myVoteCache[loc.id]; else myVoteCache[loc.id] = prevVote;
+    cache[loc.id] = prevCache;
+    return false;
+  }
+  removedAnswers[loc.id + ':' + key] = { value, bathroom };
+  return true;
+}
+
+async function undoRemoveAnswer(loc, key){
+  const stash = removedAnswers[loc.id + ':' + key];
+  if(!stash) return false;
+  const myVote = myVoteCache[loc.id] || emptyVote();
+  const updated = { ...myVote };
+  if(stash.bathroom) updated.amenities = { ...(myVote.amenities || {}), [key]: stash.value };
+  else updated.storeFeatures = { ...(myVote.storeFeatures || {}), [key]: stash.value };
+  const prevVote = myVoteCache[loc.id];
+  myVoteCache[loc.id] = updated;
+  const ok = await saveMyVote(loc.id, updated);
+  if(!ok){ myVoteCache[loc.id] = prevVote; return false; }
+  const cache = stash.bathroom ? amenityCache : storeFeatureCache;
+  const cell = (cache[loc.id] = cache[loc.id] || {})[key];
+  if(cell) cell[stash.value] = (cell[stash.value] || 0) + 1;
+  delete removedAnswers[loc.id + ':' + key];
+  return true;
+}
+
+document.addEventListener('click', async (e) => {
+  const undoBtn = e.target.closest && e.target.closest('[data-undo-answer]');
+  if(undoBtn){
+    const loc = locationsById[undoBtn.dataset.locid];
+    if(!loc) return;
+    undoBtn.disabled = true;
+    const ok = await undoRemoveAnswer(loc, undoBtn.dataset.undoAnswer);
+    if(!ok){ undoBtn.disabled = false; undoBtn.textContent = 'try again'; return; }
+    delete visitQuestions[loc.id]; delete visitCursor[loc.id];
+    refreshVoteViews(loc);
+    refreshCommunityBlock(loc);
+    return;
+  }
+
   const btn = e.target.closest && e.target.closest('[data-reopen]');
   if(!btn) return;
   const loc = locationsById[btn.dataset.locid];
   if(!loc) return;
   const key = btn.dataset.reopen;
-  (reopenedKeys[loc.id] = reopenedKeys[loc.id] || new Set()).add(key);
-  /* Force a fresh pick so the newly-eligible key is actually offered — visitQuestions is cached
-   * per location and would otherwise hold the list from before. */
+
+  /* Swap the row for its own undo line before awaiting, so the tap registers instantly even on
+   * a slow connection. The write below is what actually commits it. */
+  const row = btn.closest('.my-answer');
+  btn.disabled = true;
+  const ok = await removeMyAnswer(loc, key);
+  if(!ok){
+    btn.disabled = false;
+    btn.textContent = 'try again';
+    return;
+  }
+  if(row){
+    row.classList.add('is-removed');
+    row.innerHTML = `<span class="ma-what">Removed</span>
+      <button type="button" class="ma-change" data-undo-answer="${key}" data-locid="${loc.id}">undo</button>`;
+  }
+  /* The question is eligible again the moment the stored value is gone, so no reopen flag is
+   * needed — but the cached visit list still holds the old pick and has to be rebuilt. */
   delete visitQuestions[loc.id]; delete visitCursor[loc.id];
-  refreshVoteViews(loc);
   const step = document.getElementById('amenity-step-' + loc.id);
-  if(step) step.scrollIntoView({ block:'nearest', behavior:'smooth' });
+  if(step) step.innerHTML = renderAmenityStepHtml(myVoteCache[loc.id] || emptyVote(), loc.id);
+  refreshCommunityBlock(loc);
 });
 
 /* Every view that reads myVoteCache, redrawn together.
@@ -5306,6 +5393,19 @@ function attachStarHandlers(loc){
         /* Captured here because this is the one moment the location is guaranteed loaded. */
         if(okVote) rememberRatedMeta(loc);
         if(okVote && type === 'bathroom') logActivity('rating', { sourceId: loc.id + '_' + getEffectiveId(), locId: loc.id });
+        /* The conversion that matters. Everything else on the analytics board measures people
+         * arriving; this measures the app doing its job. Fired only after the write is confirmed,
+         * so a rejected vote never counts.
+         *
+         * `is_change` separates a first rating from someone revising one — a rising total made up
+         * entirely of edits is a very different signal from new coverage, and without this they
+         * are indistinguishable. */
+        if(okVote) track('rating_submit', {
+          rating_type: type,
+          value: val,
+          chain: loc.n || '',
+          is_change: rollback.vote > 0
+        });
         if(note) note.textContent = okVote ? 'Saved ✓ — visible to everyone' : 'Save failed — nothing was recorded';
         if(okVote) maybeShowSupportPrompt();
         /* Advance to the next question, after a beat so the tick and the saved note are seen.
@@ -5528,74 +5628,39 @@ document.getElementById('onboardingLocate')?.addEventListener('click', () => {
 // jump straight to that pin. We also report the arrival to GA4 and then scrub the
 // tracking params out of the URL, so a refresh or a re-share doesn't carry UTMs
 // around and the address bar stays clean.
-/* Two kinds of tagged arrival land here:
- *
- *   ?loc=<id>              a shared link or a /guide/ SEO page pointing at one pin
- *   ?utm_* with no loc     a campaign entry point — the QR on a printed card, for one
- *
- * This block used to return the moment `loc` was absent, so a campaign arrival fired no event
- * AND kept its utm_* params sitting in the address bar. That second part is the real bug: the
- * printed cards carry ?utm_campaign=card_v2, so anyone who scanned one and then shared the URL
- * they landed on passed the card campaign along to whoever they sent it to, and every one of
- * those arrivals counted as another card scan.
- *
- * GA4's automatic page_view carries the campaign on its own either way. The explicit event is
- * here because a named event can be counted directly rather than inferred from a session
- * dimension, and because gtag is the first thing an ad blocker removes.
- */
 (function(){
   const params = new URLSearchParams(window.location.search);
   // A link shared before the id rename carries the raw form (?loc=node%2F123). Normalise it so
   // those links keep resolving; meta.srcId holds the original if it is ever needed.
   const rawTarget = params.get('loc');
   const targetId = rawTarget ? fsId(rawTarget) : rawTarget;
-  const hasUtm = Array.from(params.keys()).some(k => k.startsWith('utm_'));
-  if(!targetId && !hasUtm) return;
+  if(!targetId) return;
 
-  // Attribution: where did this arrival come from? ("guide" = an SEO page,
-  // absent on a ?loc= link = someone shared it directly.)
-  const source   = params.get('utm_source')   || 'direct_share';
-  const medium   = params.get('utm_medium')   || '';
-  const campaign = params.get('utm_campaign') || '';
+  const target = seedLocations.find(l => l.id === targetId);
+  const found = Boolean(target && markers[targetId]);
+  if(found) zoomToMarker(markers[targetId]);
 
-  if(targetId){
-    const target = seedLocations.find(l => l.id === targetId);
-    const found = Boolean(target && markers[targetId]);
-    if(found) zoomToMarker(markers[targetId]);
+  // Attribution: where did this deep link come from? ("guide" = an SEO page,
+  // absent = a link someone shared directly.)
+  const source = params.get('utm_source') || 'direct_share';
+  track('deeplink_open', {
+    loc_id: targetId,
+    chain: (target && target.n) || '',
+    source: source,
+    campaign: params.get('utm_campaign') || '',
+    // false = the link pointed at a pin we no longer have (renamed/removed id),
+    // which is the signal that a stale /guide/ page is still in Google's index.
+    resolved: found
+  });
 
-    track('deeplink_open', {
-      loc_id: targetId,
-      chain: (target && target.n) || '',
-      source: source,
-      campaign: campaign,
-      // false = the link pointed at a pin we no longer have (renamed/removed id),
-      // which is the signal that a stale /guide/ page is still in Google's index.
-      resolved: found
-    });
-  } else {
-    // A tagged arrival that names no location: the campaign itself is the whole signal.
-    track('campaign_arrival', { source: source, medium: medium, campaign: campaign });
-  }
-
-  /* Strip loc + any utm_* so the URL is shareable and refresh-safe.
-   *
-   * Deliberately deferred to load rather than done here. gtag's library is fetched async and
-   * reads document.location when it gets around to processing the queued config() — so
-   * rewriting the URL mid-app.js can beat it to that read and cost GA4 the campaign outright,
-   * which is the opposite of the point. Waiting for load is invisible to the user and removes
-   * the race. replaceState leaves no extra history entry.
-   */
-  const strip = () => {
-    const cur = new URLSearchParams(location.search);
-    const keep = new URLSearchParams();
-    cur.forEach((v, k) => {
-      if(k !== 'loc' && !k.startsWith('utm_')) keep.append(k, v);
-    });
-    const qs = keep.toString();
-    history.replaceState({}, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
-  };
-  if(document.readyState === 'complete') strip();
-  else window.addEventListener('load', strip, { once: true });
+  // Strip loc + any utm_* so the URL is shareable and refresh-safe. GA4 has already
+  // captured them by this point. replaceState leaves no extra history entry.
+  const keep = new URLSearchParams();
+  params.forEach((v, k) => {
+    if(k !== 'loc' && !k.startsWith('utm_')) keep.append(k, v);
+  });
+  const qs = keep.toString();
+  history.replaceState({}, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
 })();
 
 // Resize every pin whenever the zoom level changes
@@ -6763,10 +6828,6 @@ function openAccountPanel(mode){
      * reopening the passport could land you on the stats reverse with no explanation. No height
      * call any more — the grid sizes both faces on its own. */
     flipCardTo(false);
-  } else {
-    // Reopening always lands on Sign Up: anyone with an account is normally already signed in,
-    // so the person looking at this panel is usually here for the first time.
-    setAuthMode('signup');
   }
 }
 
@@ -7349,45 +7410,6 @@ document.getElementById('accountClose').addEventListener('click', () => {
   setTimeout(() => { suppressNextLocateClick = false; }, 400);
 });
 
-/* Which of the two jobs the logged-out panel is doing.
- *
- * Both action buttons stay in the DOM under their original ids, with their original handlers —
- * only visibility moves. Nothing about how a signup or a login actually runs is touched here,
- * which is the whole reason it is done this way.
- */
-function setAuthMode(mode){
-  const signup = mode !== 'login';
-  const segUp = document.getElementById('authModeSignUp');
-  const segIn = document.getElementById('authModeLogIn');
-  if(!segUp || !segIn) return;
-
-  segUp.setAttribute('aria-pressed', String(signup));
-  segIn.setAttribute('aria-pressed', String(!signup));
-
-  document.getElementById('authEmailBlock').style.display = signup ? '' : 'none';
-  document.getElementById('authSignUpBtn').style.display  = signup ? '' : 'none';
-  document.getElementById('authLogInBtn').style.display   = signup ? 'none' : '';
-  // Only meaningful against an existing account, so it belongs to the log-in side.
-  document.getElementById('authForgotBtn').style.display  = signup ? 'none' : '';
-
-  /* Password managers have to be told which of the two this is. With one autocomplete value
-   * serving both, a manager offers to overwrite a saved credential on a signup and to create a
-   * second one on a login. */
-  const pw = document.getElementById('authPassword');
-  if(pw){
-    pw.setAttribute('autocomplete', signup ? 'new-password' : 'current-password');
-    pw.placeholder = signup ? 'at least 6 characters' : 'your password';
-  }
-
-  // A failed login must not leave its error sitting over the signup form, where it reads as a
-  // complaint about something the person has not done yet.
-  const note = document.getElementById('authNote');
-  if(note) note.textContent = '';
-}
-document.getElementById('authModeSignUp').addEventListener('click', () => setAuthMode('signup'));
-document.getElementById('authModeLogIn').addEventListener('click', () => setAuthMode('login'));
-setAuthMode('signup');
-
 document.getElementById('authForgotBtn').addEventListener('click', async () => {
   const username = document.getElementById('authUsername').value.trim();
   const note = document.getElementById('authNote');
@@ -7797,7 +7819,12 @@ function showBathroomNowResult(result,fallback=false){
 }
 locateBtn.addEventListener('click',()=>{
   if(suppressNextLocateClick)return;
-  if(!navigator.geolocation){nearestInfo.style.display='block';nearestInfo.textContent="Your browser doesn't support location.";return;}
+  if(!navigator.geolocation){nearestInfo.style.display='block';nearestInfo.textContent="Your browser doesn't support location.";track('bathroom_now',{outcome:'unsupported'});return;}
+  /* The primary action of the whole app, tracked by OUTCOME rather than as one undifferentiated
+   * tap. A tap that ends in a denied permission prompt, one that finds nothing in range, and one
+   * that routes someone to a bathroom are three completely different events for the person, and
+   * counting them together hides the only two that represent a broken experience. */
+  track('bathroom_now',{outcome:'tap'});
   locateBtn.disabled=true;locateBtn.textContent='Finding the closest…';nearestInfo.style.display='none';
   navigator.geolocation.getCurrentPosition(async pos=>{
     const user={lat:pos.coords.latitude,lng:pos.coords.longitude};lastKnownPos={...user,ts:Date.now()};currentListPosition=lastKnownPos;
@@ -7835,6 +7862,9 @@ locateBtn.addEventListener('click',()=>{
       locateBtn.disabled=false;locateBtn.textContent=LOCATE_LABEL;
       nearestInfo.style.display='block';
       nearestInfo.textContent='No open bathrooms found nearby right now.';
+      // A coverage hole, and the one outcome the person can do nothing about. If this climbs,
+      // it names the places that need data before anything else does.
+      track('bathroom_now',{outcome:'none_found'});
       return;
     }
     // Don't route someone to a bathroom that's actively flagged out of order. Check the 4 closest
@@ -7846,16 +7876,28 @@ locateBtn.addEventListener('click',()=>{
       locateBtn.disabled=false;locateBtn.textContent=LOCATE_LABEL;
       nearestInfo.style.display='block';
       nearestInfo.textContent='No open bathrooms found nearby right now.';
+      // A coverage hole, and the one outcome the person can do nothing about. If this climbs,
+      // it names the places that need data before anything else does.
+      track('bathroom_now',{outcome:'none_found'});
       return;
     }
     try{
       const options=await getRoutedOptions(user,candidates);
       options.sort((a,b)=>{const rank=x=>isLocationOpenNow(x.loc)===true?0:isLocationOpenNow(x.loc)===null?1:2;return rank(a)-rank(b)||a.distanceMiles-b.distanceMiles;});
       if(!options.length)throw new Error('No routes');showBathroomNowResult(options[0],false);
+      track('bathroom_now',{outcome:'found',chain:options[0].loc.n||'',miles:Math.round(options[0].distanceMiles*10)/10,routed:true});
     }catch(e){
-      const loc=candidates[0];showBathroomNowResult({loc,distanceMiles:milesBetween(user.lat,user.lng,loc.lat,loc.lng),durationMinutes:null},true);
+      const loc=candidates[0];const miles=milesBetween(user.lat,user.lng,loc.lat,loc.lng);
+      showBathroomNowResult({loc,distanceMiles:miles,durationMinutes:null},true);
+      // Still a result, but straight-line rather than routed — the routing service failed.
+      track('bathroom_now',{outcome:'found',chain:loc.n||'',miles:Math.round(miles*10)/10,routed:false});
     }finally{locateBtn.disabled=false;locateBtn.textContent=LOCATE_LABEL;}
-  },err=>{locateBtn.disabled=false;locateBtn.textContent=LOCATE_LABEL;nearestInfo.style.display='block';nearestInfo.textContent=err.code===1?'Location access was denied. Enable location permission for this site to use Bathroom Now.':'Could not get your location. Check your connection and location settings.';},{enableHighAccuracy:true,timeout:10000});
+  },err=>{locateBtn.disabled=false;locateBtn.textContent=LOCATE_LABEL;nearestInfo.style.display='block';nearestInfo.textContent=err.code===1?'Location access was denied. Enable location permission for this site to use Bathroom Now.':'Could not get your location. Check your connection and location settings.';
+    /* Permission denial is the single biggest thing standing between a visitor and the app
+     * working at all, and nothing in the funnel showed it before. If this is a large share of
+     * taps, the fix is a priming step explaining why location is needed BEFORE the browser
+     * prompt — you only get one prompt per visitor, and a reflexive Deny is permanent. */
+    track('bathroom_now',{outcome:err.code===1?'permission_denied':'location_failed'});},{enableHighAccuracy:true,timeout:10000});
 });
 
 // Missing-location reporting — logs straight to Firestore (visible in FlushPanel), no email needed
