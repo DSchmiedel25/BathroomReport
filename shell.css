@@ -105,7 +105,10 @@ button, input, select, textarea{ font-family:inherit; }
   display:grid !important; place-items:center !important; padding:0 !important;
 }
 #cardDropBtn[hidden]{ display:none !important; }
-#cardDropBtn .map-control-icon{ width:22px !important; height:22px !important; stroke:currentColor; fill:none; stroke-width:2; }
+/* margin:0 matters — the base .map-control-icon carries margin-right:7px for the buttons that
+   pair an icon with a text label, and inside a 46px square that shoves the glyph off centre.
+   #whereAmIBtn zeroes it for the same reason. */
+#cardDropBtn .map-control-icon{ display:block !important; width:22px !important; height:22px !important; margin:0 !important; stroke:currentColor; fill:none; stroke-width:2; stroke-linejoin:round; }
 #cardDropBtn:disabled{ opacity:.55 !important; }
 
 #cardDropScrim{ position:fixed; inset:0; background:rgba(4,10,18,.55); z-index:900; }
