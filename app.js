@@ -537,7 +537,7 @@ function ratingConfidenceHtml(count){
  * onboarding panel, and the FAQ — which is exactly why they drifted apart (July 14 / July 21 /
  * actually July 30). Set this ONE value on each release; everything that shows a date reads it.
  * Format is YYYY-MM-DD so it sorts and can't be misread. */
-const BUILD_DATE = '2026-08-03';
+const BUILD_DATE = '2026-08-14';
 
 // "2026-07-30" -> "July 30, 2026" for prose. Parsed as UTC parts rather than new Date(str) so it
 // can't shift a day backwards for users west of GMT.
@@ -2963,7 +2963,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.48.3';
+const BUILD = 'v2.49.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
