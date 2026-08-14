@@ -6832,6 +6832,10 @@ function openAccountPanel(mode){
      * reopening the passport could land you on the stats reverse with no explanation. No height
      * call any more — the grid sizes both faces on its own. */
     flipCardTo(false);
+  }else{
+    // Same reasoning as the flip above: the panel should not reopen halfway through a job the
+    // person abandoned. setAuthMode is declared below but hoists, so this is safe here.
+    setAuthMode('signup');
   }
 }
 
@@ -7405,6 +7409,43 @@ document.getElementById('ssSignOut')?.addEventListener('click', () => {
 
 /* The drawer's Passport button is gone; the sheet's row carries the same job and is wired
  * above, alongside the other rows that navigate. */
+
+/* The Sign Up / Log In switch.
+ *
+ * The segmented control's markup shipped without this, so nothing ever toggled it: the panel
+ * stayed in the state index.html hardcodes — Create Account showing, Log In and Forgot password
+ * both display:none. The Log In button's own click handler worked the whole time; it was simply
+ * never visible, which left existing users no way to sign in and no way to reach a password
+ * reset. Everything below is show/hide plus aria state — no auth logic lives here.
+ */
+function setAuthMode(mode){
+  const signUp = mode !== 'login';
+  const el = id => document.getElementById(id);
+  const show = (id, on) => { const n = el(id); if(n) n.style.display = on ? '' : 'none'; };
+
+  // aria-pressed is the accessible name for which half is active, and the CSS selects on it,
+  // so this is the state, not a mirror of it.
+  const tabSignUp = el('authModeSignUp'), tabLogIn = el('authModeLogIn');
+  if(tabSignUp) tabSignUp.setAttribute('aria-pressed', String(signUp));
+  if(tabLogIn)  tabLogIn.setAttribute('aria-pressed', String(!signUp));
+
+  show('authEmailBlock', signUp);   // signUpAccount() requires an email; logging in does not
+  show('authSignUpBtn',  signUp);
+  show('authLogInBtn',  !signUp);
+  show('authForgotBtn', !signUp);   // reset is only reachable from the log-in side
+
+  /* Tells the password manager which job this is. Left on new-password, iOS offers to invent a
+   * password when someone is trying to type one they already have. */
+  const pw = el('authPassword');
+  if(pw) pw.setAttribute('autocomplete', signUp ? 'new-password' : 'current-password');
+
+  // A message about the other mode ("username taken") is noise once you have switched away.
+  const note = el('authNote');
+  if(note) note.textContent = '';
+}
+
+document.getElementById('authModeSignUp')?.addEventListener('click', () => setAuthMode('signup'));
+document.getElementById('authModeLogIn')?.addEventListener('click', () => setAuthMode('login'));
 
 document.getElementById('accountToggle').addEventListener('click', () => openAccountPanel('account'));
 
