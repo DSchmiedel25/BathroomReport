@@ -2047,7 +2047,11 @@ function isMapAdmin(){ return !!window.__isAdmin; }
 
 window.addEventListener('authStateReady', () => {
   checkIfBlocked();
-  refreshAdminFlag();
+  // The flag read is async; re-sync the admin rows once it lands so a sheet that was already
+  // open when you signed in picks them up instead of waiting for a close/reopen.
+  refreshAdminFlag().then(() => {
+    if(typeof ssSyncAdminTools === 'function') ssSyncAdminTools();
+  });
   if(typeof loadAllRatings === 'function') loadAllRatings();
   if(typeof updateAccountUI === 'function') updateAccountUI();
   if(typeof loadTravelModeFromAccount === 'function') loadTravelModeFromAccount();
@@ -6848,6 +6852,135 @@ function openAccountPanel(mode){
 /* ssSetTab is gone with the tabs. The sheet is one scroll now — see the ordering note in
  * index.html — so there is no pane to show or hide and no selected state to track. */
 
+/* ---------- Admin: record a card drop ----------
+ *
+ * Quick capture for the printed cards, so recording a drop while standing at the counter does
+ * not mean loading a second page. cardmap.html is still where drops get managed — moved,
+ * annotated over time, marked gone. This only creates them.
+ *
+ * Position comes from GPS, never the map centre. "I am standing here" is the whole point, and
+ * the map centre could be a hundred miles from you after a pan — a wrong pin is worse than no
+ * pin, because nothing about it looks wrong later. If there is no fix, the save is refused and
+ * says so rather than guessing.
+ *
+ * The payload matches the cardDrops create rule exactly: those ten keys, nothing else. `notes`
+ * is the log cardmap reads; `note` mirrors its newest entry so markerTitle and the older
+ * readers keep working, which is the same contract cardmap itself honours.
+ */
+const CARD_NOTE_MAX = 200;
+let cardDropPos = null;   // the fix this prompt will save; null until we have one
+
+function cardDropClose(){
+  document.getElementById('cardDropPrompt').hidden = true;
+  document.getElementById('cardDropScrim').hidden = true;
+  document.getElementById('cardDropNote').value = '';
+  cardDropPos = null;
+  document.getElementById('cardDropBtn')?.focus({ preventScroll:true });
+}
+
+function cardDropSetWhere(text, ok){
+  const el = document.getElementById('cardDropWhere');
+  el.textContent = text;
+  // Save stays disabled until there is a real position to attach the drop to.
+  document.getElementById('cardDropSave').disabled = !ok;
+}
+
+async function cardDropOpen(){
+  if(!isMapAdmin()) return;
+  document.getElementById('cardDropScrim').hidden = false;
+  document.getElementById('cardDropPrompt').hidden = false;
+  cardDropPos = null;
+  cardDropSetWhere('Locating\u2026', false);
+  document.getElementById('cardDropNote').focus();
+
+  /* A fix from the last two minutes is good enough for "which shop am I in" and avoids a second
+   * GPS prompt on a phone that just used Where Am I?. Older than that and we ask again. */
+  if(lastKnownPos && lastKnownPos.ts && (Date.now() - lastKnownPos.ts) < 120000){
+    cardDropPos = { lat: lastKnownPos.lat, lng: lastKnownPos.lng };
+    cardDropSetWhere(cardDropPos.lat.toFixed(6) + ', ' + cardDropPos.lng.toFixed(6), true);
+    return;
+  }
+  if(!navigator.geolocation){
+    cardDropSetWhere('This device has no location support \u2014 use the Card Map to place it by hand.', false);
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      cardDropPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      lastKnownPos = { ...cardDropPos, ts: Date.now() };
+      cardDropSetWhere(cardDropPos.lat.toFixed(6) + ', ' + cardDropPos.lng.toFixed(6), true);
+    },
+    err => {
+      // Each failure gets its own wording; "location failed" tells you nothing about what to do.
+      const msg = err.code === err.PERMISSION_DENIED
+          ? 'Location permission denied \u2014 place this one in the Card Map instead.'
+        : err.code === err.POSITION_UNAVAILABLE
+          ? 'Location unavailable right now \u2014 try again or use the Card Map.'
+        : err.code === err.TIMEOUT
+          ? 'Location timed out \u2014 try again or use the Card Map.'
+          : 'Could not get your location.';
+      cardDropSetWhere(msg, false);
+    },
+    { enableHighAccuracy:true, timeout:12000, maximumAge:15000 }
+  );
+}
+
+async function cardDropSave(){
+  if(!isMapAdmin() || !cardDropPos) return;
+  const user = window.__currentUser;
+  if(!user || !user.uid){ cardDropSetWhere('Sign in again \u2014 your session expired.', false); return; }
+
+  const btn = document.getElementById('cardDropSave');
+  btn.disabled = true; btn.textContent = 'Saving\u2026';
+  try{
+    const { db, collection, addDoc } = await fb();
+    const now = Date.now();
+    const text = document.getElementById('cardDropNote').value.trim().slice(0, CARD_NOTE_MAX);
+    await addDoc(collection(db, 'cardDrops'), {
+      lat: cardDropPos.lat,
+      lng: cardDropPos.lng,
+      note: text,
+      notes: text ? [{ text, ts: now }] : [],
+      status: 'active',
+      placedAt: now,
+      createdBy: user.uid,
+      // Bounded to 40 to match the rule; a longer address would be rejected outright.
+      createdByName: String(user.email || '').slice(0, 40)
+    });
+    /* Confirm in the dialog and close on a short delay rather than firing a toast: there is no
+     * general toast helper in this app (showAchievementToast is its own thing), and a silent
+     * close leaves you unsure whether a tap in a noisy shop actually saved. */
+    cardDropSetWhere('Saved.', false);
+    setTimeout(cardDropClose, 900);
+  }catch(e){
+    console.error('card drop save failed', e && e.code);
+    cardDropSetWhere('Save failed: ' + ((e && e.code) || 'unknown'), true);
+  }finally{
+    btn.textContent = 'Save drop';
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('cardDropBtn')?.addEventListener('click', cardDropOpen);
+document.getElementById('cardDropCancel')?.addEventListener('click', cardDropClose);
+document.getElementById('cardDropScrim')?.addEventListener('click', cardDropClose);
+document.getElementById('cardDropSave')?.addEventListener('click', cardDropSave);
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && !document.getElementById('cardDropPrompt')?.hidden) cardDropClose();
+});
+
+/* Admin tools in the settings sheet.
+ *
+ * The rows are authored hidden and revealed here rather than the other way round. __isAdmin is
+ * false until refreshAdminFlag()'s admins/{uid} read returns, so a row that started visible
+ * would appear for every signed-out visitor for a moment and then be yanked away. Hiding is
+ * cosmetic either way: cardmap.html verifies admin on its own, and the Firestore rules are
+ * what actually stop anyone reading a card drop. */
+function ssSyncAdminTools(){
+  const on = typeof isMapAdmin === 'function' && isMapAdmin();
+  document.querySelectorAll('.ss-admin-only').forEach(el => { el.hidden = !on; });
+}
+
 function ssSyncIdentity(){
   const name = document.getElementById('ssName'), sub = document.getElementById('ssSub');
   const av = document.getElementById('ssAvatar'), stamp = document.getElementById('ssStamp');
@@ -6973,6 +7106,7 @@ function openSettingsSheet(){
    * page coming apart underneath your thumb. */
   document.body.style.overflow = 'hidden';
   ssSyncIdentity();
+  ssSyncAdminTools();
   ssSyncValues();
   sheet.hidden = false;
   sheet.setAttribute('aria-hidden', 'false');

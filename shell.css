@@ -93,6 +93,46 @@ button, input, select, textarea{ font-family:inherit; }
   width:100% !important; min-height:0 !important; z-index:auto !important;
 }
 
+/* ---------- Admin: card drop capture ----------
+   Third slot on the right rail. 12 / 70 / 128 keeps the 58px pitch the two above already use,
+   so the stack stays even instead of the new one landing wherever it fit. */
+#cardDropBtn{
+  position:absolute !important; right:12px !important; top:128px !important;
+  left:auto !important; bottom:auto !important; z-index:600 !important;
+  width:46px !important; height:46px !important; border-radius:14px !important;
+  background:var(--shell-chrome) !important; border:1px solid var(--shell-line) !important;
+  color:var(--shell-ink) !important; box-shadow:var(--shell-shadow) !important;
+  display:grid !important; place-items:center !important; padding:0 !important;
+}
+#cardDropBtn[hidden]{ display:none !important; }
+#cardDropBtn .map-control-icon{ width:22px !important; height:22px !important; stroke:currentColor; fill:none; stroke-width:2; }
+#cardDropBtn:disabled{ opacity:.55 !important; }
+
+#cardDropScrim{ position:fixed; inset:0; background:rgba(4,10,18,.55); z-index:900; }
+#cardDropScrim[hidden]{ display:none; }
+#cardDropPrompt{
+  position:fixed; z-index:910; left:50%; transform:translateX(-50%);
+  /* Anchored to the top rather than centred: the keyboard takes the bottom half of the screen
+     the moment the textarea is focused, and a centred dialog gets shoved off-screen. */
+  top:calc(env(safe-area-inset-top) + 64px);
+  width:min(420px, calc(100vw - 32px));
+  background:var(--shell-chrome); border:1px solid var(--shell-line); border-radius:16px;
+  box-shadow:var(--shell-shadow); color:var(--shell-ink); padding:16px;
+  max-height:calc(100vh - 96px); overflow-y:auto;
+}
+#cardDropPrompt[hidden]{ display:none; }
+#cardDropPrompt h2{ margin:0 0 4px; font-size:17px; }
+#cardDropWhere{ margin:0 0 12px; font-size:12.5px; color:var(--shell-ink-dim, #9aa3ad); }
+#cardDropPrompt textarea{
+  width:100%; box-sizing:border-box; margin-top:4px; padding:10px 12px; border-radius:10px;
+  border:1px solid var(--shell-line); background:var(--shell-surface, #1b1e23);
+  color:var(--shell-ink); line-height:1.45;
+  /* 16px or iOS Safari zooms the viewport on focus and never zooms back. */
+  font-size:16px; resize:vertical;
+}
+#cardDropActions{ display:flex; gap:8px; margin-top:14px; }
+#cardDropActions .btn{ flex:1; min-height:44px; }
+
 /* ---------- Right rail: Where Am I? (icon-only) + List ---------- */
 #whereAmIBtn{
   position:absolute !important; right:12px !important; top:12px !important;
@@ -1042,6 +1082,10 @@ html[data-theme="light"]{
 .ss-sec[hidden]{display:none !important}
 
 .ss-card{background:var(--ss-card);border-radius:14px;overflow:hidden}
+/* Explicit, like .ss-sec[hidden] and .ss-row[hidden] above. .ss-card sets no display of its own
+   so the UA default for [hidden] would win today, but every other row shape in this sheet needed
+   saying out loud, and an admin-only card silently appearing is the wrong way to find out. */
+.ss-card[hidden]{display:none !important}
 
 /* Every row shape shares one geometry: the account block, the standard rows, the toggles that
    came from the drawer, and the two select sections. */

@@ -162,6 +162,26 @@
 </div>
 <button id="listViewToggle" aria-label="List of closest bathrooms"><svg class="ico" aria-hidden="true"><use href="#i-list"></use></svg></button>
 <div id="map"></div>
+<!-- Admin-only quick capture for the printed cards. Third slot on the right rail, below Where
+     Am I? and List. Authored hidden and revealed by ssSyncAdminTools() once the admins/{uid}
+     read lands, exactly like the Card Map row in Settings — the flag is false until that async
+     read returns, so a button that started visible would flash for every visitor. -->
+<button id="cardDropBtn" class="ss-admin-only" hidden aria-label="Record a card drop here">
+  <svg class="map-control-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><rect x="3" y="6" width="18" height="12" rx="2"></rect><path d="M3 10h18"></path></svg>
+</button>
+<!-- The note prompt. A plain dialog rather than a bottom sheet: it is admin-only, it holds one
+     field, and reusing the location sheet would have meant teaching that component a second job. -->
+<div id="cardDropScrim" hidden></div>
+<div id="cardDropPrompt" role="dialog" aria-modal="true" aria-labelledby="cardDropTitle" hidden>
+  <h2 id="cardDropTitle">Record a card drop</h2>
+  <p id="cardDropWhere">Locating…</p>
+  <label class="rating-label" for="cardDropNote">Note (optional)</label>
+  <textarea id="cardDropNote" maxlength="200" rows="3" placeholder="e.g. placed 5 on the counter by the register"></textarea>
+  <div id="cardDropActions">
+    <button type="button" class="btn btn-secondary" id="cardDropCancel">Cancel</button>
+    <button type="button" class="btn btn-primary" id="cardDropSave">Save drop</button>
+  </div>
+</div>
 <button id="whereAmIBtn" aria-label="Show my current location on the map"><svg class="map-control-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path><circle cx="12" cy="12" r="8"></circle></svg><span>Where Am I?</span></button>
 <button id="locateBtn" aria-label="Find the closest bathroom">Find me the closest bathroom</button>
 <div id="nearestInfo"></div>
@@ -530,6 +550,21 @@ This is tracked on this device only. Log in to sync it across devices.
             <span class="ss-desc">What the ratings mean and where the data comes from</span></span>
           <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
+      </div>
+
+      <!-- Admin tools. Hidden by default and revealed only by ssSyncAdminTools() once the
+           admins/{uid} read has come back. Starting hidden matters: the flag is set
+           asynchronously after auth, so a row that started visible would flash for every
+           signed-out visitor before being taken away. This is a convenience link, not a
+           permission — cardmap.html makes its own admin check on load. -->
+      <div class="ss-sec ss-admin-only" id="ssAdminSec" hidden>Admin</div>
+      <div class="ss-card ss-admin-only" id="ssAdminCard" hidden>
+        <a href="/cardmap.html" class="ss-row" id="ssCardMapRow">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 4v14M15 6v14" stroke="currentColor" stroke-width="2"/></svg></span>
+          <span class="ss-main"><span class="ss-lab">Card Map</span>
+            <span class="ss-desc">Track where the printed cards have been dropped</span></span>
+          <svg class="ss-chev" viewBox="0 0 8 14" fill="none" aria-hidden="true"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </a>
       </div>
 
       <!-- FIND. RATE. SHARE. IMPROVE. as the labels for the numbers that were already here. -->
