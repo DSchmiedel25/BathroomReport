@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-16T09:42:07.936Z",
+  "generated": "2026-08-17T09:57:50.489Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -124,9 +124,15 @@
       },
       "2026-08-15": {
         "activeUsers": 4,
-        "newUsers": 2,
+        "newUsers": 3,
         "sessions": 6,
-        "pageViews": 6
+        "pageViews": 8
+      },
+      "2026-08-16": {
+        "activeUsers": 1,
+        "newUsers": 1,
+        "sessions": 1,
+        "pageViews": 1
       }
     },
     "signupsByDate": {
@@ -136,20 +142,14 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 304,
-        "users": 149
+        "sessions": 307,
+        "users": 151
       },
       {
         "source": "qr",
         "medium": "physical_card",
         "sessions": 9,
         "users": 5
-      },
-      {
-        "source": "(not set)",
-        "medium": "(not set)",
-        "sessions": 8,
-        "users": 6
       },
       {
         "source": "facebook.com",
@@ -194,6 +194,12 @@
         "users": 3
       },
       {
+        "source": "(not set)",
+        "medium": "(not set)",
+        "sessions": 2,
+        "users": 2
+      },
+      {
         "source": "l.facebook.com",
         "medium": "referral",
         "sessions": 1,
@@ -216,12 +222,12 @@
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 301
+        "sessions": 306
       },
       {
         "campaign": "(referral)",
         "content": "(not set)",
-        "sessions": 20
+        "sessions": 21
       },
       {
         "campaign": "card_v2",
@@ -240,11 +246,6 @@
       },
       {
         "campaign": "(direct)",
-        "content": "",
-        "sessions": 3
-      },
-      {
-        "campaign": "(referral)",
         "content": "",
         "sessions": 1
       }
@@ -278,8 +279,8 @@
       {
         "state": "Iowa",
         "country": "United States",
-        "users": 15,
-        "sessions": 15
+        "users": 16,
+        "sessions": 16
       },
       {
         "state": "California",
@@ -541,7 +542,7 @@
       {
         "city": "Council Bluffs",
         "state": "Iowa",
-        "users": 14
+        "users": 15
       },
       {
         "city": "Glenview",
@@ -1351,6 +1352,59 @@
         "ReferrerUrl.sessionsCount": 5,
         "PopularPages.url": "https://bathroomreport.app/",
         "PopularPages.visitsCount": 4
+      },
+      "2026-08-16": {
+        "DeadClickCount.sessionsCount": 2,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 2,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 2,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 2,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 2,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 2,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 2,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 2,
+        "Traffic.pagesPerSessionPercentage": 1,
+        "EngagementTime.totalTime": 17,
+        "EngagementTime.activeTime": 13,
+        "Browser.name": "Chrome",
+        "Browser.sessionsCount": 1,
+        "Device.name": "PC",
+        "Device.sessionsCount": 2,
+        "OS.name": "Windows",
+        "OS.sessionsCount": 2,
+        "Country.name": "United States",
+        "Country.sessionsCount": 2,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 2,
+        "ReferrerUrl.name": 0,
+        "ReferrerUrl.sessionsCount": 2,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 1
       }
     }
   },
