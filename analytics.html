@@ -320,8 +320,37 @@ tr:last-child td{border-bottom:0}
   </section>
 </div>
 
-<script>
+<script type="module">
+/* Module rather than a classic script so the Firestore SDK can be imported directly.
+ * There are no inline event handlers on this page, so nothing depended on these
+ * functions being global. `qrcode` from the cdnjs tag above is still reachable —
+ * it lives on the global object and module scope chains up to it. */
+import {
+  initializeApp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, query, where, getDocs, getCountFromServer
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 const DATA_URL = "analytics-data.json";
+
+/* Same public config as firebase.js. Deliberately NOT importing firebase.js: that module
+ * initialises App Check with reCAPTCHA and IndexedDB offline persistence, both of which
+ * exist for the app and are pure overhead on a read-only back-office page. This app
+ * instance is named so it cannot collide with the default one if firebase.js is ever
+ * added here. Every value below is public by design; the security is in firestore.rules. */
+const FB_CONFIG = {
+  apiKey: "AIzaSyDMu-9NYeqvBD4Mbp2jctoAF89raE7p8UM",
+  authDomain: "stewarts-map.firebaseapp.com",
+  projectId: "stewarts-map",
+  storageBucket: "stewarts-map.firebasestorage.app",
+  messagingSenderId: "1024042855550",
+  appId: "1:1024042855550:web:02120ef818d67c57e17c2f"
+};
+
+const DAY_MS = 86400000;
+const toKey = (ms) => new Date(ms).toISOString().slice(0, 10);
+const keyToMs = (k) => Date.parse(k + "T00:00:00Z");
 
 /* ---------- formatting ------------------------------------------------ */
 const nf = new Intl.NumberFormat("en-US");
@@ -331,10 +360,36 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&
 /* Sum a {date: value} map over the last `days` days ending yesterday. Everything on this page
  * is "the last N days", never "this month", because a calendar month resets to a tiny number
  * on the 1st and makes a healthy week look like a collapse. */
-function sumLast(map, days, offset = 0) {
+/* The date keys for a window of `days` calendar days ending at `anchor` (inclusive),
+ * shifted back by `offset` days for the comparison period.
+ *
+ * This replaces a version that sliced the last N KEYS PRESENT in the map. GA4 omits a day
+ * entirely when nothing happened on it, so "the last 7 keys" could silently span five weeks,
+ * and asking for 28 days when only 22 existed returned the all-time total under a 28d label.
+ * On 2026-08-16 that made the 28d tile read 231 when the real figure was 145. Dates are the
+ * only safe index; missing days are the data, not a gap to skip over. */
+function windowKeys(anchor, days, offset = 0) {
+  const end = keyToMs(anchor) - offset * DAY_MS;
+  const out = [];
+  for (let i = days - 1; i >= 0; i--) out.push(toKey(end - i * DAY_MS));
+  return out;
+}
+function sumWindow(map, anchor, days, offset = 0) {
+  return windowKeys(anchor, days, offset)
+    .reduce((t, k) => t + (Number((map || {})[k]) || 0), 0);
+}
+
+/* Runs of ≥2 consecutive days with no GA4 row at all. A row with zeros means GA4 was
+ * collecting and saw nothing; no row means it was not reporting. Those look identical on a
+ * line chart and mean opposite things, so they get called out in words. */
+function findGaps(map) {
   const keys = Object.keys(map || {}).sort();
-  const end = keys.length - offset;
-  return keys.slice(Math.max(0, end - days), end).reduce((t, k) => t + (Number(map[k]) || 0), 0);
+  const gaps = [];
+  for (let i = 1; i < keys.length; i++) {
+    const missing = (keyToMs(keys[i]) - keyToMs(keys[i - 1])) / DAY_MS - 1;
+    if (missing >= 2) gaps.push({ after: keys[i - 1], before: keys[i], days: missing });
+  }
+  return gaps;
 }
 function delta(cur, prev) {
   if (!prev) return cur > 0 ? { cls: "up", txt: "new" } : { cls: "", txt: "—" };
@@ -357,17 +412,30 @@ const label = (s) => SOURCE_LABEL[String(s).toLowerCase()] || s || "(none)";
 /* ---------- tiny inline chart ----------------------------------------- */
 /* Hand-rolled SVG rather than a chart library: this page loads over the same connection as
  * the map and pulling 300 KB of charting code for two series would be absurd. */
-function chart(title, series) {
-  const dates = series[0].points.map(p => p.date);
+/* Every series is drawn against ONE date axis passed in by the caller, and reads its value
+ * for each date out of its own {date: value} map.
+ *
+ * The previous version took the axis from series[0] but positioned each point by its index
+ * within its OWN array. A series with one entry therefore landed at x=0 — the left edge,
+ * whatever date that actually was — and a lone moveto with no lineto strokes nothing at all,
+ * which is why "Accounts created" showed in the legend and never appeared on the chart. Any
+ * sparse series would have been plotted against the wrong dates entirely. */
+function chart(title, series, dates) {
   if (!dates.length) return "";
   const W = 700, H = 150, PAD = 4;
-  const max = Math.max(1, ...series.flatMap(s => s.points.map(p => p.v)));
+  const valOf = (s, d) => Number((s.map || {})[d]) || 0;
+  const max = Math.max(1, ...series.flatMap(s => dates.map(d => valOf(s, d))));
   const x = (i) => (dates.length < 2 ? W / 2 : (i / (dates.length - 1)) * W);
   const y = (v) => H - PAD - (v / max) * (H - PAD * 2);
 
   const paths = series.map(s => {
-    const d = s.points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join("");
-    return `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.5"
+    const pts = dates.map((d, i) => `${x(i).toFixed(1)},${y(valOf(s, d)).toFixed(1)}`);
+    // A single-column axis has no line to draw; emit a dot so the series is still visible.
+    if (pts.length < 2) {
+      const [cx, cy] = pts[0].split(",");
+      return `<circle cx="${cx}" cy="${cy}" r="3" fill="${s.color}"/>`;
+    }
+    return `<path d="M${pts.join("L")}" fill="none" stroke="${s.color}" stroke-width="2.5"
       stroke-linejoin="round" stroke-linecap="round"/>`;
   }).join("");
 
@@ -376,17 +444,13 @@ function chart(title, series) {
 
   return `<div class="chart"><h3>${esc(title)}</h3>
     <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
-         aria-label="${esc(title)}, ${dates.length} days">
+         aria-label="${esc(title)}, ${dates.length} days, peak ${n(max)} per day">
       <line x1="0" y1="${H - PAD}" x2="${W}" y2="${H - PAD}" stroke="#D3D9D3" stroke-width="1"/>
       ${paths}
     </svg>
     <div class="legend">${legend}
       <span class="muted">${esc(dates[0])} → ${esc(dates[dates.length - 1])} · peak ${n(max)}/day</span>
     </div></div>`;
-}
-function lastN(map, days) {
-  const keys = Object.keys(map || {}).sort().slice(-days);
-  return keys.map(k => ({ date: k, v: Number(map[k]) || 0 }));
 }
 
 /* ---------- link builder ---------------------------------------------- */
@@ -676,11 +740,10 @@ function initBuilder() {
 }
 
 /* ---------- render ---------------------------------------------------- */
-function render(d) {
+function render(d, fs) {
   const ga = d.ga4 || {};
   const daily = ga.daily || {};
   const signups = ga.signupsByDate || {};
-  const ratings = ga.ratingsByDate || {};
   const ev = ga.events || {};
   const out = [];
 
@@ -708,38 +771,96 @@ function render(d) {
   }
 
   /* ---- headline tiles ---- */
-  const users7 = sumLast(mapOf(daily, "activeUsers"), 7);
-  const usersPrev7 = sumLast(mapOf(daily, "activeUsers"), 7, 7);
-  const su7 = sumLast(signups, 7), suPrev7 = sumLast(signups, 7, 7);
-  const suAll = Object.values(signups).reduce((t, v) => t + Number(v || 0), 0);
-  const ra7 = sumLast(ratings, 7), raPrev7 = sumLast(ratings, 7, 7);
-  const raAll = Object.values(ratings).reduce((t, v) => t + Number(v || 0), 0);
-  const d7 = delta(users7, usersPrev7), dsu = delta(su7, suPrev7), dra = delta(ra7, raPrev7);
+  /* Windows are anchored to the newest day GA4 actually reported, not to today. GA4's most
+     recent day is usually still filling in when the nightly job runs, so anchoring on "now"
+     would put a permanently half-empty day at the end of every window. The anchor date is
+     printed in the band so the reader is never guessing which days are being counted. */
+  const gaKeys = Object.keys(daily).sort();
+  const anchor = gaKeys[gaKeys.length - 1];
 
-  /* Ratings lead. Everything else on this page counts people arriving; this is the only number
-     saying the app did its job, and it is what the whole project is bottlenecked on. */
-  out.push(`<div class="band"><h2>The numbers</h2><span>Rolling windows, not calendar months</span></div>`);
+  const usersMap = mapOf(daily, "activeUsers");
+  const users7 = sumWindow(usersMap, anchor, 7);
+  const usersPrev7 = sumWindow(usersMap, anchor, 7, 7);
+  const su7 = sumWindow(signups, anchor, 7), suPrev7 = sumWindow(signups, anchor, 7, 7);
+  const suAll = Object.values(signups).reduce((t, v) => t + Number(v || 0), 0);
+
+  /* Ratings, tips and out-of-order reports come from Firestore — the records themselves,
+     not the GA4 events that are supposed to accompany them. GA4 loses these to ad blockers
+     and tracking protection, and right now it is reporting none of them at all, so counting
+     events would keep showing zero against a database that is not empty. */
+  const fsOk = fs && fs.ok;
+  const ra7 = fsOk ? sumWindow(fs.ratingsByDate, anchor, 7) : 0;
+  const raPrev7 = fsOk ? sumWindow(fs.ratingsByDate, anchor, 7, 7) : 0;
+  const ti7 = fsOk ? sumWindow(fs.tipsByDate, anchor, 7) : 0;
+  const tiPrev7 = fsOk ? sumWindow(fs.tipsByDate, anchor, 7, 7) : 0;
+  const oo7 = fsOk ? sumWindow(fs.oooByDate, anchor, 7) : 0;
+
+  const d7 = delta(users7, usersPrev7), dsu = delta(su7, suPrev7);
+  const dra = delta(ra7, raPrev7), dti = delta(ti7, tiPrev7);
+  const q = (v) => fsOk ? n(v) : "\u2014";   // an em dash, so a failed read never reads as a real zero
+
+  out.push(`<div class="band"><h2>The numbers</h2>
+    <span>Rolling windows ending ${esc(anchor)} \u00b7 not calendar months</span></div>`);
   out.push(`<div class="tiles">
-    <div class="tile"><p class="k">Ratings \u00b7 7d</p><p class="v">${n(ra7)}</p>
-      <p class="d ${dra.cls}">${dra.txt}</p></div>
+    <div class="tile"><p class="k">Ratings \u00b7 7d</p><p class="v">${q(ra7)}</p>
+      <p class="d ${dra.cls}">${fsOk ? dra.txt : "Firestore unavailable"}</p></div>
+    <div class="tile"><p class="k">Tips \u00b7 7d</p><p class="v">${q(ti7)}</p>
+      <p class="d ${dti.cls}">${fsOk ? dti.txt : "Firestore unavailable"}</p></div>
     <div class="tile"><p class="k">Unique users \u00b7 7d</p><p class="v">${n(users7)}</p>
       <p class="d ${d7.cls}">${d7.txt}</p></div>
     <div class="tile t"><p class="k">Accounts \u00b7 7d</p><p class="v">${n(su7)}</p>
       <p class="d ${dsu.cls}">${dsu.txt}</p></div>
     <div class="tile t"><p class="k">Ratings per 100 users</p>
-      <p class="v">${users7 ? (ra7 / users7 * 100).toFixed(0) : "\u2014"}</p>
+      <p class="v">${fsOk && users7 ? (ra7 / users7 * 100).toFixed(0) : "\u2014"}</p>
       <p class="sub">last 7 days \u00b7 the engagement rate that matters</p></div>
-    <div class="tile"><p class="k">Unique users \u00b7 28d</p><p class="v">${n(sumLast(mapOf(daily,"activeUsers"),28))}</p>
-      <p class="sub">${n(sumLast(mapOf(daily,"sessions"),28))} sessions</p></div>
-    <div class="tile t"><p class="k">Tracked since start</p><p class="v">${n(raAll)}</p>
-      <p class="sub">ratings \u00b7 ${n(suAll)} accounts</p></div>
+    <div class="tile t"><p class="k">Out of order \u00b7 7d</p><p class="v">${q(oo7)}</p>
+      <p class="sub">${fsOk ? n(fs.totals.ooo) + " reported all time" : "Firestore unavailable"}</p></div>
+    <div class="tile"><p class="k">Unique users \u00b7 28d</p><p class="v">${n(sumWindow(usersMap, anchor, 28))}</p>
+      <p class="sub">${n(sumWindow(mapOf(daily, "sessions"), anchor, 28))} sessions</p></div>
+    <div class="tile t"><p class="k">Since start</p>
+      <p class="v">${fsOk ? n(fs.totals.ratings) : "\u2014"}</p>
+      <p class="sub">ratings \u00b7 ${fsOk ? n(fs.totals.tips) : "\u2014"} tips \u00b7 ${n(suAll)} accounts</p></div>
   </div>`);
 
-  out.push(chart("Ratings, users and accounts per day, last 60 days", [
-    { name: "Unique users", color: "#0F6B4C", points: lastN(mapOf(daily, "activeUsers"), 60) },
-    { name: "Ratings", color: "#B23A2E", points: lastN(ratings, 60) },
-    { name: "Accounts created", color: "#2EA1AA", points: lastN(signups, 60) },
-  ]));
+  /* Two charts, not one. Traffic peaks around 40/day and community writes are single digits;
+     sharing a y-axis pins the community lines flat against the baseline where no change in
+     them is ever legible. Both use the same date axis so they can be read against each other. */
+  const axis = windowKeys(anchor, 60).filter(k => k >= gaKeys[0]);
+  out.push(chart("Unique users per day, last 60 days", [
+    { name: "Unique users", color: "#0F6B4C", map: usersMap },
+  ], axis));
+  out.push(chart("Community writes per day, last 60 days", [
+    { name: "Ratings", color: "#B23A2E", map: fsOk ? fs.ratingsByDate : {} },
+    { name: "Tips", color: "#7A5CA8", map: fsOk ? fs.tipsByDate : {} },
+    { name: "Accounts created", color: "#2EA1AA", map: signups },
+  ], axis));
+
+  const gaps = findGaps(daily);
+  if (gaps.length) {
+    out.push(`<div class="msg"><b>GA4 reported nothing on some days</b>
+      ${gaps.map(g => `<div class="muted">${esc(g.after)} \u2192 ${esc(g.before)}
+        \u00b7 ${g.days} days with no row at all</div>`).join("")}
+      <div class="muted" style="margin-top:7px">Those days are charted as zero. GA4 returns a
+      row of zeros when it is collecting and sees nothing, and no row when it is not reporting,
+      so a run this long is worth confirming against the property directly before reading it as
+      a genuine traffic collapse.</div></div>`);
+  }
+
+  if (fs && !fs.ok) {
+    out.push(`<div class="msg"><b>Could not read community data from Firestore</b>
+      <div class="muted">${esc(fs.error || "unknown error")}</div>
+      <div class="muted" style="margin-top:7px">Ratings, tips and out-of-order tiles show
+      \u2014 rather than 0 above. GA4 traffic numbers are unaffected.</div></div>`);
+  } else if (fsOk) {
+    const evRatings = Number(ev.rating_submit || 0);
+    if (fs.totals.ratings > 0 && evRatings === 0) {
+      out.push(`<div class="msg"><b>Firestore has ratings, GA4 has no rating_submit events</b>
+        <div class="muted">${n(fs.totals.ratings)} rating records against ${n(evRatings)}
+        events. The tiles above use the records, so they are right either way — but the event
+        pipeline is not reporting, which also means bathroom_now, share and deeplink_open are
+        blind. Tap Bathroom Now on the live site and watch GA4 Realtime to confirm.</div></div>`);
+    }
+  }
 
   out.push(`<div class="msg" style="border-left-color:#D3D9D3">
     <b>On the accounts number</b>
@@ -934,19 +1055,100 @@ function mapOf(daily, key) {
   return o;
 }
 
+/* ---------- community data, read from Firestore ------------------------ */
+/* GA4's `rating_submit` event was the only thing this page ever counted as a rating, which
+ * made it a proxy for a number the database already holds exactly. Proxies lose records to
+ * ad blockers and tracking protection even when they work, and this one is currently
+ * reporting nothing at all. The records are read directly instead.
+ *
+ * No authentication and no rules change: activity/{id} and outOfOrder/{id} are both
+ * `allow read: if true` in firestore.rules, and both hold aggregate community writes with no
+ * private profile data. votes/{id} is deliberately owner-scoped and is NOT read here — a
+ * public read of it would expose where a named person had been and when. */
+
+/* GA4 buckets its days in the property's reporting timezone; Firestore stores a raw epoch.
+ * Bucketing both the same way is what makes the two chartable on one axis. Change this if
+ * the GA4 property is ever set to something other than Eastern. */
+const REPORT_TZ = "America/New_York";
+const tzFmt = new Intl.DateTimeFormat("en-CA", {
+  timeZone: REPORT_TZ, year: "numeric", month: "2-digit", day: "2-digit"
+});
+const tzKey = (ms) => tzFmt.format(new Date(ms));
+
+async function loadCommunity() {
+  const since = Date.now() - 70 * DAY_MS;   // 60 charted days plus the 7-day comparison window
+  const ratingsByDate = {}, tipsByDate = {}, oooByDate = {};
+  const totals = { ratings: 0, tips: 0, ooo: 0 };
+
+  const db = getFirestore(initializeApp(FB_CONFIG, "analytics"));
+
+  /* One range query for the charted window. `activity` carries both ratings and tips, so
+   * splitting by type here costs nothing extra. Entries flagged deleted are skipped for the
+   * same reason loadWeeklyRecap skips them: a moderated-away tip should stop counting. */
+  const actSnap = await getDocs(
+    query(collection(db, "activity"), where("ts", ">=", since))
+  );
+  actSnap.forEach(docSnap => {
+    const a = docSnap.data();
+    if (a.deleted === true) return;
+    if (typeof a.ts !== "number") return;
+    const k = tzKey(a.ts);
+    if (a.type === "rating") ratingsByDate[k] = (ratingsByDate[k] || 0) + 1;
+    else if (a.type === "tip") tipsByDate[k] = (tipsByDate[k] || 0) + 1;
+  });
+
+  const oooSnap = await getDocs(
+    query(collection(db, "outOfOrder"), where("ts", ">=", since))
+  );
+  oooSnap.forEach(docSnap => {
+    const o = docSnap.data();
+    if (typeof o.ts !== "number") return;
+    const k = tzKey(o.ts);
+    oooByDate[k] = (oooByDate[k] || 0) + 1;
+  });
+
+  /* All-time totals via aggregation queries rather than reading the collections: billed at one
+   * read per 1,000 documents matched, so this stays cheap however far the app grows. */
+  const countOf = async (ref) => (await getCountFromServer(ref)).data().count;
+  totals.ratings = await countOf(query(collection(db, "activity"), where("type", "==", "rating")));
+  totals.tips = await countOf(query(collection(db, "activity"), where("type", "==", "tip")));
+  totals.ooo = await countOf(collection(db, "outOfOrder"));
+
+  return { ok: true, ratingsByDate, tipsByDate, oooByDate, totals };
+}
+
+/* ---------- bootstrap -------------------------------------------------- */
 /* cache:'no-store' — GitHub Pages caches aggressively and a stale dashboard that looks fresh
    is worse than one that admits it's empty. */
-fetch(DATA_URL, { cache: "no-store" })
-  .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-  .then(render)
-  .catch(() => {
+async function boot() {
+  let data;
+  try {
+    const r = await fetch(DATA_URL, { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    data = await r.json();
+  } catch (e) {
     document.getElementById("stamp").textContent = "No data file yet.";
     document.getElementById("app").innerHTML = `<div class="msg">
       <b>analytics-data.json not found</b>
       It's created by the <code>Pull analytics</code> workflow. Open the Actions tab and run it
       once manually — after that it runs itself every night at 5am Eastern.</div>`;
-  });
+    return;
+  }
 
+  /* Firestore is never allowed to take the page down with it: a blocked SDK, an offline
+   * phone or a rules change all degrade to em dashes on three tiles and a message saying so,
+   * while every GA4 number still renders. */
+  let fs;
+  try {
+    fs = await loadCommunity();
+  } catch (e) {
+    fs = { ok: false, error: (e && e.message) || String(e) };
+  }
+
+  render(data, fs);
+}
+
+boot();
 initBuilder();
 </script>
 </body>
