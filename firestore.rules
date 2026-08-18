@@ -616,7 +616,15 @@ service cloud.firestore {
        * as permission-denied — which is exactly how a broken create spent a day disguised as a
        * duplicate. `get` only: listing stays admin-only, so nobody can walk the queue. */
       allow get:    if isAdmin() || (signedIn() && resource.data.reporterId == request.auth.uid);
-      allow list:   if isAdmin();
+      /* Own reports may now be LISTED as well as fetched, so the Fixer/Caretaker count can be
+       * derived from the reports themselves rather than from a localStorage tally that dies
+       * with the browser profile.
+       *
+       * This does not reopen the queue. Firestore only permits a list when every document it
+       * could return satisfies the rule, so a query has to be provably constrained to
+       * reporterId == your own uid before it runs; anything broader is refused outright. It is
+       * the same shape already used on votes/{id}, and for the same reason. */
+      allow list:   if isAdmin() || (signedIn() && resource.data.reporterId == request.auth.uid);
       allow update: if isAdmin() && validReportStatus();
       allow delete: if isAdmin();
     }
@@ -631,12 +639,25 @@ service cloud.firestore {
     // { description, ts } plus optional lat/lng.
     match /missingReports/{id} {
       allow create: if startsPending() && hasNoModeratorFields()
-        && request.resource.data.keys().hasOnly(['description','ts','lat','lng','status'])
+        && request.resource.data.keys().hasOnly(['description','ts','lat','lng','status','uid'])
         && request.resource.data.description is string
         && request.resource.data.description.size() <= 600
         && saneTs()
-        && validLatOrAbsent('lat') && validLngOrAbsent('lng') && coordsPaired();
-      allow read:   if isAdmin();
+        && validLatOrAbsent('lat') && validLngOrAbsent('lng') && coordsPaired()
+        /* uid is OPTIONAL and must be your own when present. Absent is still a valid submission:
+         * this is the one collection someone with no account can write to, and that stays true —
+         * attaching an owner is what makes a submission countable toward Fixer/Caretaker, not
+         * what makes it acceptable. A forged uid would credit a stranger's contribution to
+         * whoever sent it, so the value is checked against the token rather than trusted. */
+        && (!request.resource.data.keys().hasAny(['uid'])
+            || (signedIn() && request.resource.data.uid == request.auth.uid));
+      /* Own submissions are readable so the achievement count can be derived from them.
+       * `get('uid','')` rather than `.uid` because most existing documents have no such field
+       * at all, and a bare read of a missing key aborts rule evaluation instead of returning
+       * null. Listing is constrained the same way reports/{id} is: Firestore refuses any query
+       * that could return a document failing this test, so a person can only ever list theirs. */
+      allow read:   if isAdmin()
+        || (signedIn() && resource.data.get('uid', '') == request.auth.uid);
       allow update: if isAdmin() && validReportStatus();
       allow delete: if isAdmin();
     }
@@ -811,6 +832,24 @@ service cloud.firestore {
                && validDayWindows(request.resource.data.value))
            );
       allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    /* Collection-group access to the SAME documents as the block above.
+     *
+     * A nested match never covers a collection-group query, however identical the path looks:
+     * `collectionGroup(db, 'submissions')` is evaluated against this wildcard rule and nothing
+     * else, so without it the Hours Hero count fails with permission-denied even though the
+     * caller can already read each of those documents one at a time.
+     *
+     * Read-only, and narrower than the nested rule on purpose: that one lets any signed-in user
+     * read any submission (the consensus display needs it), while a query across EVERY store at
+     * once should only ever return your own. Writes stay on the nested path, where the store id
+     * is explicit and the Cloud Function's trigger expectations hold.
+     *
+     * Requires a collection-group index on `submissions.uid` — automatic single-field indexes
+     * are collection-scoped, so this one has to be created explicitly or the query is refused. */
+    match /{path=**}/submissions/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
     }
 
     // Server-derived hours consensus. Written ONLY by the recomputeHourStatus Cloud Function

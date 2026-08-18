@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
   import {
     getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
     doc, getDoc, setDoc, increment, arrayUnion,
-    collection, addDoc, query, where, getDocs, deleteDoc, deleteField
+    collection, collectionGroup, addDoc, query, where, getDocs, deleteDoc, deleteField
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import {
     getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
@@ -91,7 +91,11 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
      * Deleting the key from the object client-side and merging leaves the server value exactly
      * where it was — which is why "change" on an amenity answer appeared to work and then the
      * old answer came back on reload. */
-    db, doc, getDoc, setDoc, increment, arrayUnion, collection, addDoc, query, where, getDocs, deleteDoc, deleteField,
+    /* collectionGroup — the only way to find a person's own hour reports. They live at
+     * hourReports/{storeId}/submissions/{uid}, so the store id is in the PATH: without a
+     * collection-group query you would have to already know every store someone had
+     * reported before you could ask whether they had reported it. */
+    db, doc, getDoc, setDoc, increment, arrayUnion, collection, collectionGroup, addDoc, query, where, getDocs, deleteDoc, deleteField,
     auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile,
     functions, httpsCallable
   };

@@ -2272,6 +2272,7 @@ async function saveHoursReport(locId, value, kind){
     await setDoc(doc(db, 'hourReports', safeId, 'submissions', uid),
       { uid, value, kind, submittedAt: Date.now(), schemaVersion: 1 });
     markHoursReported(locId);
+    invalidateServerImprovements();   // this account's contribution set just changed
     return true;
   }catch(e){ return false; }
 }
@@ -2300,8 +2301,97 @@ function countTipsWritten(){
 /* Everything you have done to FIX the map, as one running total: hours reported, problems
  * flagged, and locations added. Three separate stores because each was built for its own
  * purpose; summed here because to a reader they are one thing — corrections made. */
-function countImprovements(){
+/* Contributions this ACCOUNT has made, read back from the records themselves.
+ *
+ * The three local stores below only ever knew what this browser profile had done, so a new
+ * phone, a second browser or a cleared Safari cache reset Fixer, Caretaker and Hours Hero to
+ * zero with nothing to rebuild from. Every one of those contributions is already durable
+ * server-side — it was just unreachable, because nothing queried it by author.
+ *
+ * Derived, never counted into a stored total: a tally that is written once and incremented
+ * afterwards drifts the moment a report is deleted in moderation, and there is no honest way
+ * to reconcile it later. Three queries, each independently allowed to fail.
+ *
+ * Cached per uid for the session. Passport and the footer creed both call this and neither
+ * needs it fresher than the tab.
+ */
+let serverImprovementsCache = null;
+
+function invalidateServerImprovements(){ serverImprovementsCache = null; }
+
+async function loadServerImprovements(){
+  if(!isLoggedIn()) return null;
+  const uid = window.__currentUser.uid;
+  if(serverImprovementsCache && serverImprovementsCache.uid === uid) return serverImprovementsCache;
+
+  const out = { uid, hours: new Set(), reports: new Set(), added: new Set(), failed: [] };
+  const { db, collection, collectionGroup, query, where, getDocs } = await fb();
+
+  /* Problem reports. The document stores locId in its raw form, the same shape the local set
+   * uses, so these merge without normalising. Muted reporters have a local entry with no
+   * document behind it — the union keeps their count intact, which is the existing behaviour. */
+  try{
+    const snap = await getDocs(query(collection(db, 'reports'), where('reporterId', '==', uid)));
+    snap.forEach(d => { const v = d.data(); if(v && v.locId) out.reports.add(v.locId); });
+  }catch(e){
+    out.failed.push('reports');
+    console.warn('improvements: reports query failed —', (e && e.code) || e);
+  }
+
+  /* Places submitted through "Add a place". Only those carrying a uid can be found; anything
+   * sent before the field existed, or sent while signed out, is unattributable for good. */
+  try{
+    const snap = await getDocs(query(collection(db, 'missingReports'), where('uid', '==', uid)));
+    snap.forEach(d => out.added.add(d.id));
+  }catch(e){
+    out.failed.push('missingReports');
+    console.warn('improvements: missingReports query failed —', (e && e.code) || e);
+  }
+
+  /* Hour reports, at hourReports/{storeId}/submissions/{uid}. The store id is the SLUGGED
+   * location id, so the local set is slugged to match before the union rather than after —
+   * mixing "way/123" and "way__123" would count one report as two.
+   *
+   * Needs a collection-group index on submissions.uid. Until that exists Firestore refuses the
+   * query with failed-precondition and logs a URL that creates it; the catch keeps Hours Hero
+   * on its local count in the meantime instead of taking the whole Passport down. */
+  try{
+    const snap = await getDocs(query(collectionGroup(db, 'submissions'), where('uid', '==', uid)));
+    snap.forEach(d => {
+      const store = d.ref.parent.parent;
+      if(store) out.hours.add(store.id);
+    });
+  }catch(e){
+    out.failed.push('hourReports');
+    console.warn('improvements: hourReports collection-group query failed —', (e && e.code) || e);
+  }
+
+  serverImprovementsCache = out;
+  return out;
+}
+
+// Distinct stores this person has reported hours for, device and account merged.
+function countHoursReported(server){
+  const local = new Set();
+  try{
+    JSON.parse(localStorage.getItem('br_hours_reported') || '[]')
+      .forEach(id => local.add(fsId(id)));   // slugged, to match the server's store ids
+  }catch(e){}
+  if(server) server.hours.forEach(id => local.add(id));
+  return local.size;
+}
+
+function countImprovements(server){
   const size = (key) => { try{ return new Set(JSON.parse(localStorage.getItem(key) || '[]')).size; }catch(e){ return 0; } };
+  const merged = (key, serverSet, normalise) => {
+    const s = new Set();
+    try{
+      JSON.parse(localStorage.getItem(key) || '[]')
+        .forEach(id => s.add(normalise ? normalise(id) : id));
+    }catch(e){}
+    if(serverSet) serverSet.forEach(id => s.add(id));
+    return s.size;
+  };
   /* br_reports_made, not reportedLocations. The latter is the open-report UI hint and now
    * expires after 30 days; reading it here would make the footer's IMPROVE total shrink over
    * time for someone who had done nothing at all.
@@ -2309,7 +2399,10 @@ function countImprovements(){
    * Anyone upgrading has a populated reportedLocations and an empty lifetime store, so the
    * lifetime store is seeded from it once rather than starting everyone back at zero. */
   seedLifetimeReports();
-  return size('br_hours_reported') + size('br_reports_made') + size('br_locations_added');
+  if(!server) return size('br_hours_reported') + size('br_reports_made') + size('br_locations_added');
+  return merged('br_hours_reported', server.hours, fsId)
+    + merged('br_reports_made', server.reports)
+    + merged('br_locations_added', server.added);
 }
 
 /* One-time migration for anyone who reported before the lifetime store existed. Keyed like the
@@ -3466,6 +3559,7 @@ async function logReport(loc, reason){
 
     await setDoc(doc(db, 'reports', reportDocId(loc.id, uid)), reportDoc, { merge: false });
     markReportedLocally(loc.id, true);
+    invalidateServerImprovements();   // this account's contribution set just changed
     return true;
   }catch(e){
     /* A rules rejection is NOT necessarily a duplicate.
@@ -3501,8 +3595,14 @@ async function logMissingLocation(description, coords){
     const {db, collection, addDoc} = await fb();
     const docData = { description, ts: Date.now() };
     if(coords){ docData.lat = coords.lat; docData.lng = coords.lng; }
-    await addDoc(collection(db, 'missingReports'), docData);
-    return true;
+    /* Attached only when there is an account to attach. Submitting without one still works and
+     * still reaches moderation — the uid is what lets the submission count toward Fixer and
+     * Caretaker later, not what makes it acceptable. The rules check it against the token, so a
+     * forged value is refused rather than credited to someone else. */
+    if(isLoggedIn()) docData.uid = window.__currentUser.uid;
+    const ref = await addDoc(collection(db, 'missingReports'), docData);
+    invalidateServerImprovements();   // this account's contribution set just changed
+    return ref.id;
   }catch(e){
     console.error('logMissingLocation failed:', e);
     return false;
@@ -4366,8 +4466,14 @@ function longestConsecutiveDayStreak(dayKeySet){
 }
 // Achievements derive entirely from your own votes (already in myVoteCache) joined with the
 // bundled location data — states, chains, cities, coordinates, and each rating's ratedAt.
-// No check-in reads, no extra queries: zero Firestore reads beyond the Passport's votes load.
+// No check-in reads, and the only extra queries are the three contribution lookups below.
 async function computeAchievementStats(){
+  /* The IMPROVE badges are the one group that cannot be answered from votes: corrections live in
+   * reports, missingReports and hourReports, keyed by author rather than by rating. Fetched once
+   * and cached for the session; null when signed out, which leaves every count on the local
+   * device tally exactly as it behaved before. */
+  const serverImprovements = await loadServerImprovements().catch(() => null);
+
   /* TWO lists, because a rating and the place it was left have different availability.
    *
    * `rated` used to be the only one, and it dropped any vote whose location was not in
@@ -4487,13 +4593,14 @@ async function computeAchievementStats(){
     travelPlazaCount, maxStatesIn7Days,
     maxInOneDay, maxStreak: longestConsecutiveDayStreak(dayKeys), maxMilesApart,
     visitedCount: bathroomRatedCount, totalLocations: seedLocations.length,
-    // Hours Hero: distinct stores this device has reported hours for (client-trusted, like the
-    // other achievement stats). Populated by markHoursReported() on each successful report.
-    hoursAddedCount: (() => { try { return new Set(JSON.parse(localStorage.getItem('br_hours_reported') || '[]')).size; } catch(e){ return 0; } })(),
+    // Hours Hero: distinct stores reported, this device's set merged with this account's.
+    // Populated by markHoursReported() locally and by loadServerImprovements() from
+    // hourReports/{storeId}/submissions/{uid}.
+    hoursAddedCount: countHoursReported(serverImprovements),
     // SHARE and IMPROVE in the footer creed. Derived here so the footer, the passport and any
     // future achievement all read the same number rather than each computing its own.
     tipsWrittenCount: countTipsWritten(),
-    improvementCount: countImprovements()
+    improvementCount: countImprovements(serverImprovements)
   };
 }
 
@@ -8136,7 +8243,12 @@ async function submitMissingLocation(){
     /* Counted only on a confirmed write, never on the attempt — the footer's IMPROVE number is a
      * record of what you actually contributed, and a failed submit that still incremented it
      * would quietly inflate every total from then on. */
-    markLocationAdded(finalDescription);
+    /* Keyed by the new document's id, which is what the server-side count returns too, so a
+     * submission made while signed in is one contribution rather than two. Entries written
+     * before this change are keyed by description text and cannot be matched to a document;
+     * they are left in place rather than cleared, so the worst case is an old submission
+     * counting twice instead of an old submission disappearing. */
+    markLocationAdded(ok);
     missingInput.value = '';
     missingInput.placeholder = 'Address or cross streets';
     capturedMissingCoords = null;
