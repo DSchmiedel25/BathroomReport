@@ -579,43 +579,57 @@ describe('reportHistory — the archive is admin-only', () => {
 });
 
 /* ─────────────────────────────────────────────────────────────────────────────
- * Contribution counts follow the ACCOUNT, not the browser profile.
+ * Contribution credits — approval is what counts
  *
- * Fixer, Caretaker and Hours Hero used to be counted from localStorage, so a new phone reset
- * them to zero with nothing to rebuild from. They are now derived from the records themselves,
- * which needed three new read paths — and every one of them is a query, which is the shape of
- * rule that is easiest to get subtly wrong.
+ * The badges used to count contributions at SUBMISSION time, which rewarded filing nonsense
+ * exactly as much as filing something real. Credit is now granted server-side on approval, as
+ * one document per approved contribution under userStats/{uid}/credits.
  *
- * The collection-group test below exists because the first version of that rule bound the path
- * wildcard and compared it to request.auth.uid, while the query filters on the uid FIELD. A
- * list is only allowed when Firestore can PROVE every possible result satisfies the rule before
- * running it, and a field filter proves nothing about a path segment — so the query was refused
- * with permission-denied. The two values are always equal, which is exactly why reading the rule
- * did not reveal it. It reached production and was found by hand.
+ * The important property is that NOTHING with a client credential can write there. Cloud
+ * Functions use the Admin SDK and bypass rules entirely, so the collection stays fully closed
+ * and the triggers still work. If a test below ever starts passing a write, the badges have
+ * become self-serve.
+ *
+ * The read paths this feature briefly needed — an own-scoped list of reports, an own-scoped read
+ * of missingReports, and a collection-group read of hour submissions — are all gone again: the
+ * client only reads its own credit ledger now. These assertions hold the queue shut.
  * ────────────────────────────────────────────────────────────────────────────*/
-describe('contribution counts — own reports are listable', () => {
-  const rpt = (uid, locId) => ({
-    locId, locName: 'x', chainKey: 'stewarts', chain: 'S',
-    reporterId: uid, reporterName: 'dave', reason: 'Wrong hours', ts: Date.now(),
+describe('contribution credits — the ledger is server-written only', () => {
+  const creditRef = (db, uid) => doc(db, 'userStats', uid, 'credits', 'report_abc');
+
+  test('I cannot grant myself a credit', async () => {
+    await assertFails(setDoc(creditRef(asMe(), ME), { type: 'report', grantedAt: Date.now() }));
   });
 
-  test('I can list my own reports', async () => {
-    await assertSucceeds(setDoc(doc(asMe(), 'reports', `a_${ME}`), rpt(ME, 'a')));
-    await assertSucceeds(
-      getDocs(query(collection(asMe(), 'reports'), where('reporterId', '==', ME))));
+  test('an admin cannot grant a credit from a client either', async () => {
+    await assertFails(setDoc(creditRef(asAdmin(), ME), { type: 'report', grantedAt: Date.now() }));
   });
 
-  test('I cannot list someone else\'s', async () => {
-    await assertFails(
-      getDocs(query(collection(asMe(), 'reports'), where('reporterId', '==', THEM))));
+  test('I can read my own credits', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'userStats', ME, 'credits', 'report_abc'),
+        { type: 'report', grantedAt: Date.now() });
+    });
+    await assertSucceeds(getDocs(collection(asMe(), 'userStats', ME, 'credits')));
   });
 
-  test('the queue itself is still closed', async () => {
-    await assertFails(getDocs(collection(asMe(), 'reports')));
+  test('I cannot read someone else\'s', async () => {
+    // A credit names the location that was corrected, so the set is a map of where a person
+    // has been — the same reason votes/{id} is owner-only.
+    await assertFails(getDocs(collection(asMe(), 'userStats', THEM, 'credits')));
+  });
+
+  test('a signed-out visitor cannot read credits', async () => {
+    await assertFails(getDocs(collection(asAnon(), 'userStats', ME, 'credits')));
+  });
+
+  test('the hour-credit ledger is closed to everyone', async () => {
+    await assertFails(getDocs(collection(asMe(), 'hourCredits')));
+    await assertFails(setDoc(doc(asAdmin(), 'hourCredits', 'loc1'), { uids: [ME] }));
   });
 });
 
-describe('contribution counts — missingReports carry an optional owner', () => {
+describe('contribution credits — missingReports carry an optional owner', () => {
   const missing = (extra) => ({ description: '123 Main St', ts: Date.now(), ...extra });
 
   test('a submission with my own uid is accepted', async () => {
@@ -628,7 +642,7 @@ describe('contribution counts — missingReports carry an optional owner', () =>
 
   test('a signed-out submission with no uid still works', async () => {
     // The whole point of this collection: someone with no account can still flag a missing
-    // place. Attaching an owner is what makes it COUNTABLE, never what makes it acceptable.
+    // place. Attaching an owner is what makes it CREDITABLE, never what makes it acceptable.
     await assertSucceeds(addDoc(collection(asAnon(), 'missingReports'), missing()));
   });
 
@@ -636,41 +650,23 @@ describe('contribution counts — missingReports carry an optional owner', () =>
     await assertFails(addDoc(collection(asAnon(), 'missingReports'), missing({ uid: ME })));
   });
 
-  test('I can list my own submissions', async () => {
-    await assertSucceeds(addDoc(collection(asMe(), 'missingReports'), missing({ uid: ME })));
-    await assertSucceeds(
-      getDocs(query(collection(asMe(), 'missingReports'), where('uid', '==', ME))));
-  });
-
-  test('I cannot list the whole queue', async () => {
+  test('the submission queue stays admin-only', async () => {
     await assertFails(getDocs(collection(asMe(), 'missingReports')));
   });
 });
 
-describe('contribution counts — hour reports across every store', () => {
-  const sub = (uid) => ({
-    uid, kind: 'single', value: '0500-2300', submittedAt: Date.now(), schemaVersion: 1,
+describe('contribution credits — the moderation queues stay shut', () => {
+  test('a reporter still cannot list their own reports', async () => {
+    await assertFails(
+      getDocs(query(collection(asMe(), 'reports'), where('reporterId', '==', ME))));
   });
 
-  test('I can collection-group query my own hour reports', async () => {
-    await assertSucceeds(setDoc(doc(asMe(), 'hourReports', 'loc1', 'submissions', ME), sub(ME)));
-    await assertSucceeds(setDoc(doc(asMe(), 'hourReports', 'loc2', 'submissions', ME), sub(ME)));
-    // The assertion that would have caught the shipped bug.
-    await assertSucceeds(
+  test('nor the whole report queue', async () => {
+    await assertFails(getDocs(collection(asMe(), 'reports')));
+  });
+
+  test('a collection-group read of hour submissions is denied', async () => {
+    await assertFails(
       getDocs(query(collectionGroup(asMe(), 'submissions'), where('uid', '==', ME))));
-  });
-
-  test('I cannot collection-group query someone else\'s', async () => {
-    await assertFails(
-      getDocs(query(collectionGroup(asMe(), 'submissions'), where('uid', '==', THEM))));
-  });
-
-  test('an unscoped collection-group query is denied', async () => {
-    await assertFails(getDocs(collectionGroup(asMe(), 'submissions')));
-  });
-
-  test('a signed-out visitor cannot collection-group query at all', async () => {
-    await assertFails(
-      getDocs(query(collectionGroup(asAnon(), 'submissions'), where('uid', '==', ME))));
   });
 });

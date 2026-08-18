@@ -616,15 +616,7 @@ service cloud.firestore {
        * as permission-denied — which is exactly how a broken create spent a day disguised as a
        * duplicate. `get` only: listing stays admin-only, so nobody can walk the queue. */
       allow get:    if isAdmin() || (signedIn() && resource.data.reporterId == request.auth.uid);
-      /* Own reports may now be LISTED as well as fetched, so the Fixer/Caretaker count can be
-       * derived from the reports themselves rather than from a localStorage tally that dies
-       * with the browser profile.
-       *
-       * This does not reopen the queue. Firestore only permits a list when every document it
-       * could return satisfies the rule, so a query has to be provably constrained to
-       * reporterId == your own uid before it runs; anything broader is refused outright. It is
-       * the same shape already used on votes/{id}, and for the same reason. */
-      allow list:   if isAdmin() || (signedIn() && resource.data.reporterId == request.auth.uid);
+      allow list:   if isAdmin();
       allow update: if isAdmin() && validReportStatus();
       allow delete: if isAdmin();
     }
@@ -651,13 +643,7 @@ service cloud.firestore {
          * whoever sent it, so the value is checked against the token rather than trusted. */
         && (!request.resource.data.keys().hasAny(['uid'])
             || (signedIn() && request.resource.data.uid == request.auth.uid));
-      /* Own submissions are readable so the achievement count can be derived from them.
-       * `get('uid','')` rather than `.uid` because most existing documents have no such field
-       * at all, and a bare read of a missing key aborts rule evaluation instead of returning
-       * null. Listing is constrained the same way reports/{id} is: Firestore refuses any query
-       * that could return a document failing this test, so a person can only ever list theirs. */
-      allow read:   if isAdmin()
-        || (signedIn() && resource.data.get('uid', '') == request.auth.uid);
+      allow read:   if isAdmin();
       allow update: if isAdmin() && validReportStatus();
       allow delete: if isAdmin();
     }
@@ -755,6 +741,26 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    /* Approved contributions, one document per credit, written ONLY by the credit triggers in
+     * functions/index.js. Those use the Admin SDK, which bypasses rules entirely — so this stays
+     * closed to every client including admins, exactly like the parent document.
+     *
+     * Read is owner-only rather than public, unlike userStats above. A credit names the location
+     * that was corrected, so the full set is a map of where somebody has physically been — the
+     * same thing that closed votes/{id} to public reads. The count is the part meant to be seen,
+     * and it is derived from a query the owner runs on their own subcollection. */
+    match /userStats/{uid}/credits/{creditId} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    /* Which uids have been credited for a verified store, so the trigger can revoke cleanly when
+     * a verification changes. Server-only on both sides: it is bookkeeping, not content, and a
+     * public read would expose who reported hours where. */
+    match /hourCredits/{storeId} {
+      allow read, write: if false;
+    }
+
 
     // ============================================================
     //  Public user profiles (display name + own ratings snapshot)
@@ -834,34 +840,6 @@ service cloud.firestore {
       allow delete: if signedIn() && request.auth.uid == uid;
     }
 
-    /* Collection-group access to the SAME documents as the block above.
-     *
-     * A nested match never covers a collection-group query, however identical the path looks:
-     * `collectionGroup(db, 'submissions')` is evaluated against this wildcard rule and nothing
-     * else, so without it the Hours Hero count fails even though the caller can already read
-     * each of those documents one at a time.
-     *
-     * The condition tests the uid FIELD, not the document id, and the distinction is the whole
-     * point. The first version of this rule bound the wildcard (`{uid}`) and compared that —
-     * which reads as correct, because the two always hold the same value. But a list is only
-     * permitted when Firestore can PROVE every possible result satisfies the rule before running
-     * it, and `where('uid','==',...)` constrains a field, which proves nothing about a path
-     * segment. The query was refused with permission-denied, not failed-precondition, and the
-     * two are easy to confuse when the index is also missing.
-     *
-     * Safe because the nested create rule enforces `request.resource.data.uid == uid`, so the
-     * field can never disagree with the document id.
-     *
-     * Read-only, and narrower than the nested rule on purpose: that one lets any signed-in user
-     * read any submission (the consensus display needs it), while a query across EVERY store at
-     * once should only ever return your own. Writes stay on the nested path, where the store id
-     * is explicit and the Cloud Function's trigger expectations hold.
-     *
-     * Still requires a collection-group index on `submissions.uid` — automatic single-field
-     * indexes are collection-scoped, so that one has to be created explicitly. */
-    match /{path=**}/submissions/{docId} {
-      allow read: if signedIn() && resource.data.uid == request.auth.uid;
-    }
 
     // Server-derived hours consensus. Written ONLY by the recomputeHourStatus Cloud Function
     // (admin privileges bypass rules). Public read (drives display / bake review); no client write.

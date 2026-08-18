@@ -655,3 +655,131 @@ exports.requestPasswordReset = onCall({secrets: [RESEND_API_KEY], cors: true}, a
   }
   return {ok: true};
 });
+
+
+/* ============================================================================
+ *  Contribution credits — one document per APPROVED contribution
+ *
+ *  WHY THIS EXISTS
+ *  The Fixer / Caretaker / Hours Hero badges counted contributions the moment they were
+ *  SUBMITTED. Two things were wrong with that. Submissions are unreviewed, so filing ten
+ *  pieces of nonsense earned the same badge as ten real corrections. And the client counted
+ *  them out of the live `reports` collection — which only ever holds PENDING items, because
+ *  FlushPanel archives to reportHistory and deletes the original on resolve. So the count
+ *  went DOWN as the queue was worked through: doing the moderation destroyed the number.
+ *
+ *  Credit is now granted here, on approval, and nowhere else.
+ *
+ *  WHY A DOCUMENT PER CREDIT RATHER THAN A COUNTER
+ *  An incremented counter drifts the first time a trigger retries, and Firestore triggers are
+ *  at-least-once — a redelivery would silently double somebody's total with no way to tell
+ *  afterwards which totals were wrong. Each credit is instead a document whose ID is derived
+ *  from the thing it credits, so a replay writes the same document twice and the count is
+ *  unchanged. The total is derived by counting, never stored.
+ *
+ *  WHY THE CLIENT CANNOT WRITE THESE
+ *  Cloud Functions use the Admin SDK, which bypasses security rules entirely. userStats keeps
+ *  `allow write: if false` for every client including admins, and these still work.
+ * ========================================================================== */
+
+const CREDIT_TYPES = { REPORT: 'report', PLACE: 'place', HOURS: 'hours' };
+
+/* Grant or revoke a single credit. Revocation matters: a report resolved by mistake and then
+ * dismissed has to give the credit back, or the badge rewards the error. */
+async function setCredit(uid, creditId, granted, payload) {
+  if (!uid || !creditId) return;
+  const ref = db.doc('userStats/' + uid + '/credits/' + creditId);
+  if (granted) {
+    await ref.set({ ...payload, grantedAt: Date.now() }, { merge: true });
+  } else {
+    await ref.delete().catch(() => {});   // already absent is the desired end state
+  }
+}
+
+/* A problem report becomes a credit when it is RESOLVED. Dismissed reports credit nothing —
+ * that is the entire point: the badge should mean "corrections that turned out to be real",
+ * not "times I pressed the flag button".
+ *
+ * Triggered on reportHistory rather than reports because resolving MOVES the document: the
+ * live collection holds only pending items. */
+exports.creditResolvedReport = onDocumentWritten('reportHistory/{id}', async (event) => {
+  const after = event.data.after.exists ? event.data.after.data() : null;
+  const before = event.data.before.exists ? event.data.before.data() : null;
+  const uid = (after && after.reporterId) || (before && before.reporterId);
+  if (!uid) return;                       // pre-uid history, or an anonymous artefact
+  const granted = !!after && after.status === 'resolved';
+  await setCredit(uid, CREDIT_TYPES.REPORT + '_' + event.params.id, granted, {
+    type: CREDIT_TYPES.REPORT,
+    locId: (after && after.locId) || null,
+  });
+});
+
+/* A submitted place becomes a credit when an admin marks it resolved. Unlike reports these are
+ * never archived, so the status lives on the original document.
+ *
+ * Only submissions carrying a uid can ever be credited. Anything sent before that field existed,
+ * or sent by someone with no account, has nothing tying it to a person and never will. */
+exports.creditResolvedPlace = onDocumentWritten('missingReports/{id}', async (event) => {
+  const after = event.data.after.exists ? event.data.after.data() : null;
+  const before = event.data.before.exists ? event.data.before.data() : null;
+  const uid = (after && after.uid) || (before && before.uid);
+  if (!uid) return;
+  const granted = !!after && after.status === 'resolved';
+  await setCredit(uid, CREDIT_TYPES.PLACE + '_' + event.params.id, granted, {
+    type: CREDIT_TYPES.PLACE,
+  });
+});
+
+/* Hours have no admin approval step — recomputeHourStatus derives consensus instead, and two
+ * agreeing eligible people make a store verified. So "approved" here means the submission became
+ * part of verified data, which is the honest analogue.
+ *
+ * Credit goes to everyone whose reported value MATCHES the verified one. Somebody who reported
+ * different hours and was outvoted contributed to the tally but not to the answer, and crediting
+ * them would make the badge mean "submitted hours" again.
+ *
+ * Who was credited is recorded in hourCredits/{storeId}, NOT on the hourStatus document. Writing
+ * it back to hourStatus would re-fire this very trigger — an infinite loop that costs money until
+ * somebody notices. */
+exports.creditVerifiedHours = onDocumentWritten('hourStatus/{storeId}', async (event) => {
+  const storeId = event.params.storeId;
+  const after = event.data.after.exists ? event.data.after.data() : null;
+
+  let winners = [];
+  if (after && after.verified === true && after.value !== undefined && after.value !== null) {
+    /* Re-read the submissions rather than trusting a list passed along: this trigger can fire
+     * long after the status was computed, and the submissions are the source of truth. */
+    const target = JSON.stringify(after.value);
+    const subs = await db.collection('hourReports/' + storeId + '/submissions').get();
+    const seen = new Set();
+    for (const doc of subs.docs) {
+      const s = doc.data();
+      const canon = canonicalize(s.value, s.kind);
+      if (!canon || !s.uid) continue;
+      if (JSON.stringify(canon.value) !== target) continue;
+      if (seen.has(s.uid)) continue;
+      seen.add(s.uid);
+      winners.push(s.uid);
+    }
+  }
+
+  const ledgerRef = db.doc('hourCredits/' + storeId);
+  const ledger = await ledgerRef.get();
+  const previous = (ledger.exists && Array.isArray(ledger.data().uids)) ? ledger.data().uids : [];
+
+  const nowSet = new Set(winners);
+  const wasSet = new Set(previous);
+  const creditId = CREDIT_TYPES.HOURS + '_' + storeId;
+
+  /* Diffed rather than rewritten so an unchanged verification does no writes at all. A store
+   * whose hours are re-confirmed weekly would otherwise churn every contributor's credit. */
+  const toGrant = winners.filter((u) => !wasSet.has(u));
+  const toRevoke = previous.filter((u) => !nowSet.has(u));
+  if (!toGrant.length && !toRevoke.length) return;
+
+  await Promise.all([
+    ...toGrant.map((u) => setCredit(u, creditId, true, { type: CREDIT_TYPES.HOURS, storeId })),
+    ...toRevoke.map((u) => setCredit(u, creditId, false)),
+  ]);
+  await ledgerRef.set({ uids: winners, updatedAt: Date.now() }, { merge: true });
+});

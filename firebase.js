@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
   import {
     getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
     doc, getDoc, setDoc, increment, arrayUnion,
-    collection, collectionGroup, addDoc, query, where, getDocs, deleteDoc, deleteField
+    collection, addDoc, query, where, getDocs, getCountFromServer, deleteDoc, deleteField
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import {
     getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
@@ -91,11 +91,15 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
      * Deleting the key from the object client-side and merging leaves the server value exactly
      * where it was — which is why "change" on an amenity answer appeared to work and then the
      * old answer came back on reload. */
-    /* collectionGroup — the only way to find a person's own hour reports. They live at
-     * hourReports/{storeId}/submissions/{uid}, so the store id is in the PATH: without a
-     * collection-group query you would have to already know every store someone had
-     * reported before you could ask whether they had reported it. */
-    db, doc, getDoc, setDoc, increment, arrayUnion, collection, collectionGroup, addDoc, query, where, getDocs, deleteDoc, deleteField,
+    /* getCountFromServer — the contribution badges count approved credits rather than fetching
+     * them. An aggregation query is billed one read per 1,000 index entries matched, so the
+     * Passport costs the same two reads for somebody with three corrections and somebody with
+     * three thousand. Fetching the documents was O(lifetime contributions) on every page load.
+     *
+     * collectionGroup was added here for an earlier approach that queried hour submissions
+     * across every store. The credit ledger lives under one path per user, so it is no longer
+     * needed and is removed rather than left as a loaded gun for the next person. */
+    db, doc, getDoc, setDoc, increment, arrayUnion, collection, addDoc, query, where, getDocs, getCountFromServer, deleteDoc, deleteField,
     auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile,
     functions, httpsCallable
   };

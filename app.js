@@ -2301,19 +2301,24 @@ function countTipsWritten(){
 /* Everything you have done to FIX the map, as one running total: hours reported, problems
  * flagged, and locations added. Three separate stores because each was built for its own
  * purpose; summed here because to a reader they are one thing — corrections made. */
-/* Contributions this ACCOUNT has made, read back from the records themselves.
+/* Contributions this ACCOUNT has been CREDITED for, read back from the credit ledger.
  *
- * The three local stores below only ever knew what this browser profile had done, so a new
- * phone, a second browser or a cleared Safari cache reset Fixer, Caretaker and Hours Hero to
- * zero with nothing to rebuild from. Every one of those contributions is already durable
- * server-side — it was just unreachable, because nothing queried it by author.
+ * Two problems with the version this replaces. It counted contributions at submission time, so
+ * ten pieces of nonsense earned the same badge as ten real corrections. And it counted problem
+ * reports out of the live `reports` collection — which holds only PENDING items, because
+ * FlushPanel archives to reportHistory and deletes the original on resolve. The count therefore
+ * FELL as the queue was worked through: moderating the reports destroyed the number they fed.
  *
- * Derived, never counted into a stored total: a tally that is written once and incremented
- * afterwards drifts the moment a report is deleted in moderation, and there is no honest way
- * to reconcile it later. Three queries, each independently allowed to fail.
+ * Credit is now granted server-side on approval (see functions/index.js) as one document per
+ * approved contribution, under userStats/{uid}/credits. Nothing here can grant it, which is the
+ * point — the badge means somebody reviewed the work and kept it.
  *
- * Cached per uid for the session. Passport and the footer creed both call this and neither
- * needs it fresher than the tab.
+ * Two aggregation queries instead of the three document-fetching ones this replaces. Aggregation
+ * is billed one read per 1,000 index entries matched, so this is effectively 2 reads no matter
+ * how much a person has contributed — the previous version was O(lifetime contributions) on
+ * every page load and would only ever have got worse.
+ *
+ * Cached per uid for the session; Passport and the footer creed both call this.
  */
 let serverImprovementsCache = null;
 
@@ -2324,52 +2329,26 @@ async function loadServerImprovements(){
   const uid = window.__currentUser.uid;
   if(serverImprovementsCache && serverImprovementsCache.uid === uid) return serverImprovementsCache;
 
-  const out = { uid, hours: new Set(), reports: new Set(), added: new Set(), failed: [] };
-  const { db, collection, collectionGroup, query, where, getDocs } = await fb();
+  const out = { uid, approved: 0, hours: 0, failed: [] };
+  const { db, collection, query, where, getCountFromServer } = await fb();
+  const credits = collection(db, 'userStats', uid, 'credits');
 
-  /* Problem reports. The document stores locId in its raw form, the same shape the local set
-   * uses, so these merge without normalising. Muted reporters have a local entry with no
-   * document behind it — the union keeps their count intact, which is the existing behaviour. */
+  /* Total approved contributions — drives Fixer and Caretaker. */
   try{
-    const snap = await getDocs(query(collection(db, 'reports'), where('reporterId', '==', uid)));
-    snap.forEach(d => { const v = d.data(); if(v && v.locId) out.reports.add(v.locId); });
+    out.approved = (await getCountFromServer(credits)).data().count;
   }catch(e){
-    out.failed.push('reports');
-    console.warn('improvements: reports query failed —',
+    out.failed.push('credits');
+    console.warn('improvements: credit count failed —',
       ((e && e.code) || 'unknown') + ': ' + ((e && e.message) || e));
   }
 
-  /* Places submitted through "Add a place". Only those carrying a uid can be found; anything
-   * sent before the field existed, or sent while signed out, is unattributable for good. */
+  /* Verified-hours credits only — drives Hours Hero, which is a distinct badge and must not
+   * count a resolved report toward it. */
   try{
-    const snap = await getDocs(query(collection(db, 'missingReports'), where('uid', '==', uid)));
-    snap.forEach(d => out.added.add(d.id));
+    out.hours = (await getCountFromServer(query(credits, where('type', '==', 'hours')))).data().count;
   }catch(e){
-    out.failed.push('missingReports');
-    console.warn('improvements: missingReports query failed —',
-      ((e && e.code) || 'unknown') + ': ' + ((e && e.message) || e));
-  }
-
-  /* Hour reports, at hourReports/{storeId}/submissions/{uid}. The store id is the SLUGGED
-   * location id, so the local set is slugged to match before the union rather than after —
-   * mixing "way/123" and "way__123" would count one report as two.
-   *
-   * Needs a collection-group index on submissions.uid. Until that exists Firestore refuses the
-   * query with failed-precondition and logs a URL that creates it; the catch keeps Hours Hero
-   * on its local count in the meantime instead of taking the whole Passport down. */
-  try{
-    const snap = await getDocs(query(collectionGroup(db, 'submissions'), where('uid', '==', uid)));
-    snap.forEach(d => {
-      const store = d.ref.parent.parent;
-      if(store) out.hours.add(store.id);
-    });
-  }catch(e){
-    out.failed.push('hourReports');
-    /* Both halves of the error, because the code alone cannot tell the two likely causes apart:
-     * failed-precondition means the collection-group index is missing and the MESSAGE carries a
-     * link that creates it, while permission-denied means the rule is wrong. Logging only the
-     * code once sent an afternoon chasing the wrong one. */
-    console.warn('improvements: hourReports collection-group query failed —',
+    out.failed.push('hours');
+    console.warn('improvements: hours credit count failed —',
       ((e && e.code) || 'unknown') + ': ' + ((e && e.message) || e));
   }
 
@@ -2377,28 +2356,23 @@ async function loadServerImprovements(){
   return out;
 }
 
-// Distinct stores this person has reported hours for, device and account merged.
+/* Distinct stores credited for verified hours.
+ *
+ * Signed in, this is the server count ALONE — deliberately not merged with the local set. The
+ * device knows what it submitted; it cannot know what was approved, so folding it in would
+ * re-admit exactly the unreviewed submissions the credit ledger exists to exclude.
+ *
+ * Signed out there is no ledger to read, so the local tally still stands. Behaviour for a
+ * signed-out visitor is unchanged. */
 function countHoursReported(server){
-  const local = new Set();
+  if(server) return server.hours;
   try{
-    JSON.parse(localStorage.getItem('br_hours_reported') || '[]')
-      .forEach(id => local.add(fsId(id)));   // slugged, to match the server's store ids
-  }catch(e){}
-  if(server) server.hours.forEach(id => local.add(id));
-  return local.size;
+    return new Set(JSON.parse(localStorage.getItem('br_hours_reported') || '[]')).size;
+  }catch(e){ return 0; }
 }
 
 function countImprovements(server){
   const size = (key) => { try{ return new Set(JSON.parse(localStorage.getItem(key) || '[]')).size; }catch(e){ return 0; } };
-  const merged = (key, serverSet, normalise) => {
-    const s = new Set();
-    try{
-      JSON.parse(localStorage.getItem(key) || '[]')
-        .forEach(id => s.add(normalise ? normalise(id) : id));
-    }catch(e){}
-    if(serverSet) serverSet.forEach(id => s.add(id));
-    return s.size;
-  };
   /* br_reports_made, not reportedLocations. The latter is the open-report UI hint and now
    * expires after 30 days; reading it here would make the footer's IMPROVE total shrink over
    * time for someone who had done nothing at all.
@@ -2406,10 +2380,8 @@ function countImprovements(server){
    * Anyone upgrading has a populated reportedLocations and an empty lifetime store, so the
    * lifetime store is seeded from it once rather than starting everyone back at zero. */
   seedLifetimeReports();
-  if(!server) return size('br_hours_reported') + size('br_reports_made') + size('br_locations_added');
-  return merged('br_hours_reported', server.hours, fsId)
-    + merged('br_reports_made', server.reports)
-    + merged('br_locations_added', server.added);
+  if(server) return server.approved;
+  return size('br_hours_reported') + size('br_reports_made') + size('br_locations_added');
 }
 
 /* One-time migration for anyone who reported before the lifetime store existed. Keyed like the
