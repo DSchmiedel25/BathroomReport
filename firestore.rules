@@ -838,18 +838,29 @@ service cloud.firestore {
      *
      * A nested match never covers a collection-group query, however identical the path looks:
      * `collectionGroup(db, 'submissions')` is evaluated against this wildcard rule and nothing
-     * else, so without it the Hours Hero count fails with permission-denied even though the
-     * caller can already read each of those documents one at a time.
+     * else, so without it the Hours Hero count fails even though the caller can already read
+     * each of those documents one at a time.
+     *
+     * The condition tests the uid FIELD, not the document id, and the distinction is the whole
+     * point. The first version of this rule bound the wildcard (`{uid}`) and compared that —
+     * which reads as correct, because the two always hold the same value. But a list is only
+     * permitted when Firestore can PROVE every possible result satisfies the rule before running
+     * it, and `where('uid','==',...)` constrains a field, which proves nothing about a path
+     * segment. The query was refused with permission-denied, not failed-precondition, and the
+     * two are easy to confuse when the index is also missing.
+     *
+     * Safe because the nested create rule enforces `request.resource.data.uid == uid`, so the
+     * field can never disagree with the document id.
      *
      * Read-only, and narrower than the nested rule on purpose: that one lets any signed-in user
      * read any submission (the consensus display needs it), while a query across EVERY store at
      * once should only ever return your own. Writes stay on the nested path, where the store id
      * is explicit and the Cloud Function's trigger expectations hold.
      *
-     * Requires a collection-group index on `submissions.uid` — automatic single-field indexes
-     * are collection-scoped, so this one has to be created explicitly or the query is refused. */
-    match /{path=**}/submissions/{uid} {
-      allow read: if signedIn() && request.auth.uid == uid;
+     * Still requires a collection-group index on `submissions.uid` — automatic single-field
+     * indexes are collection-scoped, so that one has to be created explicitly. */
+    match /{path=**}/submissions/{docId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
     // Server-derived hours consensus. Written ONLY by the recomputeHourStatus Cloud Function

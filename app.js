@@ -2335,7 +2335,8 @@ async function loadServerImprovements(){
     snap.forEach(d => { const v = d.data(); if(v && v.locId) out.reports.add(v.locId); });
   }catch(e){
     out.failed.push('reports');
-    console.warn('improvements: reports query failed —', (e && e.code) || e);
+    console.warn('improvements: reports query failed —',
+      ((e && e.code) || 'unknown') + ': ' + ((e && e.message) || e));
   }
 
   /* Places submitted through "Add a place". Only those carrying a uid can be found; anything
@@ -2345,7 +2346,8 @@ async function loadServerImprovements(){
     snap.forEach(d => out.added.add(d.id));
   }catch(e){
     out.failed.push('missingReports');
-    console.warn('improvements: missingReports query failed —', (e && e.code) || e);
+    console.warn('improvements: missingReports query failed —',
+      ((e && e.code) || 'unknown') + ': ' + ((e && e.message) || e));
   }
 
   /* Hour reports, at hourReports/{storeId}/submissions/{uid}. The store id is the SLUGGED
@@ -2363,7 +2365,12 @@ async function loadServerImprovements(){
     });
   }catch(e){
     out.failed.push('hourReports');
-    console.warn('improvements: hourReports collection-group query failed —', (e && e.code) || e);
+    /* Both halves of the error, because the code alone cannot tell the two likely causes apart:
+     * failed-precondition means the collection-group index is missing and the MESSAGE carries a
+     * link that creates it, while permission-denied means the rule is wrong. Logging only the
+     * code once sent an afternoon chasing the wrong one. */
+    console.warn('improvements: hourReports collection-group query failed —',
+      ((e && e.code) || 'unknown') + ': ' + ((e && e.message) || e));
   }
 
   serverImprovementsCache = out;

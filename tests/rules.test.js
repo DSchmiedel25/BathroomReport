@@ -30,7 +30,7 @@ const {
   assertFails,
   assertSucceeds,
 } = require('@firebase/rules-unit-testing');
-const { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, where, addDoc } =
+const { doc, getDoc, setDoc, deleteDoc, collection, collectionGroup, getDocs, query, where, addDoc } =
   require('firebase/firestore');
 
 const PROJECT_ID = 'bathroomreport-rules-test';
@@ -575,5 +575,102 @@ describe('reportHistory — the archive is admin-only', () => {
   test('nobody else can read it', async () => {
     await assertFails(getDocs(collection(asMe(), 'reportHistory')));
     await assertFails(getDocs(collection(asAnon(), 'reportHistory')));
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Contribution counts follow the ACCOUNT, not the browser profile.
+ *
+ * Fixer, Caretaker and Hours Hero used to be counted from localStorage, so a new phone reset
+ * them to zero with nothing to rebuild from. They are now derived from the records themselves,
+ * which needed three new read paths — and every one of them is a query, which is the shape of
+ * rule that is easiest to get subtly wrong.
+ *
+ * The collection-group test below exists because the first version of that rule bound the path
+ * wildcard and compared it to request.auth.uid, while the query filters on the uid FIELD. A
+ * list is only allowed when Firestore can PROVE every possible result satisfies the rule before
+ * running it, and a field filter proves nothing about a path segment — so the query was refused
+ * with permission-denied. The two values are always equal, which is exactly why reading the rule
+ * did not reveal it. It reached production and was found by hand.
+ * ────────────────────────────────────────────────────────────────────────────*/
+describe('contribution counts — own reports are listable', () => {
+  const rpt = (uid, locId) => ({
+    locId, locName: 'x', chainKey: 'stewarts', chain: 'S',
+    reporterId: uid, reporterName: 'dave', reason: 'Wrong hours', ts: Date.now(),
+  });
+
+  test('I can list my own reports', async () => {
+    await assertSucceeds(setDoc(doc(asMe(), 'reports', `a_${ME}`), rpt(ME, 'a')));
+    await assertSucceeds(
+      getDocs(query(collection(asMe(), 'reports'), where('reporterId', '==', ME))));
+  });
+
+  test('I cannot list someone else\'s', async () => {
+    await assertFails(
+      getDocs(query(collection(asMe(), 'reports'), where('reporterId', '==', THEM))));
+  });
+
+  test('the queue itself is still closed', async () => {
+    await assertFails(getDocs(collection(asMe(), 'reports')));
+  });
+});
+
+describe('contribution counts — missingReports carry an optional owner', () => {
+  const missing = (extra) => ({ description: '123 Main St', ts: Date.now(), ...extra });
+
+  test('a submission with my own uid is accepted', async () => {
+    await assertSucceeds(addDoc(collection(asMe(), 'missingReports'), missing({ uid: ME })));
+  });
+
+  test('a submission claiming someone else\'s uid is refused', async () => {
+    await assertFails(addDoc(collection(asMe(), 'missingReports'), missing({ uid: THEM })));
+  });
+
+  test('a signed-out submission with no uid still works', async () => {
+    // The whole point of this collection: someone with no account can still flag a missing
+    // place. Attaching an owner is what makes it COUNTABLE, never what makes it acceptable.
+    await assertSucceeds(addDoc(collection(asAnon(), 'missingReports'), missing()));
+  });
+
+  test('a signed-out submission cannot forge a uid', async () => {
+    await assertFails(addDoc(collection(asAnon(), 'missingReports'), missing({ uid: ME })));
+  });
+
+  test('I can list my own submissions', async () => {
+    await assertSucceeds(addDoc(collection(asMe(), 'missingReports'), missing({ uid: ME })));
+    await assertSucceeds(
+      getDocs(query(collection(asMe(), 'missingReports'), where('uid', '==', ME))));
+  });
+
+  test('I cannot list the whole queue', async () => {
+    await assertFails(getDocs(collection(asMe(), 'missingReports')));
+  });
+});
+
+describe('contribution counts — hour reports across every store', () => {
+  const sub = (uid) => ({
+    uid, kind: 'single', value: '0500-2300', submittedAt: Date.now(), schemaVersion: 1,
+  });
+
+  test('I can collection-group query my own hour reports', async () => {
+    await assertSucceeds(setDoc(doc(asMe(), 'hourReports', 'loc1', 'submissions', ME), sub(ME)));
+    await assertSucceeds(setDoc(doc(asMe(), 'hourReports', 'loc2', 'submissions', ME), sub(ME)));
+    // The assertion that would have caught the shipped bug.
+    await assertSucceeds(
+      getDocs(query(collectionGroup(asMe(), 'submissions'), where('uid', '==', ME))));
+  });
+
+  test('I cannot collection-group query someone else\'s', async () => {
+    await assertFails(
+      getDocs(query(collectionGroup(asMe(), 'submissions'), where('uid', '==', THEM))));
+  });
+
+  test('an unscoped collection-group query is denied', async () => {
+    await assertFails(getDocs(collectionGroup(asMe(), 'submissions')));
+  });
+
+  test('a signed-out visitor cannot collection-group query at all', async () => {
+    await assertFails(
+      getDocs(query(collectionGroup(asAnon(), 'submissions'), where('uid', '==', ME))));
   });
 });
