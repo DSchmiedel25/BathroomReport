@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-20T09:50:19.709Z",
+  "generated": "2026-08-21T09:52:24.838Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -145,6 +145,12 @@
         "newUsers": 8,
         "sessions": 8,
         "pageViews": 8
+      },
+      "2026-08-20": {
+        "activeUsers": 1,
+        "newUsers": 2,
+        "sessions": 3,
+        "pageViews": 4
       }
     },
     "signupsByDate": {
@@ -154,13 +160,13 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 321,
-        "users": 163
+        "sessions": 323,
+        "users": 164
       },
       {
         "source": "qr",
         "medium": "physical_card",
-        "sessions": 9,
+        "sessions": 10,
         "users": 5
       },
       {
@@ -255,6 +261,16 @@
         "campaign": "(organic)",
         "content": "(not set)",
         "sessions": 4
+      },
+      {
+        "campaign": "(direct)",
+        "content": "",
+        "sessions": 2
+      },
+      {
+        "campaign": "card_v2",
+        "content": "",
+        "sessions": 1
       }
     ],
     "events": {
@@ -269,8 +285,8 @@
       {
         "state": "New York",
         "country": "United States",
-        "users": 54,
-        "sessions": 194
+        "users": 55,
+        "sessions": 197
       },
       {
         "state": "Virginia",
@@ -591,7 +607,7 @@
       {
         "city": "Colonie",
         "state": "New York",
-        "users": 3
+        "users": 4
       },
       {
         "city": "Los Angeles",
@@ -1564,6 +1580,59 @@
         "Traffic.pagesPerSessionPercentage": 0,
         "EngagementTime.totalTime": 0,
         "EngagementTime.activeTime": 0
+      },
+      "2026-08-20": {
+        "DeadClickCount.sessionsCount": 3,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 3,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 3,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 3,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 3,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 3,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 94.33,
+        "Traffic.totalSessionCount": 3,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 3,
+        "Traffic.pagesPerSessionPercentage": 1,
+        "EngagementTime.totalTime": 4,
+        "EngagementTime.activeTime": 2,
+        "Browser.name": "MobileSafari",
+        "Browser.sessionsCount": 2,
+        "Device.name": "Mobile",
+        "Device.sessionsCount": 3,
+        "OS.name": "IOS",
+        "OS.sessionsCount": 2,
+        "Country.name": "United States",
+        "Country.sessionsCount": 3,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 3,
+        "ReferrerUrl.name": 0,
+        "ReferrerUrl.sessionsCount": 3,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 3
       }
     }
   },
