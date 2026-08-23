@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-22T09:42:14.899Z",
+  "generated": "2026-08-23T09:43:03.326Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -156,7 +156,13 @@
         "activeUsers": 1,
         "newUsers": 0,
         "sessions": 1,
-        "pageViews": 3
+        "pageViews": 4
+      },
+      "2026-08-22": {
+        "activeUsers": 2,
+        "newUsers": 0,
+        "sessions": 3,
+        "pageViews": 1
       }
     },
     "signupsByDate": {
@@ -166,7 +172,7 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 324,
+        "sessions": 325,
         "users": 164
       },
       {
@@ -194,6 +200,12 @@
         "users": 5
       },
       {
+        "source": "(not set)",
+        "medium": "(not set)",
+        "sessions": 4,
+        "users": 4
+      },
+      {
         "source": "google",
         "medium": "organic",
         "sessions": 4,
@@ -204,12 +216,6 @@
         "medium": "referral",
         "sessions": 4,
         "users": 4
-      },
-      {
-        "source": "(not set)",
-        "medium": "(not set)",
-        "sessions": 3,
-        "users": 3
       },
       {
         "source": "m.facebook.com",
@@ -246,7 +252,7 @@
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 323
+        "sessions": 324
       },
       {
         "campaign": "(referral)",
@@ -275,7 +281,7 @@
       }
     ],
     "events": {
-      "bathroom_now": 2,
+      "bathroom_now": 4,
       "login": 2,
       "sign_up": 1
     },
@@ -287,7 +293,7 @@
         "state": "New York",
         "country": "United States",
         "users": 55,
-        "sessions": 198
+        "sessions": 201
       },
       {
         "state": "Virginia",
@@ -626,6 +632,11 @@
         "users": 3
       },
       {
+        "city": "Syracuse",
+        "state": "New York",
+        "users": 3
+      },
+      {
         "city": "Warsaw",
         "state": "Masovian Voivodeship",
         "users": 3
@@ -677,11 +688,6 @@
       },
       {
         "city": "Saratoga Springs",
-        "state": "New York",
-        "users": 2
-      },
-      {
-        "city": "Syracuse",
         "state": "New York",
         "users": 2
       },
@@ -1687,6 +1693,59 @@
         "ReferrerUrl.sessionsCount": 1,
         "PopularPages.url": "https://bathroomreport.app/",
         "PopularPages.visitsCount": 1
+      },
+      "2026-08-22": {
+        "DeadClickCount.sessionsCount": 4,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 4,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 4,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 4,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 4,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 4,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 4,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 2,
+        "Traffic.pagesPerSessionPercentage": 1,
+        "EngagementTime.totalTime": 16,
+        "EngagementTime.activeTime": 15,
+        "Browser.name": "MobileSafari",
+        "Browser.sessionsCount": 3,
+        "Device.name": "Mobile",
+        "Device.sessionsCount": 4,
+        "OS.name": "IOS",
+        "OS.sessionsCount": 3,
+        "Country.name": "United States",
+        "Country.sessionsCount": 4,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 4,
+        "ReferrerUrl.name": 0,
+        "ReferrerUrl.sessionsCount": 4,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 4
       }
     }
   },
