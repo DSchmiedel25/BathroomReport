@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-23T09:43:03.326Z",
+  "generated": "2026-08-24T10:03:58.078Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -162,7 +162,13 @@
         "activeUsers": 2,
         "newUsers": 0,
         "sessions": 3,
-        "pageViews": 1
+        "pageViews": 3
+      },
+      "2026-08-23": {
+        "activeUsers": 1,
+        "newUsers": 0,
+        "sessions": 1,
+        "pageViews": 2
       }
     },
     "signupsByDate": {
@@ -172,13 +178,13 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 325,
+        "sessions": 326,
         "users": 164
       },
       {
         "source": "qr",
         "medium": "physical_card",
-        "sessions": 10,
+        "sessions": 11,
         "users": 5
       },
       {
@@ -200,12 +206,6 @@
         "users": 5
       },
       {
-        "source": "(not set)",
-        "medium": "(not set)",
-        "sessions": 4,
-        "users": 4
-      },
-      {
         "source": "google",
         "medium": "organic",
         "sessions": 4,
@@ -216,6 +216,12 @@
         "medium": "referral",
         "sessions": 4,
         "users": 4
+      },
+      {
+        "source": "(not set)",
+        "medium": "(not set)",
+        "sessions": 3,
+        "users": 3
       },
       {
         "source": "m.facebook.com",
@@ -252,7 +258,7 @@
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 324
+        "sessions": 326
       },
       {
         "campaign": "(referral)",
@@ -262,7 +268,7 @@
       {
         "campaign": "card_v2",
         "content": "(not set)",
-        "sessions": 10
+        "sessions": 11
       },
       {
         "campaign": "test",
@@ -273,11 +279,6 @@
         "campaign": "(organic)",
         "content": "(not set)",
         "sessions": 4
-      },
-      {
-        "campaign": "(direct)",
-        "content": "",
-        "sessions": 1
       }
     ],
     "events": {
@@ -545,7 +546,7 @@
         "state": "Quebec",
         "country": "Canada",
         "users": 1,
-        "sessions": 1
+        "sessions": 2
       },
       {
         "state": "Tennessee",
@@ -1746,6 +1747,59 @@
         "ReferrerUrl.sessionsCount": 4,
         "PopularPages.url": "https://bathroomreport.app/",
         "PopularPages.visitsCount": 4
+      },
+      "2026-08-23": {
+        "DeadClickCount.sessionsCount": 1,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 1,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 1,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 1,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 1,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 1,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 1,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 1,
+        "Traffic.pagesPerSessionPercentage": 4,
+        "EngagementTime.totalTime": 19,
+        "EngagementTime.activeTime": 18,
+        "Browser.name": "Safari",
+        "Browser.sessionsCount": 1,
+        "Device.name": "PC",
+        "Device.sessionsCount": 1,
+        "OS.name": "MacOSX",
+        "OS.sessionsCount": 1,
+        "Country.name": "Canada",
+        "Country.sessionsCount": 1,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 1,
+        "ReferrerUrl.name": 0,
+        "ReferrerUrl.sessionsCount": 1,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 1
       }
     }
   },
