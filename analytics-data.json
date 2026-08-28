@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-27T19:51:03.166Z",
+  "generated": "2026-08-28T20:50:25.282Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -191,8 +191,8 @@
       "2026-08-27": {
         "activeUsers": 2,
         "newUsers": 0,
-        "sessions": 3,
-        "pageViews": 3
+        "sessions": 5,
+        "pageViews": 5
       }
     },
     "signupsByDate": {
@@ -202,7 +202,7 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 331,
+        "sessions": 333,
         "users": 164
       },
       {
@@ -226,7 +226,7 @@
       {
         "source": "(not set)",
         "medium": "(not set)",
-        "sessions": 5,
+        "sessions": 6,
         "users": 4
       },
       {
@@ -258,12 +258,6 @@
         "medium": "referral",
         "sessions": 3,
         "users": 3
-      },
-      {
-        "source": "chatgpt.com",
-        "medium": "(none)",
-        "sessions": 1,
-        "users": 1
       },
       {
         "source": "chatgpt.com",
@@ -319,7 +313,7 @@
       {
         "campaign": "(direct)",
         "content": "",
-        "sessions": 2
+        "sessions": 3
       },
       {
         "campaign": "card_v2",
@@ -328,7 +322,7 @@
       },
       {
         "campaign": "(ai-assistant)",
-        "content": "",
+        "content": "(not set)",
         "sessions": 1
       }
     ],
@@ -349,7 +343,7 @@
         "state": "New York",
         "country": "United States",
         "users": 55,
-        "sessions": 208
+        "sessions": 210
       },
       {
         "state": "Virginia",
@@ -2014,6 +2008,45 @@
         "ReferrerUrl.sessionsCount": 2,
         "PopularPages.url": "https://bathroomreport.app/",
         "PopularPages.visitsCount": 2
+      },
+      "2026-08-27": {
+        "DeadClickCount.sessionsCount": 0,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 0,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 0,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 0,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 0,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 0,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 0,
+        "Traffic.totalSessionCount": 0,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 0,
+        "Traffic.pagesPerSessionPercentage": 0,
+        "EngagementTime.totalTime": 0,
+        "EngagementTime.activeTime": 0
       }
     }
   },
