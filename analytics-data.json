@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-28T20:50:25.282Z",
+  "generated": "2026-08-29T14:28:58.346Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -193,6 +193,12 @@
         "newUsers": 0,
         "sessions": 5,
         "pageViews": 5
+      },
+      "2026-08-28": {
+        "activeUsers": 1,
+        "newUsers": 0,
+        "sessions": 1,
+        "pageViews": 1
       }
     },
     "signupsByDate": {
@@ -202,7 +208,7 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 333,
+        "sessions": 334,
         "users": 164
       },
       {
@@ -222,12 +228,6 @@
         "medium": "test",
         "sessions": 7,
         "users": 5
-      },
-      {
-        "source": "(not set)",
-        "medium": "(not set)",
-        "sessions": 6,
-        "users": 4
       },
       {
         "source": "test",
@@ -260,6 +260,12 @@
         "users": 3
       },
       {
+        "source": "(not set)",
+        "medium": "(not set)",
+        "sessions": 2,
+        "users": 2
+      },
+      {
         "source": "chatgpt.com",
         "medium": "ai-assistant",
         "sessions": 1,
@@ -288,7 +294,7 @@
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 330
+        "sessions": 333
       },
       {
         "campaign": "(referral)",
@@ -298,7 +304,7 @@
       {
         "campaign": "card_v2",
         "content": "(not set)",
-        "sessions": 15
+        "sessions": 17
       },
       {
         "campaign": "test",
@@ -311,23 +317,18 @@
         "sessions": 4
       },
       {
-        "campaign": "(direct)",
-        "content": "",
-        "sessions": 3
-      },
-      {
-        "campaign": "card_v2",
-        "content": "",
-        "sessions": 2
-      },
-      {
         "campaign": "(ai-assistant)",
         "content": "(not set)",
+        "sessions": 1
+      },
+      {
+        "campaign": "(direct)",
+        "content": "",
         "sessions": 1
       }
     ],
     "events": {
-      "bathroom_now": 13,
+      "bathroom_now": 14,
       "rating_submit": 6,
       "login": 2,
       "sign_up": 1
@@ -343,7 +344,7 @@
         "state": "New York",
         "country": "United States",
         "users": 55,
-        "sessions": 210
+        "sessions": 211
       },
       {
         "state": "Virginia",
@@ -2010,6 +2011,45 @@
         "PopularPages.visitsCount": 2
       },
       "2026-08-27": {
+        "DeadClickCount.sessionsCount": 0,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 0,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 0,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 0,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 0,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 0,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 0,
+        "Traffic.totalSessionCount": 0,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 0,
+        "Traffic.pagesPerSessionPercentage": 0,
+        "EngagementTime.totalTime": 0,
+        "EngagementTime.activeTime": 0
+      },
+      "2026-08-28": {
         "DeadClickCount.sessionsCount": 0,
         "DeadClickCount.sessionsWithMetricPercentage": 0,
         "DeadClickCount.sessionsWithoutMetricPercentage": 100,
