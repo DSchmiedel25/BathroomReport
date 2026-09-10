@@ -204,7 +204,7 @@ window.cumberlandFarmsLocations = [
 {"n":"Hudson Street, Cornwall-on-Hudson","lat":"41.444536","lng":"-74.016301","addr":"263 Hudson Street, Cornwall-on-Hudson, NY, 12520","id":"way-459394927","hrs":"","osm":{"gas":1}},
 {"n":"Riverside Avenue, Burlington","lat":"44.488022","lng":"-73.200509","addr":"454 Riverside Avenue, Burlington, VT","id":"way-490587781","hrs":"","osm":{"gas":1}},
 {"n":"Main Street, Winchester","lat":"41.919990","lng":"-73.059040","addr":"29 Main Street, Winchester, CT, 06098","id":"way-546534846","hrs":"","osm":{"gas":1}},
-{"n":"Carman Road, Schenectady","lat":"42.764889","lng":"-73.939722","addr":"3088 Carman Road, Schenectady, NY, 12303","id":"way-687476421","hrs":"","osm":{"gas":1}},
+{"n":"Carman Road, Schenectady","lat":"42.764889","lng":"-73.939722","addr":"3088 Carman Road, Schenectady, NY, 12303","id":"way-687476421","hrs":"24","osm":{"gas":1},"meta":{"prevHrs":"","prevHrsSrc":"","hrsSrc":"admin_override"}},
 {"n":"Broad Street, Meriden","lat":"41.544229","lng":"-72.784459","addr":"937 Broad Street, Meriden, CT, 06450","id":"way-696282367","hrs":"","osm":{"gas":1}},
 {"n":"Roosevelt Trail, Windham","lat":"43.834937","lng":"-70.438131","addr":"749 Roosevelt Trail, Windham, ME, 04062","id":"way-710772874","hrs":"","osm":{"gas":1}},
 {"n":"East Main Street, Newport","lat":"44.943545","lng":"-72.193276","addr":"535 East Main Street, Newport, VT, 05855","id":"way-753511685","hrs":"","osm":{"gas":1}},
