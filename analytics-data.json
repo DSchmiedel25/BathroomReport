@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-13T13:48:08.497Z",
+  "generated": "2026-09-14T15:53:37.844Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -277,6 +277,18 @@
         "newUsers": 4,
         "sessions": 5,
         "pageViews": 5
+      },
+      "2026-09-13": {
+        "activeUsers": 8,
+        "newUsers": 8,
+        "sessions": 9,
+        "pageViews": 9
+      },
+      "2026-09-14": {
+        "activeUsers": 3,
+        "newUsers": 2,
+        "sessions": 3,
+        "pageViews": 2
       }
     },
     "signupsByDate": {
@@ -287,14 +299,14 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 364,
-        "users": 174
+        "sessions": 373,
+        "users": 183
       },
       {
         "source": "qr",
         "medium": "physical_card",
-        "sessions": 36,
-        "users": 16
+        "sessions": 38,
+        "users": 17
       },
       {
         "source": "facebook.com",
@@ -309,15 +321,15 @@
         "users": 5
       },
       {
+        "source": "(not set)",
+        "medium": "(not set)",
+        "sessions": 6,
+        "users": 5
+      },
+      {
         "source": "chatgpt.com",
         "medium": "ai-assistant",
         "sessions": 6,
-        "users": 4
-      },
-      {
-        "source": "(not set)",
-        "medium": "(not set)",
-        "sessions": 5,
         "users": 4
       },
       {
@@ -373,7 +385,7 @@
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 358
+        "sessions": 364
       },
       {
         "campaign": "card_v2",
@@ -386,14 +398,14 @@
         "sessions": 25
       },
       {
+        "campaign": "(direct)",
+        "content": "",
+        "sessions": 9
+      },
+      {
         "campaign": "(ai-assistant)",
         "content": "(not set)",
         "sessions": 6
-      },
-      {
-        "campaign": "(direct)",
-        "content": "",
-        "sessions": 5
       },
       {
         "campaign": "test",
@@ -404,6 +416,11 @@
         "campaign": "(organic)",
         "content": "(not set)",
         "sessions": 4
+      },
+      {
+        "campaign": "card_v2",
+        "content": "",
+        "sessions": 2
       }
     ],
     "events": {
@@ -428,22 +445,22 @@
         "sessions": 239
       },
       {
+        "state": "Illinois",
+        "country": "United States",
+        "users": 28,
+        "sessions": 29
+      },
+      {
         "state": "Virginia",
         "country": "United States",
         "users": 27,
         "sessions": 28
       },
       {
-        "state": "Illinois",
-        "country": "United States",
-        "users": 25,
-        "sessions": 26
-      },
-      {
         "state": "Iowa",
         "country": "United States",
-        "users": 19,
-        "sessions": 19
+        "users": 21,
+        "sessions": 21
       },
       {
         "state": "Massachusetts",
@@ -466,7 +483,13 @@
       {
         "state": "Oregon",
         "country": "United States",
-        "users": 7,
+        "users": 8,
+        "sessions": 8
+      },
+      {
+        "state": "Georgia",
+        "country": "United States",
+        "users": 6,
         "sessions": 7
       },
       {
@@ -476,16 +499,16 @@
         "sessions": 12
       },
       {
-        "state": "Georgia",
+        "state": "New Jersey",
         "country": "United States",
         "users": 5,
-        "sessions": 6
+        "sessions": 5
       },
       {
         "state": "Ohio",
         "country": "United States",
         "users": 5,
-        "sessions": 5
+        "sessions": 6
       },
       {
         "state": "Texas",
@@ -512,6 +535,12 @@
         "sessions": 3
       },
       {
+        "state": "England",
+        "country": "United Kingdom",
+        "users": 3,
+        "sessions": 3
+      },
+      {
         "state": "Ile-de-France",
         "country": "France",
         "users": 3,
@@ -524,20 +553,8 @@
         "sessions": 3
       },
       {
-        "state": "New Jersey",
-        "country": "United States",
-        "users": 3,
-        "sessions": 3
-      },
-      {
         "state": "Alabama",
         "country": "United States",
-        "users": 2,
-        "sessions": 2
-      },
-      {
-        "state": "England",
-        "country": "United Kingdom",
         "users": 2,
         "sessions": 2
       },
@@ -668,6 +685,12 @@
         "sessions": 3
       },
       {
+        "state": "Minnesota",
+        "country": "United States",
+        "users": 1,
+        "sessions": 1
+      },
+      {
         "state": "Missouri",
         "country": "United States",
         "users": 1,
@@ -724,13 +747,13 @@
     ],
     "cities": [
       {
-        "city": "Ashburn",
-        "state": "Virginia",
-        "users": 22
-      },
-      {
         "city": "Glenview",
         "state": "Illinois",
+        "users": 25
+      },
+      {
+        "city": "Ashburn",
+        "state": "Virginia",
         "users": 22
       },
       {
@@ -741,7 +764,7 @@
       {
         "city": "Council Bluffs",
         "state": "Iowa",
-        "users": 18
+        "users": 20
       },
       {
         "city": "Buffalo",
@@ -764,19 +787,24 @@
         "users": 6
       },
       {
+        "city": "Boardman",
+        "state": "Oregon",
+        "users": 6
+      },
+      {
         "city": "Colonie",
         "state": "New York",
         "users": 6
       },
       {
-        "city": "Boardman",
-        "state": "Oregon",
-        "users": 5
-      },
-      {
         "city": "Schenectady",
         "state": "New York",
         "users": 5
+      },
+      {
+        "city": "London",
+        "state": "England",
+        "users": 3
       },
       {
         "city": "Los Angeles",
@@ -844,11 +872,6 @@
         "users": 2
       },
       {
-        "city": "London",
-        "state": "England",
-        "users": 2
-      },
-      {
         "city": "Montreal",
         "state": "Quebec",
         "users": 2
@@ -876,6 +899,11 @@
       {
         "city": "Santa Clara",
         "state": "California",
+        "users": 2
+      },
+      {
+        "city": "Secaucus",
+        "state": "New Jersey",
         "users": 2
       },
       {
@@ -2980,6 +3008,59 @@
         "ReferrerUrl.sessionsCount": 5,
         "PopularPages.url": "https://bathroomreport.app/",
         "PopularPages.visitsCount": 5
+      },
+      "2026-09-13": {
+        "DeadClickCount.sessionsCount": 13,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 13,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 13,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 13,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 13,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 15.38,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 84.62,
+        "ScriptErrorCount.pagesViews": 2,
+        "ScriptErrorCount.subTotal": 6,
+        "ErrorClickCount.sessionsCount": 13,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 13,
+        "Traffic.totalBotSessionCount": 1,
+        "Traffic.distinctUserCount": 14,
+        "Traffic.pagesPerSessionPercentage": 1.1428571428571428,
+        "EngagementTime.totalTime": 19,
+        "EngagementTime.activeTime": 17,
+        "Browser.name": "Chrome",
+        "Browser.sessionsCount": 5,
+        "Device.name": "PC",
+        "Device.sessionsCount": 8,
+        "OS.name": "Windows",
+        "OS.sessionsCount": 8,
+        "Country.name": "United States",
+        "Country.sessionsCount": 12,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 13,
+        "ReferrerUrl.name": 0,
+        "ReferrerUrl.sessionsCount": 13,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 12
       }
     }
   },
