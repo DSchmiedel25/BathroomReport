@@ -33,8 +33,8 @@ jobs:
           # sanity: valid JSON?
           node -e "require('./serviceAccountKey.json')" || { echo "Invalid FIREBASE_SERVICE_ACCOUNT secret"; exit 1; }
 
-      - name: Install firebase-admin
-        run: npm install firebase-admin --no-save
+      - name: Install dependencies
+        run: npm ci
 
       # A failing bake step must stay VISIBLE. These used to end in
       #   || echo "... — continuing"
