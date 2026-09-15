@@ -77,6 +77,60 @@ button, input, select, textarea{ font-family:inherit; }
 
 /* tagline under the wordmark (repurposed subtitle) */
 
+/* ---------- Address search: recenter the map on a typed place ---------- */
+#addressSearchForm{
+  display:flex !important; align-items:center; gap:8px;
+  margin:10px 12px 0 !important; padding:0;
+}
+#addressSearchField{
+  flex:1; min-width:0; display:flex; align-items:center; gap:8px;
+  background:var(--shell-chrome2) !important; border:1px solid var(--shell-line) !important;
+  border-radius:12px !important; padding:0 12px; height:44px; box-sizing:border-box;
+}
+#addressSearchField .ico{ width:18px; height:18px; flex:none; color:var(--shell-muted); }
+#addressSearchInput{
+  flex:1; min-width:0; border:0; background:transparent; color:var(--shell-ink);
+  /* 16px or iOS Safari zooms the viewport on focus and never zooms back. */
+  font-size:16px; height:100%; padding:0;
+}
+#addressSearchInput::placeholder{ color:var(--shell-muted); }
+#addressSearchInput:focus{ outline:0; }
+#addressSearchClear{
+  flex:none; width:28px; height:28px; border:0; background:transparent;
+  color:var(--shell-muted); font-size:15px; border-radius:50%; padding:0;
+  display:grid; place-items:center; cursor:pointer;
+}
+#addressSearchClear[hidden]{ display:none !important; }
+#addressSearchClear:active{ background:var(--shell-line); }
+#addressSearchSubmit{
+  flex:none; height:44px; padding:0 16px; border-radius:12px !important;
+  background:var(--accent) !important; color:var(--accent-ink) !important;
+  border:0 !important; font-weight:800 !important; font-size:14px !important;
+  letter-spacing:.02em; cursor:pointer;
+}
+#addressSearchSubmit:active{ background:var(--accent-deep) !important; }
+#addressSearchSubmit:disabled{ opacity:.6; cursor:default; }
+#addressSearchField:focus-within{ border-color:var(--accent) !important; }
+#addressSearchSubmit:focus-visible,
+#addressSearchClear:focus-visible,
+#addressSearchInput:focus-visible{
+  outline:2px solid var(--accent) !important; outline-offset:2px;
+}
+
+/* Pin dropped for a searched address — distinct from the blue "you are here" dot so the two
+   are never mistaken for each other; teal matches the app's accent. */
+.address-search-pin{
+  width:26px; height:26px; display:flex; align-items:center; justify-content:center;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.5));
+}
+.address-search-pin svg{ width:26px; height:26px; fill:var(--accent); stroke:var(--shell-chrome); stroke-width:1; }
+
+#addressSearchStatus{
+  margin:6px 12px 0 !important; font-size:12.5px; color:var(--shell-muted);
+}
+#addressSearchStatus.err{ color:#ff8a7a; }
+#addressSearchStatus[hidden]{ display:none !important; }
+
 /* ---------- Map fills the space ---------- */
 #mapWrap{ position:relative; }
 #map{ background:#20242a; }

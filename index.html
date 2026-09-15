@@ -127,6 +127,20 @@
 <button id="accountToggle">👤 Log In</button>
 </div>
 </div>
+<!-- Address search: recenters the map on a typed address, the same way Where Am I? recenters
+     on the device's GPS position, but for a place the user isn't standing at (checking a
+     destination before a trip, an area they're about to drive through, etc). Geocoded via OSM's
+     Nominatim — no API key, matches the tile layer and routing the app already uses. Submit-only
+     (no live suggestions) to keep requests to one per search rather than one per keystroke. -->
+<form id="addressSearchForm" role="search" autocomplete="off">
+<div id="addressSearchField">
+<svg class="ico" aria-hidden="true"><use href="#i-search"></use></svg>
+<input type="text" id="addressSearchInput" name="address" placeholder="Search an address or city" aria-label="Search an address or city" maxlength="120">
+<button type="button" id="addressSearchClear" aria-label="Clear address search" hidden>&#10005;</button>
+</div>
+<button type="submit" id="addressSearchSubmit" aria-label="Search">Go</button>
+</form>
+<div id="addressSearchStatus" role="status" aria-live="polite" hidden></div>
 <span id="chainBadge">🚽 Regional convenience-store bathrooms</span>
 <div id="statPillRow">
 <span class="stat-pill" id="openNowBadge"></span>
@@ -256,6 +270,7 @@
      read, especially the accessibility mark.
      ============================================================================ -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.4" cy="10.4" r="6.6"/><path d="M15.2 15.2L20.5 20.5"/></symbol>
 <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.6 8.4l-2.1 5.1-5.1 2.1 2.1-5.1z"/></symbol>
 <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a4.5 4.5 0 006.4 0l2.6-2.6a4.5 4.5 0 00-6.4-6.4L11.4 5.3"/><path d="M14 11a4.5 4.5 0 00-6.4 0L5 13.6a4.5 4.5 0 006.4 6.4l1.2-1.2"/></symbol>
 <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h11l-1.7 3.4L16 11H5z"/></symbol>

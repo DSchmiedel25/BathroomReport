@@ -8066,6 +8066,97 @@ whereAmIBtn.addEventListener('click',()=>{
       : 'Could not get your location. Check your connection and location settings.';
   },{enableHighAccuracy:true,timeout:10000,maximumAge:30000});
 });
+
+/* Address search — recenters the map on a typed place, the same "look here" move whereAmIBtn
+ * does for GPS, but for anywhere the user isn't standing. Geocoded through OSM's Nominatim
+ * (no API key, matches the OSM tile layer and OSM-based routing already in use). Submit-only:
+ * one request per search rather than one per keystroke, so this stays well inside Nominatim's
+ * usage policy even on a busy day.
+ *
+ * addressSearchMarker is kept separate from userMarker (the blue GPS dot) — they mean different
+ * things and must never look alike or share state, so searching an address never disturbs a
+ * live "you are here" marker and vice versa. */
+let addressSearchMarker=null;
+let addressSearchAbort=null;
+const addressSearchForm=document.getElementById('addressSearchForm');
+const addressSearchInput=document.getElementById('addressSearchInput');
+const addressSearchClear=document.getElementById('addressSearchClear');
+const addressSearchSubmit=document.getElementById('addressSearchSubmit');
+const addressSearchStatus=document.getElementById('addressSearchStatus');
+
+function setAddressSearchStatus(msg, isError){
+  if(!msg){ addressSearchStatus.hidden=true; addressSearchStatus.textContent=''; addressSearchStatus.classList.remove('err'); return; }
+  addressSearchStatus.hidden=false;
+  addressSearchStatus.textContent=msg;
+  addressSearchStatus.classList.toggle('err', !!isError);
+}
+
+addressSearchInput.addEventListener('input',()=>{
+  addressSearchClear.hidden = addressSearchInput.value.length===0;
+});
+
+addressSearchClear.addEventListener('click',()=>{
+  addressSearchInput.value='';
+  addressSearchClear.hidden=true;
+  setAddressSearchStatus(null);
+  addressSearchInput.focus();
+});
+
+addressSearchForm.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const query=addressSearchInput.value.trim();
+  if(!query){ addressSearchInput.focus(); return; }
+
+  track('address_search',{outcome:'submit'});
+
+  // A second search fired before the first returns (fast typer + fast tap) should replace it,
+  // not race it — otherwise a slower first response can land after a faster second one and
+  // silently snap the map back to the wrong place.
+  if(addressSearchAbort) addressSearchAbort.abort();
+  addressSearchAbort = (typeof AbortController!=='undefined') ? new AbortController() : null;
+
+  addressSearchSubmit.disabled=true;
+  setAddressSearchStatus('Searching…', false);
+
+  try{
+    const url='https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(query);
+    const res = await fetch(url, addressSearchAbort ? {signal:addressSearchAbort.signal} : {});
+    if(!res.ok) throw new Error('bad_status');
+    const results = await res.json();
+    if(!Array.isArray(results) || results.length===0){
+      setAddressSearchStatus("No results found for that address.", true);
+      track('address_search',{outcome:'not_found'});
+      return;
+    }
+    const lat=parseFloat(results[0].lat), lng=parseFloat(results[0].lon);
+    if(!isFinite(lat) || !isFinite(lng)){
+      setAddressSearchStatus("No results found for that address.", true);
+      track('address_search',{outcome:'not_found'});
+      return;
+    }
+    if(addressSearchMarker) map.removeLayer(addressSearchMarker);
+    addressSearchMarker=L.marker([lat,lng],{
+      icon:L.divIcon({
+        className:'',
+        html:'<div class="address-search-pin"><svg class="ico ico-fill" aria-hidden="true"><use href="#i-pin"></use></svg></div>',
+        iconSize:[26,26],
+        iconAnchor:[13,26]
+      }),
+      zIndexOffset:900
+    }).addTo(map);
+    map.setView([lat,lng],16,{animate:true});
+    setAddressSearchStatus(null);
+    track('address_search',{outcome:'found'});
+    addressSearchInput.blur();   // dismiss the on-screen keyboard so the map is visible right away
+  }catch(err){
+    if(err && err.name==='AbortError') return;   // superseded by a newer search — not a failure
+    setAddressSearchStatus("Couldn't reach the search service. Check your connection and try again.", true);
+    track('address_search',{outcome:'error'});
+  }finally{
+    addressSearchSubmit.disabled=false;
+  }
+});
+
 let suppressNextLocateClick=false;
 function showBathroomNowResult(result,fallback=false){
   nearestInfo.style.display='block'; nearestInfo.innerHTML=bathroomNowCard(result,fallback);
