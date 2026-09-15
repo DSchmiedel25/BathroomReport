@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-14T15:53:37.844Z",
+  "generated": "2026-09-15T14:19:54.139Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -285,10 +285,10 @@
         "pageViews": 9
       },
       "2026-09-14": {
-        "activeUsers": 3,
-        "newUsers": 2,
-        "sessions": 3,
-        "pageViews": 2
+        "activeUsers": 6,
+        "newUsers": 4,
+        "sessions": 6,
+        "pageViews": 7
       }
     },
     "signupsByDate": {
@@ -299,8 +299,8 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 373,
-        "users": 183
+        "sessions": 376,
+        "users": 185
       },
       {
         "source": "qr",
@@ -321,16 +321,16 @@
         "users": 5
       },
       {
-        "source": "(not set)",
-        "medium": "(not set)",
-        "sessions": 6,
-        "users": 5
-      },
-      {
         "source": "chatgpt.com",
         "medium": "ai-assistant",
         "sessions": 6,
         "users": 4
+      },
+      {
+        "source": "(not set)",
+        "medium": "(not set)",
+        "sessions": 5,
+        "users": 5
       },
       {
         "source": "m.facebook.com",
@@ -385,12 +385,12 @@
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 364
+        "sessions": 371
       },
       {
         "campaign": "card_v2",
         "content": "(not set)",
-        "sessions": 36
+        "sessions": 38
       },
       {
         "campaign": "(referral)",
@@ -398,14 +398,14 @@
         "sessions": 25
       },
       {
-        "campaign": "(direct)",
-        "content": "",
-        "sessions": 9
-      },
-      {
         "campaign": "(ai-assistant)",
         "content": "(not set)",
         "sessions": 6
+      },
+      {
+        "campaign": "(direct)",
+        "content": "",
+        "sessions": 5
       },
       {
         "campaign": "test",
@@ -416,15 +416,10 @@
         "campaign": "(organic)",
         "content": "(not set)",
         "sessions": 4
-      },
-      {
-        "campaign": "card_v2",
-        "content": "",
-        "sessions": 2
       }
     ],
     "events": {
-      "bathroom_now": 42,
+      "bathroom_now": 44,
       "rating_submit": 11,
       "login": 3,
       "sign_up": 2
@@ -441,8 +436,8 @@
       {
         "state": "New York",
         "country": "United States",
-        "users": 58,
-        "sessions": 239
+        "users": 59,
+        "sessions": 241
       },
       {
         "state": "Illinois",
@@ -465,8 +460,8 @@
       {
         "state": "Massachusetts",
         "country": "United States",
-        "users": 15,
-        "sessions": 22
+        "users": 16,
+        "sessions": 23
       },
       {
         "state": "California",
@@ -493,6 +488,12 @@
         "sessions": 7
       },
       {
+        "state": "Ohio",
+        "country": "United States",
+        "users": 6,
+        "sessions": 6
+      },
+      {
         "state": "Florida",
         "country": "United States",
         "users": 5,
@@ -503,12 +504,6 @@
         "country": "United States",
         "users": 5,
         "sessions": 5
-      },
-      {
-        "state": "Ohio",
-        "country": "United States",
-        "users": 5,
-        "sessions": 6
       },
       {
         "state": "Texas",
@@ -752,13 +747,13 @@
         "users": 25
       },
       {
-        "city": "Ashburn",
-        "state": "Virginia",
-        "users": 22
-      },
-      {
         "city": "New York",
         "state": "New York",
+        "users": 23
+      },
+      {
+        "city": "Ashburn",
+        "state": "Virginia",
         "users": 22
       },
       {
@@ -772,14 +767,14 @@
         "users": 15
       },
       {
-        "city": "Denver",
-        "state": "Colorado",
+        "city": "Boston",
+        "state": "Massachusetts",
         "users": 8
       },
       {
-        "city": "Boston",
-        "state": "Massachusetts",
-        "users": 7
+        "city": "Denver",
+        "state": "Colorado",
+        "users": 8
       },
       {
         "city": "Albany",
@@ -3061,6 +3056,59 @@
         "ReferrerUrl.sessionsCount": 13,
         "PopularPages.url": "https://bathroomreport.app/",
         "PopularPages.visitsCount": 12
+      },
+      "2026-09-14": {
+        "DeadClickCount.sessionsCount": 5,
+        "DeadClickCount.sessionsWithMetricPercentage": 20,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 80,
+        "DeadClickCount.pagesViews": 1,
+        "DeadClickCount.subTotal": 1,
+        "ExcessiveScroll.sessionsCount": 5,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 5,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 5,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 5,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 20,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 80,
+        "ScriptErrorCount.pagesViews": 1,
+        "ScriptErrorCount.subTotal": 1,
+        "ErrorClickCount.sessionsCount": 5,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 5,
+        "Traffic.totalBotSessionCount": 1,
+        "Traffic.distinctUserCount": 5,
+        "Traffic.pagesPerSessionPercentage": 1.1666666666666667,
+        "EngagementTime.totalTime": 98,
+        "EngagementTime.activeTime": 68,
+        "Browser.name": "MobileSafari",
+        "Browser.sessionsCount": 3,
+        "Device.name": "Mobile",
+        "Device.sessionsCount": 3,
+        "OS.name": "IOS",
+        "OS.sessionsCount": 3,
+        "Country.name": "United States",
+        "Country.sessionsCount": 4,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 5,
+        "ReferrerUrl.name": 0,
+        "ReferrerUrl.sessionsCount": 5,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 4
       }
     }
   },
