@@ -7988,10 +7988,16 @@ function bathroomNowCard(result,fallback=false){
         : '');
   const outsideSelection=!activeChains.has(result.loc.chain || DEFAULT_CHAIN_KEY);
   const chainNote=outsideSelection?`<div class="nearest-alert">Nothing close by in your selected chains, so this ${escapeHtml((CHAIN_REGISTRY[result.loc.chain]||{}).name||'nearby')} location is shown instead.</div>`:'';
+  // When Bathroom Now is running off a searched address rather than the device's real position,
+  // say so right on the result — otherwise "closest" silently means "closest to that address",
+  // which someone who forgot the search was still active would have no way to know.
+  const searchOriginNote = addressSearchOverridePos
+    ? `<div class="nearest-alert">📍 Searching near ${escapeHtml(addressSearchOverridePos.label)}</div>`
+    : '';
   // Filled chain pill so you can see which brand this is at a glance, colored from the registry.
   const chain=CHAIN_REGISTRY[result.loc.chain]||{};
   const chainBadge=chain.name?`<div class="now-chain-badge" style="background:${chain.color};color:${chain.textColor};">${escapeHtml(chain.name)}</div>`:'';
-  return `<div class="bathroom-now-card"><button class="bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':(travelMode==='foot'?'Closest bathroom by walking distance':'Closest bathroom by driving distance')}</div>${chainNote}${chainBadge}<b>${escapeHtml(result.loc.n)}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${lastRatedNote}${hoursMissingNote}${accessNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">Details</button></div></div>`;
+  return `<div class="bathroom-now-card"><button class="bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':(travelMode==='foot'?'Closest bathroom by walking distance':'Closest bathroom by driving distance')}</div>${searchOriginNote}${chainNote}${chainBadge}<b>${escapeHtml(result.loc.n)}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${lastRatedNote}${hoursMissingNote}${accessNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">Details</button></div></div>`;
 }
 // For Bathroom Now: drop any of the top-4 nearest candidates that are in the HARD out-of-order
 // phase, in a SINGLE batched query (Firestore `in` takes up to 10 ids, so 4 = one read cost).
@@ -8025,6 +8031,18 @@ const locateBtn=document.getElementById('locateBtn'),nearestInfo=document.getEle
  * timeout, error — and each of those reset it to its own hardcoded string, so changing the markup
  * silently lasted until the first tap. */
 const LOCATE_LABEL = 'Find me the closest bathroom';
+/* Sticky address-search override for Bathroom Now. Set when an address search succeeds, cleared
+ * when a fresh GPS fix comes in from Where Am I? (a real position always wins over a typed one).
+ * Deliberately NOT the same slot as lastKnownPos/currentListPosition — those feed the List,
+ * distance-based rating flows, and the admin Card Drop tool, and all of those must keep meaning
+ * "where the device actually is". Only Bathroom Now reads this override.
+ *
+ * The button's own label stays fixed rather than growing to fit the searched address — an
+ * address can run much longer than "Find me the closest bathroom", and this button sits with
+ * little headroom below nearestInfo, so wrapping to two lines risked the two overlapping on a
+ * narrow phone. bathroomNowCard() below surfaces the searched address instead, inside a card
+ * that already has room to grow without crowding anything. */
+let addressSearchOverridePos = null;
 
 function setUserLocationMarker(lat, lng){
   if(userMarker) map.removeLayer(userMarker);
@@ -8055,6 +8073,9 @@ whereAmIBtn.addEventListener('click',()=>{
     currentListPosition=lastKnownPos;
     setUserLocationMarker(lat,lng);
     map.setView([lat,lng],16,{animate:true});
+    // A real GPS fix always wins over a typed address — this is the "no, really, where I am"
+    // button, so any sticky address-search override for Bathroom Now clears here.
+    addressSearchOverridePos=null;
     whereAmIBtn.disabled=false;
     whereAmIBtn.innerHTML=original;
   },err=>{
@@ -8078,11 +8099,13 @@ whereAmIBtn.addEventListener('click',()=>{
  * live "you are here" marker and vice versa. */
 let addressSearchMarker=null;
 let addressSearchAbort=null;
+const addressSearchToggle=document.getElementById('addressSearchToggle');
 const addressSearchForm=document.getElementById('addressSearchForm');
 const addressSearchInput=document.getElementById('addressSearchInput');
 const addressSearchClear=document.getElementById('addressSearchClear');
 const addressSearchSubmit=document.getElementById('addressSearchSubmit');
 const addressSearchStatus=document.getElementById('addressSearchStatus');
+const ADDRESS_SEARCH_ICON='<svg class="ico" aria-hidden="true"><use href="#i-search"></use></svg>';
 
 function setAddressSearchStatus(msg, isError){
   if(!msg){ addressSearchStatus.hidden=true; addressSearchStatus.textContent=''; addressSearchStatus.classList.remove('err'); return; }
@@ -8090,6 +8113,34 @@ function setAddressSearchStatus(msg, isError){
   addressSearchStatus.textContent=msg;
   addressSearchStatus.classList.toggle('err', !!isError);
 }
+
+/* Icon toggles into the search field and back — the same button both opens and closes it, so
+ * the header never carries more than one control for this. Closing (by tap, Escape, or after a
+ * successful search) clears the field itself; it's a fresh search next time it opens, not a
+ * reopened one. */
+function setAddressSearchOpen(open){
+  addressSearchForm.classList.toggle('open', open);
+  addressSearchToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  addressSearchToggle.setAttribute('aria-label', open ? 'Close address search' : 'Search an address');
+  addressSearchToggle.innerHTML = open ? '&#10005;' : ADDRESS_SEARCH_ICON;
+  if(open){
+    requestAnimationFrame(()=>addressSearchInput.focus());
+  }else{
+    if(addressSearchAbort) addressSearchAbort.abort();
+    addressSearchInput.blur();   // CSS alone hiding a focused field doesn't reliably drop the iOS keyboard
+    addressSearchInput.value='';
+    addressSearchClear.hidden=true;
+    setAddressSearchStatus(null);
+  }
+}
+
+addressSearchToggle.addEventListener('click',()=>{
+  setAddressSearchOpen(!addressSearchForm.classList.contains('open'));
+});
+
+addressSearchInput.addEventListener('keydown',(e)=>{
+  if(e.key==='Escape') setAddressSearchOpen(false);
+});
 
 addressSearchInput.addEventListener('input',()=>{
   addressSearchClear.hidden = addressSearchInput.value.length===0;
@@ -8145,9 +8196,15 @@ addressSearchForm.addEventListener('submit', async (e)=>{
       zIndexOffset:900
     }).addTo(map);
     map.setView([lat,lng],16,{animate:true});
-    setAddressSearchStatus(null);
+    // Bathroom Now searches from here instead of the device's GPS, until a real GPS fix
+    // (Where Am I?) or another address search replaces it. The resolved place name reads better
+    // in the result card than the raw query ("123 Main St" instead of whatever the person typed).
+    const shortLabel = ((results[0].display_name || query).split(',')[0] || query).trim() || query;
+    addressSearchOverridePos = {lat, lng, label: shortLabel};
     track('address_search',{outcome:'found'});
-    addressSearchInput.blur();   // dismiss the on-screen keyboard so the map is visible right away
+    // Close the search back down to the icon — the point of collapsing it was to get the map
+    // clear again once someone's done with it, and "done" here means it found something.
+    setAddressSearchOpen(false);
   }catch(err){
     if(err && err.name==='AbortError') return;   // superseded by a newer search — not a failure
     setAddressSearchStatus("Couldn't reach the search service. Check your connection and try again.", true);
@@ -8175,6 +8232,17 @@ function showBathroomNowResult(result,fallback=false){
 }
 locateBtn.addEventListener('click',()=>{
   if(suppressNextLocateClick)return;
+
+  // A sticky address search takes over Bathroom Now entirely — no GPS prompt needed, since the
+  // whole point is finding the closest bathroom to somewhere other than the device's real
+  // location. Cleared by a fresh Where Am I? fix or a new address search (see their handlers).
+  if(addressSearchOverridePos){
+    track('bathroom_now',{outcome:'tap',source:'address_override'});
+    locateBtn.disabled=true;locateBtn.textContent='Finding the closest…';nearestInfo.style.display='none';
+    runBathroomNowFor({lat:addressSearchOverridePos.lat,lng:addressSearchOverridePos.lng});
+    return;
+  }
+
   if(!navigator.geolocation){nearestInfo.style.display='block';nearestInfo.textContent="Your browser doesn't support location.";track('bathroom_now',{outcome:'unsupported'});return;}
   /* The primary action of the whole app, tracked by OUTCOME rather than as one undifferentiated
    * tap. A tap that ends in a denied permission prompt, one that finds nothing in range, and one
@@ -8185,69 +8253,7 @@ locateBtn.addEventListener('click',()=>{
   navigator.geolocation.getCurrentPosition(async pos=>{
     const user={lat:pos.coords.latitude,lng:pos.coords.longitude};lastKnownPos={...user,ts:Date.now()};currentListPosition=lastKnownPos;
     setUserLocationMarker(user.lat,user.lng);
-    // Prefer the selected chains, but don't strand someone far from their nearest pick —
-    // if nothing selected is within reasonable reach, widen to every chain (still open-only)
-    // so the closest real option wins instead. On foot the leash is much shorter: widening to
-    // an unselected chain 20 miles away is a rescue by car and an insult on foot — past a
-    // mile and a half, showing a farther option from the chains they DID pick is the honest
-    // answer, and the card's access notes do the rest.
-    const CHAIN_FALLBACK_MILES = travelMode === 'foot' ? 1.5 : 20;
-    // Bathroom Now ignores travel mode on purpose: it's the emergency button, so the closest
-    // usable bathroom wins even if it's a city/metro spot (e.g. a Dunkin) while in road mode.
-    const notClosed = (loc) => isLocationOpenNow(loc) !== false && !isConfirmedNoRestroom(loc);
-    const inSelection = (loc) => activeChains.has(loc.chain || DEFAULT_CHAIN_KEY);
-    const nearestMiles = (list) => list.reduce((min,loc) => {
-      const d = milesBetween(user.lat, user.lng, loc.lat, loc.lng);
-      return d < min ? d : min;
-    }, Infinity);
-    // Relax one constraint at a time, and only when nothing acceptable is within reach.
-    // Access-unknown spots come before abandoning the user's chain selection, because an
-    // untagged public toilet nearby beats a chain they didn't pick 30 miles away.
-    let eligible = seedLocations.filter(loc => inSelection(loc) && notClosed(loc) && goodRecommendation(loc));
-    if(nearestMiles(eligible) > CHAIN_FALLBACK_MILES){
-      eligible = seedLocations.filter(loc => inSelection(loc) && notClosed(loc));
-    }
-    if(nearestMiles(eligible) > CHAIN_FALLBACK_MILES){
-      eligible = seedLocations.filter(loc => notClosed(loc) && goodRecommendation(loc));
-    }
-    if(nearestMiles(eligible) > CHAIN_FALLBACK_MILES){
-      eligible = seedLocations.filter(notClosed);
-    }
-    let candidates=eligible.map(loc=>({loc,d:milesBetween(user.lat,user.lng,loc.lat,loc.lng)})).sort((a,b)=>a.d-b.d).slice(0,10).map(x=>x.loc);
-    if(!candidates.length){
-      locateBtn.disabled=false;locateBtn.textContent=LOCATE_LABEL;
-      nearestInfo.style.display='block';
-      nearestInfo.textContent='No open bathrooms found nearby right now.';
-      // A coverage hole, and the one outcome the person can do nothing about. If this climbs,
-      // it names the places that need data before anything else does.
-      track('bathroom_now',{outcome:'none_found'});
-      return;
-    }
-    // Don't route someone to a bathroom that's actively flagged out of order. Check the 4 closest
-    // in a single batched query and drop any in the HARD phase (soft-phase ones are fine — "might
-    // be working now"). Falls through to the next closest survivor. If the check fails or all 4 are
-    // flagged (extremely unlikely), we keep the original list rather than dead-end.
-    candidates = await filterOutHardOoo(candidates);
-    if(!candidates.length){
-      locateBtn.disabled=false;locateBtn.textContent=LOCATE_LABEL;
-      nearestInfo.style.display='block';
-      nearestInfo.textContent='No open bathrooms found nearby right now.';
-      // A coverage hole, and the one outcome the person can do nothing about. If this climbs,
-      // it names the places that need data before anything else does.
-      track('bathroom_now',{outcome:'none_found'});
-      return;
-    }
-    try{
-      const options=await getRoutedOptions(user,candidates);
-      options.sort((a,b)=>{const rank=x=>isLocationOpenNow(x.loc)===true?0:isLocationOpenNow(x.loc)===null?1:2;return rank(a)-rank(b)||a.distanceMiles-b.distanceMiles;});
-      if(!options.length)throw new Error('No routes');showBathroomNowResult(options[0],false);
-      track('bathroom_now',{outcome:'found',chain:options[0].loc.n||'',miles:Math.round(options[0].distanceMiles*10)/10,routed:true});
-    }catch(e){
-      const loc=candidates[0];const miles=milesBetween(user.lat,user.lng,loc.lat,loc.lng);
-      showBathroomNowResult({loc,distanceMiles:miles,durationMinutes:null},true);
-      // Still a result, but straight-line rather than routed — the routing service failed.
-      track('bathroom_now',{outcome:'found',chain:loc.n||'',miles:Math.round(miles*10)/10,routed:false});
-    }finally{locateBtn.disabled=false;locateBtn.textContent=LOCATE_LABEL;}
+    await runBathroomNowFor(user);
   },err=>{locateBtn.disabled=false;locateBtn.textContent=LOCATE_LABEL;nearestInfo.style.display='block';nearestInfo.textContent=err.code===1?'Location access was denied. Enable location permission for this site to use Bathroom Now.':'Could not get your location. Check your connection and location settings.';
     /* Permission denial is the single biggest thing standing between a visitor and the app
      * working at all, and nothing in the funnel showed it before. If this is a large share of
@@ -8255,6 +8261,75 @@ locateBtn.addEventListener('click',()=>{
      * prompt — you only get one prompt per visitor, and a reflexive Deny is permanent. */
     track('bathroom_now',{outcome:err.code===1?'permission_denied':'location_failed'});},{enableHighAccuracy:true,timeout:10000});
 });
+
+/* The actual "find the closest open bathroom" search, given a position — GPS or a searched
+ * address, either way. Extracted so both callers (real geolocation and the address override
+ * above) share one implementation instead of two copies drifting apart. */
+async function runBathroomNowFor(user){
+  // Prefer the selected chains, but don't strand someone far from their nearest pick —
+  // if nothing selected is within reasonable reach, widen to every chain (still open-only)
+  // so the closest real option wins instead. On foot the leash is much shorter: widening to
+  // an unselected chain 20 miles away is a rescue by car and an insult on foot — past a
+  // mile and a half, showing a farther option from the chains they DID pick is the honest
+  // answer, and the card's access notes do the rest.
+  const CHAIN_FALLBACK_MILES = travelMode === 'foot' ? 1.5 : 20;
+  // Bathroom Now ignores travel mode on purpose: it's the emergency button, so the closest
+  // usable bathroom wins even if it's a city/metro spot (e.g. a Dunkin) while in road mode.
+  const notClosed = (loc) => isLocationOpenNow(loc) !== false && !isConfirmedNoRestroom(loc);
+  const inSelection = (loc) => activeChains.has(loc.chain || DEFAULT_CHAIN_KEY);
+  const nearestMiles = (list) => list.reduce((min,loc) => {
+    const d = milesBetween(user.lat, user.lng, loc.lat, loc.lng);
+    return d < min ? d : min;
+  }, Infinity);
+  // Relax one constraint at a time, and only when nothing acceptable is within reach.
+  // Access-unknown spots come before abandoning the user's chain selection, because an
+  // untagged public toilet nearby beats a chain they didn't pick 30 miles away.
+  let eligible = seedLocations.filter(loc => inSelection(loc) && notClosed(loc) && goodRecommendation(loc));
+  if(nearestMiles(eligible) > CHAIN_FALLBACK_MILES){
+    eligible = seedLocations.filter(loc => inSelection(loc) && notClosed(loc));
+  }
+  if(nearestMiles(eligible) > CHAIN_FALLBACK_MILES){
+    eligible = seedLocations.filter(loc => notClosed(loc) && goodRecommendation(loc));
+  }
+  if(nearestMiles(eligible) > CHAIN_FALLBACK_MILES){
+    eligible = seedLocations.filter(notClosed);
+  }
+  let candidates=eligible.map(loc=>({loc,d:milesBetween(user.lat,user.lng,loc.lat,loc.lng)})).sort((a,b)=>a.d-b.d).slice(0,10).map(x=>x.loc);
+  if(!candidates.length){
+    locateBtn.disabled=false;locateBtn.textContent=LOCATE_LABEL;
+    nearestInfo.style.display='block';
+    nearestInfo.textContent='No open bathrooms found nearby right now.';
+    // A coverage hole, and the one outcome the person can do nothing about. If this climbs,
+    // it names the places that need data before anything else does.
+    track('bathroom_now',{outcome:'none_found'});
+    return;
+  }
+  // Don't route someone to a bathroom that's actively flagged out of order. Check the 4 closest
+  // in a single batched query and drop any in the HARD phase (soft-phase ones are fine — "might
+  // be working now"). Falls through to the next closest survivor. If the check fails or all 4 are
+  // flagged (extremely unlikely), we keep the original list rather than dead-end.
+  candidates = await filterOutHardOoo(candidates);
+  if(!candidates.length){
+    locateBtn.disabled=false;locateBtn.textContent=LOCATE_LABEL;
+    nearestInfo.style.display='block';
+    nearestInfo.textContent='No open bathrooms found nearby right now.';
+    // A coverage hole, and the one outcome the person can do nothing about. If this climbs,
+    // it names the places that need data before anything else does.
+    track('bathroom_now',{outcome:'none_found'});
+    return;
+  }
+  try{
+    const options=await getRoutedOptions(user,candidates);
+    options.sort((a,b)=>{const rank=x=>isLocationOpenNow(x.loc)===true?0:isLocationOpenNow(x.loc)===null?1:2;return rank(a)-rank(b)||a.distanceMiles-b.distanceMiles;});
+    if(!options.length)throw new Error('No routes');showBathroomNowResult(options[0],false);
+    track('bathroom_now',{outcome:'found',chain:options[0].loc.n||'',miles:Math.round(options[0].distanceMiles*10)/10,routed:true});
+  }catch(e){
+    const loc=candidates[0];const miles=milesBetween(user.lat,user.lng,loc.lat,loc.lng);
+    showBathroomNowResult({loc,distanceMiles:miles,durationMinutes:null},true);
+    // Still a result, but straight-line rather than routed — the routing service failed.
+    track('bathroom_now',{outcome:'found',chain:loc.n||'',miles:Math.round(miles*10)/10,routed:false});
+  }finally{locateBtn.disabled=false;locateBtn.textContent=LOCATE_LABEL;}
+}
 
 // Missing-location reporting — logs straight to Firestore (visible in FlushPanel), no email needed
 const missingBtn = document.getElementById('missingBtn');

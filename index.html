@@ -124,6 +124,7 @@
 <h1>BATHROOM <span class="wm-accent">REPORT</span></h1>
 </div>
 <div id="headerActions">
+<button id="addressSearchToggle" aria-label="Search an address" aria-expanded="false" aria-controls="addressSearchForm"><svg class="ico" aria-hidden="true"><use href="#i-search"></use></svg></button>
 <button id="accountToggle">👤 Log In</button>
 </div>
 </div>
@@ -131,7 +132,9 @@
      on the device's GPS position, but for a place the user isn't standing at (checking a
      destination before a trip, an area they're about to drive through, etc). Geocoded via OSM's
      Nominatim — no API key, matches the tile layer and routing the app already uses. Submit-only
-     (no live suggestions) to keep requests to one per search rather than one per keystroke. -->
+     (no live suggestions) to keep requests to one per search rather than one per keystroke.
+     Collapsed by default (addressSearchToggle above expands it) so the header stays a single
+     compact row until someone actually wants to search. -->
 <form id="addressSearchForm" role="search" autocomplete="off">
 <div id="addressSearchField">
 <svg class="ico" aria-hidden="true"><use href="#i-search"></use></svg>
