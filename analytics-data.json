@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-19T13:10:18.232Z",
+  "generated": "2026-09-20T13:35:00.863Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -309,10 +309,16 @@
         "pageViews": 6
       },
       "2026-09-18": {
-        "activeUsers": 0,
+        "activeUsers": 1,
         "newUsers": 0,
         "sessions": 1,
         "pageViews": 1
+      },
+      "2026-09-19": {
+        "activeUsers": 1,
+        "newUsers": 0,
+        "sessions": 1,
+        "pageViews": 2
       }
     },
     "signupsByDate": {
@@ -330,7 +336,7 @@
       {
         "source": "qr",
         "medium": "physical_card",
-        "sessions": 40,
+        "sessions": 41,
         "users": 17
       },
       {
@@ -364,6 +370,12 @@
         "users": 5
       },
       {
+        "source": "address_override",
+        "medium": "(not set)",
+        "sessions": 4,
+        "users": 1
+      },
+      {
         "source": "google",
         "medium": "organic",
         "sessions": 4,
@@ -376,28 +388,16 @@
         "users": 4
       },
       {
-        "source": "address_override",
+        "source": "(not set)",
         "medium": "(not set)",
         "sessions": 3,
-        "users": 1
+        "users": 3
       },
       {
         "source": "reddit.com",
         "medium": "referral",
         "sessions": 3,
         "users": 3
-      },
-      {
-        "source": "(not set)",
-        "medium": "(not set)",
-        "sessions": 2,
-        "users": 2
-      },
-      {
-        "source": "address_override",
-        "medium": "",
-        "sessions": 1,
-        "users": 0
       },
       {
         "source": "l.facebook.com",
@@ -448,10 +448,15 @@
         "campaign": "(organic)",
         "content": "(not set)",
         "sessions": 4
+      },
+      {
+        "campaign": "card_v2",
+        "content": "",
+        "sessions": 1
       }
     ],
     "events": {
-      "bathroom_now": 58,
+      "bathroom_now": 60,
       "rating_submit": 11,
       "login": 4,
       "sign_up": 3
@@ -469,7 +474,7 @@
         "state": "New York",
         "country": "United States",
         "users": 59,
-        "sessions": 251
+        "sessions": 252
       },
       {
         "state": "Illinois",
@@ -3354,6 +3359,59 @@
         "Device.name": "Mobile",
         "Device.sessionsCount": 1,
         "OS.name": "IOS",
+        "OS.sessionsCount": 1,
+        "Country.name": "United States",
+        "Country.sessionsCount": 1,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 1,
+        "ReferrerUrl.name": 0,
+        "ReferrerUrl.sessionsCount": 1,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 1
+      },
+      "2026-09-19": {
+        "DeadClickCount.sessionsCount": 1,
+        "DeadClickCount.sessionsWithMetricPercentage": 100,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 0,
+        "DeadClickCount.pagesViews": 1,
+        "DeadClickCount.subTotal": 1,
+        "ExcessiveScroll.sessionsCount": 1,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 1,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 1,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 1,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 1,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 1,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 1,
+        "Traffic.pagesPerSessionPercentage": 2,
+        "EngagementTime.totalTime": 64,
+        "EngagementTime.activeTime": 64,
+        "Browser.name": "ChromeMobile",
+        "Browser.sessionsCount": 1,
+        "Device.name": "Mobile",
+        "Device.sessionsCount": 1,
+        "OS.name": "Android",
         "OS.sessionsCount": 1,
         "Country.name": "United States",
         "Country.sessionsCount": 1,
