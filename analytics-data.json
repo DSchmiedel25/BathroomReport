@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-23T14:14:43.464Z",
+  "generated": "2026-09-24T14:12:39.544Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -330,13 +330,13 @@
         "activeUsers": 1,
         "newUsers": 0,
         "sessions": 1,
-        "pageViews": 3
+        "pageViews": 4
       },
       "2026-09-23": {
-        "activeUsers": 1,
-        "newUsers": 1,
-        "sessions": 1,
-        "pageViews": 1
+        "activeUsers": 4,
+        "newUsers": 4,
+        "sessions": 5,
+        "pageViews": 4
       }
     },
     "signupsByDate": {
@@ -348,8 +348,8 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 387,
-        "users": 192
+        "sessions": 390,
+        "users": 195
       },
       {
         "source": "qr",
@@ -376,6 +376,12 @@
         "users": 4
       },
       {
+        "source": "address_override",
+        "medium": "(not set)",
+        "sessions": 5,
+        "users": 1
+      },
+      {
         "source": "m.facebook.com",
         "medium": "referral",
         "sessions": 5,
@@ -386,12 +392,6 @@
         "medium": "test",
         "sessions": 5,
         "users": 5
-      },
-      {
-        "source": "address_override",
-        "medium": "(not set)",
-        "sessions": 4,
-        "users": 1
       },
       {
         "source": "google",
@@ -409,7 +409,7 @@
         "source": "(not set)",
         "medium": "(not set)",
         "sessions": 3,
-        "users": 3
+        "users": 2
       },
       {
         "source": "reddit.com",
@@ -420,18 +420,6 @@
       {
         "source": "(data not available)",
         "medium": "(data not available)",
-        "sessions": 1,
-        "users": 1
-      },
-      {
-        "source": "address_override",
-        "medium": "",
-        "sessions": 1,
-        "users": 1
-      },
-      {
-        "source": "address_override",
-        "medium": "(none)",
         "sessions": 1,
         "users": 1
       },
@@ -486,12 +474,12 @@
         "sessions": 4
       },
       {
-        "campaign": "(cross-network)",
+        "campaign": "(direct)",
         "content": "",
-        "sessions": 1
+        "sessions": 3
       },
       {
-        "campaign": "(direct)",
+        "campaign": "(cross-network)",
         "content": "",
         "sessions": 1
       }
@@ -515,7 +503,7 @@
         "state": "New York",
         "country": "United States",
         "users": 60,
-        "sessions": 255
+        "sessions": 256
       },
       {
         "state": "Illinois",
@@ -544,8 +532,8 @@
       {
         "state": "California",
         "country": "United States",
-        "users": 13,
-        "sessions": 21
+        "users": 14,
+        "sessions": 22
       },
       {
         "state": "Colorado",
@@ -558,6 +546,12 @@
         "country": "United States",
         "users": 9,
         "sessions": 9
+      },
+      {
+        "state": "Ohio",
+        "country": "United States",
+        "users": 7,
+        "sessions": 7
       },
       {
         "state": "Washington",
@@ -573,12 +567,6 @@
       },
       {
         "state": "New Jersey",
-        "country": "United States",
-        "users": 6,
-        "sessions": 6
-      },
-      {
-        "state": "Ohio",
         "country": "United States",
         "users": 6,
         "sessions": 6
@@ -620,6 +608,12 @@
         "sessions": 3
       },
       {
+        "state": "Kentucky",
+        "country": "United States",
+        "users": 3,
+        "sessions": 3
+      },
+      {
         "state": "Masovian Voivodeship",
         "country": "Poland",
         "users": 3,
@@ -628,6 +622,12 @@
       {
         "state": "Alabama",
         "country": "United States",
+        "users": 2,
+        "sessions": 2
+      },
+      {
+        "state": "Gyeonggi-do",
+        "country": "South Korea",
         "users": 2,
         "sessions": 2
       },
@@ -642,12 +642,6 @@
         "country": "United States",
         "users": 2,
         "sessions": 3
-      },
-      {
-        "state": "Kentucky",
-        "country": "United States",
-        "users": 2,
-        "sessions": 2
       },
       {
         "state": "Maryland",
@@ -700,12 +694,6 @@
       {
         "state": "County Dublin",
         "country": "Ireland",
-        "users": 1,
-        "sessions": 1
-      },
-      {
-        "state": "Gyeonggi-do",
-        "country": "South Korea",
         "users": 1,
         "sessions": 1
       },
@@ -895,6 +883,11 @@
         "users": 3
       },
       {
+        "city": "Santa Clara",
+        "state": "California",
+        "users": 3
+      },
+      {
         "city": "Saratoga Springs",
         "state": "New York",
         "users": 3
@@ -917,6 +910,11 @@
       {
         "city": "Alexandria",
         "state": "Virginia",
+        "users": 2
+      },
+      {
+        "city": "Anyang-si",
+        "state": "Gyeonggi-do",
         "users": 2
       },
       {
@@ -985,18 +983,8 @@
         "users": 2
       },
       {
-        "city": "Santa Clara",
-        "state": "California",
-        "users": 2
-      },
-      {
         "city": "Secaucus",
         "state": "New Jersey",
-        "users": 2
-      },
-      {
-        "city": "Troy",
-        "state": "New York",
         "users": 2
       }
     ],
@@ -3607,6 +3595,59 @@
         "Traffic.pagesPerSessionPercentage": 3,
         "EngagementTime.totalTime": 767,
         "EngagementTime.activeTime": 61,
+        "Browser.name": "MobileSafari",
+        "Browser.sessionsCount": 2,
+        "Device.name": "Mobile",
+        "Device.sessionsCount": 2,
+        "OS.name": "IOS",
+        "OS.sessionsCount": 2,
+        "Country.name": "United States",
+        "Country.sessionsCount": 2,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 2,
+        "ReferrerUrl.name": 0,
+        "ReferrerUrl.sessionsCount": 2,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 2
+      },
+      "2026-09-23": {
+        "DeadClickCount.sessionsCount": 2,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 2,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 2,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 2,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 2,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 2,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 2,
+        "Traffic.totalBotSessionCount": 1,
+        "Traffic.distinctUserCount": 3,
+        "Traffic.pagesPerSessionPercentage": 1,
+        "EngagementTime.totalTime": 38,
+        "EngagementTime.activeTime": 8,
         "Browser.name": "MobileSafari",
         "Browser.sessionsCount": 2,
         "Device.name": "Mobile",
