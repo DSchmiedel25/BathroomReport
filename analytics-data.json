@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-26T13:44:48.885Z",
+  "generated": "2026-09-27T14:42:00.178Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -343,6 +343,12 @@
         "newUsers": 0,
         "sessions": 1,
         "pageViews": 1
+      },
+      "2026-09-26": {
+        "activeUsers": 3,
+        "newUsers": 0,
+        "sessions": 4,
+        "pageViews": 3
       }
     },
     "signupsByDate": {
@@ -354,7 +360,7 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 391,
+        "sessions": 392,
         "users": 196
       },
       {
@@ -370,21 +376,27 @@
         "users": 10
       },
       {
+        "source": "address_override",
+        "medium": "(not set)",
+        "sessions": 7,
+        "users": 1
+      },
+      {
         "source": "qr",
         "medium": "test",
         "sessions": 7,
         "users": 5
       },
       {
-        "source": "address_override",
-        "medium": "(not set)",
-        "sessions": 6,
-        "users": 1
-      },
-      {
         "source": "chatgpt.com",
         "medium": "ai-assistant",
         "sessions": 6,
+        "users": 4
+      },
+      {
+        "source": "(not set)",
+        "medium": "(not set)",
+        "sessions": 5,
         "users": 4
       },
       {
@@ -412,12 +424,6 @@
         "users": 4
       },
       {
-        "source": "(not set)",
-        "medium": "(not set)",
-        "sessions": 3,
-        "users": 3
-      },
-      {
         "source": "reddit.com",
         "medium": "referral",
         "sessions": 3,
@@ -426,6 +432,12 @@
       {
         "source": "address_override",
         "medium": "",
+        "sessions": 1,
+        "users": 0
+      },
+      {
+        "source": "address_override",
+        "medium": "(none)",
         "sessions": 1,
         "users": 1
       },
@@ -478,11 +490,16 @@
         "campaign": "(organic)",
         "content": "(not set)",
         "sessions": 4
+      },
+      {
+        "campaign": "(direct)",
+        "content": "",
+        "sessions": 2
       }
     ],
     "events": {
-      "bathroom_now": 64,
-      "rating_submit": 11,
+      "bathroom_now": 75,
+      "rating_submit": 13,
       "login": 4,
       "sign_up": 3
     },
@@ -490,7 +507,8 @@
       "2026-08-25": 2,
       "2026-08-27": 4,
       "2026-09-06": 2,
-      "2026-09-11": 3
+      "2026-09-11": 3,
+      "2026-09-26": 2
     },
     "bathroomNow": null,
     "guidePages": [],
@@ -499,7 +517,7 @@
         "state": "New York",
         "country": "United States",
         "users": 60,
-        "sessions": 257
+        "sessions": 260
       },
       {
         "state": "Illinois",
@@ -658,6 +676,12 @@
         "sessions": 2
       },
       {
+        "state": "Nevada",
+        "country": "United States",
+        "users": 2,
+        "sessions": 2
+      },
+      {
         "state": "North Carolina",
         "country": "United States",
         "users": 2,
@@ -749,12 +773,6 @@
       },
       {
         "state": "Missouri",
-        "country": "United States",
-        "users": 1,
-        "sessions": 1
-      },
-      {
-        "state": "Nevada",
         "country": "United States",
         "users": 1,
         "sessions": 1
@@ -3731,6 +3749,59 @@
         "Traffic.pagesPerSessionPercentage": 0,
         "EngagementTime.totalTime": 0,
         "EngagementTime.activeTime": 0
+      },
+      "2026-09-26": {
+        "DeadClickCount.sessionsCount": 1,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 1,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 1,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 1,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 1,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 1,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 1,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 1,
+        "Traffic.pagesPerSessionPercentage": 1,
+        "EngagementTime.totalTime": 48,
+        "EngagementTime.activeTime": 34,
+        "Browser.name": "MobileSafari",
+        "Browser.sessionsCount": 1,
+        "Device.name": "Mobile",
+        "Device.sessionsCount": 1,
+        "OS.name": "IOS",
+        "OS.sessionsCount": 1,
+        "Country.name": "United States",
+        "Country.sessionsCount": 1,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 1,
+        "ReferrerUrl.name": 0,
+        "ReferrerUrl.sessionsCount": 1,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 1
       }
     }
   },
