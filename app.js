@@ -469,17 +469,47 @@ function sizesForZoom(zoom){
 // NOTE: if pins ever encode per-location state again (e.g. the v2 rating-colored centers),
 // add that state to the cache key (e.g. a rating bucket) — do NOT go back to per-id icons.
 const _iconCache = {};
+
+/* What a pin says about opening hours. Colour and shape stay the chain's; this only picks one
+ * of three treatments on top (styles in shell.css, .br-pin--*):
+ *   'open'    — open now, or a timed window the app won't judge because the place is over
+ *               OPEN_NOW_CONFIDENT_MILES away. Solid, exactly as before. The far case is solid
+ *               on purpose: fading it would read as "no hours" for every pin in another state.
+ *   'unknown' — no usable hours for today. Faded, dashed ring.
+ *   'closed'  — closed now. Dimmed with a slash; normally filtered off by "Hide confirmed closed".
+ * Never colour alone: the dashed ring and the slash carry the meaning for colour-blind users.
+ *
+ * The first pins are built while app.js is still running top to bottom, before the hours code
+ * further down (HRS_DAY_KEYS, OPEN_NOW_CONFIDENT_MILES) exists — touching it then throws and
+ * stops the whole script. So every pin starts solid, and once that code is defined the flag
+ * flips and refreshPinOpenStates() applies the real states. */
+var _pinStatesReady = false;
+function pinOpenState(loc){
+  if(!_pinStatesReady) return 'open';
+  const open = isLocationOpenNow(loc);
+  if(open === true) return 'open';
+  if(open === false) return 'closed';
+  const hrs = todayHrsString(loc);
+  if(hrs && /^\d{4}-\d{4}$/.test(hrs) && !openNowConfident(loc)) return 'open';
+  return 'unknown';
+}
+
 function makeIcon(id){
   const loc = locationsById[id];
   const chainKey = (loc && loc.chain) || DEFAULT_CHAIN_KEY;
   const chain = chainFor(loc);
   const size = sizesForZoom(map.getZoom()).rated; // one uniform size per zoom level
-  const cacheKey = chainKey + '|' + size;
+  const state = loc ? pinOpenState(loc) : 'open';
+  const marker = markers[id];
+  if(marker) marker._brPinState = state;
+  // Three states x chains x five size buckets — still a small fixed set of shared descriptors.
+  const cacheKey = chainKey + '|' + size + '|' + state;
   let icon = _iconCache[cacheKey];
   if(!icon){
+    const cls = 'br-pin br-pin--' + state + (chain.shape === 'diamond' ? ' br-pin--diamond' : '');
     icon = L.divIcon({
       className:'',
-      html:`<div style="${pinShapeStyle(chain, size)}"></div>`,
+      html:`<div class="${cls}" style="${pinShapeStyle(chain, size)}"></div>`,
       iconSize:[size, size],
       iconAnchor:[size/2, size/2]
     });
@@ -3040,7 +3070,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.49.3';
+const BUILD = 'v2.50.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -3220,6 +3250,7 @@ function addMarker(loc){
   marker.locId = loc.id; // used by the cluster icon function to compute the cluster's average rating
   marker.chainKey = loc.chain || DEFAULT_CHAIN_KEY;
   marker.locationData = loc;
+  marker._brPinState = pinOpenState(loc); // makeIcon ran before markers[id] existed
   allLocationMarkers.push(marker);
   // Not added to the map here on purpose: applyFilters() is the single authority on which
   // pins are on the map. It renders only markers within the current viewport (plus the
@@ -5762,6 +5793,29 @@ document.getElementById('onboardingLocate')?.addEventListener('click', () => {
   history.replaceState({}, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
 })();
 
+/* Pins show open / unknown / closed, and that changes with the clock. Once a minute (and when
+ * the app comes back to the foreground) recompute the state of the pins near the viewport and
+ * swap the icon only where it changed. Pins with an open popup are left alone, the same rule
+ * as the zoom handler. If anything changed, applyFilters() re-runs so a place that just closed
+ * leaves the map when "Hide confirmed closed" is on. */
+function refreshPinOpenStates(){
+  if(document.hidden) return;
+  const area = map.getBounds().pad(0.5);
+  let changed = false;
+  for(const id in markers){
+    const m = markers[id];
+    const loc = m.locationData || locationsById[id];
+    if(!loc || !area.contains(m.getLatLng())) continue;
+    if(pinOpenState(loc) === m._brPinState) continue;
+    changed = true;
+    if(!m.isPopupOpen()) m.setIcon(makeIcon(id));
+  }
+  if(changed) applyFilters();
+}
+setInterval(refreshPinOpenStates, 60000);
+document.addEventListener('visibilitychange', refreshPinOpenStates);
+map.on('moveend', () => { clearTimeout(refreshPinOpenStates._t); refreshPinOpenStates._t = setTimeout(refreshPinOpenStates, 400); });
+
 // Resize every pin whenever the zoom level changes
 let lastMetroZoomOk = null;
 let lastRestZoomOk = null;
@@ -5817,6 +5871,9 @@ function todayHrsString(loc){
  * inside 150 miles, so this isn't a guarantee; it caps a possible error at roughly an hour instead
  * of three, and only where the app was already guessing. */
 const OPEN_NOW_CONFIDENT_MILES = 150;
+// Everything isLocationOpenNow() reads is defined from here on; see pinOpenState().
+_pinStatesReady = true;
+setTimeout(refreshPinOpenStates, 0);
 
 // True when the device clock is a fair stand-in for the location's local time. With no position
 // fix we have nothing better to go on, so the device clock stays the best available guess rather

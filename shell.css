@@ -1411,3 +1411,23 @@ html[data-theme="light"] .ss-body .d-toggle .d-switch{background:#d6dde3}
 #offlineBar .ob-dot{
   width:8px; height:8px; border-radius:50%; background:#e8a33d; flex:none;
 }
+
+/* ============================================================
+   Pin hours state (v2.50.0). Colour and shape stay the chain's; these only add a treatment.
+   Set by makeIcon() via pinOpenState(): open = untouched, unknown = faded + dashed ring,
+   closed = dimmed + slash. Shape, not colour alone, carries the meaning.
+   ============================================================ */
+.br-pin{ position:relative; box-sizing:border-box; }
+.br-pin--unknown{ opacity:.45; border-style:dashed !important; }
+.br-pin--closed{ opacity:.55; }
+.br-pin--closed::after{
+  content:""; position:absolute; left:-3px; right:-3px; top:50%; height:3px; margin-top:-1.5px;
+  background:#fff; box-shadow:0 0 2px rgba(0,0,0,.6); transform:rotate(-45deg); pointer-events:none;
+}
+/* The diamond pin is a square rotated 45deg, so its slash turns a further 45 to read the same. */
+.br-pin--diamond.br-pin--closed::after{ transform:rotate(-90deg); }
+/* Legend swatches in How it works: a neutral pin, since the colour is the chain's. */
+.br-pin--legend{
+  display:inline-block; width:18px; height:18px; border-radius:50%;
+  background:#6b7280; border:2px solid #fff; box-shadow:0 0 3px rgba(0,0,0,.6); justify-self:center;
+}
