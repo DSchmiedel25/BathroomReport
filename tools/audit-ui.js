@@ -253,14 +253,23 @@ console.log('\namenity value lists');
 console.log('\nanswer removal safety');
 {
   const src = fs.readFileSync('app.js', 'utf8');
+  /* The design changed: "Remove" now deletes the answer outright (it is a correction, so it is
+   * not geofenced; adding an answer still is). What has to hold is that the delete actually
+   * reaches Firestore. saveMyVote merges, and a merge never removes a nested key, so the
+   * removal must pass the key through to a deleteField() in saveMyVote. */
   const i = src.indexOf("closest('[data-reopen]')");
   const reopen = i < 0 ? '' : src.slice(i, i + 2200);
+  const r = src.indexOf('async function removeMyAnswer');
+  const remove = r < 0 ? '' : src.slice(r, src.indexOf('\n}', r));
+  const s = src.indexOf('async function saveMyVote');
+  const save = s < 0 ? '' : src.slice(s, src.indexOf('\n}', s));
   if (!reopen) fail('could not find the reopen handler');
-  else if (/delete\s+bucket\[key\]|deleteField\(\)/.test(reopen))
-    fail('reopen destroys the stored answer — answering is geofenced, so it may not be replaceable');
-  else if (!/reopenedKeys/.test(reopen))
-    fail('reopen does not mark the question askable, so nothing will be offered');
-  else pass('reopen preserves the stored answer until a new one is given');
+  else if (!/removeMyAnswer\(/.test(reopen)) fail('the Remove button no longer calls removeMyAnswer');
+  else if (!remove || !/saveMyVote\([^)]*\{\s*field:/.test(remove))
+    fail('removeMyAnswer saves without naming the removed key, so the merge keeps the old answer');
+  else if (!/deleteField\(\)/.test(save))
+    fail('saveMyVote never writes deleteField(), so a removed answer survives the merge');
+  else pass('removing an answer deletes it server-side (deleteField through the merge)');
 
   /* Anywhere else that deletes from a vote object must not then merge it away. */
   const merges = [...src.matchAll(/delete\s+\w*[Vv]ote[\w.\[\]']*;[\s\S]{0,400}?saveMyVote\(/g)];
