@@ -108,6 +108,11 @@ const CHAIN_REGISTRY = {
    * restroom-only popup and question list (a customer restroom, not a destination), and the
    * zoom-12 gate, without which nine thousand pins would render at national zoom. */
   dunkin: { name: "Dunkin'", color: '#ff6e0c', textColor: '#ffffff', dataVar: 'dunkinLocations', group: 'metro', layer: 'customer' },
+  /* National Starbucks, company-operated stores only (build-starbucks.js). Same treatment as
+   * Dunkin' above. The NYC and Boston sets below stay alongside it — their records keep their ids
+   * (ratings and /guide/ pages key on them) and the national file leaves those stores out, so
+   * nothing is pinned twice. All three share the display name, so they merge into one filter row. */
+  starbucks: { name: 'Starbucks', color: '#00704a', textColor: '#ffffff', dataVar: 'starbucksLocations', group: 'metro', layer: 'customer' },
   nycStarbucks: { name: 'Starbucks', color: '#00704a', textColor: '#ffffff', dataVar: 'nycStarbucksLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
   nycGregorys: { name: 'Gregorys Coffee', color: '#1a1a1a', textColor: '#ffffff', dataVar: 'nycGregorysLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
   /* All four public-restroom sets are configured IDENTICALLY — no group, layer:'public', same
@@ -537,7 +542,7 @@ function ratingConfidenceHtml(count){
  * onboarding panel, and the FAQ — which is exactly why they drifted apart (July 14 / July 21 /
  * actually July 30). Set this ONE value on each release; everything that shows a date reads it.
  * Format is YYYY-MM-DD so it sorts and can't be misread. */
-const BUILD_DATE = '2026-08-14';
+const BUILD_DATE = '2026-09-28';
 
 // "2026-07-30" -> "July 30, 2026" for prose. Parsed as UTC parts rather than new Date(str) so it
 // can't shift a day backwards for users west of GMT.
@@ -3035,7 +3040,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.49.2';
+const BUILD = 'v2.49.3';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
