@@ -1160,7 +1160,7 @@ async function removeMyAnswer(loc, key){
   const prevVote = myVoteCache[loc.id];
   myVoteCache[loc.id] = updated;
 
-  const ok = await saveMyVote(loc.id, updated);
+  const ok = await saveMyVote(loc.id, updated, { field: bathroom ? 'amenities' : 'storeFeatures', key });
   if(!ok){
     if(prevVote === undefined) delete myVoteCache[loc.id]; else myVoteCache[loc.id] = prevVote;
     cache[loc.id] = prevCache;
@@ -2150,13 +2150,21 @@ function mirrorEntry(payload){
 const MIRROR_MAX_LOCATIONS = 2500;
 
 let lastSaveError = null;   // set by saveMyVote on failure; read by saveFailureNote
-async function saveMyVote(id, data){
+/* `removed` ({ field: 'amenities' | 'storeFeatures', key }) is for removeMyAnswer only.
+ * Both writes below merge, and a merge combines nested maps key by key: leaving a key out of
+ * the object keeps the server's copy. So a removal has to name the key with deleteField(), or
+ * the answer disappears on screen, stays in Firestore, keeps counting in the aggregate, and
+ * comes back on the next load. */
+async function saveMyVote(id, data, removed){
   lastSaveError = null;
   try{
-    const {db, doc, setDoc} = await fb();
+    const {db, doc, setDoc, deleteField} = await fb();
     const clientId = getEffectiveId();
     const existing = myVoteCache[id] || {};
     const payload = { ...data, clientId, locId: id, lastUpdated: Date.now() };
+    if(removed && removed.field && removed.key){
+      payload[removed.field] = { ...(payload[removed.field] || {}), [removed.key]: deleteField() };
+    }
     // Username on the vote lets the leaderboard Cloud Function credit ratings to a display name
     // without a separate lookup. Only logged-in users can rate, so this is always present.
     // Sliced to 40 to match the votes rule. An account created before the length check above
@@ -3070,7 +3078,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.50.0';
+const BUILD = 'v2.50.1';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
