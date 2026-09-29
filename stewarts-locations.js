@@ -383,7 +383,6 @@ window.stewartsLocations = [
 {"n":"Stewart's","lat":37.422722,"lng":-76.903595,"addr":"Stewart's","id":"stewarts-osm-374227769036","src":"osm","osm":{"gas":1}},
 {"n":"Stewart's","lat":42.985519,"lng":-73.74776,"addr":"Stewart's","id":"stewarts-osm-429855737478","src":"osm","osm":{"gas":1}},
 {"n":"South Glens Falls, NY","lat":43.274373,"lng":-73.639461,"addr":"43 Bluebird Road, South Glens Falls, NY 12803","id":"stewarts-osm-ny-southglensfalls","src":"osm","osm":{"gas":1,"airPump":1},"hrs":"0400-2400","meta":{"prevHrs":"","prevHrsSrc":"","hrsSrc":"admin_override"}},
-{"n":"Amsterdam, NY","lat":42.944305,"lng":-74.197948,"addr":"151 Guy Park Avenue, Amsterdam, NY 12010","id":"stewarts-osm-ny-amsterdam","src":"osm"},
 {"n":"Stewart's Shops","lat":42.747019,"lng":-73.865316,"addr":"2005 Central Avenue, Albany, NY 12205","id":"stewarts-osm-427470738653","src":"osm","osm":{"gas":1},"state":"NY","hrs":"0430-2400","meta":{"prevHrs":"","prevHrsSrc":"","hrsSrc":"admin_override"}},
 {"n":"Newburgh","lat":41.502998,"lng":-74.046648,"addr":"Newburgh,","id":"stewarts-osm-415030740466","src":"osm"},
 {"n":"Rome","lat":43.268969,"lng":-75.46662,"addr":"Rome,","id":"stewarts-osm-432690754666","src":"osm"},
