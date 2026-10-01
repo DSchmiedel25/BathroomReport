@@ -572,7 +572,7 @@ function ratingConfidenceHtml(count){
  * onboarding panel, and the FAQ — which is exactly why they drifted apart (July 14 / July 21 /
  * actually July 30). Set this ONE value on each release; everything that shows a date reads it.
  * Format is YYYY-MM-DD so it sorts and can't be misread. */
-const BUILD_DATE = '2026-09-28';
+const BUILD_DATE = '2026-10-01';
 
 // "2026-07-30" -> "July 30, 2026" for prose. Parsed as UTC parts rather than new Date(str) so it
 // can't shift a day backwards for users west of GMT.
@@ -2092,6 +2092,8 @@ window.addEventListener('authStateReady', () => {
   if(typeof loadTravelModeFromAccount === 'function') loadTravelModeFromAccount();
   // Same moment, same precedence: a synced preference wins over whatever this device had.
   if(typeof loadStripPicksFromAccount === 'function') loadStripPicksFromAccount();
+  // Also runs on sign-out (this event fires on every auth change), which is what clears the list.
+  if(typeof loadHiddenSpotsFromAccount === 'function') loadHiddenSpotsFromAccount();
 });
 
 // Shared (public) aggregate — visible to everyone who opens this map
@@ -2967,6 +2969,149 @@ function refreshOpenPopupStrip(){
   });
 }
 
+/* ---------- Hide this spot ----------
+ * A private "never show me this one again" for a bathroom someone had a bad time at. Signed-in
+ * only, like the chain filter: the list lives in settings/{uid}.hiddenSpots, so it follows the
+ * account across devices and nobody else ever sees it. It is not a rating and changes nothing for
+ * anyone else — a bad experience that SHOULD reach other people is what Report and the ratings
+ * are for.
+ *
+ * A hidden spot is left out of the map, the List and Bathroom Now. It can still be opened on
+ * purpose — a shared link, or "Details" — because zoomToMarker forces the pin on, and that card
+ * then offers Unhide. Settings -> Places on the map lists everything hidden.
+ *
+ * `var`, not `let`: applyFilters can run before this line is reached during startup, and a `let`
+ * read before its line throws and stops the whole script (the v2.50.0 pin bug, same cause). */
+var hiddenSpots = new Set();
+const HIDDEN_SPOTS_MAX = 500;   // matches the cap in firestore.rules
+
+function isHiddenSpot(loc){
+  return !!(loc && hiddenSpots && hiddenSpots.size && hiddenSpots.has(loc.id) && isLoggedIn());
+}
+
+async function loadHiddenSpotsFromAccount(){
+  if(!isLoggedIn()){
+    if(hiddenSpots.size){ hiddenSpots = new Set(); applyFilters(); }
+    ssRenderHiddenSpots();
+    return;
+  }
+  try{
+    const {db, doc, getDoc} = await fb();
+    const snap = await getDoc(doc(db, 'settings', getEffectiveId()));
+    const raw = snap.exists() ? snap.data().hiddenSpots : null;
+    hiddenSpots = new Set(Array.isArray(raw) ? raw.filter(x => typeof x === 'string') : []);
+    if(hiddenSpots.size) applyFilters();
+  }catch(e){ console.error('loading hidden spots failed', e && (e.code || e.message)); }
+  ssRenderHiddenSpots();
+}
+
+/* Optimistic: the pin goes at once, and comes back (with a message) if the save is refused.
+ * A Set keeps insertion order, so re-adding moves an id to the end and the oldest falls off
+ * first when the cap is reached. */
+async function setSpotHidden(loc, hide){
+  if(!loc || !isLoggedIn()) return false;
+  const before = new Set(hiddenSpots);
+  hiddenSpots.delete(loc.id);
+  if(hide){
+    hiddenSpots.add(loc.id);
+    while(hiddenSpots.size > HIDDEN_SPOTS_MAX) hiddenSpots.delete(hiddenSpots.values().next().value);
+  }
+  applyFilters();
+  ssRenderHiddenSpots();
+  try{
+    const {db, doc, setDoc} = await fb();
+    await setDoc(doc(db, 'settings', getEffectiveId()), { hiddenSpots: [...hiddenSpots] }, { merge: true });
+    track(hide ? 'spot_hidden' : 'spot_unhidden', { chain: loc.n || '' });
+    return true;
+  }catch(e){
+    console.error('saving hidden spots failed', e && (e.code || e.message));
+    hiddenSpots = before;
+    applyFilters();
+    ssRenderHiddenSpots();
+    return false;
+  }
+}
+
+function hideSpotButtonHtml(loc){
+  if(!isLoggedIn()) return '';
+  return isHiddenSpot(loc)
+    ? `<button type="button" class="hide-spot-btn" data-unhide-spot="${loc.id}" aria-label="Unhide this spot, so it shows on your map again">${ico('eye')} Unhide</button>`
+    : `<button type="button" class="hide-spot-btn" data-hide-spot="${loc.id}" aria-label="Hide this spot from your map. Only you see this.">${ico('eye-off')} Hide</button>`;
+}
+
+/* One short-lived bar with Undo, built once. role=status so a screen reader hears it. */
+let _hideToastTimer = null;
+function showHideToast(text, undo){
+  let el = document.getElementById('hideToast');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'hideToast';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    document.body.appendChild(el);
+  }
+  el.innerHTML = `<span class="ht-text"></span>${undo ? '<button type="button" class="ht-undo">Undo</button>' : ''}`;
+  el.querySelector('.ht-text').textContent = text;
+  if(undo) el.querySelector('.ht-undo').onclick = () => { hideHideToast(); undo(); };
+  el.classList.add('show');
+  clearTimeout(_hideToastTimer);
+  _hideToastTimer = setTimeout(hideHideToast, 6000);
+}
+function hideHideToast(){
+  const el = document.getElementById('hideToast');
+  if(el) el.classList.remove('show');
+}
+
+document.addEventListener('click', async (e) => {
+  const hideBtn = e.target.closest && e.target.closest('[data-hide-spot]');
+  const unhideBtn = !hideBtn && e.target.closest && e.target.closest('[data-unhide-spot]');
+  if(!hideBtn && !unhideBtn) return;
+  const id = (hideBtn || unhideBtn).dataset[hideBtn ? 'hideSpot' : 'unhideSpot'];
+  const loc = locationsById[id] || { id, n: '' };
+  const inCard = !!(hideBtn || unhideBtn).closest('.leaflet-popup');
+  if(hideBtn){
+    // Close first: applyFilters keeps any pin whose popup is open.
+    if(inCard) map.closePopup();
+    const ok = await setSpotHidden(loc, true);
+    if(ok) showHideToast('Hidden from your map', () => setSpotHidden(loc, false));
+    else showHideToast("Couldn't hide that spot. Check your connection and try again.");
+  } else {
+    const ok = await setSpotHidden(loc, false);
+    if(!ok){ showHideToast("Couldn't unhide that spot. Try again."); return; }
+    if(inCard){
+      const btn = document.querySelector(`.leaflet-popup [data-unhide-spot="${id}"]`);
+      if(btn) btn.outerHTML = hideSpotButtonHtml(loc);
+    } else {
+      showHideToast('Back on your map');
+    }
+  }
+});
+
+/* Settings -> Places on the map -> Hidden spots. Newest first. Ids for places that aren't loaded
+ * yet (the public-restroom regions load as you pan) still get a row, so they can be unhidden. */
+function ssRenderHiddenSpots(){
+  const sec = document.getElementById('ssHiddenSec');
+  const hint = document.getElementById('ssHiddenHint');
+  const list = document.getElementById('ssHiddenList');
+  if(!sec || !hint || !list) return;
+  const on = isLoggedIn();
+  sec.hidden = hint.hidden = list.hidden = !on;
+  if(!on){ list.innerHTML = ''; return; }
+  const ids = [...hiddenSpots].reverse();
+  hint.textContent = ids.length
+    ? 'Only you see these. They stay off your map, your list and Bathroom Now.'
+    : 'Nothing hidden. Tap Hide on any location card to keep that spot off your map.';
+  list.hidden = !ids.length;
+  list.innerHTML = ids.map(id => {
+    const loc = locationsById[id];
+    const name = loc ? (loc.n || 'Location') : 'Hidden spot';
+    const addr = loc ? (loc.addr || '') : "Details show once you're near it";
+    return `<div class="ss-row ss-hidden-row"><span class="ss-main"><span class="ss-lab">${escapeHtml(name)}</span>` +
+      `<span class="ss-desc">${escapeHtml(addr)}</span></span>` +
+      `<button type="button" class="ss-unhide" data-unhide-spot="${escapeHtml(id)}">Unhide</button></div>`;
+  }).join('');
+}
+
 function stripHtml(loc, agg){
   const picks = stripPicks();
   const cells = picks.map(k => {
@@ -3037,6 +3182,7 @@ function metroPopupHtml(loc, agg, myVote){
     <div class="popup-subactions">
       <button class="share-btn" data-shareurl="${shareUrl}" data-sharename="${(loc.n||'').replace(/"/g,'&quot;')}">${ico('link')} Share</button>
       ${reportButtonHtml(loc)}
+      ${hideSpotButtonHtml(loc)}
     </div>
     <div class="report-section" id="report-section-${loc.id}" style="display:none;">
       <div class="report-heading">Report a problem with this listing</div>
@@ -3062,7 +3208,7 @@ function metroPopupHtml(loc, agg, myVote){
     ${osmFeatureBlockHtml(loc)}` : `${communityBlockHtml(loc)}
     ${osmFeatureBlockHtml(loc)}
     ${tipsSectionHtml(loc, false)}
-    <div class="popup-signin-hint">${ico('lock')} Sign in to rate this bathroom, add tips, or report an issue.</div>`}
+    <div class="popup-signin-hint">${ico('lock')} Sign in to rate this bathroom, add tips, report an issue, or hide spots you don't want to see.</div>`}
   </div>`;
 }
 
@@ -3078,7 +3224,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.50.1';
+const BUILD = 'v2.51.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';
@@ -3211,6 +3357,7 @@ function popupHtml(loc, agg, myVote){
     <div class="popup-subactions">
       <button class="share-btn" data-shareurl="${shareUrl}" data-sharename="${loc.n.replace(/"/g,'&quot;')}">${ico('link')} Share</button>
       ${reportButtonHtml(loc)}
+      ${hideSpotButtonHtml(loc)}
     </div>
     <div class="report-section" id="report-section-${loc.id}" style="display:none;">
       <div class="report-heading">Report a problem with this listing</div>
@@ -3237,7 +3384,7 @@ function popupHtml(loc, agg, myVote){
 ` : `${communityBlockHtml(loc)}
     ${osmFeatureBlockHtml(loc)}
     ${tipsSectionHtml(loc, false)}
-    <div class="popup-signin-hint">${ico('lock')} Sign in to rate this bathroom, add tips, or report an issue.</div>`}
+    <div class="popup-signin-hint">${ico('lock')} Sign in to rate this bathroom, add tips, report an issue, or hide spots you don't want to see.</div>`}
   </div>`;
 }
 
@@ -6110,7 +6257,8 @@ function applyFilters(){
       const zoomOk = (!isMetroLoc || map.getZoom() >= METRO_MIN_ZOOM)
                   && (!isRestLoc || map.getZoom() >= REST_MIN_ZOOM);
       const popupOpen = m.isPopupOpen && m.isPopupOpen();
-      if((openOk && restroomOk && accessOk && chainOk && zoomOk) || popupOpen){
+      const notHidden = !isHiddenSpot(loc);   // "Hide this spot" — this person's own list
+      if((openOk && restroomOk && accessOk && chainOk && zoomOk && notHidden) || popupOpen){
         if(!markerCluster.hasLayer(m)) markerCluster.addLayer(m);
       } else if(markerCluster.hasLayer(m)){
         markerCluster.removeLayer(m);
@@ -6850,7 +6998,7 @@ async function buildListView(){
 
   // Distance-only + capped: no ratings, no reads to build. Details load when a pin is opened.
   const nearest = seedLocations
-    .filter(loc => modeAllows(loc) && !isConfirmedNoRestroom(loc)
+    .filter(loc => modeAllows(loc) && !isConfirmedNoRestroom(loc) && !isHiddenSpot(loc)
                 && activeChains.has(loc.chain || DEFAULT_CHAIN_KEY))
     .map(loc => ({ loc, dist: milesBetween(currentListPosition.lat, currentListPosition.lng, loc.lat, loc.lng) }))
     .sort((a,b) => a.dist - b.dist)
@@ -7515,6 +7663,7 @@ function ssSyncScreen(id){
     });
   }
   if(id === 'ssScreenPlaces' && typeof renderChainKey === 'function') renderChainKey();
+  if(id === 'ssScreenPlaces') ssRenderHiddenSpots();
   if(id === 'ssScreenLayout'){ ssLayoutPicks = stripPicks().slice(); ssRenderLayout(); }
   if(id === 'ssScreenChains') ssRenderChains();
 }
@@ -8064,10 +8213,18 @@ function bathroomNowCard(result,fallback=false){
   const searchOriginNote = addressSearchOverridePos
     ? `<div class="nearest-alert">📍 Searching near ${escapeHtml(addressSearchOverridePos.label)}</div>`
     : '';
+  // Hidden spots that are closer than this answer (see runBathroomNowFor).
+  let hiddenNote = '';
+  if(_bnHiddenNearby && _bnHiddenNearby.list.length){
+    const u = _bnHiddenNearby.user;
+    const here = milesBetween(u.lat, u.lng, result.loc.lat, result.loc.lng);
+    const closer = _bnHiddenNearby.list.filter(l => milesBetween(u.lat, u.lng, l.lat, l.lng) < here).length;
+    if(closer) hiddenNote = `<div class="nearest-alert">${closer === 1 ? '1 spot you hid is' : closer + ' spots you hid are'} closer.</div>`;
+  }
   // Filled chain pill so you can see which brand this is at a glance, colored from the registry.
   const chain=CHAIN_REGISTRY[result.loc.chain]||{};
   const chainBadge=chain.name?`<div class="now-chain-badge" style="background:${chain.color};color:${chain.textColor};">${escapeHtml(chain.name)}</div>`:'';
-  return `<div class="bathroom-now-card"><button class="bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':(travelMode==='foot'?'Closest bathroom by walking distance':'Closest bathroom by driving distance')}</div>${searchOriginNote}${chainNote}${chainBadge}<b>${escapeHtml(result.loc.n)}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${lastRatedNote}${hoursMissingNote}${accessNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">Details</button></div></div>`;
+  return `<div class="bathroom-now-card"><button class="bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':(travelMode==='foot'?'Closest bathroom by walking distance':'Closest bathroom by driving distance')}</div>${searchOriginNote}${chainNote}${hiddenNote}${chainBadge}<b>${escapeHtml(result.loc.n)}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${lastRatedNote}${hoursMissingNote}${accessNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">Details</button></div></div>`;
 }
 // For Bathroom Now: drop any of the top-4 nearest candidates that are in the HARD out-of-order
 // phase, in a SINGLE batched query (Firestore `in` takes up to 10 ids, so 4 = one read cost).
@@ -8335,6 +8492,7 @@ locateBtn.addEventListener('click',()=>{
 /* The actual "find the closest open bathroom" search, given a position — GPS or a searched
  * address, either way. Extracted so both callers (real geolocation and the address override
  * above) share one implementation instead of two copies drifting apart. */
+var _bnHiddenNearby = null;   // set by runBathroomNowFor, read by bathroomNowCard
 async function runBathroomNowFor(user){
   // Prefer the selected chains, but don't strand someone far from their nearest pick —
   // if nothing selected is within reasonable reach, widen to every chain (still open-only)
@@ -8345,7 +8503,15 @@ async function runBathroomNowFor(user){
   const CHAIN_FALLBACK_MILES = travelMode === 'foot' ? 1.5 : 20;
   // Bathroom Now ignores travel mode on purpose: it's the emergency button, so the closest
   // usable bathroom wins even if it's a city/metro spot (e.g. a Dunkin) while in road mode.
-  const notClosed = (loc) => isLocationOpenNow(loc) !== false && !isConfirmedNoRestroom(loc);
+  const usable = (loc) => isLocationOpenNow(loc) !== false && !isConfirmedNoRestroom(loc);
+  /* Hidden spots are skipped, but not silently: if one the person hid is closer than the answer,
+   * the card says so. In an emergency "the closest one is the place you hated" is still worth
+   * knowing — they can decide. Kept to the open, usable ones within a few miles. */
+  _bnHiddenNearby = hiddenSpots.size
+    ? { user, list: seedLocations.filter(loc => isHiddenSpot(loc) && usable(loc)
+          && milesBetween(user.lat, user.lng, loc.lat, loc.lng) < 5) }
+    : null;
+  const notClosed = (loc) => usable(loc) && !isHiddenSpot(loc);
   const inSelection = (loc) => activeChains.has(loc.chain || DEFAULT_CHAIN_KEY);
   const nearestMiles = (list) => list.reduce((min,loc) => {
     const d = milesBetween(user.lat, user.lng, loc.lat, loc.lng);

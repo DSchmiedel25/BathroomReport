@@ -1431,3 +1431,39 @@ html[data-theme="light"] .ss-body .d-toggle .d-switch{background:#d6dde3}
   display:inline-block; width:18px; height:18px; border-radius:50%;
   background:#6b7280; border:2px solid #fff; box-shadow:0 0 3px rgba(0,0,0,.6); justify-self:center;
 }
+
+/* ============================================================
+   Hide this spot (v2.51.0)
+   ============================================================ */
+/* Third button in the card's quiet row (Share · Report · Hide). Inherits the row's look. */
+.popup-subactions .hide-spot-btn .ico{ width:16px; height:16px; }
+
+/* The "Hidden from your map · Undo" bar. Sits where the community banner does, above Bathroom
+   Now, and never covers it. */
+#hideToast{
+  position:fixed; left:12px; right:12px; z-index:700;
+  bottom:calc(env(safe-area-inset-bottom) + 82px);
+  max-width:420px; margin:0 auto;
+  display:flex; align-items:center; gap:12px;
+  background:var(--shell-chrome); color:var(--shell-ink); border:1px solid var(--shell-line);
+  border-radius:14px; padding:6px 6px 6px 16px; box-shadow:var(--shell-shadow);
+  font-size:14px; font-weight:700;
+  opacity:0; transform:translateY(8px); pointer-events:none;
+  transition:opacity .18s ease, transform .18s ease;
+}
+#hideToast.show{ opacity:1; transform:none; pointer-events:auto; }
+#hideToast .ht-text{ flex:1; min-width:0; padding:8px 0; }
+#hideToast .ht-undo{
+  flex:none; min-height:44px; min-width:64px; padding:0 14px; border:0; border-radius:10px;
+  background:transparent; color:var(--accent); font:inherit; font-weight:800; cursor:pointer;
+}
+#hideToast .ht-undo:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+@media (prefers-reduced-motion: reduce){ #hideToast{ transition:none; } }
+
+/* Settings -> Places -> Hidden spots */
+.ss-hidden-row{ cursor:default !important; }
+.ss-unhide{
+  flex:none; min-height:44px; padding:0 14px; border:1px solid var(--ss-line); border-radius:10px;
+  background:none; color:var(--accent); font:inherit; font-size:var(--ss-t-body); font-weight:700; cursor:pointer;
+}
+.ss-unhide:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }

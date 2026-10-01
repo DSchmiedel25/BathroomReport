@@ -464,9 +464,19 @@ service cloud.firestore {
        * list here is an unbounded document. The VALUES are not enumerated on purpose: the app's
        * fact list grows, and a rule that has to be redeployed to add a strip option would be a
        * rule that silently blocks the feature until someone remembers. An unknown key is
-       * dropped client-side at read time, so a bad value costs nothing. */
+       * dropped client-side at read time, so a bad value costs nothing.
+       *
+       * hiddenSpots: location ids this person chose to hide from their own map ("Hide this
+       * spot"). Private, like the rest of this doc — nobody else reads it and it changes nothing
+       * for anyone else. Bounded at 500 so it stays a small document; the app keeps the newest
+       * 500. Entries can't be type-checked (rules can't loop over a list), and don't need to be:
+       * an id that matches no location simply hides nothing. */
       allow write: if signedIn() && uid == request.auth.uid
-        && request.resource.data.keys().hasOnly(['travelMode', 'stripPicks'])
+        && request.resource.data.keys().hasOnly(['travelMode', 'stripPicks', 'hiddenSpots'])
+        && (!('hiddenSpots' in request.resource.data) || (
+             request.resource.data.hiddenSpots is list
+             && request.resource.data.hiddenSpots.size() <= 500
+           ))
         && (!('travelMode' in request.resource.data)
             || request.resource.data.travelMode in ['road', 'foot'])
         && (!('stripPicks' in request.resource.data) || (
