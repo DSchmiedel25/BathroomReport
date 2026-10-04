@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-03T14:18:56.837Z",
+  "generated": "2026-10-04T14:47:48.584Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -381,8 +381,8 @@
         "pageViews": 11
       },
       "2026-10-02": {
-        "activeUsers": 1,
-        "newUsers": 0,
+        "activeUsers": 2,
+        "newUsers": 1,
         "sessions": 2,
         "pageViews": 3
       },
@@ -414,13 +414,13 @@
       {
         "source": "facebook.com",
         "medium": "referral",
-        "sessions": 20,
-        "users": 20
+        "sessions": 21,
+        "users": 21
       },
       {
         "source": "address_override",
         "medium": "(not set)",
-        "sessions": 13,
+        "sessions": 14,
         "users": 1
       },
       {
@@ -454,12 +454,6 @@
         "users": 5
       },
       {
-        "source": "(not set)",
-        "medium": "(not set)",
-        "sessions": 4,
-        "users": 3
-      },
-      {
         "source": "google",
         "medium": "organic",
         "sessions": 4,
@@ -472,16 +466,10 @@
         "users": 3
       },
       {
-        "source": "address_override",
-        "medium": "",
-        "sessions": 1,
-        "users": 1
-      },
-      {
-        "source": "address_override",
-        "medium": "(none)",
-        "sessions": 1,
-        "users": 1
+        "source": "(not set)",
+        "medium": "(not set)",
+        "sessions": 2,
+        "users": 2
       },
       {
         "source": "l.facebook.com",
@@ -516,7 +504,7 @@
       {
         "campaign": "(referral)",
         "content": "(not set)",
-        "sessions": 38
+        "sessions": 39
       },
       {
         "campaign": "(ai-assistant)",
@@ -536,11 +524,11 @@
       {
         "campaign": "(direct)",
         "content": "",
-        "sessions": 2
+        "sessions": 1
       }
     ],
     "events": {
-      "bathroom_now": 99,
+      "bathroom_now": 101,
       "rating_submit": 14,
       "login": 7,
       "sign_up": 3
@@ -558,7 +546,7 @@
       {
         "state": "New York",
         "country": "United States",
-        "users": 70,
+        "users": 71,
         "sessions": 279
       },
       {
@@ -889,6 +877,11 @@
         "users": 16
       },
       {
+        "city": "Albany",
+        "state": "New York",
+        "users": 8
+      },
+      {
         "city": "Boston",
         "state": "Massachusetts",
         "users": 8
@@ -897,11 +890,6 @@
         "city": "Denver",
         "state": "Colorado",
         "users": 8
-      },
-      {
-        "city": "Albany",
-        "state": "New York",
-        "users": 7
       },
       {
         "city": "Boardman",
@@ -4148,6 +4136,45 @@
         "ReferrerUrl.sessionsCount": 2,
         "PopularPages.url": "https://bathroomreport.app/",
         "PopularPages.visitsCount": 3
+      },
+      "2026-10-03": {
+        "DeadClickCount.sessionsCount": 0,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 0,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 0,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 0,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 0,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 0,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 0,
+        "Traffic.totalSessionCount": 0,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 0,
+        "Traffic.pagesPerSessionPercentage": 0,
+        "EngagementTime.totalTime": 0,
+        "EngagementTime.activeTime": 0
       }
     }
   },
