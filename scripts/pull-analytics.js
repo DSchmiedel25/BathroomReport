@@ -158,6 +158,24 @@ async function pullGA4(token, propertyId) {
     source: r.dims[0], medium: r.dims[1], sessions: r.mets[0], users: r.mets[1],
   }));
 
+  /* 3b. The same split, one row per day, for the dashboard's last day / 3 / 7 day columns.
+   *     A separate short report rather than adding `date` to the 90-day one: per-day rows over
+   *     90 days would run to thousands and bury the file. 15 days covers the 7-day window, the
+   *     7 days before it for comparison, and today's partial day the page leaves out.
+   *     Sessions only — users can't be summed across days without double-counting. */
+  const sourcesByDay = await runReport(token, propertyId, {
+    dateRanges: dateRange(15),
+    dimensions: [{ name: "date" }, { name: "sessionSource" }, { name: "sessionMedium" }],
+    metrics: [{ name: "sessions" }],
+    orderBys: [{ dimension: { dimensionName: "date" } }],
+    limit: 2000,
+  });
+  out.sourcesDaily = rows(sourcesByDay)
+    .filter((r) => r.mets[0] > 0)
+    .map((r) => ({
+      date: isoDate(r.dims[0]), source: r.dims[1], medium: r.dims[2], sessions: r.mets[0],
+    }));
+
   // 4. Campaign + content. utm_content is per card design, so this is which artwork
   //    actually gets scanned off a table.
   const campaigns = await runReport(token, propertyId, {
