@@ -82,6 +82,20 @@ tr:last-child td{border-bottom:0}
 .chip.hi{background:var(--green);color:#fff}
 .bar{height:5px;border-radius:3px;background:var(--teal);margin-top:5px;min-width:2px}
 
+/* ---- recent 1/3/7-day table ------------------------------------------ */
+.recent table{table-layout:fixed}
+.recent th:first-child,.recent td:first-child{width:34%}
+.recent td.n,.recent th.n{padding-left:6px}
+.recent .rv{display:block;font-size:1.05rem;font-weight:800;line-height:1.2}
+.recent .rd{display:block;font-size:.72rem;font-weight:700;color:var(--muted);white-space:nowrap}
+.recent .rd.up{color:var(--up)}.recent .rd.down{color:var(--down)}
+.recent tbody th{font-size:inherit;font-weight:600;letter-spacing:0;text-transform:none;
+  color:var(--ink);padding:9px 0;border-bottom:1px solid #EFF2EF}
+.recent tr.grp td{padding:14px 0 4px;font-size:.66rem;font-weight:900;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
+@media (max-width:420px){.recent table{font-size:.84rem}.recent .rv{font-size:.95rem}
+  .recent th:first-child,.recent td:first-child{width:30%}}
+
 /* ---- link builder ----------------------------------------------------- */
 .lb{display:grid;grid-template-columns:1fr 1fr;gap:18px 20px;margin:4px 0 18px}
 .fld label{display:block;font-size:.68rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
@@ -799,6 +813,8 @@ function render(d, fs) {
   const dra = delta(ra7, raPrev7), dti = delta(ti7, tiPrev7);
   const q = (v) => fsOk ? n(v) : "\u2014";   // an em dash, so a failed read never reads as a real zero
 
+  out.push(recentSection(d, fs, daily, signups, anchor));
+
   out.push(`<div class="band"><h2>The numbers</h2>
     <span>Rolling windows ending ${esc(anchor)} \u00b7 not calendar months</span></div>`);
   out.push(`<div class="tiles">
@@ -1048,6 +1064,96 @@ function render(d, fs) {
 
   document.getElementById("app").innerHTML = out.join("");
 }
+/* ---------- last day / 3 days / 7 days -------------------------------- */
+/* Short windows are where a partial day does the most damage. GA4 is pulled with endDate
+ * "today", so the newest GA4 key is the day the job ran — at the 5am nightly run that is five
+ * hours old and nearly empty, and "last day" would read as a collapse every morning. These
+ * windows therefore end on the last COMPLETE day: the day before the pull, in the report
+ * timezone. The longer tiles below keep their existing anchor. */
+function lastCompleteDay(d, gaAnchor) {
+  if (d.generated) {
+    const pulled = Date.parse(d.generated);
+    if (!Number.isNaN(pulled)) return toKey(keyToMs(tzKey(pulled)) - DAY_MS);
+  }
+  return toKey(keyToMs(gaAnchor) - DAY_MS);
+}
+
+/* Compact version of delta() for narrow table cells. Arrow plus number, so the direction is
+ * never carried by colour alone. */
+function shortDelta(cur, prev) {
+  if (!prev) return cur > 0 ? { cls: "up", txt: "new" } : { cls: "", txt: "—" };
+  const pct = Math.round(((cur - prev) / prev) * 100);
+  if (pct === 0) return { cls: "", txt: "flat" };
+  return { cls: pct > 0 ? "up" : "down", txt: `${pct > 0 ? "▲" : "▼"} ${Math.abs(pct)}%` };
+}
+
+function recentSection(d, fs, daily, signups, gaAnchor) {
+  const end = lastCompleteDay(d, gaAnchor);
+  const WINDOWS = [1, 3, 7];
+  const fsOk = fs && fs.ok;
+
+  /* Clarity stores one snapshot per day with many keys; pull a single metric out of each. */
+  const cd = (d.clarity && d.clarity.daily) || {};
+  const clarityMap = (key) => {
+    const o = {};
+    for (const [day, snap] of Object.entries(cd)) if (snap && snap[key] != null) o[day] = snap[key];
+    return o;
+  };
+  const clarityDays = Object.keys(cd);
+
+  /* [label, map or null when the source is unavailable] */
+  const groups = [
+    ["Traffic · GA4", [
+      ["Active users", mapOf(daily, "activeUsers")],
+      ["New users", mapOf(daily, "newUsers")],
+      ["Sessions", mapOf(daily, "sessions")],
+      ["Page views", mapOf(daily, "pageViews")],
+      ["Accounts created", signups],
+    ]],
+    ["Community · Firestore", [
+      ["Ratings", fsOk ? fs.ratingsByDate : null],
+      ["Tips", fsOk ? fs.tipsByDate : null],
+      ["Out of order", fsOk ? fs.oooByDate : null],
+    ]],
+  ];
+  if (clarityDays.length) {
+    groups.push(["Frustration · Clarity", [
+      ["Rage clicks", clarityMap("RageClickCount.subTotal")],
+      ["Dead clicks", clarityMap("DeadClickCount.subTotal")],
+      ["Script errors", clarityMap("ScriptErrorCount.subTotal")],
+    ]]);
+  }
+
+  const cell = (map, days) => {
+    if (!map) return `<td class="n"><span class="rv">—</span><span class="rd">unavailable</span></td>`;
+    const cur = sumWindow(map, end, days), prev = sumWindow(map, end, days, days);
+    const dl = shortDelta(cur, prev);
+    return `<td class="n"><span class="rv">${n(cur)}</span>
+      <span class="rd ${dl.cls}" title="Previous ${days} day${days === 1 ? "" : "s"}: ${n(prev)}">${dl.txt}</span></td>`;
+  };
+
+  const startOf = (days) => windowKeys(end, days)[0];
+  const head = WINDOWS.map(w => `<th class="n" scope="col">${w === 1 ? "Last day" : `Last ${w} days`}</th>`).join("");
+  const body = groups.map(([g, rows]) =>
+    `<tr class="grp"><td colspan="${WINDOWS.length + 1}">${esc(g)}</td></tr>` +
+    rows.map(([name, map]) =>
+      `<tr><th scope="row">${esc(name)}</th>${WINDOWS.map(w => cell(map, w)).join("")}</tr>`
+    ).join("")).join("");
+
+  return `<div class="band"><h2>Recent days</h2>
+      <span>Complete days ending ${esc(end)}</span></div>
+    <div class="panel recent">
+      <p class="note">Last day is ${esc(end)}. Last 3 days starts ${esc(startOf(3))}, last 7 days starts
+        ${esc(startOf(7))}. Each change compares against the same number of days just before.
+        Today is left out because it is still filling in.</p>
+      <table><thead><tr><th scope="col">Metric</th>${head}</tr></thead>
+      <tbody>${body}</tbody></table>
+      <p class="note" style="margin:12px 0 0">Active users are summed per day, so someone who came
+        back on three days counts three times in the 3-day column.${clarityDays.length &&
+        !cd[end] ? ` Clarity has no snapshot for ${esc(end)} yet.` : ""}</p>
+    </div>`;
+}
+
 // {date: {activeUsers, ...}} -> {date: activeUsers}
 function mapOf(daily, key) {
   const o = {};
