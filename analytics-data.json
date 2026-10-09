@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-08T16:28:34.744Z",
+  "generated": "2026-10-09T16:13:05.522Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -411,10 +411,16 @@
         "pageViews": 1
       },
       "2026-10-07": {
-        "activeUsers": 9,
-        "newUsers": 9,
+        "activeUsers": 10,
+        "newUsers": 10,
         "sessions": 10,
-        "pageViews": 9
+        "pageViews": 10
+      },
+      "2026-10-08": {
+        "activeUsers": 1,
+        "newUsers": 1,
+        "sessions": 1,
+        "pageViews": 1
       }
     },
     "signupsByDate": {
@@ -426,8 +432,8 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 404,
-        "users": 205
+        "sessions": 406,
+        "users": 207
       },
       {
         "source": "qr",
@@ -446,12 +452,6 @@
         "medium": "(not set)",
         "sessions": 15,
         "users": 1
-      },
-      {
-        "source": "(not set)",
-        "medium": "(not set)",
-        "sessions": 9,
-        "users": 2
       },
       {
         "source": "lm.facebook.com",
@@ -496,6 +496,12 @@
         "users": 3
       },
       {
+        "source": "(not set)",
+        "medium": "(not set)",
+        "sessions": 2,
+        "users": 2
+      },
+      {
         "source": "l.facebook.com",
         "medium": "referral",
         "sessions": 1,
@@ -515,24 +521,6 @@
       }
     ],
     "sourcesDaily": [
-      {
-        "date": "2026-09-23",
-        "source": "(direct)",
-        "medium": "(none)",
-        "sessions": 4
-      },
-      {
-        "date": "2026-09-23",
-        "source": "address_override",
-        "medium": "(not set)",
-        "sessions": 1
-      },
-      {
-        "date": "2026-09-23",
-        "source": "qr",
-        "medium": "physical_card",
-        "sessions": 1
-      },
       {
         "date": "2026-09-25",
         "source": "address_override",
@@ -657,20 +645,20 @@
         "date": "2026-10-07",
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 9
+        "sessions": 10
       },
       {
-        "date": "2026-10-07",
-        "source": "(not set)",
-        "medium": "(not set)",
-        "sessions": 7
+        "date": "2026-10-08",
+        "source": "(direct)",
+        "medium": "(none)",
+        "sessions": 1
       }
     ],
     "campaigns": [
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 395
+        "sessions": 405
       },
       {
         "campaign": "card_v2",
@@ -681,11 +669,6 @@
         "campaign": "(referral)",
         "content": "(not set)",
         "sessions": 39
-      },
-      {
-        "campaign": "(direct)",
-        "content": "",
-        "sessions": 9
       },
       {
         "campaign": "(ai-assistant)",
@@ -701,6 +684,11 @@
         "campaign": "(organic)",
         "content": "(not set)",
         "sessions": 4
+      },
+      {
+        "campaign": "(direct)",
+        "content": "",
+        "sessions": 1
       }
     ],
     "events": {
@@ -724,13 +712,13 @@
       {
         "state": "New York",
         "country": "United States",
-        "users": 71,
-        "sessions": 283
+        "users": 72,
+        "sessions": 284
       },
       {
         "state": "Illinois",
         "country": "United States",
-        "users": 39,
+        "users": 40,
         "sessions": 41
       },
       {
@@ -1032,7 +1020,7 @@
       {
         "city": "Glenview",
         "state": "Illinois",
-        "users": 36
+        "users": 37
       },
       {
         "city": "New York",
@@ -1087,7 +1075,7 @@
       {
         "city": "Schenectady",
         "state": "New York",
-        "users": 5
+        "users": 6
       },
       {
         "city": "Syracuse",
@@ -4547,6 +4535,59 @@
         "Traffic.pagesPerSessionPercentage": 0,
         "EngagementTime.totalTime": 0,
         "EngagementTime.activeTime": 0
+      },
+      "2026-10-08": {
+        "DeadClickCount.sessionsCount": 1,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 1,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 1,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 1,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 1,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 1,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 1,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 1,
+        "Traffic.pagesPerSessionPercentage": 1,
+        "EngagementTime.totalTime": 40,
+        "EngagementTime.activeTime": 18,
+        "Browser.name": "FacebookApp",
+        "Browser.sessionsCount": 1,
+        "Device.name": "Mobile",
+        "Device.sessionsCount": 1,
+        "OS.name": "IOS",
+        "OS.sessionsCount": 1,
+        "Country.name": "United States",
+        "Country.sessionsCount": 1,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 1,
+        "ReferrerUrl.name": "facebook.com",
+        "ReferrerUrl.sessionsCount": 1,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 1
       }
     }
   },
