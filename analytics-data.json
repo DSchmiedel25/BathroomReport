@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-13T16:57:05.043Z",
+  "generated": "2026-10-14T14:30:53.647Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -445,6 +445,12 @@
         "newUsers": 0,
         "sessions": 1,
         "pageViews": 1
+      },
+      "2026-10-13": {
+        "activeUsers": 2,
+        "newUsers": 1,
+        "sessions": 2,
+        "pageViews": 2
       }
     },
     "signupsByDate": {
@@ -456,13 +462,13 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 411,
-        "users": 212
+        "sessions": 412,
+        "users": 213
       },
       {
         "source": "qr",
         "medium": "physical_card",
-        "sessions": 51,
+        "sessions": 52,
         "users": 19
       },
       {
@@ -474,7 +480,7 @@
       {
         "source": "address_override",
         "medium": "(not set)",
-        "sessions": 16,
+        "sessions": 17,
         "users": 1
       },
       {
@@ -526,12 +532,6 @@
         "users": 3
       },
       {
-        "source": "address_override",
-        "medium": "",
-        "sessions": 1,
-        "users": 1
-      },
-      {
         "source": "l.facebook.com",
         "medium": "referral",
         "sessions": 1,
@@ -551,30 +551,6 @@
       }
     ],
     "sourcesDaily": [
-      {
-        "date": "2026-09-28",
-        "source": "facebook.com",
-        "medium": "referral",
-        "sessions": 9
-      },
-      {
-        "date": "2026-09-28",
-        "source": "(direct)",
-        "medium": "(none)",
-        "sessions": 1
-      },
-      {
-        "date": "2026-09-28",
-        "source": "address_override",
-        "medium": "(not set)",
-        "sessions": 1
-      },
-      {
-        "date": "2026-09-28",
-        "source": "lm.facebook.com",
-        "medium": "referral",
-        "sessions": 1
-      },
       {
         "date": "2026-09-29",
         "source": "lm.facebook.com",
@@ -697,14 +673,26 @@
       },
       {
         "date": "2026-10-12",
+        "source": "address_override",
+        "medium": "(not set)",
+        "sessions": 1
+      },
+      {
+        "date": "2026-10-13",
+        "source": "(direct)",
+        "medium": "(none)",
+        "sessions": 1
+      },
+      {
+        "date": "2026-10-13",
         "source": "(not set)",
         "medium": "(not set)",
         "sessions": 1
       },
       {
-        "date": "2026-10-12",
-        "source": "address_override",
-        "medium": "",
+        "date": "2026-10-13",
+        "source": "qr",
+        "medium": "physical_card",
         "sessions": 1
       }
     ],
@@ -738,11 +726,21 @@
         "campaign": "(organic)",
         "content": "(not set)",
         "sessions": 4
+      },
+      {
+        "campaign": "(direct)",
+        "content": "",
+        "sessions": 1
+      },
+      {
+        "campaign": "card_v2",
+        "content": "",
+        "sessions": 1
       }
     ],
     "events": {
-      "bathroom_now": 113,
-      "rating_submit": 20,
+      "bathroom_now": 115,
+      "rating_submit": 23,
       "login": 7,
       "sign_up": 3
     },
@@ -754,7 +752,8 @@
       "2026-09-26": 3,
       "2026-10-05": 2,
       "2026-10-06": 2,
-      "2026-10-10": 2
+      "2026-10-10": 2,
+      "2026-10-13": 3
     },
     "bathroomNow": null,
     "guidePages": [],
@@ -763,7 +762,7 @@
         "state": "New York",
         "country": "United States",
         "users": 75,
-        "sessions": 290
+        "sessions": 291
       },
       {
         "state": "Illinois",
@@ -798,8 +797,8 @@
       {
         "state": "Oregon",
         "country": "United States",
-        "users": 11,
-        "sessions": 11
+        "users": 12,
+        "sessions": 12
       },
       {
         "state": "Colorado",
@@ -1114,14 +1113,14 @@
         "users": 8
       },
       {
-        "city": "Schenectady",
-        "state": "New York",
+        "city": "Boardman",
+        "state": "Oregon",
         "users": 7
       },
       {
-        "city": "Boardman",
-        "state": "Oregon",
-        "users": 6
+        "city": "Schenectady",
+        "state": "New York",
+        "users": 7
       },
       {
         "city": "Colonie",
@@ -4848,6 +4847,45 @@
         "PageTitle.sessionsCount": 1,
         "PopularPages.url": "https://bathroomreport.app/",
         "PopularPages.visitsCount": 1
+      },
+      "2026-10-13": {
+        "DeadClickCount.sessionsCount": 0,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 0,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 0,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 0,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 0,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 0,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 0,
+        "Traffic.totalSessionCount": 0,
+        "Traffic.totalBotSessionCount": 1,
+        "Traffic.distinctUserCount": 0,
+        "Traffic.pagesPerSessionPercentage": 0,
+        "EngagementTime.totalTime": 0,
+        "EngagementTime.activeTime": 0
       }
     }
   },
