@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-14T14:30:53.647Z",
+  "generated": "2026-10-15T14:09:59.534Z",
   "ga4": {
     "daily": {
       "2026-07-17": {
@@ -451,6 +451,12 @@
         "newUsers": 1,
         "sessions": 2,
         "pageViews": 2
+      },
+      "2026-10-14": {
+        "activeUsers": 3,
+        "newUsers": 1,
+        "sessions": 3,
+        "pageViews": 3
       }
     },
     "signupsByDate": {
@@ -468,8 +474,8 @@
       {
         "source": "qr",
         "medium": "physical_card",
-        "sessions": 52,
-        "users": 19
+        "sessions": 54,
+        "users": 20
       },
       {
         "source": "facebook.com",
@@ -508,6 +514,12 @@
         "users": 6
       },
       {
+        "source": "(not set)",
+        "medium": "(not set)",
+        "sessions": 5,
+        "users": 5
+      },
+      {
         "source": "test",
         "medium": "test",
         "sessions": 5,
@@ -518,12 +530,6 @@
         "medium": "organic",
         "sessions": 4,
         "users": 4
-      },
-      {
-        "source": "(not set)",
-        "medium": "(not set)",
-        "sessions": 3,
-        "users": 3
       },
       {
         "source": "reddit.com",
@@ -551,12 +557,6 @@
       }
     ],
     "sourcesDaily": [
-      {
-        "date": "2026-09-29",
-        "source": "lm.facebook.com",
-        "medium": "referral",
-        "sessions": 2
-      },
       {
         "date": "2026-09-30",
         "source": "facebook.com",
@@ -685,27 +685,33 @@
       },
       {
         "date": "2026-10-13",
-        "source": "(not set)",
-        "medium": "(not set)",
-        "sessions": 1
-      },
-      {
-        "date": "2026-10-13",
         "source": "qr",
         "medium": "physical_card",
         "sessions": 1
+      },
+      {
+        "date": "2026-10-14",
+        "source": "(not set)",
+        "medium": "(not set)",
+        "sessions": 3
+      },
+      {
+        "date": "2026-10-14",
+        "source": "qr",
+        "medium": "physical_card",
+        "sessions": 2
       }
     ],
     "campaigns": [
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 411
+        "sessions": 412
       },
       {
         "campaign": "card_v2",
         "content": "(not set)",
-        "sessions": 51
+        "sessions": 52
       },
       {
         "campaign": "(referral)",
@@ -728,19 +734,14 @@
         "sessions": 4
       },
       {
-        "campaign": "(direct)",
-        "content": "",
-        "sessions": 1
-      },
-      {
         "campaign": "card_v2",
         "content": "",
-        "sessions": 1
+        "sessions": 2
       }
     ],
     "events": {
-      "bathroom_now": 115,
-      "rating_submit": 23,
+      "bathroom_now": 117,
+      "rating_submit": 25,
       "login": 7,
       "sign_up": 3
     },
@@ -753,7 +754,8 @@
       "2026-10-05": 2,
       "2026-10-06": 2,
       "2026-10-10": 2,
-      "2026-10-13": 3
+      "2026-10-13": 3,
+      "2026-10-14": 2
     },
     "bathroomNow": null,
     "guidePages": [],
@@ -762,7 +764,7 @@
         "state": "New York",
         "country": "United States",
         "users": 75,
-        "sessions": 291
+        "sessions": 292
       },
       {
         "state": "Illinois",
@@ -1029,6 +1031,12 @@
         "sessions": 1
       },
       {
+        "state": "New Hampshire",
+        "country": "United States",
+        "users": 1,
+        "sessions": 1
+      },
+      {
         "state": "Oklahoma",
         "country": "United States",
         "users": 1,
@@ -1060,12 +1068,6 @@
       },
       {
         "state": "Tennessee",
-        "country": "United States",
-        "users": 1,
-        "sessions": 1
-      },
-      {
-        "state": "Vermont",
         "country": "United States",
         "users": 1,
         "sessions": 1
@@ -4886,6 +4888,57 @@
         "Traffic.pagesPerSessionPercentage": 0,
         "EngagementTime.totalTime": 0,
         "EngagementTime.activeTime": 0
+      },
+      "2026-10-14": {
+        "DeadClickCount.sessionsCount": 3,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 3,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 3,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 3,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 3,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 3,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 3,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 3,
+        "Traffic.pagesPerSessionPercentage": 1.3333333333333333,
+        "EngagementTime.totalTime": 24,
+        "EngagementTime.activeTime": 22,
+        "Browser.name": "MobileSafari",
+        "Browser.sessionsCount": 2,
+        "Device.name": "Mobile",
+        "Device.sessionsCount": 3,
+        "OS.name": "IOS",
+        "OS.sessionsCount": 2,
+        "Country.name": "United States",
+        "Country.sessionsCount": 3,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 3,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 3
       }
     }
   },
