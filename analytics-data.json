@@ -1,13 +1,7 @@
 {
-  "generated": "2026-10-21T14:29:37.944Z",
+  "generated": "2026-10-22T14:30:53.233Z",
   "ga4": {
     "daily": {
-      "2026-07-23": {
-        "activeUsers": 22,
-        "newUsers": 15,
-        "sessions": 33,
-        "pageViews": 115
-      },
       "2026-07-24": {
         "activeUsers": 18,
         "newUsers": 12,
@@ -455,6 +449,12 @@
       "2026-10-20": {
         "activeUsers": 1,
         "newUsers": 0,
+        "sessions": 2,
+        "pageViews": 1
+      },
+      "2026-10-21": {
+        "activeUsers": 1,
+        "newUsers": 1,
         "sessions": 1,
         "pageViews": 1
       }
@@ -468,13 +468,13 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 218,
-        "users": 121
+        "sessions": 186,
+        "users": 104
       },
       {
         "source": "qr",
         "medium": "physical_card",
-        "sessions": 63,
+        "sessions": 64,
         "users": 23
       },
       {
@@ -516,8 +516,8 @@
       {
         "source": "lm.facebook.com",
         "medium": "referral",
-        "sessions": 4,
-        "users": 4
+        "sessions": 3,
+        "users": 3
       },
       {
         "source": "m.facebook.com",
@@ -532,25 +532,19 @@
         "users": 2
       },
       {
-        "source": "aimanhunt.online",
+        "source": "stripe.lightning.force.com",
         "medium": "referral",
-        "sessions": 1,
-        "users": 1
+        "sessions": 2,
+        "users": 2
       },
       {
-        "source": "stripe.lightning.force.com",
+        "source": "aimanhunt.online",
         "medium": "referral",
         "sessions": 1,
         "users": 1
       }
     ],
     "sourcesDaily": [
-      {
-        "date": "2026-10-06",
-        "source": "qr",
-        "medium": "physical_card",
-        "sessions": 1
-      },
       {
         "date": "2026-10-07",
         "source": "(direct)",
@@ -693,6 +687,12 @@
         "date": "2026-10-20",
         "source": "qr",
         "medium": "physical_card",
+        "sessions": 2
+      },
+      {
+        "date": "2026-10-21",
+        "source": "stripe.lightning.force.com",
+        "medium": "referral",
         "sessions": 1
       }
     ],
@@ -700,17 +700,17 @@
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 218
+        "sessions": 186
       },
       {
         "campaign": "card_v2",
         "content": "(not set)",
-        "sessions": 62
+        "sessions": 64
       },
       {
         "campaign": "(referral)",
         "content": "(not set)",
-        "sessions": 25
+        "sessions": 24
       },
       {
         "campaign": "(ai-assistant)",
@@ -728,7 +728,7 @@
         "sessions": 5
       },
       {
-        "campaign": "card_v2",
+        "campaign": "(referral)",
         "content": "",
         "sessions": 1
       }
@@ -759,20 +759,20 @@
       {
         "state": "New York",
         "country": "United States",
-        "users": 47,
-        "sessions": 177
+        "users": 45,
+        "sessions": 162
       },
       {
         "state": "Illinois",
         "country": "United States",
-        "users": 36,
-        "sessions": 37
+        "users": 30,
+        "sessions": 31
       },
       {
         "state": "Massachusetts",
         "country": "United States",
-        "users": 16,
-        "sessions": 22
+        "users": 15,
+        "sessions": 21
       },
       {
         "state": "Oregon",
@@ -783,20 +783,20 @@
       {
         "state": "California",
         "country": "United States",
-        "users": 11,
-        "sessions": 14
+        "users": 10,
+        "sessions": 12
       },
       {
         "state": "Iowa",
         "country": "United States",
-        "users": 10,
-        "sessions": 10
+        "users": 9,
+        "sessions": 9
       },
       {
         "state": "Virginia",
         "country": "United States",
-        "users": 10,
-        "sessions": 10
+        "users": 9,
+        "sessions": 9
       },
       {
         "state": "Ohio",
@@ -811,21 +811,21 @@
         "sessions": 5
       },
       {
-        "state": "Florida",
+        "state": "New Jersey",
         "country": "United States",
         "users": 4,
-        "sessions": 5
+        "sessions": 4
+      },
+      {
+        "state": "Florida",
+        "country": "United States",
+        "users": 3,
+        "sessions": 3
       },
       {
         "state": "Georgia",
         "country": "United States",
-        "users": 4,
-        "sessions": 5
-      },
-      {
-        "state": "New Jersey",
-        "country": "United States",
-        "users": 4,
+        "users": 3,
         "sessions": 4
       },
       {
@@ -841,32 +841,8 @@
         "sessions": 5
       },
       {
-        "state": "Texas",
-        "country": "United States",
-        "users": 3,
-        "sessions": 3
-      },
-      {
-        "state": "Colorado",
-        "country": "United States",
-        "users": 2,
-        "sessions": 2
-      },
-      {
         "state": "England",
         "country": "United Kingdom",
-        "users": 2,
-        "sessions": 2
-      },
-      {
-        "state": "Gyeonggi-do",
-        "country": "South Korea",
-        "users": 2,
-        "sessions": 2
-      },
-      {
-        "state": "Ile-de-France",
-        "country": "France",
         "users": 2,
         "sessions": 2
       },
@@ -889,12 +865,6 @@
         "sessions": 2
       },
       {
-        "state": "Nevada",
-        "country": "United States",
-        "users": 2,
-        "sessions": 2
-      },
-      {
         "state": "Quebec",
         "country": "Canada",
         "users": 2,
@@ -907,8 +877,20 @@
         "sessions": 3
       },
       {
+        "state": "Texas",
+        "country": "United States",
+        "users": 2,
+        "sessions": 2
+      },
+      {
         "state": "British Columbia",
         "country": "Canada",
+        "users": 1,
+        "sessions": 1
+      },
+      {
+        "state": "Colorado",
+        "country": "United States",
         "users": 1,
         "sessions": 1
       },
@@ -921,6 +903,12 @@
       {
         "state": "County Dublin",
         "country": "Ireland",
+        "users": 1,
+        "sessions": 1
+      },
+      {
+        "state": "Gyeonggi-do",
+        "country": "South Korea",
         "users": 1,
         "sessions": 1
       },
@@ -962,6 +950,12 @@
       },
       {
         "state": "Nebraska",
+        "country": "United States",
+        "users": 1,
+        "sessions": 1
+      },
+      {
+        "state": "Nevada",
         "country": "United States",
         "users": 1,
         "sessions": 1
@@ -1019,21 +1013,16 @@
       {
         "city": "Glenview",
         "state": "Illinois",
-        "users": 34
+        "users": 28
       },
       {
         "city": "New York",
         "state": "New York",
-        "users": 12
+        "users": 13
       },
       {
         "city": "Council Bluffs",
         "state": "Iowa",
-        "users": 10
-      },
-      {
-        "city": "Buffalo",
-        "state": "New York",
         "users": 9
       },
       {
@@ -1047,17 +1036,22 @@
         "users": 8
       },
       {
-        "city": "Ashburn",
-        "state": "Virginia",
-        "users": 7
-      },
-      {
-        "city": "Schenectady",
+        "city": "Buffalo",
         "state": "New York",
         "users": 7
       },
       {
+        "city": "Ashburn",
+        "state": "Virginia",
+        "users": 6
+      },
+      {
         "city": "Colonie",
+        "state": "New York",
+        "users": 6
+      },
+      {
+        "city": "Schenectady",
         "state": "New York",
         "users": 6
       },
@@ -1072,11 +1066,6 @@
         "users": 5
       },
       {
-        "city": "Saratoga Springs",
-        "state": "New York",
-        "users": 4
-      },
-      {
         "city": "Troy",
         "state": "New York",
         "users": 4
@@ -1087,18 +1076,13 @@
         "users": 3
       },
       {
-        "city": "Santa Clara",
-        "state": "California",
+        "city": "Saratoga Springs",
+        "state": "New York",
         "users": 3
       },
       {
         "city": "Agawam",
         "state": "Massachusetts",
-        "users": 2
-      },
-      {
-        "city": "Anyang-si",
-        "state": "Gyeonggi-do",
         "users": 2
       },
       {
@@ -1122,11 +1106,6 @@
         "users": 2
       },
       {
-        "city": "Hialeah Gardens",
-        "state": "Florida",
-        "users": 2
-      },
-      {
         "city": "London",
         "state": "England",
         "users": 2
@@ -1142,8 +1121,8 @@
         "users": 2
       },
       {
-        "city": "Paris",
-        "state": "Ile-de-France",
+        "city": "Santa Clara",
+        "state": "California",
         "users": 2
       },
       {
@@ -1165,6 +1144,26 @@
         "city": "West Springfield",
         "state": "Massachusetts",
         "users": 2
+      },
+      {
+        "city": "Amelia",
+        "state": "Ohio",
+        "users": 1
+      },
+      {
+        "city": "Anyang-si",
+        "state": "Gyeonggi-do",
+        "users": 1
+      },
+      {
+        "city": "Athens",
+        "state": "Ohio",
+        "users": 1
+      },
+      {
+        "city": "Auburn",
+        "state": "New York",
+        "users": 1
       }
     ],
     "deeplinkResolved": null
@@ -5140,6 +5139,59 @@
         "Traffic.pagesPerSessionPercentage": 0,
         "EngagementTime.totalTime": 0,
         "EngagementTime.activeTime": 0
+      },
+      "2026-10-21": {
+        "DeadClickCount.sessionsCount": 1,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 1,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 1,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 1,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 1,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 1,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 1,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 1,
+        "Traffic.pagesPerSessionPercentage": 1,
+        "EngagementTime.totalTime": 502,
+        "EngagementTime.activeTime": 30,
+        "Browser.name": "Chrome",
+        "Browser.sessionsCount": 1,
+        "Device.name": "PC",
+        "Device.sessionsCount": 1,
+        "OS.name": "MacOSX",
+        "OS.sessionsCount": 1,
+        "Country.name": "United States",
+        "Country.sessionsCount": 1,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 1,
+        "ReferrerUrl.name": "stripe.lightning.force.com",
+        "ReferrerUrl.sessionsCount": 1,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 1
       }
     }
   },
