@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-24T13:20:11.672Z",
+  "generated": "2026-10-25T13:42:56.040Z",
   "ga4": {
     "daily": {
       "2026-08-04": {
@@ -459,10 +459,10 @@
         "pageViews": 1
       },
       "2026-10-24": {
-        "activeUsers": 1,
-        "newUsers": 0,
-        "sessions": 1,
-        "pageViews": 1
+        "activeUsers": 3,
+        "newUsers": 1,
+        "sessions": 3,
+        "pageViews": 3
       }
     },
     "signupsByDate": {
@@ -474,8 +474,8 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 168,
-        "users": 95
+        "sessions": 170,
+        "users": 96
       },
       {
         "source": "qr",
@@ -545,18 +545,6 @@
       }
     ],
     "sourcesDaily": [
-      {
-        "date": "2026-10-09",
-        "source": "(direct)",
-        "medium": "(none)",
-        "sessions": 1
-      },
-      {
-        "date": "2026-10-09",
-        "source": "facebook.com",
-        "medium": "referral",
-        "sessions": 1
-      },
       {
         "date": "2026-10-10",
         "source": "(direct)",
@@ -705,14 +693,14 @@
         "date": "2026-10-24",
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 1
+        "sessions": 3
       }
     ],
     "campaigns": [
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 166
+        "sessions": 167
       },
       {
         "campaign": "card_v2",
@@ -737,7 +725,7 @@
       {
         "campaign": "(direct)",
         "content": "",
-        "sessions": 2
+        "sessions": 3
       },
       {
         "campaign": "test",
@@ -795,8 +783,8 @@
       {
         "state": "Virginia",
         "country": "United States",
-        "users": 10,
-        "sessions": 10
+        "users": 11,
+        "sessions": 11
       },
       {
         "state": "California",
@@ -820,7 +808,7 @@
         "state": "Washington",
         "country": "United States",
         "users": 6,
-        "sessions": 6
+        "sessions": 7
       },
       {
         "state": "Michigan",
@@ -1039,14 +1027,14 @@
         "users": 9
       },
       {
-        "city": "Boardman",
-        "state": "Oregon",
+        "city": "Ashburn",
+        "state": "Virginia",
         "users": 8
       },
       {
-        "city": "Ashburn",
-        "state": "Virginia",
-        "users": 7
+        "city": "Boardman",
+        "state": "Oregon",
+        "users": 8
       },
       {
         "city": "Albany",
@@ -5302,6 +5290,57 @@
         "Traffic.pagesPerSessionPercentage": 1,
         "EngagementTime.totalTime": 4,
         "EngagementTime.activeTime": 4,
+        "Browser.name": "MobileSafari",
+        "Browser.sessionsCount": 1,
+        "Device.name": "Mobile",
+        "Device.sessionsCount": 1,
+        "OS.name": "IOS",
+        "OS.sessionsCount": 1,
+        "Country.name": "United States",
+        "Country.sessionsCount": 1,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 1,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 1
+      },
+      "2026-10-24": {
+        "DeadClickCount.sessionsCount": 1,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 1,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 1,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 1,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 1,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 1,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 1,
+        "Traffic.totalBotSessionCount": 2,
+        "Traffic.distinctUserCount": 1,
+        "Traffic.pagesPerSessionPercentage": 1,
+        "EngagementTime.totalTime": 390,
+        "EngagementTime.activeTime": 13,
         "Browser.name": "MobileSafari",
         "Browser.sessionsCount": 1,
         "Device.name": "Mobile",
