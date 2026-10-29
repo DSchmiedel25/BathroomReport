@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-28T16:02:55.348Z",
+  "generated": "2026-10-29T16:07:08.557Z",
   "ga4": {
     "daily": {
       "2026-08-04": {
@@ -475,6 +475,12 @@
         "newUsers": 1,
         "sessions": 5,
         "pageViews": 6
+      },
+      "2026-10-28": {
+        "activeUsers": 3,
+        "newUsers": 2,
+        "sessions": 5,
+        "pageViews": 4
       }
     },
     "signupsByDate": {
@@ -486,13 +492,13 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 175,
-        "users": 100
+        "sessions": 176,
+        "users": 101
       },
       {
         "source": "qr",
         "medium": "physical_card",
-        "sessions": 65,
+        "sessions": 67,
         "users": 23
       },
       {
@@ -510,7 +516,7 @@
       {
         "source": "google",
         "medium": "organic",
-        "sessions": 8,
+        "sessions": 9,
         "users": 5
       },
       {
@@ -520,6 +526,12 @@
         "users": 5
       },
       {
+        "source": "reddit.com",
+        "medium": "referral",
+        "sessions": 4,
+        "users": 4
+      },
+      {
         "source": "lm.facebook.com",
         "medium": "referral",
         "sessions": 3,
@@ -527,12 +539,6 @@
       },
       {
         "source": "m.facebook.com",
-        "medium": "referral",
-        "sessions": 3,
-        "users": 3
-      },
-      {
-        "source": "reddit.com",
         "medium": "referral",
         "sessions": 3,
         "users": 3
@@ -557,18 +563,6 @@
       }
     ],
     "sourcesDaily": [
-      {
-        "date": "2026-10-13",
-        "source": "(direct)",
-        "medium": "(none)",
-        "sessions": 1
-      },
-      {
-        "date": "2026-10-13",
-        "source": "qr",
-        "medium": "physical_card",
-        "sessions": 1
-      },
       {
         "date": "2026-10-14",
         "source": "qr",
@@ -694,6 +688,30 @@
         "source": "qr",
         "medium": "physical_card",
         "sessions": 1
+      },
+      {
+        "date": "2026-10-28",
+        "source": "qr",
+        "medium": "physical_card",
+        "sessions": 2
+      },
+      {
+        "date": "2026-10-28",
+        "source": "(direct)",
+        "medium": "(none)",
+        "sessions": 1
+      },
+      {
+        "date": "2026-10-28",
+        "source": "google",
+        "medium": "organic",
+        "sessions": 1
+      },
+      {
+        "date": "2026-10-28",
+        "source": "reddit.com",
+        "medium": "referral",
+        "sessions": 1
       }
     ],
     "campaigns": [
@@ -723,14 +741,34 @@
         "sessions": 7
       },
       {
+        "campaign": "card_v2",
+        "content": "",
+        "sessions": 2
+      },
+      {
+        "campaign": "(direct)",
+        "content": "",
+        "sessions": 1
+      },
+      {
+        "campaign": "(organic)",
+        "content": "",
+        "sessions": 1
+      },
+      {
+        "campaign": "(referral)",
+        "content": "",
+        "sessions": 1
+      },
+      {
         "campaign": "test",
         "content": "(not set)",
         "sessions": 1
       }
     ],
     "events": {
-      "bathroom_now": 137,
-      "rating_submit": 32,
+      "bathroom_now": 139,
+      "rating_submit": 35,
       "login": 9,
       "sign_up": 3
     },
@@ -747,7 +785,8 @@
       "2026-10-14": 2,
       "2026-10-19": 3,
       "2026-10-20": 2,
-      "2026-10-26": 2
+      "2026-10-26": 2,
+      "2026-10-28": 3
     },
     "bathroomNow": null,
     "guidePages": [],
@@ -756,13 +795,19 @@
         "state": "New York",
         "country": "United States",
         "users": 34,
-        "sessions": 138
+        "sessions": 140
       },
       {
         "state": "Illinois",
         "country": "United States",
         "users": 25,
         "sessions": 26
+      },
+      {
+        "state": "Oregon",
+        "country": "United States",
+        "users": 13,
+        "sessions": 13
       },
       {
         "state": "Virginia",
@@ -775,12 +820,6 @@
         "country": "United States",
         "users": 12,
         "sessions": 21
-      },
-      {
-        "state": "Oregon",
-        "country": "United States",
-        "users": 12,
-        "sessions": 12
       },
       {
         "state": "California",
@@ -993,6 +1032,12 @@
         "sessions": 1
       },
       {
+        "state": "State of Santa Catarina",
+        "country": "Brazil",
+        "users": 1,
+        "sessions": 1
+      },
+      {
         "state": "Vermont",
         "country": "United States",
         "users": 1,
@@ -1008,7 +1053,7 @@
         "state": "Arizona",
         "country": "United States",
         "users": 0,
-        "sessions": 1
+        "sessions": 2
       }
     ],
     "cities": [
@@ -5490,6 +5535,59 @@
         "Traffic.pagesPerSessionPercentage": 0,
         "EngagementTime.totalTime": 0,
         "EngagementTime.activeTime": 0
+      },
+      "2026-10-28": {
+        "DeadClickCount.sessionsCount": 2,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 2,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 2,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 2,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 2,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 2,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 2,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 2,
+        "Traffic.pagesPerSessionPercentage": 1,
+        "EngagementTime.totalTime": 10,
+        "EngagementTime.activeTime": 10,
+        "Browser.name": "Other",
+        "Browser.sessionsCount": 1,
+        "Device.name": "PC",
+        "Device.sessionsCount": 1,
+        "OS.name": "Linux",
+        "OS.sessionsCount": 1,
+        "Country.name": "United States",
+        "Country.sessionsCount": 1,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 2,
+        "ReferrerUrl.name": "www.reddit.com",
+        "ReferrerUrl.sessionsCount": 1,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 2
       }
     }
   },
