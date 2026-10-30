@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-29T16:07:08.557Z",
+  "generated": "2026-10-30T15:56:18.128Z",
   "ga4": {
     "daily": {
       "2026-08-04": {
@@ -564,18 +564,6 @@
     ],
     "sourcesDaily": [
       {
-        "date": "2026-10-14",
-        "source": "qr",
-        "medium": "physical_card",
-        "sessions": 2
-      },
-      {
-        "date": "2026-10-14",
-        "source": "(direct)",
-        "medium": "(none)",
-        "sessions": 1
-      },
-      {
         "date": "2026-10-15",
         "source": "qr",
         "medium": "physical_card",
@@ -718,47 +706,27 @@
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 175
+        "sessions": 176
       },
       {
         "campaign": "card_v2",
         "content": "(not set)",
-        "sessions": 65
+        "sessions": 67
       },
       {
         "campaign": "(referral)",
         "content": "(not set)",
-        "sessions": 26
+        "sessions": 27
       },
       {
         "campaign": "(organic)",
         "content": "(not set)",
-        "sessions": 8
+        "sessions": 9
       },
       {
         "campaign": "(ai-assistant)",
         "content": "(not set)",
         "sessions": 7
-      },
-      {
-        "campaign": "card_v2",
-        "content": "",
-        "sessions": 2
-      },
-      {
-        "campaign": "(direct)",
-        "content": "",
-        "sessions": 1
-      },
-      {
-        "campaign": "(organic)",
-        "content": "",
-        "sessions": 1
-      },
-      {
-        "campaign": "(referral)",
-        "content": "",
-        "sessions": 1
       },
       {
         "campaign": "test",
@@ -5588,6 +5556,57 @@
         "ReferrerUrl.sessionsCount": 1,
         "PopularPages.url": "https://bathroomreport.app/",
         "PopularPages.visitsCount": 2
+      },
+      "2026-10-29": {
+        "DeadClickCount.sessionsCount": 1,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 1,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 1,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 1,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 1,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 1,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 1,
+        "Traffic.totalBotSessionCount": 1,
+        "Traffic.distinctUserCount": 1,
+        "Traffic.pagesPerSessionPercentage": 1,
+        "EngagementTime.totalTime": 32,
+        "EngagementTime.activeTime": 32,
+        "Browser.name": "ChromeMobile",
+        "Browser.sessionsCount": 1,
+        "Device.name": "Mobile",
+        "Device.sessionsCount": 1,
+        "OS.name": "Android",
+        "OS.sessionsCount": 1,
+        "Country.name": "United States",
+        "Country.sessionsCount": 1,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 1,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 1
       }
     }
   },
