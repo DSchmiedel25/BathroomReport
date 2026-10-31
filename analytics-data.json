@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-30T15:56:18.128Z",
+  "generated": "2026-10-31T15:19:48.789Z",
   "ga4": {
     "daily": {
       "2026-08-04": {
@@ -481,6 +481,12 @@
         "newUsers": 2,
         "sessions": 5,
         "pageViews": 4
+      },
+      "2026-10-30": {
+        "activeUsers": 4,
+        "newUsers": 2,
+        "sessions": 5,
+        "pageViews": 6
       }
     },
     "signupsByDate": {
@@ -492,13 +498,13 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 176,
-        "users": 101
+        "sessions": 178,
+        "users": 103
       },
       {
         "source": "qr",
         "medium": "physical_card",
-        "sessions": 67,
+        "sessions": 69,
         "users": 23
       },
       {
@@ -550,6 +556,12 @@
         "users": 2
       },
       {
+        "source": "address_override",
+        "medium": "",
+        "sessions": 1,
+        "users": 1
+      },
+      {
         "source": "aimanhunt.online",
         "medium": "referral",
         "sessions": 1,
@@ -563,18 +575,6 @@
       }
     ],
     "sourcesDaily": [
-      {
-        "date": "2026-10-15",
-        "source": "qr",
-        "medium": "physical_card",
-        "sessions": 4
-      },
-      {
-        "date": "2026-10-15",
-        "source": "aimanhunt.online",
-        "medium": "referral",
-        "sessions": 1
-      },
       {
         "date": "2026-10-16",
         "source": "qr",
@@ -700,6 +700,24 @@
         "source": "reddit.com",
         "medium": "referral",
         "sessions": 1
+      },
+      {
+        "date": "2026-10-30",
+        "source": "(direct)",
+        "medium": "(none)",
+        "sessions": 2
+      },
+      {
+        "date": "2026-10-30",
+        "source": "qr",
+        "medium": "physical_card",
+        "sessions": 2
+      },
+      {
+        "date": "2026-10-30",
+        "source": "address_override",
+        "medium": "",
+        "sessions": 1
       }
     ],
     "campaigns": [
@@ -729,14 +747,24 @@
         "sessions": 7
       },
       {
+        "campaign": "(direct)",
+        "content": "",
+        "sessions": 2
+      },
+      {
+        "campaign": "card_v2",
+        "content": "",
+        "sessions": 2
+      },
+      {
         "campaign": "test",
         "content": "(not set)",
         "sessions": 1
       }
     ],
     "events": {
-      "bathroom_now": 139,
-      "rating_submit": 35,
+      "bathroom_now": 141,
+      "rating_submit": 37,
       "login": 9,
       "sign_up": 3
     },
@@ -754,7 +782,8 @@
       "2026-10-19": 3,
       "2026-10-20": 2,
       "2026-10-26": 2,
-      "2026-10-28": 3
+      "2026-10-28": 3,
+      "2026-10-30": 2
     },
     "bathroomNow": null,
     "guidePages": [],
@@ -763,7 +792,7 @@
         "state": "New York",
         "country": "United States",
         "users": 34,
-        "sessions": 140
+        "sessions": 142
       },
       {
         "state": "Illinois",
@@ -787,7 +816,7 @@
         "state": "Massachusetts",
         "country": "United States",
         "users": 12,
-        "sessions": 21
+        "sessions": 22
       },
       {
         "state": "California",
@@ -824,6 +853,12 @@
         "country": "United States",
         "users": 4,
         "sessions": 4
+      },
+      {
+        "state": "County Dublin",
+        "country": "Ireland",
+        "users": 3,
+        "sessions": 3
       },
       {
         "state": "Georgia",
@@ -900,12 +935,6 @@
       {
         "state": "Connecticut",
         "country": "United States",
-        "users": 1,
-        "sessions": 1
-      },
-      {
-        "state": "County Dublin",
-        "country": "Ireland",
         "users": 1,
         "sessions": 1
       },
@@ -1081,6 +1110,11 @@
         "users": 4
       },
       {
+        "city": "Dublin",
+        "state": "County Dublin",
+        "users": 3
+      },
+      {
         "city": "Prineville",
         "state": "Oregon",
         "users": 3
@@ -1173,11 +1207,6 @@
       {
         "city": "Athens",
         "state": "Ohio",
-        "users": 1
-      },
-      {
-        "city": "Auburn",
-        "state": "New York",
         "users": 1
       }
     ],
@@ -5595,6 +5624,57 @@
         "Traffic.pagesPerSessionPercentage": 1,
         "EngagementTime.totalTime": 32,
         "EngagementTime.activeTime": 32,
+        "Browser.name": "ChromeMobile",
+        "Browser.sessionsCount": 1,
+        "Device.name": "Mobile",
+        "Device.sessionsCount": 1,
+        "OS.name": "Android",
+        "OS.sessionsCount": 1,
+        "Country.name": "United States",
+        "Country.sessionsCount": 1,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 1,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 1
+      },
+      "2026-10-30": {
+        "DeadClickCount.sessionsCount": 1,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 1,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 1,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 1,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 1,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 1,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 1,
+        "Traffic.totalBotSessionCount": 3,
+        "Traffic.distinctUserCount": 1,
+        "Traffic.pagesPerSessionPercentage": 1,
+        "EngagementTime.totalTime": 121,
+        "EngagementTime.activeTime": 120,
         "Browser.name": "ChromeMobile",
         "Browser.sessionsCount": 1,
         "Device.name": "Mobile",
