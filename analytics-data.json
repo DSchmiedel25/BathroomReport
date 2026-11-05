@@ -1,13 +1,7 @@
 {
-  "generated": "2026-11-04T17:14:56.755Z",
+  "generated": "2026-11-05T17:23:55.324Z",
   "ga4": {
     "daily": {
-      "2026-08-06": {
-        "activeUsers": 9,
-        "newUsers": 8,
-        "sessions": 13,
-        "pageViews": 19
-      },
       "2026-08-07": {
         "activeUsers": 9,
         "newUsers": 5,
@@ -501,14 +495,13 @@
         "pageViews": 3
       },
       "2026-11-04": {
-        "activeUsers": 1,
-        "newUsers": 0,
-        "sessions": 1,
-        "pageViews": 2
+        "activeUsers": 3,
+        "newUsers": 1,
+        "sessions": 4,
+        "pageViews": 5
       }
     },
     "signupsByDate": {
-      "2026-08-06": 1,
       "2026-09-02": 1,
       "2026-09-16": 1,
       "2026-10-31": 1
@@ -517,19 +510,19 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 168,
-        "users": 99
+        "sessions": 155,
+        "users": 91
       },
       {
         "source": "qr",
         "medium": "physical_card",
-        "sessions": 75,
+        "sessions": 77,
         "users": 25
       },
       {
         "source": "address_override",
         "medium": "(not set)",
-        "sessions": 24,
+        "sessions": 25,
         "users": 1
       },
       {
@@ -551,6 +544,12 @@
         "users": 5
       },
       {
+        "source": "reddit.com",
+        "medium": "referral",
+        "sessions": 4,
+        "users": 4
+      },
+      {
         "source": "lm.facebook.com",
         "medium": "referral",
         "sessions": 3,
@@ -563,22 +562,10 @@
         "users": 3
       },
       {
-        "source": "reddit.com",
-        "medium": "referral",
-        "sessions": 3,
-        "users": 3
-      },
-      {
         "source": "stripe.lightning.force.com",
         "medium": "referral",
         "sessions": 2,
         "users": 2
-      },
-      {
-        "source": "address_override",
-        "medium": "",
-        "sessions": 1,
-        "users": 1
       },
       {
         "source": "aimanhunt.online",
@@ -594,12 +581,6 @@
       }
     ],
     "sourcesDaily": [
-      {
-        "date": "2026-10-20",
-        "source": "qr",
-        "medium": "physical_card",
-        "sessions": 2
-      },
       {
         "date": "2026-10-21",
         "source": "stripe.lightning.force.com",
@@ -735,13 +716,19 @@
       {
         "date": "2026-11-03",
         "source": "address_override",
-        "medium": "",
+        "medium": "(not set)",
         "sessions": 1
       },
       {
         "date": "2026-11-04",
         "source": "qr",
         "medium": "physical_card",
+        "sessions": 3
+      },
+      {
+        "date": "2026-11-04",
+        "source": "reddit.com",
+        "medium": "referral",
         "sessions": 1
       }
     ],
@@ -749,12 +736,12 @@
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 168
+        "sessions": 155
       },
       {
         "campaign": "card_v2",
         "content": "(not set)",
-        "sessions": 72
+        "sessions": 74
       },
       {
         "campaign": "(referral)",
@@ -777,16 +764,21 @@
         "sessions": 3
       },
       {
+        "campaign": "(referral)",
+        "content": "",
+        "sessions": 1
+      },
+      {
         "campaign": "test",
         "content": "(not set)",
         "sessions": 1
       }
     ],
     "events": {
-      "bathroom_now": 149,
-      "rating_submit": 39,
+      "bathroom_now": 151,
+      "rating_submit": 41,
       "login": 9,
-      "sign_up": 4
+      "sign_up": 3
     },
     "ratingsByDate": {
       "2026-08-25": 2,
@@ -804,7 +796,8 @@
       "2026-10-26": 2,
       "2026-10-28": 3,
       "2026-10-30": 2,
-      "2026-11-03": 2
+      "2026-11-03": 2,
+      "2026-11-04": 2
     },
     "bathroomNow": null,
     "guidePages": [],
@@ -812,26 +805,20 @@
       {
         "state": "New York",
         "country": "United States",
-        "users": 34,
+        "users": 33,
         "sessions": 140
       },
       {
         "state": "Illinois",
         "country": "United States",
-        "users": 25,
-        "sessions": 26
-      },
-      {
-        "state": "Virginia",
-        "country": "United States",
-        "users": 14,
-        "sessions": 14
+        "users": 24,
+        "sessions": 25
       },
       {
         "state": "Massachusetts",
         "country": "United States",
-        "users": 13,
-        "sessions": 26
+        "users": 12,
+        "sessions": 24
       },
       {
         "state": "Oregon",
@@ -840,10 +827,16 @@
         "sessions": 12
       },
       {
+        "state": "Virginia",
+        "country": "United States",
+        "users": 12,
+        "sessions": 12
+      },
+      {
         "state": "California",
         "country": "United States",
-        "users": 10,
-        "sessions": 11
+        "users": 11,
+        "sessions": 12
       },
       {
         "state": "Iowa",
@@ -885,7 +878,7 @@
         "state": "Georgia",
         "country": "United States",
         "users": 3,
-        "sessions": 4
+        "sessions": 3
       },
       {
         "state": "North Carolina",
@@ -900,19 +893,7 @@
         "sessions": 2
       },
       {
-        "state": "Indiana",
-        "country": "United States",
-        "users": 2,
-        "sessions": 3
-      },
-      {
         "state": "Kentucky",
-        "country": "United States",
-        "users": 2,
-        "sessions": 2
-      },
-      {
-        "state": "Maryland",
         "country": "United States",
         "users": 2,
         "sessions": 2
@@ -978,19 +959,25 @@
         "sessions": 1
       },
       {
+        "state": "Indiana",
+        "country": "United States",
+        "users": 1,
+        "sessions": 2
+      },
+      {
         "state": "Maine",
         "country": "United States",
         "users": 1,
-        "sessions": 3
+        "sessions": 2
       },
       {
-        "state": "Minnesota",
+        "state": "Maryland",
         "country": "United States",
         "users": 1,
         "sessions": 1
       },
       {
-        "state": "Missouri",
+        "state": "Minnesota",
         "country": "United States",
         "users": 1,
         "sessions": 1
@@ -1030,12 +1017,6 @@
         "country": "Canada",
         "users": 1,
         "sessions": 1
-      },
-      {
-        "state": "Pennsylvania",
-        "country": "United States",
-        "users": 1,
-        "sessions": 2
       },
       {
         "state": "Saxony",
@@ -1083,7 +1064,7 @@
       {
         "city": "Ashburn",
         "state": "Virginia",
-        "users": 11
+        "users": 10
       },
       {
         "city": "Council Bluffs",
@@ -1096,13 +1077,13 @@
         "users": 7
       },
       {
-        "city": "Albany",
-        "state": "New York",
-        "users": 5
+        "city": "Los Angeles",
+        "state": "California",
+        "users": 6
       },
       {
-        "city": "Boston",
-        "state": "Massachusetts",
+        "city": "Albany",
+        "state": "New York",
         "users": 5
       },
       {
@@ -1111,8 +1092,8 @@
         "users": 5
       },
       {
-        "city": "Los Angeles",
-        "state": "California",
+        "city": "Colonie",
+        "state": "New York",
         "users": 5
       },
       {
@@ -1121,8 +1102,8 @@
         "users": 5
       },
       {
-        "city": "Colonie",
-        "state": "New York",
+        "city": "Boston",
+        "state": "Massachusetts",
         "users": 4
       },
       {
@@ -1168,11 +1149,6 @@
       {
         "city": "Catskill",
         "state": "New York",
-        "users": 2
-      },
-      {
-        "city": "Chicago",
-        "state": "Illinois",
         "users": 2
       },
       {
@@ -1231,8 +1207,13 @@
         "users": 1
       },
       {
-        "city": "Baltimore",
-        "state": "Maryland",
+        "city": "Berea",
+        "state": "Kentucky",
+        "users": 1
+      },
+      {
+        "city": "Beverly Hills",
+        "state": "California",
         "users": 1
       }
     ],
@@ -5919,6 +5900,59 @@
         "Country.sessionsCount": 3,
         "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
         "PageTitle.sessionsCount": 3,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 3
+      },
+      "2026-11-04": {
+        "DeadClickCount.sessionsCount": 3,
+        "DeadClickCount.sessionsWithMetricPercentage": 33.33,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 66.67,
+        "DeadClickCount.pagesViews": 1,
+        "DeadClickCount.subTotal": 1,
+        "ExcessiveScroll.sessionsCount": 3,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 3,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 3,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 3,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 3,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 100,
+        "Traffic.totalSessionCount": 3,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 2,
+        "Traffic.pagesPerSessionPercentage": 1,
+        "EngagementTime.totalTime": 17,
+        "EngagementTime.activeTime": 16,
+        "Browser.name": "ChromeMobile",
+        "Browser.sessionsCount": 3,
+        "Device.name": "Mobile",
+        "Device.sessionsCount": 3,
+        "OS.name": "Android",
+        "OS.sessionsCount": 3,
+        "Country.name": "United States",
+        "Country.sessionsCount": 3,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 3,
+        "ReferrerUrl.name": "www.reddit.com",
+        "ReferrerUrl.sessionsCount": 1,
         "PopularPages.url": "https://bathroomreport.app/",
         "PopularPages.visitsCount": 3
       }
