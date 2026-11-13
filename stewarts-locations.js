@@ -62,7 +62,6 @@ window.stewartsLocations = [
 {"n":"Delaware Ave, Delmar (S)","lat":"42.614984","lng":"-73.852007","addr":"624 Delaware Ave, Delmar, NY 12054","id":"delmar-delaware624","hrs":"0430-2300"},
 {"n":"Columbia St, Cohoes (N)","lat":"42.769540","lng":"-73.704181","addr":"94 Columbia St, Cohoes, NY 12047","id":"cohoes-columbia94","hrs":"0500-2300"},
 {"n":"Columbia St, Cohoes (S)","lat":"42.771717","lng":"-73.727562","addr":"480 Columbia St, Cohoes, NY 12047","id":"cohoes-columbia480","hrs":"0500-2400","osm":{"gas":1,"airPump":1}},
-{"n":"2nd Ave, Watervliet (N)","lat":"42.735097","lng":"-73.700473","addr":"2458 2nd Ave, Watervliet, NY 12189","id":"watervliet-2ndN","hrs":"0430-2400"},
 {"n":"2nd Ave, Watervliet (S)","lat":"42.730451","lng":"-73.700893","addr":"2002 2nd Ave, Watervliet, NY 12189","id":"watervliet-2ndS","hrs":"0400-0100","osm":{"gas":1}},
 {"n":"6th St, Watervliet","lat":"42.713257","lng":"-73.707633","addr":"309 6th St, Watervliet, NY 12189","id":"watervliet-6th","hrs":"0500-2300"},
 {"n":"Broadway, Menands","lat":"42.677738","lng":"-73.735072","addr":"14 Broadway, Menands, NY 12204","id":"menands-broadway","hrs":"0430-2300","osm":{"gas":1}},
