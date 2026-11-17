@@ -1,13 +1,7 @@
 {
-  "generated": "2026-11-16T19:36:33.026Z",
+  "generated": "2026-11-17T18:34:07.180Z",
   "ga4": {
     "daily": {
-      "2026-08-18": {
-        "activeUsers": 8,
-        "newUsers": 8,
-        "sessions": 8,
-        "pageViews": 8
-      },
       "2026-08-20": {
         "activeUsers": 2,
         "newUsers": 1,
@@ -493,6 +487,12 @@
         "newUsers": 1,
         "sessions": 3,
         "pageViews": 3
+      },
+      "2026-11-16": {
+        "activeUsers": 1,
+        "newUsers": 0,
+        "sessions": 1,
+        "pageViews": 1
       }
     },
     "signupsByDate": {
@@ -504,8 +504,8 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 146,
-        "users": 98
+        "sessions": 139,
+        "users": 90
       },
       {
         "source": "qr",
@@ -569,18 +569,6 @@
       }
     ],
     "sourcesDaily": [
-      {
-        "date": "2026-11-01",
-        "source": "address_override",
-        "medium": "(not set)",
-        "sessions": 1
-      },
-      {
-        "date": "2026-11-01",
-        "source": "qr",
-        "medium": "physical_card",
-        "sessions": 1
-      },
       {
         "date": "2026-11-02",
         "source": "qr",
@@ -730,13 +718,19 @@
         "source": "qr",
         "medium": "physical_card",
         "sessions": 1
+      },
+      {
+        "date": "2026-11-16",
+        "source": "(direct)",
+        "medium": "(none)",
+        "sessions": 1
       }
     ],
     "campaigns": [
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 146
+        "sessions": 138
       },
       {
         "campaign": "card_v2",
@@ -757,10 +751,15 @@
         "campaign": "(organic)",
         "content": "(not set)",
         "sessions": 7
+      },
+      {
+        "campaign": "(direct)",
+        "content": "",
+        "sessions": 1
       }
     ],
     "events": {
-      "bathroom_now": 179,
+      "bathroom_now": 181,
       "rating_submit": 52,
       "login": 7,
       "sign_up": 3
@@ -800,8 +799,8 @@
       {
         "state": "Illinois",
         "country": "United States",
-        "users": 24,
-        "sessions": 24
+        "users": 17,
+        "sessions": 17
       },
       {
         "state": "Iowa",
@@ -836,8 +835,8 @@
       {
         "state": "Washington",
         "country": "United States",
-        "users": 7,
-        "sessions": 9
+        "users": 6,
+        "sessions": 8
       },
       {
         "state": "New Jersey",
@@ -910,6 +909,12 @@
         "country": "United States",
         "users": 2,
         "sessions": 2
+      },
+      {
+        "state": "Arizona",
+        "country": "United States",
+        "users": 1,
+        "sessions": 3
       },
       {
         "state": "British Columbia",
@@ -1042,19 +1047,13 @@
         "country": "United States",
         "users": 1,
         "sessions": 1
-      },
-      {
-        "state": "Arizona",
-        "country": "United States",
-        "users": 0,
-        "sessions": 2
       }
     ],
     "cities": [
       {
         "city": "Glenview",
         "state": "Illinois",
-        "users": 23
+        "users": 16
       },
       {
         "city": "Council Bluffs",
@@ -6489,6 +6488,45 @@
         "PageTitle.sessionsCount": 1,
         "PopularPages.url": "https://bathroomreport.app/",
         "PopularPages.visitsCount": 1
+      },
+      "2026-11-16": {
+        "DeadClickCount.sessionsCount": 0,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 0,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 0,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 0,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 0,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 0,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 0,
+        "Traffic.totalSessionCount": 0,
+        "Traffic.totalBotSessionCount": 1,
+        "Traffic.distinctUserCount": 0,
+        "Traffic.pagesPerSessionPercentage": 0,
+        "EngagementTime.totalTime": 0,
+        "EngagementTime.activeTime": 0
       }
     }
   },
