@@ -86,9 +86,13 @@
 <script defer src="public-toilets-manifest.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Overpass:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Fredoka:wght@500;600;700&family=Overpass:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="shell.css">
+<!-- TEMPORARY neon skin. Applied before first paint so Vice users never see a Classic flash.
+     Toggle: Settings > Look. See the removal steps at the top of vice.css. -->
+<link rel="stylesheet" href="vice.css">
+<script>try{if(localStorage.getItem('skin')==='vice')document.documentElement.setAttribute('data-skin','vice');}catch(e){}</script>
   <!-- GA4. app.js already fires a `deeplink_open` event through gtag() when a
        /guide/ page or a shared link lands here with ?loc= — that call was guarded by
        `typeof gtag === 'function'`, so with no loader on the page it silently did
@@ -522,6 +526,14 @@ This is tracked on this device only. Log in to sync it across devices.
         <div class="d-gate-note" id="prefsGateNote" hidden>Sign in to change these</div>
       </div>
 
+      <div class="ss-sec">Look</div>
+      <div class="ss-card">
+        <button id="skinToggle" class="d-toggle" aria-pressed="false">
+          <span class="ss-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 15a7 7 0 0114 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M3 15h18M6 18.5h12M9 21.5h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+          <span class="ss-lab">Neon sunset look</span><span class="d-switch"><b></b></span>
+        </button>
+      </div>
+
       <div class="ss-sec" id="ssPlateRecovery">Account</div>
       <div class="ss-card">
         <button class="ss-row" id="acctEmailRow">
@@ -594,7 +606,7 @@ This is tracked on this device only. Log in to sync it across devices.
 
       <div class="ss-foot">
         <span class="d-count" id="drawerLocCount"></span>
-        <span id="ssVersion">Bathroom Report</span> <span class="d-version" data-version="v2.51.1">v2.51.1 · 2026-11-01</span><br>
+        <span id="ssVersion">Bathroom Report</span> <span class="d-version" data-version="v2.52.0">v2.52.0 · 2026-11-19</span><br>
         &copy; 2025&ndash;2026 Bathroom Report. Independent and community-created.
         Not affiliated with any business listed.
       </div>

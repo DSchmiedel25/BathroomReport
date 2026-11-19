@@ -270,6 +270,27 @@ document.getElementById('themeToggle').addEventListener('click', () => {
   applyTheme(next);
 });
 
+// Vice skin toggle (TEMPORARY — see the removal steps at the top of vice.css).
+// Purely cosmetic and per-device, so it's open to everyone, signed in or not. The <head> script
+// already applied the saved choice before first paint; this only syncs the switch and flips it.
+(function(){
+  const btn = document.getElementById('skinToggle');
+  if(!btn) return;
+  const sync = () => {
+    const on = document.documentElement.getAttribute('data-skin') === 'vice';
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', String(on));
+  };
+  sync();
+  btn.addEventListener('click', () => {
+    const on = document.documentElement.getAttribute('data-skin') !== 'vice';
+    if(on) document.documentElement.setAttribute('data-skin', 'vice');
+    else document.documentElement.removeAttribute('data-skin');
+    try{ localStorage.setItem('skin', on ? 'vice' : 'classic'); }catch(e){}
+    sync();
+  });
+})();
+
 // (The old always-rendered legend was replaced by the chain key — see the Chain key module
 // further down, which renders the same swatches as tappable filter rows.)
 
@@ -572,7 +593,7 @@ function ratingConfidenceHtml(count){
  * onboarding panel, and the FAQ — which is exactly why they drifted apart (July 14 / July 21 /
  * actually July 30). Set this ONE value on each release; everything that shows a date reads it.
  * Format is YYYY-MM-DD so it sorts and can't be misread. */
-const BUILD_DATE = '2026-10-01';
+const BUILD_DATE = '2026-11-19';
 
 // "2026-07-30" -> "July 30, 2026" for prose. Parsed as UTC parts rather than new Date(str) so it
 // can't shift a day backwards for users west of GMT.
@@ -3224,7 +3245,7 @@ function metroPopupHtml(loc, agg, myVote){
  *
  * BUILD is bumped alongside the stamp in index.html. If they disagree, or the sprite is missing,
  * say so where it will actually be seen instead of leaving it to be discovered by eye. */
-const BUILD = 'v2.51.1';
+const BUILD = 'v2.52.0';
 (function checkBuild(){
   try{
     const stamped = document.querySelector('.d-version')?.dataset.version || '(none)';

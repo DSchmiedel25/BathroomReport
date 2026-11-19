@@ -1,0 +1,257 @@
+/* ============================================================
+   vice.css — TEMPORARY "Vice City" skin (sunset neon, night drive)
+
+   Everything here is scoped under html[data-skin="vice"], so with the skin off this file
+   matches nothing and Classic renders exactly as before. The switch lives in Settings ▸ Look
+   and is saved per device (localStorage 'skin').
+
+   The skin is a single night look on purpose: anonymous users can't change the theme (they
+   get Light), so a skin that only worked in dark mode would be invisible to most people.
+   It overrides both themes' tokens; the Dark mode switch has no visible effect while it's on.
+
+   Visual only: no positions, sizes or behaviour change, so map controls, safe areas and
+   tap targets stay exactly where Classic puts them.
+
+   TO REMOVE THE SKIN ENTIRELY:
+     1. delete this file
+     2. index.html: remove the vice.css <link>, the early "skin" <script>, and the #skinToggle card
+     3. app.js:    remove the "Vice skin toggle" block
+     4. sw.js:     remove './vice.css' from APP_SHELL and bump CACHE_NAME
+   ============================================================ */
+
+html[data-skin="vice"]{
+  /* Palette */
+  --vc-night:#12061f;
+  --vc-night2:#1c0b2e;
+  --vc-night3:#2a1142;
+  --vc-pink:#ff2e88;
+  --vc-orange:#ff8a3d;
+  --vc-gold:#ffc94a;
+  --vc-cyan:#2de2e6;
+  --vc-violet:#8b3dff;
+  --vc-ink:#fff4fb;
+  --vc-muted:#c4a9d6;
+  --vc-line:rgba(255,46,136,.28);
+  --vc-sunset:linear-gradient(100deg, #ff2e88 0%, #ff6a5c 45%, #ff8a3d 70%, #ffc94a 100%);
+  --vc-glow:0 0 0 1px rgba(255,46,136,.35), 0 8px 28px rgba(255,46,136,.28);
+  --font-vice:'Anton', 'Impact', 'Haettenschweiler', 'Arial Narrow Bold', sans-serif;
+
+  /* Re-point the app's own tokens (both themes) */
+  --accent:var(--vc-pink);
+  --accent-deep:#d81b6e;
+  --accent-ink:#1a0626;
+  --amber:var(--vc-gold);
+  --green:#39e58c;
+  --charcoal:var(--vc-night);
+  --cream:var(--vc-ink);
+  --header-grad-top:var(--vc-night2);
+  --muted:var(--vc-muted);
+  --placeholder:#9c84ad;
+  --panel-bg:rgba(28,11,46,.94);
+  --panel-border:var(--vc-line);
+
+  --shell-bg:var(--vc-night);
+  --shell-chrome:var(--vc-night2);
+  --shell-chrome2:var(--vc-night3);
+  --shell-line:var(--vc-line);
+  --shell-ink:var(--vc-ink);
+  --shell-muted:var(--vc-muted);
+  --shell-shadow:0 12px 40px rgba(8,0,20,.6), 0 0 22px rgba(255,46,136,.12);
+
+  --popup-bg:#1a0a2b; --popup-text:var(--vc-ink); --popup-muted:var(--vc-muted);
+  --popup-border:var(--vc-line); --popup-divider:rgba(255,46,136,.22);
+  --popup-report-bg:#3a1030; --popup-tip-input-bg:#12061f; --popup-star-empty:#4a2a5e;
+
+  --answer-yes-bg:rgba(57,229,140,.12); --answer-yes-border:rgba(57,229,140,.45); --answer-yes-text:#7af0b2;
+  --answer-no-bg:rgba(255,59,92,.13);  --answer-no-border:rgba(255,59,92,.45);  --answer-no-text:#ff8aa0;
+
+  --ss-bg:var(--vc-night); --ss-card:var(--vc-night2); --ss-card2:var(--vc-night3);
+  --ss-line:rgba(255,46,136,.16); --ss-ink:var(--vc-ink); --ss-ink2:var(--vc-muted); --ss-ink3:#8e74a1;
+  --ss-tile-bg:rgba(255,46,136,.12);
+
+  color-scheme:dark;
+}
+html[data-skin="vice"] body{ background:var(--vc-night); color:var(--vc-ink); }
+
+/* ---------- Header: night sky with a sunset horizon line ---------- */
+html[data-skin="vice"] #header{
+  background:linear-gradient(180deg, #0c0418 0%, #1c0b2e 100%) !important;
+  border-bottom:0 !important;
+  box-shadow:0 2px 0 0 transparent !important;
+  position:relative;
+}
+html[data-skin="vice"] #header::after{
+  content:""; position:absolute; left:0; right:0; bottom:0; height:2px;
+  background:var(--vc-sunset); box-shadow:0 0 12px rgba(255,46,136,.7);
+  pointer-events:none;
+}
+html[data-skin="vice"] #headerBrand h1{
+  font-family:var(--font-vice) !important; font-weight:400 !important;
+  font-size:clamp(16px, 4.9vw, 22px) !important; letter-spacing:.035em !important;
+  color:#fff !important; transform:skewX(-8deg);
+  text-shadow:0 0 10px rgba(255,46,136,.45);
+}
+html[data-skin="vice"] #headerBrand h1 .wm-accent{
+  background:var(--vc-sunset); -webkit-background-clip:text; background-clip:text;
+  color:transparent !important; -webkit-text-fill-color:transparent;
+  text-shadow:none; filter:drop-shadow(0 0 6px rgba(255,138,61,.55));
+}
+html[data-skin="vice"] #headerIcon{ filter:drop-shadow(0 0 6px rgba(255,46,136,.6)); }
+html[data-skin="vice"] #menuBtn{ color:var(--vc-cyan); }
+html[data-skin="vice"] #accountToggle,
+html[data-skin="vice"] #addressSearchToggle{
+  background:rgba(255,46,136,.10) !important; color:var(--vc-ink) !important;
+  border:1px solid var(--vc-line) !important;
+}
+html[data-skin="vice"] #addressSearchToggle[aria-expanded="true"]{ background:rgba(255,46,136,.28) !important; }
+html[data-skin="vice"] #addressSearchInput{ background:var(--vc-night) !important; color:var(--vc-ink) !important; border-color:var(--vc-line) !important; }
+html[data-skin="vice"] #addressSearchSubmit{ background:var(--vc-sunset) !important; color:var(--accent-ink) !important; border:0 !important; }
+
+/* ---------- Map: neon night-drive tiles + sunset haze ---------- */
+html[data-skin="vice"] #map{ background:#1a0b2a !important; }
+/* One filter for both tile sets. Light tiles are inverted here; dark tiles already are, so the
+   class rule repeats the full chain rather than stacking a second invert on top. */
+html[data-skin="vice"] #map .leaflet-tile-pane,
+html[data-skin="vice"] #map.dark-map-tiles .leaflet-tile-pane{
+  filter:invert(1) hue-rotate(205deg) brightness(.78) contrast(1.12) saturate(1.7);
+}
+html[data-skin="vice"] #mapWrap::after{
+  content:""; position:absolute; left:0; right:0; top:0; height:110px; z-index:450;
+  background:linear-gradient(180deg, rgba(255,46,136,.22), rgba(255,138,61,.08) 55%, transparent);
+  pointer-events:none;
+}
+/* Cluster bubbles: markercluster's stock green/yellow/orange → sunset steps */
+html[data-skin="vice"] .marker-cluster-small{ background-color:rgba(45,226,230,.35); }
+html[data-skin="vice"] .marker-cluster-small div{ background-color:rgba(45,226,230,.9); }
+html[data-skin="vice"] .marker-cluster-medium{ background-color:rgba(255,138,61,.38); }
+html[data-skin="vice"] .marker-cluster-medium div{ background-color:rgba(255,138,61,.95); }
+html[data-skin="vice"] .marker-cluster-large{ background-color:rgba(255,46,136,.38); }
+html[data-skin="vice"] .marker-cluster-large div{ background-color:rgba(255,46,136,.95); }
+html[data-skin="vice"] .marker-cluster div span{ color:#1a0626; font-weight:800; }
+
+/* ---------- Map controls: dark glass, neon edge, cyan glyphs ---------- */
+html[data-skin="vice"] #whereAmIBtn,
+html[data-skin="vice"] #listViewToggle,
+html[data-skin="vice"] #cardDropBtn{
+  background:rgba(28,11,46,.92) !important; color:var(--vc-cyan) !important;
+  border:1px solid rgba(45,226,230,.45) !important;
+  box-shadow:0 0 14px rgba(45,226,230,.25), 0 10px 26px rgba(8,0,20,.55) !important;
+}
+html[data-skin="vice"] #missingBtn,
+html[data-skin="vice"] #legend,
+html[data-skin="vice"] #chainFilter,
+html[data-skin="vice"] #chainKeyPill{
+  background:rgba(28,11,46,.92) !important; color:var(--vc-ink) !important;
+  border:1px solid var(--vc-line) !important;
+}
+
+/* ---------- Bathroom Now: the big sunset button ---------- */
+html[data-skin="vice"] #locateBtn{
+  background:var(--vc-sunset) !important; color:var(--accent-ink) !important;
+  font-family:var(--font-vice) !important; font-weight:400 !important;
+  font-size:21px !important; letter-spacing:.09em !important;
+  padding:16px 18px !important; border-radius:12px !important;
+  border:1px solid rgba(255,255,255,.35) !important;
+  box-shadow:0 0 0 2px rgba(18,6,31,.6), 0 0 26px rgba(255,46,136,.55), 0 10px 30px rgba(255,138,61,.35) !important;
+  text-shadow:0 1px 0 rgba(255,255,255,.35);
+}
+html[data-skin="vice"] #locateBtn:active{ background:var(--vc-sunset) !important; filter:brightness(.9); }
+@media (prefers-reduced-motion: no-preference){
+  html[data-skin="vice"] #locateBtn{ animation:vc-pulse 3.2s ease-in-out infinite; }
+  @keyframes vc-pulse{
+    0%,100%{ box-shadow:0 0 0 2px rgba(18,6,31,.6), 0 0 22px rgba(255,46,136,.45), 0 10px 30px rgba(255,138,61,.3); }
+    50%    { box-shadow:0 0 0 2px rgba(18,6,31,.6), 0 0 34px rgba(255,46,136,.75), 0 10px 34px rgba(255,138,61,.45); }
+  }
+}
+html[data-skin="vice"] #nearestInfo{ border-color:var(--vc-line) !important; }
+html[data-skin="vice"] .bathroom-now-card .now-title{
+  font-family:var(--font-vice); font-weight:400; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--vc-gold);
+}
+
+/* ---------- Stat pills + banners ---------- */
+html[data-skin="vice"] .stat-pill{
+  background:rgba(255,46,136,.12) !important; color:var(--vc-ink) !important;
+  border:1px solid var(--vc-line) !important;
+}
+html[data-skin="vice"] #communityBanner,
+html[data-skin="vice"] #installBanner{
+  background:var(--vc-night2) !important; color:var(--vc-ink) !important;
+  border:1px solid var(--vc-line) !important;
+}
+
+/* ---------- Pin popups ---------- */
+html[data-skin="vice"] .leaflet-popup-content-wrapper{
+  background:var(--popup-bg) !important; color:var(--popup-text) !important;
+  border:1px solid var(--vc-line); border-radius:14px !important;
+  box-shadow:0 0 24px rgba(255,46,136,.25), 0 14px 40px rgba(8,0,20,.6) !important;
+  overflow:hidden;
+}
+html[data-skin="vice"] .leaflet-popup-content-wrapper::before{
+  content:""; display:block; height:3px; background:var(--vc-sunset);
+}
+html[data-skin="vice"] .leaflet-popup-tip{ background:var(--popup-bg) !important; }
+html[data-skin="vice"] .leaflet-popup-close-button{ color:var(--vc-muted) !important; }
+html[data-skin="vice"] .popup-inner h3{ letter-spacing:.02em; }
+
+/* ---------- Buttons ---------- */
+html[data-skin="vice"] .btn-primary{
+  background:var(--vc-sunset) !important; color:var(--accent-ink) !important;
+  border:0 !important; font-weight:800;
+}
+html[data-skin="vice"] .btn-primary:visited,
+html[data-skin="vice"] .btn-primary:hover{ color:var(--accent-ink) !important; }
+html[data-skin="vice"] .btn-secondary{
+  background:rgba(45,226,230,.12) !important; color:var(--vc-ink) !important;
+  border:1px solid rgba(45,226,230,.4) !important;
+}
+
+/* ---------- Open / closed / unknown (labels stay; neon hues only) ---------- */
+html[data-skin="vice"] .status-open  .status-dot{ background:#39e58c; box-shadow:0 0 6px #39e58c; }
+html[data-skin="vice"] .status-shut  .status-dot{ background:#ff3b5c; box-shadow:0 0 6px #ff3b5c; }
+html[data-skin="vice"] .status-open  .status-word{ color:#5cf0a3; }
+html[data-skin="vice"] .status-shut  .status-word{ color:#ff7088; }
+
+/* ---------- List view ---------- */
+html[data-skin="vice"] #listViewPanel{ background:var(--vc-night) !important; color:var(--vc-ink) !important; }
+html[data-skin="vice"] #listViewHeader{
+  background:var(--vc-night2) !important; color:var(--vc-ink) !important;
+  border-bottom:2px solid var(--vc-pink) !important;
+  font-family:var(--font-vice); font-weight:400; letter-spacing:.05em; text-transform:uppercase;
+}
+html[data-skin="vice"] .list-item{ border-color:rgba(255,46,136,.14) !important; }
+html[data-skin="vice"] .list-item .list-item-name{ color:var(--vc-ink) !important; }
+html[data-skin="vice"] .list-item:active{ background:rgba(255,46,136,.12) !important; }
+
+/* ---------- Settings sheet ---------- */
+html[data-skin="vice"] .ss-title{
+  font-family:var(--font-vice); font-weight:400; letter-spacing:.03em; text-transform:uppercase;
+  background:var(--vc-sunset); -webkit-background-clip:text; background-clip:text;
+  color:transparent; -webkit-text-fill-color:transparent;
+}
+html[data-skin="vice"] .ss-sec{ color:var(--vc-pink) !important; letter-spacing:.12em; }
+html[data-skin="vice"] .ss-brand b i{ color:var(--vc-orange); }
+html[data-skin="vice"] .ss-tile{ color:var(--vc-cyan); }
+html[data-skin="vice"] .ss-body .d-toggle.on .d-switch,
+html[data-skin="vice"] .ss-screen .d-toggle.on .d-switch{ background:var(--vc-pink) !important; }
+html[data-skin="vice"] .ss-body .d-toggle .d-switch{ background:#3d2352; }
+
+/* ---------- Account panel, overlays, How it works ---------- */
+html[data-skin="vice"] #accountPanel,
+html[data-skin="vice"] #missingPanel,
+html[data-skin="vice"] #onboardingCard,
+html[data-skin="vice"] .hiw-card{
+  background:var(--vc-night2) !important; color:var(--vc-ink) !important;
+  border:1px solid var(--vc-line) !important;
+}
+html[data-skin="vice"] .hiw-head h2,
+html[data-skin="vice"] #onboardingTitle{
+  font-family:var(--font-vice); font-weight:400; letter-spacing:.04em; text-transform:uppercase;
+}
+html[data-skin="vice"] .hiw-body p{ color:#d9c6e6; }
+html[data-skin="vice"] .hiw-body h3,
+html[data-skin="vice"] .hiw-faq b{ color:var(--vc-gold); }
+html[data-skin="vice"] .hiw-body a{ color:var(--vc-cyan); }
+
+/* Focus stays obvious on the darker surfaces */
+html[data-skin="vice"] :focus-visible{ outline:2px solid var(--vc-cyan); outline-offset:2px; }
