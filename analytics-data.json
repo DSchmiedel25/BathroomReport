@@ -1,13 +1,7 @@
 {
-  "generated": "2026-11-21T16:46:58.645Z",
+  "generated": "2026-11-22T17:09:26.871Z",
   "ga4": {
     "daily": {
-      "2026-08-23": {
-        "activeUsers": 1,
-        "newUsers": 0,
-        "sessions": 1,
-        "pageViews": 4
-      },
       "2026-08-24": {
         "activeUsers": 2,
         "newUsers": 0,
@@ -487,6 +481,12 @@
         "newUsers": 1,
         "sessions": 3,
         "pageViews": 4
+      },
+      "2026-11-21": {
+        "activeUsers": 1,
+        "newUsers": 1,
+        "sessions": 1,
+        "pageViews": 1
       }
     },
     "signupsByDate": {
@@ -499,7 +499,7 @@
         "source": "(direct)",
         "medium": "(none)",
         "sessions": 136,
-        "users": 90
+        "users": 91
       },
       {
         "source": "qr",
@@ -563,12 +563,6 @@
       }
     ],
     "sourcesDaily": [
-      {
-        "date": "2026-11-06",
-        "source": "address_override",
-        "medium": "(not set)",
-        "sessions": 1
-      },
       {
         "date": "2026-11-07",
         "source": "reddit.com",
@@ -688,13 +682,19 @@
         "source": "address_override",
         "medium": "(not set)",
         "sessions": 1
+      },
+      {
+        "date": "2026-11-21",
+        "source": "(direct)",
+        "medium": "(none)",
+        "sessions": 1
       }
     ],
     "campaigns": [
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 136
+        "sessions": 135
       },
       {
         "campaign": "card_v2",
@@ -715,6 +715,11 @@
         "campaign": "(organic)",
         "content": "(not set)",
         "sessions": 7
+      },
+      {
+        "campaign": "(direct)",
+        "content": "",
+        "sessions": 1
       }
     ],
     "events": {
@@ -776,8 +781,8 @@
       {
         "state": "California",
         "country": "United States",
-        "users": 10,
-        "sessions": 11
+        "users": 11,
+        "sessions": 12
       },
       {
         "state": "Oregon",
@@ -854,12 +859,6 @@
       {
         "state": "Minnesota",
         "country": "United States",
-        "users": 2,
-        "sessions": 2
-      },
-      {
-        "state": "Quebec",
-        "country": "Canada",
         "users": 2,
         "sessions": 2
       },
@@ -962,6 +961,12 @@
       {
         "state": "Oklahoma",
         "country": "United States",
+        "users": 1,
+        "sessions": 1
+      },
+      {
+        "state": "Quebec",
+        "country": "Canada",
         "users": 1,
         "sessions": 1
       },
@@ -1105,11 +1110,6 @@
         "users": 2
       },
       {
-        "city": "Montreal",
-        "state": "Quebec",
-        "users": 2
-      },
-      {
         "city": "North Bergen",
         "state": "New Jersey",
         "users": 2
@@ -1167,6 +1167,11 @@
       {
         "city": "Blackstone",
         "state": "Virginia",
+        "users": 1
+      },
+      {
+        "city": "Bridgeport",
+        "state": "Connecticut",
         "users": 1
       }
     ],
@@ -6662,6 +6667,45 @@
         "ScrollDepth.averageScrollDepth": 0,
         "Traffic.totalSessionCount": 0,
         "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 0,
+        "Traffic.pagesPerSessionPercentage": 0,
+        "EngagementTime.totalTime": 0,
+        "EngagementTime.activeTime": 0
+      },
+      "2026-11-21": {
+        "DeadClickCount.sessionsCount": 0,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 0,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 0,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 0,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 0,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 0,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 0,
+        "Traffic.totalSessionCount": 0,
+        "Traffic.totalBotSessionCount": 1,
         "Traffic.distinctUserCount": 0,
         "Traffic.pagesPerSessionPercentage": 0,
         "EngagementTime.totalTime": 0,
