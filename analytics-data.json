@@ -1,13 +1,7 @@
 {
-  "generated": "2026-11-23T21:24:52.050Z",
+  "generated": "2026-11-24T20:09:33.816Z",
   "ga4": {
     "daily": {
-      "2026-08-25": {
-        "activeUsers": 2,
-        "newUsers": 0,
-        "sessions": 2,
-        "pageViews": 2
-      },
       "2026-08-26": {
         "activeUsers": 1,
         "newUsers": 1,
@@ -489,10 +483,10 @@
         "pageViews": 3
       },
       "2026-11-23": {
-        "activeUsers": 1,
-        "newUsers": 0,
-        "sessions": 1,
-        "pageViews": 1
+        "activeUsers": 7,
+        "newUsers": 4,
+        "sessions": 9,
+        "pageViews": 10
       }
     },
     "signupsByDate": {
@@ -504,13 +498,13 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 138,
-        "users": 92
+        "sessions": 142,
+        "users": 96
       },
       {
         "source": "qr",
         "medium": "physical_card",
-        "sessions": 68,
+        "sessions": 67,
         "users": 24
       },
       {
@@ -544,6 +538,12 @@
         "users": 4
       },
       {
+        "source": "address_override",
+        "medium": "",
+        "sessions": 3,
+        "users": 1
+      },
+      {
         "source": "lm.facebook.com",
         "medium": "referral",
         "sessions": 3,
@@ -569,18 +569,6 @@
       }
     ],
     "sourcesDaily": [
-      {
-        "date": "2026-11-08",
-        "source": "address_override",
-        "medium": "(not set)",
-        "sessions": 1
-      },
-      {
-        "date": "2026-11-08",
-        "source": "qr",
-        "medium": "physical_card",
-        "sessions": 1
-      },
       {
         "date": "2026-11-09",
         "source": "(direct)",
@@ -699,19 +687,25 @@
         "date": "2026-11-23",
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 1
+        "sessions": 6
+      },
+      {
+        "date": "2026-11-23",
+        "source": "address_override",
+        "medium": "",
+        "sessions": 3
       }
     ],
     "campaigns": [
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 137
+        "sessions": 136
       },
       {
         "campaign": "card_v2",
         "content": "(not set)",
-        "sessions": 68
+        "sessions": 67
       },
       {
         "campaign": "(referral)",
@@ -731,17 +725,16 @@
       {
         "campaign": "(direct)",
         "content": "",
-        "sessions": 1
+        "sessions": 6
       }
     ],
     "events": {
-      "bathroom_now": 183,
-      "rating_submit": 54,
+      "bathroom_now": 187,
+      "rating_submit": 52,
       "login": 7,
       "sign_up": 3
     },
     "ratingsByDate": {
-      "2026-08-25": 2,
       "2026-08-27": 4,
       "2026-09-06": 2,
       "2026-09-11": 3,
@@ -770,14 +763,14 @@
       {
         "state": "New York",
         "country": "United States",
-        "users": 28,
-        "sessions": 123
+        "users": 30,
+        "sessions": 124
       },
       {
         "state": "Illinois",
         "country": "United States",
-        "users": 17,
-        "sessions": 17
+        "users": 18,
+        "sessions": 18
       },
       {
         "state": "Iowa",
@@ -795,16 +788,16 @@
         "state": "Massachusetts",
         "country": "United States",
         "users": 12,
-        "sessions": 27
-      },
-      {
-        "state": "Oregon",
-        "country": "United States",
-        "users": 10,
-        "sessions": 10
+        "sessions": 29
       },
       {
         "state": "Virginia",
+        "country": "United States",
+        "users": 11,
+        "sessions": 11
+      },
+      {
+        "state": "Oregon",
         "country": "United States",
         "users": 10,
         "sessions": 10
@@ -978,6 +971,12 @@
         "sessions": 1
       },
       {
+        "state": "Pennsylvania",
+        "country": "United States",
+        "users": 1,
+        "sessions": 1
+      },
+      {
         "state": "Saxony",
         "country": "Germany",
         "users": 1,
@@ -1034,7 +1033,7 @@
       {
         "city": "Ashburn",
         "state": "Virginia",
-        "users": 8
+        "users": 9
       },
       {
         "city": "New York",
@@ -1052,6 +1051,11 @@
         "users": 5
       },
       {
+        "city": "Colonie",
+        "state": "New York",
+        "users": 5
+      },
+      {
         "city": "Los Angeles",
         "state": "California",
         "users": 5
@@ -1062,7 +1066,7 @@
         "users": 4
       },
       {
-        "city": "Colonie",
+        "city": "Schenectady",
         "state": "New York",
         "users": 4
       },
@@ -1078,11 +1082,6 @@
       },
       {
         "city": "Saratoga Springs",
-        "state": "New York",
-        "users": 3
-      },
-      {
-        "city": "Schenectady",
         "state": "New York",
         "users": 3
       },
@@ -1114,6 +1113,11 @@
       {
         "city": "Catskill",
         "state": "New York",
+        "users": 2
+      },
+      {
+        "city": "Chicago",
+        "state": "Illinois",
         "users": 2
       },
       {
@@ -1169,16 +1173,6 @@
       {
         "city": "Berea",
         "state": "Kentucky",
-        "users": 1
-      },
-      {
-        "city": "Beverly Hills",
-        "state": "California",
-        "users": 1
-      },
-      {
-        "city": "Blackstone",
-        "state": "Virginia",
         "users": 1
       }
     ],
@@ -6768,6 +6762,57 @@
         "PageTitle.sessionsCount": 4,
         "PopularPages.url": "https://bathroomreport.app/",
         "PopularPages.visitsCount": 4
+      },
+      "2026-11-23": {
+        "DeadClickCount.sessionsCount": 2,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 2,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 2,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 2,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 2,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 2,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 99.5,
+        "Traffic.totalSessionCount": 2,
+        "Traffic.totalBotSessionCount": 2,
+        "Traffic.distinctUserCount": 2,
+        "Traffic.pagesPerSessionPercentage": 1,
+        "EngagementTime.totalTime": 29,
+        "EngagementTime.activeTime": 27,
+        "Browser.name": "ChromeMobile",
+        "Browser.sessionsCount": 2,
+        "Device.name": "Mobile",
+        "Device.sessionsCount": 2,
+        "OS.name": "Android",
+        "OS.sessionsCount": 2,
+        "Country.name": "United States",
+        "Country.sessionsCount": 2,
+        "PageTitle.name": "Bathroom Report | Find. Rate. Share. Improve.",
+        "PageTitle.sessionsCount": 2,
+        "PopularPages.url": "https://bathroomreport.app/",
+        "PopularPages.visitsCount": 2
       }
     }
   },
