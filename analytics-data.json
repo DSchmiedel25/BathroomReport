@@ -1,13 +1,7 @@
 {
-  "generated": "2026-11-24T20:09:33.816Z",
+  "generated": "2026-11-25T19:15:45.528Z",
   "ga4": {
     "daily": {
-      "2026-08-26": {
-        "activeUsers": 1,
-        "newUsers": 1,
-        "sessions": 1,
-        "pageViews": 1
-      },
       "2026-08-27": {
         "activeUsers": 2,
         "newUsers": 0,
@@ -487,6 +481,12 @@
         "newUsers": 4,
         "sessions": 9,
         "pageViews": 10
+      },
+      "2026-11-24": {
+        "activeUsers": 1,
+        "newUsers": 0,
+        "sessions": 1,
+        "pageViews": 1
       }
     },
     "signupsByDate": {
@@ -498,7 +498,7 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 142,
+        "sessions": 143,
         "users": 96
       },
       {
@@ -510,7 +510,7 @@
       {
         "source": "address_override",
         "medium": "(not set)",
-        "sessions": 34,
+        "sessions": 37,
         "users": 1
       },
       {
@@ -522,8 +522,8 @@
       {
         "source": "chatgpt.com",
         "medium": "ai-assistant",
-        "sessions": 8,
-        "users": 6
+        "sessions": 7,
+        "users": 5
       },
       {
         "source": "google",
@@ -536,12 +536,6 @@
         "medium": "referral",
         "sessions": 4,
         "users": 4
-      },
-      {
-        "source": "address_override",
-        "medium": "",
-        "sessions": 3,
-        "users": 1
       },
       {
         "source": "lm.facebook.com",
@@ -569,24 +563,6 @@
       }
     ],
     "sourcesDaily": [
-      {
-        "date": "2026-11-09",
-        "source": "(direct)",
-        "medium": "(none)",
-        "sessions": 3
-      },
-      {
-        "date": "2026-11-09",
-        "source": "address_override",
-        "medium": "(not set)",
-        "sessions": 1
-      },
-      {
-        "date": "2026-11-09",
-        "source": "chatgpt.com",
-        "medium": "ai-assistant",
-        "sessions": 1
-      },
       {
         "date": "2026-11-10",
         "source": "(direct)",
@@ -692,15 +668,21 @@
       {
         "date": "2026-11-23",
         "source": "address_override",
-        "medium": "",
+        "medium": "(not set)",
         "sessions": 3
+      },
+      {
+        "date": "2026-11-24",
+        "source": "(direct)",
+        "medium": "(none)",
+        "sessions": 1
       }
     ],
     "campaigns": [
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 136
+        "sessions": 142
       },
       {
         "campaign": "card_v2",
@@ -715,7 +697,7 @@
       {
         "campaign": "(ai-assistant)",
         "content": "(not set)",
-        "sessions": 8
+        "sessions": 7
       },
       {
         "campaign": "(organic)",
@@ -725,12 +707,12 @@
       {
         "campaign": "(direct)",
         "content": "",
-        "sessions": 6
+        "sessions": 1
       }
     ],
     "events": {
       "bathroom_now": 187,
-      "rating_submit": 52,
+      "rating_submit": 54,
       "login": 7,
       "sign_up": 3
     },
@@ -755,7 +737,8 @@
       "2026-11-09": 5,
       "2026-11-12": 2,
       "2026-11-13": 1,
-      "2026-11-23": 2
+      "2026-11-23": 2,
+      "2026-11-24": 2
     },
     "bathroomNow": null,
     "guidePages": [],
@@ -764,13 +747,13 @@
         "state": "New York",
         "country": "United States",
         "users": 30,
-        "sessions": 124
+        "sessions": 125
       },
       {
         "state": "Illinois",
         "country": "United States",
-        "users": 18,
-        "sessions": 18
+        "users": 17,
+        "sessions": 17
       },
       {
         "state": "Iowa",
@@ -1116,11 +1099,6 @@
         "users": 2
       },
       {
-        "city": "Chicago",
-        "state": "Illinois",
-        "users": 2
-      },
-      {
         "city": "North Bergen",
         "state": "New Jersey",
         "users": 2
@@ -1173,6 +1151,16 @@
       {
         "city": "Berea",
         "state": "Kentucky",
+        "users": 1
+      },
+      {
+        "city": "Beverly Hills",
+        "state": "California",
+        "users": 1
+      },
+      {
+        "city": "Blackstone",
+        "state": "Virginia",
         "users": 1
       }
     ],
@@ -6813,6 +6801,45 @@
         "PageTitle.sessionsCount": 2,
         "PopularPages.url": "https://bathroomreport.app/",
         "PopularPages.visitsCount": 2
+      },
+      "2026-11-24": {
+        "DeadClickCount.sessionsCount": 0,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 0,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 0,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 0,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 0,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 0,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 0,
+        "Traffic.totalSessionCount": 0,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 0,
+        "Traffic.pagesPerSessionPercentage": 0,
+        "EngagementTime.totalTime": 0,
+        "EngagementTime.activeTime": 0
       }
     }
   },
