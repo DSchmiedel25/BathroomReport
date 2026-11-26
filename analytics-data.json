@@ -1,13 +1,7 @@
 {
-  "generated": "2026-11-25T19:15:45.528Z",
+  "generated": "2026-11-26T18:59:46.911Z",
   "ga4": {
     "daily": {
-      "2026-08-27": {
-        "activeUsers": 2,
-        "newUsers": 0,
-        "sessions": 5,
-        "pageViews": 5
-      },
       "2026-08-28": {
         "activeUsers": 1,
         "newUsers": 0,
@@ -487,6 +481,12 @@
         "newUsers": 0,
         "sessions": 1,
         "pageViews": 1
+      },
+      "2026-11-25": {
+        "activeUsers": 1,
+        "newUsers": 0,
+        "sessions": 4,
+        "pageViews": 7
       }
     },
     "signupsByDate": {
@@ -498,13 +498,13 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 143,
+        "sessions": 140,
         "users": 96
       },
       {
         "source": "qr",
         "medium": "physical_card",
-        "sessions": 67,
+        "sessions": 65,
         "users": 24
       },
       {
@@ -532,6 +532,12 @@
         "users": 3
       },
       {
+        "source": "address_override",
+        "medium": "",
+        "sessions": 4,
+        "users": 1
+      },
+      {
         "source": "reddit.com",
         "medium": "referral",
         "sessions": 4,
@@ -550,6 +556,12 @@
         "users": 3
       },
       {
+        "source": "(not set)",
+        "medium": "(not set)",
+        "sessions": 1,
+        "users": 1
+      },
+      {
         "source": "aimanhunt.online",
         "medium": "referral",
         "sessions": 1,
@@ -563,12 +575,6 @@
       }
     ],
     "sourcesDaily": [
-      {
-        "date": "2026-11-10",
-        "source": "(direct)",
-        "medium": "(none)",
-        "sessions": 7
-      },
       {
         "date": "2026-11-11",
         "source": "(direct)",
@@ -676,18 +682,30 @@
         "source": "(direct)",
         "medium": "(none)",
         "sessions": 1
+      },
+      {
+        "date": "2026-11-25",
+        "source": "address_override",
+        "medium": "",
+        "sessions": 4
+      },
+      {
+        "date": "2026-11-25",
+        "source": "(not set)",
+        "medium": "(not set)",
+        "sessions": 1
       }
     ],
     "campaigns": [
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 142
+        "sessions": 140
       },
       {
         "campaign": "card_v2",
         "content": "(not set)",
-        "sessions": 67
+        "sessions": 65
       },
       {
         "campaign": "(referral)",
@@ -703,21 +721,15 @@
         "campaign": "(organic)",
         "content": "(not set)",
         "sessions": 7
-      },
-      {
-        "campaign": "(direct)",
-        "content": "",
-        "sessions": 1
       }
     ],
     "events": {
-      "bathroom_now": 187,
-      "rating_submit": 54,
+      "bathroom_now": 183,
+      "rating_submit": 50,
       "login": 7,
       "sign_up": 3
     },
     "ratingsByDate": {
-      "2026-08-27": 4,
       "2026-09-06": 2,
       "2026-09-11": 3,
       "2026-09-26": 3,
@@ -747,7 +759,7 @@
         "state": "New York",
         "country": "United States",
         "users": 30,
-        "sessions": 125
+        "sessions": 121
       },
       {
         "state": "Illinois",
@@ -771,7 +783,7 @@
         "state": "Massachusetts",
         "country": "United States",
         "users": 12,
-        "sessions": 29
+        "sessions": 32
       },
       {
         "state": "Virginia",
@@ -1156,11 +1168,6 @@
       {
         "city": "Beverly Hills",
         "state": "California",
-        "users": 1
-      },
-      {
-        "city": "Blackstone",
-        "state": "Virginia",
         "users": 1
       }
     ],
@@ -6803,6 +6810,45 @@
         "PopularPages.visitsCount": 2
       },
       "2026-11-24": {
+        "DeadClickCount.sessionsCount": 0,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 0,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 0,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 0,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 0,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 0,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 0,
+        "Traffic.totalSessionCount": 0,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 0,
+        "Traffic.pagesPerSessionPercentage": 0,
+        "EngagementTime.totalTime": 0,
+        "EngagementTime.activeTime": 0
+      },
+      "2026-11-25": {
         "DeadClickCount.sessionsCount": 0,
         "DeadClickCount.sessionsWithMetricPercentage": 0,
         "DeadClickCount.sessionsWithoutMetricPercentage": 100,
