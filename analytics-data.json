@@ -1,13 +1,7 @@
 {
-  "generated": "2026-11-26T18:59:46.911Z",
+  "generated": "2026-11-27T18:59:15.820Z",
   "ga4": {
     "daily": {
-      "2026-08-28": {
-        "activeUsers": 1,
-        "newUsers": 0,
-        "sessions": 1,
-        "pageViews": 1
-      },
       "2026-08-29": {
         "activeUsers": 2,
         "newUsers": 0,
@@ -487,6 +481,12 @@
         "newUsers": 0,
         "sessions": 4,
         "pageViews": 7
+      },
+      "2026-11-26": {
+        "activeUsers": 0,
+        "newUsers": 0,
+        "sessions": 1,
+        "pageViews": 1
       }
     },
     "signupsByDate": {
@@ -498,7 +498,7 @@
       {
         "source": "(direct)",
         "medium": "(none)",
-        "sessions": 140,
+        "sessions": 139,
         "users": 96
       },
       {
@@ -510,7 +510,7 @@
       {
         "source": "address_override",
         "medium": "(not set)",
-        "sessions": 37,
+        "sessions": 41,
         "users": 1
       },
       {
@@ -532,12 +532,6 @@
         "users": 3
       },
       {
-        "source": "address_override",
-        "medium": "",
-        "sessions": 4,
-        "users": 1
-      },
-      {
         "source": "reddit.com",
         "medium": "referral",
         "sessions": 4,
@@ -556,10 +550,10 @@
         "users": 3
       },
       {
-        "source": "(not set)",
-        "medium": "(not set)",
+        "source": "address_override",
+        "medium": "",
         "sessions": 1,
-        "users": 1
+        "users": 0
       },
       {
         "source": "aimanhunt.online",
@@ -575,18 +569,6 @@
       }
     ],
     "sourcesDaily": [
-      {
-        "date": "2026-11-11",
-        "source": "(direct)",
-        "medium": "(none)",
-        "sessions": 2
-      },
-      {
-        "date": "2026-11-11",
-        "source": "google",
-        "medium": "organic",
-        "sessions": 1
-      },
       {
         "date": "2026-11-12",
         "source": "(direct)",
@@ -686,13 +668,13 @@
       {
         "date": "2026-11-25",
         "source": "address_override",
-        "medium": "",
+        "medium": "(not set)",
         "sessions": 4
       },
       {
-        "date": "2026-11-25",
-        "source": "(not set)",
-        "medium": "(not set)",
+        "date": "2026-11-26",
+        "source": "address_override",
+        "medium": "",
         "sessions": 1
       }
     ],
@@ -700,7 +682,7 @@
       {
         "campaign": "(direct)",
         "content": "(not set)",
-        "sessions": 140
+        "sessions": 139
       },
       {
         "campaign": "card_v2",
@@ -759,7 +741,7 @@
         "state": "New York",
         "country": "United States",
         "users": 30,
-        "sessions": 121
+        "sessions": 120
       },
       {
         "state": "Illinois",
@@ -783,7 +765,7 @@
         "state": "Massachusetts",
         "country": "United States",
         "users": 12,
-        "sessions": 32
+        "sessions": 33
       },
       {
         "state": "Virginia",
@@ -1168,6 +1150,11 @@
       {
         "city": "Beverly Hills",
         "state": "California",
+        "users": 1
+      },
+      {
+        "city": "Blackstone",
+        "state": "Virginia",
         "users": 1
       }
     ],
@@ -6849,6 +6836,45 @@
         "EngagementTime.activeTime": 0
       },
       "2026-11-25": {
+        "DeadClickCount.sessionsCount": 0,
+        "DeadClickCount.sessionsWithMetricPercentage": 0,
+        "DeadClickCount.sessionsWithoutMetricPercentage": 100,
+        "DeadClickCount.pagesViews": 0,
+        "DeadClickCount.subTotal": 0,
+        "ExcessiveScroll.sessionsCount": 0,
+        "ExcessiveScroll.sessionsWithMetricPercentage": 0,
+        "ExcessiveScroll.sessionsWithoutMetricPercentage": 100,
+        "ExcessiveScroll.pagesViews": 0,
+        "ExcessiveScroll.subTotal": 0,
+        "RageClickCount.sessionsCount": 0,
+        "RageClickCount.sessionsWithMetricPercentage": 0,
+        "RageClickCount.sessionsWithoutMetricPercentage": 100,
+        "RageClickCount.pagesViews": 0,
+        "RageClickCount.subTotal": 0,
+        "QuickbackClick.sessionsCount": 0,
+        "QuickbackClick.sessionsWithMetricPercentage": 0,
+        "QuickbackClick.sessionsWithoutMetricPercentage": 100,
+        "QuickbackClick.pagesViews": 0,
+        "QuickbackClick.subTotal": 0,
+        "ScriptErrorCount.sessionsCount": 0,
+        "ScriptErrorCount.sessionsWithMetricPercentage": 0,
+        "ScriptErrorCount.sessionsWithoutMetricPercentage": 100,
+        "ScriptErrorCount.pagesViews": 0,
+        "ScriptErrorCount.subTotal": 0,
+        "ErrorClickCount.sessionsCount": 0,
+        "ErrorClickCount.sessionsWithMetricPercentage": 0,
+        "ErrorClickCount.sessionsWithoutMetricPercentage": 100,
+        "ErrorClickCount.pagesViews": 0,
+        "ErrorClickCount.subTotal": 0,
+        "ScrollDepth.averageScrollDepth": 0,
+        "Traffic.totalSessionCount": 0,
+        "Traffic.totalBotSessionCount": 0,
+        "Traffic.distinctUserCount": 0,
+        "Traffic.pagesPerSessionPercentage": 0,
+        "EngagementTime.totalTime": 0,
+        "EngagementTime.activeTime": 0
+      },
+      "2026-11-26": {
         "DeadClickCount.sessionsCount": 0,
         "DeadClickCount.sessionsWithMetricPercentage": 0,
         "DeadClickCount.sessionsWithoutMetricPercentage": 100,
